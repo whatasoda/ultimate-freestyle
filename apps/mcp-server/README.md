@@ -1,6 +1,6 @@
 # Remote MCP server
 
-最自由研究の制作機能をCodexやChatGPTへ提供するCloudflare Workerです。`health`、`get_access_status`、固定resourceと、Twitch OAuthによる利用資格判定を実装しています。本番はTwitchアプリの秘密情報を投入するまで認証無効で運用します。
+最自由研究の制作機能をCodexやChatGPTへ提供するCloudflare Workerです。Twitch OAuthによる利用資格判定と、所有者分離された研究データの作成・再開・更新・評価・発表構成を標準MCPで提供します。本番はTwitchアプリの秘密情報を投入するまで認証無効で運用します。
 
 ## 開発と検証
 
@@ -25,7 +25,9 @@ bun run smoke:mcp
 
 `bun run smoke:mcp` は、本番のヘルスチェックとMCP初期化をブラウザなしで検証します。別環境を検証するときだけ、`MCP_BASE_URL` にoriginを指定してください。デプロイはリポジトリルートで `bun run deploy:mcp` を実行します。
 
-2026-07-26時点でWorker v0.2.0、Custom Domain、DNS、TLS、OAuth用KV、state用KV、D1と期限切れOAuthデータを清掃するcronは本番配置済みです。D1の`0001_auth.sql`も適用済みです。R2、Queue、Containerは後続Phaseで追加します。
+2026-07-26時点でWorker v0.3.0、Custom Domain、DNS、TLS、OAuth用KV、state用KV、D1と期限切れOAuthデータを清掃するcronは本番配置済みです。D1の`0001_auth.sql`と`0002_projects.sql`も適用済みです。R2、Queue、Containerは後続Phaseで追加します。
+
+研究データは512 KiB以内の固定schemaでD1へ保存します。`create_project`はidempotency key、`update_project`は`expected_version`を必須とし、再試行による重複作成と同時編集による上書きを防ぎます。全操作で認証中の所有者IDを強制し、他利用者のproject IDを指定しても存在を開示しません。
 
 ## 設定
 

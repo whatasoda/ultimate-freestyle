@@ -1517,13 +1517,14 @@ docs/                  # 設計・運用手順</pre>
           <h2>認証を先に証明し、制作機能を後から載せる</h2>
           <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
           <p class="callout">
-            <strong>2026-07-26現在：</strong>Phase 0は完了。Phase 1のWorker v0.2.0を
+            <strong>2026-07-26現在：</strong>Phase 0は完了。Phase 1のWorker v0.3.0を
             <code>https://saijiyu-kenkyu.2764.moe/mcp</code>へデプロイし、
             自動contract test、本番スモークテスト、Codexからのtool／resource呼び出しを確認済み。
             Phase 2はOAuth用KV、state用KV、D1 migration、二段OAuth、PKCE、CSRF、
             フォロー期間／サブスク／override判定、token更新、<code>get_access_status</code>とfixture E2Eまで実装済み。
             本番は既存接続を維持するため認証無効で、Twitchアプリのclient ID／secret投入と実アカウント確認後に有効化する。
-            ChatGPT実クライアント確認はその後に行い、R2、Queue、Containerは未着手。
+            Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価tool、動的resource、3つの伴走promptまで実装・本番配置済み。
+            ChatGPT実クライアント確認は認証有効化後に行い、R2、Queue、Containerは未着手。
           </p>
         </div>
 
@@ -1559,7 +1560,7 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 3</div>
             <div class="phase-main">
               <h3>研究データMVP</h3>
-              <p>共通schema、D1 migration、resource、prompt、project CRUD、版番号による競合防止を実装する。</p>
+              <p>共通schema、D1 migration、resource、prompt、project CRUD、版番号による競合防止を実装する。自動contract testと本番配置は完了し、Twitch認証有効化後の実クライアント確認を残す。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>AIクライアントとの対話だけで研究を作成・再開できる。</p></div>
           </article>
@@ -1624,13 +1625,12 @@ docs/                  # 設計・運用手順</pre>
 
       <section>
         <div class="final-plan">
-          <p class="section-kicker">Recommended first move</p>
-          <h2>最初の実装は「資格を答えるだけのMCP」</h2>
+          <p class="section-kicker">Recommended next move</p>
+          <h2>Twitch認証を実アカウントで有効化する</h2>
           <p>
-            <code>get_access_status</code>だけを持つRemote MCPをCloudflareへ配置し、
-            自動contract testとCodexからの直接接続を先に通す。その後、同じMCPをChatGPT用pluginから呼び出し、
-            Twitchログイン、フォロー期間、サブスク、拒否、token失効までを検証する。
-            ここが安定してから研究CRUDを追加すれば、最大の不確実性を小さな実装で検証できる。
+            Twitch開発者コンソールへcallback URLを登録し、Worker secretを投入して認証modeを切り替える。
+            CodexからTwitchログイン、<code>get_access_status</code>、研究の作成・再開・version競合までを確認し、
+            続いてChatGPTから同じ標準MCP契約を検証する。ここが安定した後にPhase 4のrenderer抽出、preview、R2 publishへ進む。
           </p>
         </div>
       </section>
