@@ -1517,10 +1517,13 @@ docs/                  # 設計・運用手順</pre>
           <h2>認証を先に証明し、制作機能を後から載せる</h2>
           <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
           <p class="callout">
-            <strong>2026-07-26現在：</strong>Phase 0は完了。Phase 1のWorkerを
+            <strong>2026-07-26現在：</strong>Phase 0は完了。Phase 1のWorker v0.2.0を
             <code>https://saijiyu-kenkyu.2764.moe/mcp</code>へデプロイし、
-            自動contract testと本番スモークテストでStreamable HTTP初期化を確認済み。
-            Phase 1の残作業はCodex・ChatGPT実クライアントからの接続確認で、Twitch認証、D1、R2、Queue、Containerはまだ作成しない。
+            自動contract test、本番スモークテスト、Codexからのtool／resource呼び出しを確認済み。
+            Phase 2はOAuth用KV、state用KV、D1 migration、二段OAuth、PKCE、CSRF、
+            フォロー期間／サブスク／override判定、token更新、<code>get_access_status</code>とfixture E2Eまで実装済み。
+            本番は既存接続を維持するため認証無効で、Twitchアプリのclient ID／secret投入と実アカウント確認後に有効化する。
+            ChatGPT実クライアント確認はその後に行い、R2、Queue、Containerは未着手。
           </p>
         </div>
 
@@ -1547,7 +1550,7 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 2</div>
             <div class="phase-main">
               <h3>Twitch OAuth + 資格判定</h3>
-              <p>二段OAuth、scope、state、token暗号化、フォロー／サブスク判定、allow・deny overrideを実装する。</p>
+              <p>二段OAuth、scope、state、token暗号化、フォロー／サブスク判定、allow・deny overrideを実装する。自動fixture E2Eと本番基盤は完了し、Twitchアプリ登録後の本番有効化を残す。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>資格あり／なし／拒否／失効のE2Eテストが通る。</p></div>
           </article>

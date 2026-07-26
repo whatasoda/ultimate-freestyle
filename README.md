@@ -6,7 +6,7 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成への移行初期です。新しいRemote MCPは `apps/mcp-server/` にあり、発表UIはまだリポジトリ直下にあります。現行形式の外部利用者はいないため、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
+現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成へ移行中です。新しいRemote MCP v0.2.0は `apps/mcp-server/` から本番稼働し、Twitch OAuthと資格判定はfixture E2Eまで実装済みです。本番認証はTwitchアプリの秘密情報を投入するまで無効です。発表UIはまだリポジトリ直下にあり、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
 
 ## できること
 
@@ -50,7 +50,7 @@ bun run test
 
 ## Remote MCPを開発する
 
-CodexとChatGPTを優先するRemote MCPの最小実装があります。現段階は認証前で、`health` toolと固定の制作ガイドresourceを提供します。
+CodexとChatGPTを優先するRemote MCPがあります。`health`、`get_access_status`、固定の制作ガイドresource、Twitch OAuthによるフォロー期間・サブスク・運用overrideの資格判定を実装しています。
 
 ```bash
 bun run dev:mcp
