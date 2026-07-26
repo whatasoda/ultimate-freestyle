@@ -26,7 +26,7 @@ Codex本体に加え、次の3観点を独立したエージェントで調査�
 
 ### 2. Web sessionはD1へ移す
 
-現在のKV sessionは即時失効とread-after-writeに向かない。OAuthの一回限りstateはKVに残し、Web sessionは次のmigrationでD1へ移す。
+KV sessionは即時失効とread-after-writeに向かない。OAuthの一回限りstateはKVに残し、Web sessionは`0003_web_sessions.sql`でD1へ移した。
 
 - Cookieには256 bitの不透明tokenだけを置く。
 - D1にはtoken hash、user ID、CSRF hash、認証時刻、期限を保存する。

@@ -1,14 +1,16 @@
 import { z } from "zod";
 
 import {
+  WEB_CSRF_COOKIE,
   WEB_SESSION_COOKIE,
+  clearSecureCookie,
   createSecureCookie,
   hashToken,
   randomToken,
-  readCookie
+  readCookie,
+  secureTokenEqual
 } from "./security";
 
-const SESSION_KEY_PREFIX = "auth:web:session:";
 const SESSION_TTL_SECONDS = 24 * 60 * 60;
 const SESSION_TOKEN_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -16,63 +18,126 @@ const webSessionSchema = z.object({
   userId: z.string().min(1).max(128),
   twitchLogin: z.string().min(1).max(128),
   csrfToken: z.string().length(64),
+  authenticatedAt: z.string().datetime(),
   expiresAt: z.string().datetime()
 });
 
 export type WebSession = z.infer<typeof webSessionSchema>;
 
-async function sessionKey(token: string): Promise<string> {
-  return `${SESSION_KEY_PREFIX}${await hashToken(token)}`;
-}
+type WebSessionRow = {
+  user_id: string;
+  twitch_login: string;
+  csrf_token_hash: string;
+  authenticated_at: string;
+  expires_at: string;
+};
 
 export async function createWebSession(
-  kv: KVNamespace,
-  options: { userId: string; twitchLogin: string; now?: Date }
-): Promise<{ session: WebSession; cookie: string }> {
-  const token = randomToken();
+  db: D1Database,
+  options: { userId: string; now?: Date }
+): Promise<{ cookies: string[] }> {
+  const sessionToken = randomToken();
+  const csrfToken = randomToken();
   const now = options.now ?? new Date();
-  const session = webSessionSchema.parse({
-    userId: options.userId,
-    twitchLogin: options.twitchLogin,
-    csrfToken: randomToken(),
-    expiresAt: new Date(now.getTime() + SESSION_TTL_SECONDS * 1000).toISOString()
-  });
-  await kv.put(await sessionKey(token), JSON.stringify(session), {
-    expirationTtl: SESSION_TTL_SECONDS
-  });
-  return {
-    session,
-    cookie: createSecureCookie(
-      WEB_SESSION_COOKIE,
-      token,
-      SESSION_TTL_SECONDS
+  const nowIso = now.toISOString();
+  const expiresAt = new Date(
+    now.getTime() + SESSION_TTL_SECONDS * 1000
+  ).toISOString();
+  await db
+    .prepare(
+      `INSERT INTO web_sessions (
+         token_hash, user_id, csrf_token_hash,
+         authenticated_at, expires_at, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?)`
     )
+    .bind(
+      await hashToken(sessionToken),
+      options.userId,
+      await hashToken(csrfToken),
+      nowIso,
+      expiresAt,
+      nowIso
+    )
+    .run();
+  return {
+    cookies: [
+      createSecureCookie(
+        WEB_SESSION_COOKIE,
+        sessionToken,
+        SESSION_TTL_SECONDS
+      ),
+      createSecureCookie(WEB_CSRF_COOKIE, csrfToken, SESSION_TTL_SECONDS)
+    ]
   };
 }
 
 export async function readWebSession(
   request: Request,
-  kv: KVNamespace,
+  db: D1Database,
   now = new Date()
 ): Promise<WebSession | null> {
-  const token = readCookie(request, WEB_SESSION_COOKIE);
-  if (token === null || !SESSION_TOKEN_PATTERN.test(token)) {
+  const sessionToken = readCookie(request, WEB_SESSION_COOKIE);
+  const csrfToken = readCookie(request, WEB_CSRF_COOKIE);
+  if (
+    sessionToken === null ||
+    csrfToken === null ||
+    !SESSION_TOKEN_PATTERN.test(sessionToken) ||
+    !SESSION_TOKEN_PATTERN.test(csrfToken)
+  ) {
     return null;
   }
-  const stored = await kv.get(await sessionKey(token), "json");
-  const parsed = webSessionSchema.safeParse(stored);
-  if (!parsed.success || Date.parse(parsed.data.expiresAt) <= now.getTime()) {
+  const row = await db
+    .prepare(
+      `SELECT s.user_id, u.twitch_login, s.csrf_token_hash,
+              s.authenticated_at, s.expires_at
+       FROM web_sessions s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.token_hash = ? AND s.expires_at > ?`
+    )
+    .bind(await hashToken(sessionToken), now.toISOString())
+    .first<WebSessionRow>();
+  if (
+    row === null ||
+    !(await secureTokenEqual(await hashToken(csrfToken), row.csrf_token_hash))
+  ) {
     return null;
   }
-  return parsed.data;
+  return webSessionSchema.parse({
+    userId: row.user_id,
+    twitchLogin: row.twitch_login,
+    csrfToken,
+    authenticatedAt: row.authenticated_at,
+    expiresAt: row.expires_at
+  });
 }
 
 export async function deleteWebSession(
   request: Request,
-  kv: KVNamespace
+  db: D1Database
 ): Promise<void> {
   const token = readCookie(request, WEB_SESSION_COOKIE);
   if (token !== null && SESSION_TOKEN_PATTERN.test(token)) {
-    await kv.delete(await sessionKey(token));
+    await db
+      .prepare("DELETE FROM web_sessions WHERE token_hash = ?")
+      .bind(await hashToken(token))
+      .run();
   }
+}
+
+export async function purgeExpiredWebSessions(
+  db: D1Database,
+  now = new Date()
+): Promise<number> {
+  const result = await db
+    .prepare("DELETE FROM web_sessions WHERE expires_at <= ?")
+    .bind(now.toISOString())
+    .run();
+  return result.meta.changes;
+}
+
+export function clearWebSessionCookies(): string[] {
+  return [
+    clearSecureCookie(WEB_SESSION_COOKIE),
+    clearSecureCookie(WEB_CSRF_COOKIE)
+  ];
 }

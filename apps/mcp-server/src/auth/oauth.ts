@@ -244,9 +244,8 @@ async function handleTwitchCallback(
   }
 
   if (pendingState.kind === "web") {
-    const webSession = await createWebSession(env.AUTH_STATE_KV, {
+    const webSession = await createWebSession(env.DB, {
       userId,
-      twitchLogin: identity.login,
       now
     });
     await recordAuditEvent(env.DB, {
@@ -257,7 +256,7 @@ async function handleTwitchCallback(
       createdAt: nowIso
     });
     return webLoginCompletePage([
-      webSession.cookie,
+      ...webSession.cookies,
       clearSecureCookie(TWITCH_STATE_COOKIE)
     ]);
   }

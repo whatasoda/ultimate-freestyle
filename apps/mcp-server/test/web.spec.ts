@@ -144,15 +144,28 @@ describe("Web dashboard", () => {
     expect(loginComplete.headers.get("location")).toBe("/dashboard");
     const setCookie = loginComplete.headers.get("set-cookie") ?? "";
     expect(setCookie).toContain("__Host-SAIJIYU_SESSION=");
+    expect(setCookie).toContain("__Host-SAIJIYU_WEB_CSRF=");
     expect(setCookie).toContain("HttpOnly");
     expect(setCookie).toContain("Secure");
     expect(setCookie).toContain("SameSite=Lax");
     const sessionCookie = cookiePair(setCookie, "__Host-SAIJIYU_SESSION");
+    const csrfCookie = cookiePair(setCookie, "__Host-SAIJIYU_WEB_CSRF");
+    const browserCookies = `${sessionCookie}; ${csrfCookie}`;
+
+    const sessionWithoutCsrf = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/dashboard", {
+        headers: { cookie: sessionCookie }
+      }),
+      authEnv
+    );
+    expect(sessionWithoutCsrf.status).toBe(303);
+    expect(sessionWithoutCsrf.headers.get("location")).toBe("/");
 
     const emptyDashboard = await requestProvider(
       provider,
       new Request("https://saijiyu-kenkyu.2764.moe/dashboard", {
-        headers: { cookie: sessionCookie }
+        headers: { cookie: browserCookies }
       }),
       authEnv
     );
@@ -204,7 +217,7 @@ describe("Web dashboard", () => {
     const dashboard = await requestProvider(
       provider,
       new Request("https://saijiyu-kenkyu.2764.moe/dashboard", {
-        headers: { cookie: sessionCookie }
+        headers: { cookie: browserCookies }
       }),
       authEnv
     );
@@ -223,7 +236,7 @@ describe("Web dashboard", () => {
       provider,
       new Request(
         "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
-        { headers: { cookie: sessionCookie } }
+        { headers: { cookie: browserCookies } }
       ),
       authEnv
     );
@@ -240,7 +253,7 @@ describe("Web dashboard", () => {
       provider,
       new Request(
         "https://saijiyu-kenkyu.2764.moe/dashboard/projects/20000000-0000-4000-8000-000000000002",
-        { headers: { cookie: sessionCookie } }
+        { headers: { cookie: browserCookies } }
       ),
       authEnv
     );
@@ -257,7 +270,7 @@ describe("Web dashboard", () => {
       new Request("https://saijiyu-kenkyu.2764.moe/logout", {
         method: "POST",
         headers: {
-          cookie: sessionCookie,
+          cookie: browserCookies,
           "content-length": String(logoutBody.toString().length),
           "content-type": "application/x-www-form-urlencoded"
         },
@@ -272,7 +285,7 @@ describe("Web dashboard", () => {
     const afterLogout = await requestProvider(
       provider,
       new Request("https://saijiyu-kenkyu.2764.moe/dashboard", {
-        headers: { cookie: sessionCookie }
+        headers: { cookie: browserCookies }
       }),
       authEnv
     );

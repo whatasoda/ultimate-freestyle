@@ -1,8 +1,6 @@
 import { readAuthConfig } from "../auth/config";
 import { externalAuthorizationPage, messagePage } from "../auth/pages";
 import {
-  WEB_SESSION_COOKIE,
-  clearSecureCookie,
   secureTokenEqual
 } from "../auth/security";
 import {
@@ -12,6 +10,7 @@ import {
 import { TwitchClient, type Fetcher } from "../auth/twitch";
 import {
   deleteWebSession,
+  clearWebSessionCookies,
   readWebSession
 } from "../auth/web-session";
 import { getProject, listProjects } from "../projects/repository";
@@ -34,7 +33,7 @@ async function handleWebLogin(
   if (request.method !== "GET") {
     return new Response(null, { status: 405, headers: { allow: "GET" } });
   }
-  if ((await readWebSession(request, env.AUTH_STATE_KV)) !== null) {
+  if ((await readWebSession(request, env.DB)) !== null) {
     return redirectPage("/dashboard");
   }
   const config = readAuthConfig(env);
@@ -49,9 +48,9 @@ async function handleDashboard(request: Request, env: Env): Promise<Response> {
   if (request.method !== "GET") {
     return new Response(null, { status: 405, headers: { allow: "GET" } });
   }
-  const session = await readWebSession(request, env.AUTH_STATE_KV);
+  const session = await readWebSession(request, env.DB);
   if (session === null) {
-    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
+    return redirectPage("/", clearWebSessionCookies());
   }
   return dashboardPage({
     twitchLogin: session.twitchLogin,
@@ -68,9 +67,9 @@ async function handleProjectDetail(
   if (request.method !== "GET") {
     return new Response(null, { status: 405, headers: { allow: "GET" } });
   }
-  const session = await readWebSession(request, env.AUTH_STATE_KV);
+  const session = await readWebSession(request, env.DB);
   if (session === null) {
-    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
+    return redirectPage("/", clearWebSessionCookies());
   }
   const project = await getProject(env.DB, session.userId, projectId);
   if (project === null) {
@@ -87,9 +86,9 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") {
     return new Response(null, { status: 405, headers: { allow: "POST" } });
   }
-  const session = await readWebSession(request, env.AUTH_STATE_KV);
+  const session = await readWebSession(request, env.DB);
   if (session === null) {
-    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
+    return redirectPage("/", clearWebSessionCookies());
   }
   const form = await readUrlEncodedFormCapped(request, MAX_FORM_BYTES);
   if (!form.ok) {
@@ -112,8 +111,8 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
       403
     );
   }
-  await deleteWebSession(request, env.AUTH_STATE_KV);
-  return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
+  await deleteWebSession(request, env.DB);
+  return redirectPage("/", clearWebSessionCookies());
 }
 
 export async function handleWebRequest(
@@ -123,7 +122,7 @@ export async function handleWebRequest(
 ): Promise<Response | null> {
   const path = new URL(request.url).pathname;
   if (path === "/" && request.method === "GET") {
-    const session = await readWebSession(request, env.AUTH_STATE_KV);
+    const session = await readWebSession(request, env.DB);
     return session === null ? landingPage() : redirectPage("/dashboard");
   }
   if (path === "/login") {

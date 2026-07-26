@@ -1286,7 +1286,7 @@ docs/                  # 設計・運用手順</pre>
             </article>
             <article class="card">
               <h3>KV</h3>
-              <p>OAuthの短寿命state、CSRF照合情報、24時間のWeb用不透明セッション、短期的な資格キャッシュ。永続的な研究データの正本にはしない。</p>
+              <p>OAuthの短寿命stateとCSRF照合情報、短期的な資格キャッシュ。即時失効が必要な24時間のWeb用不透明セッションはD1へ保存し、永続的な研究データの正本にもKVは使わない。</p>
             </article>
             <article class="card">
               <h3>R2</h3>
@@ -1531,7 +1531,7 @@ docs/                  # 設計・運用手順</pre>
             Twitchアプリのclient ID／secretをWorker secretへ投入し、本番MCPのOAuth必須化、metadata、未認証401、Twitch認可URLのcallback／scope一致、実アカウントによるCodex OAuth完走まで確認済み。
             Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価tool、動的resource、3つの伴走promptまで実装・本番配置済み。
             Phase 4は安全な自己完結HTML rendererと段階表示schemaまで実装・自動検証済み。
-            Web UIはトップページ、Twitchログイン、24時間のWeb専用セッション、CSRF付きログアウト、所有者限定の研究一覧と空状態まで実装済み。
+            Web UIはトップページ、Twitchログイン、D1上の24時間Web専用セッション、CSRF付きログアウト、所有者限定の研究一覧・詳細と空状態まで実装済み。
             R2 bucket作成はCloudflareアカウントでR2が未有効のため保留し、preview／publish toolは有効化後に接続する。
             Codexでは<code>health</code>と<code>get_access_status</code>の実呼び出しまで確認済み。ChatGPT実クライアント確認を残し、Queue、Containerは未着手。
           </p>

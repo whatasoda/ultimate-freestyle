@@ -3,6 +3,7 @@ const encoder = new TextEncoder();
 export const CSRF_COOKIE = "__Host-SAIJIYU_CSRF";
 export const TWITCH_STATE_COOKIE = "__Host-SAIJIYU_TWITCH_STATE";
 export const WEB_SESSION_COOKIE = "__Host-SAIJIYU_SESSION";
+export const WEB_CSRF_COOKIE = "__Host-SAIJIYU_WEB_CSRF";
 
 export function createSecureCookie(
   name: string,

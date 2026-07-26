@@ -2,6 +2,7 @@ import { createMcpHandler } from "agents/mcp";
 
 import { createOAuthProvider } from "./auth/oauth";
 import { readAuthConfig } from "./auth/config";
+import { purgeExpiredWebSessions } from "./auth/web-session";
 import {
   createHealthResult,
   createServer
@@ -93,11 +94,15 @@ export default {
   ): Promise<void> {
     const provider = createOAuthProvider(env, handleMcpRequest);
     ctx.waitUntil(
-      provider.purgeExpiredData(env, { batchSize: 50 }).then((result) => {
+      Promise.all([
+        provider.purgeExpiredData(env, { batchSize: 50 }),
+        purgeExpiredWebSessions(env.DB)
+      ]).then(([result, webSessionsPurged]) => {
         console.log(
           JSON.stringify({
             message: "OAuth KV cleanup completed",
-            ...result
+            ...result,
+            web_sessions_purged: webSessionsPurged
           })
         );
       })
