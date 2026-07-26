@@ -1,0 +1,100 @@
+name: Generate VOICEVOX audio
+
+run-name: Generate VOICEVOX audio for ${{ inputs.slug || github.ref_name }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: Research slug, or "all"
+        required: true
+        default: all
+        type: string
+      speaker:
+        description: VOICEVOX speaker name
+        required: true
+        default: ずんだもん
+        type: string
+      style:
+        description: VOICEVOX style name
+        required: true
+        default: ノーマル
+        type: string
+  push:
+    tags:
+      - "voice-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: voicevox-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  VOICEVOX_IMAGE: voicevox/voicevox_engine:cpu-latest
+  VOICEVOX_URL: http://127.0.0.1:50021
+  RESEARCH_SLUG: ${{ inputs.slug || 'all' }}
+  VOICEVOX_SPEAKER: ${{ inputs.speaker || 'ずんだもん' }}
+  VOICEVOX_STYLE: ${{ inputs.style || 'ノーマル' }}
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Start VOICEVOX ENGINE
+        run: >-
+          docker run --detach --rm --name voicevox
+          --publish 127.0.0.1:50021:50021
+          "$VOICEVOX_IMAGE"
+
+      - name: Wait for VOICEVOX ENGINE
+        run: |
+          for _ in {1..90}; do
+            if curl --fail --silent "$VOICEVOX_URL/version"; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs voicevox
+          exit 1
+
+      - name: Generate audio
+        run: |
+          if [[ "$RESEARCH_SLUG" == "all" ]]; then
+            bun run voicevox:generate -- --all
+          else
+            bun run voicevox:generate -- "$RESEARCH_SLUG"
+          fi
+
+      - name: Record generation summary
+        run: |
+          {
+            echo "## VOICEVOX audio"
+            echo "- Engine: $(curl --fail --silent "$VOICEVOX_URL/version")"
+            echo "- Research: $RESEARCH_SLUG"
+            echo "- Speaker: $VOICEVOX_SPEAKER / $VOICEVOX_STYLE"
+            echo "- WAV files: $(find public/researches -type f -name '*.wav' | wc -l)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload generated audio
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicevox-audio-${{ github.ref_name }}
+          path: public/researches/*/audio/*.wav
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Stop VOICEVOX ENGINE
+        if: always()
+        run: docker stop voicevox || true

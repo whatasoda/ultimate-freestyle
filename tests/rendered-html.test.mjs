@@ -76,6 +76,25 @@ test("includes generated VOICEVOX audio for every starter narration segment", as
   assert.equal(titleAudio.subarray(8, 12).toString("ascii"), "WAVE");
 });
 
+test("keeps VOICEVOX generation opt-in on GitHub Actions", async () => {
+  const [workflow, generator] = await Promise.all([
+    readFile(
+      new URL("../.github/workflows/generate-voicevox.yml", import.meta.url),
+      "utf8"
+    ),
+    readFile(
+      new URL("../scripts/generate-voicevox.ts", import.meta.url),
+      "utf8"
+    )
+  ]);
+
+  assert.match(workflow, /workflow_dispatch:/);
+  assert.match(workflow, /"voice-\*"/);
+  assert.doesNotMatch(workflow, /branches:/);
+  assert.match(workflow, /retention-days: 7/);
+  assert.match(generator, /args\.includes\("--all"\)/);
+});
+
 test("persists volume locally and presentation progress in the URL", async () => {
   const presentation = await readFile(
     new URL("../components/presentation/Presentation.tsx", import.meta.url),

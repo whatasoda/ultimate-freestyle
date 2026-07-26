@@ -243,6 +243,12 @@ bun run voicevox:list
 bun run voicevox:generate -- starter
 ```
 
+全研究をまとめて生成する場合：
+
+```bash
+bun run voicevox:generate -- --all
+```
+
 既定値は「ずんだもん／ノーマル」です。変更する場合：
 
 ```bash
@@ -264,6 +270,22 @@ audioSrc: "/researches/starter/audio/question-0.wav"
 ```
 
 生成済み音声を使う場合は、最終スライド等に話者の規約に沿ったクレジットを表示してください。テンプレートは `VOICEVOX:ずんだもん` を最終スライドで表示します。
+
+### GitHub Actionsで生成する
+
+ローカルへVOICEVOXを導入せず、GitHub Actions上の公式CPU Dockerイメージで音声を生成できます。通常のpushやPages公開では実行せず、次のどちらかで明示的に起動します。
+
+- Actions画面の `Generate VOICEVOX audio` → `Run workflow` から、研究slug・話者・スタイルを指定する
+- `voice-*` 形式のタグをpushし、登録済みの全研究を既定の「ずんだもん／ノーマル」で生成する
+
+```bash
+git tag voice-2026-08-01
+git push origin voice-2026-08-01
+```
+
+生成後はworkflow runの `Artifacts` から `voicevox-audio-...` をダウンロードします。展開すると `<slug>/audio/` ごとにWAVが入っているため、内容を `public/researches/` 配下へコピーします。保存期間は7日です。音声を試聴し、問題なければリポジトリへコミットしてください。
+
+音声は意図やイントネーションを人が確認してから公開する必要があるため、Actionからmainへの自動コミットは行いません。また、Release公開とタグpushの両方をトリガーにすると同じ版で二重実行しやすいため、専用タグだけを自動トリガーにしています。
 
 ずんだもん等の特徴的な声を使いたい場合は、外部の音声合成環境で音声を生成し、WAVやMP3を `public/researches/<slug>/audio/` に配置して `audioSrc` を設定する方式を想定しています。採用前に、音声合成ソフト・話者・キャラクターそれぞれの最新の利用規約とクレジット条件を確認してください。
 
