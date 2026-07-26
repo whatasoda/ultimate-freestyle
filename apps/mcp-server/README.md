@@ -29,6 +29,8 @@ bun run smoke:mcp
 
 研究データは512 KiB以内の固定schemaでD1へ保存します。`create_project`はidempotency key、`update_project`は`expected_version`を必須とし、再試行による重複作成と同時編集による上書きを防ぎます。全操作で認証中の所有者IDを強制し、他利用者のproject IDを指定しても存在を開示しません。
 
+構造化deckから自己完結HTMLを作るrendererも実装済みです。16:9枠、cinematic／BIIM／minimal、段階表示、字幕、ブラウザ読み上げ、音量保存、自動送り、進捗とURL復帰を含み、研究由来の文字列はHTMLと埋め込みJSONの両方でescapeします。R2保存と`request_preview`／`publish_project`は、Cloudflare Dashboardで対象アカウントのR2を有効化してから接続します。
+
 ## 設定
 
 秘密ではない初期値は `wrangler.jsonc` の `vars` に置きます。

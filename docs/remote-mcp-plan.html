@@ -1524,7 +1524,9 @@ docs/                  # 設計・運用手順</pre>
             フォロー期間／サブスク／override判定、token更新、<code>get_access_status</code>とfixture E2Eまで実装済み。
             本番は既存接続を維持するため認証無効で、Twitchアプリのclient ID／secret投入と実アカウント確認後に有効化する。
             Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価tool、動的resource、3つの伴走promptまで実装・本番配置済み。
-            ChatGPT実クライアント確認は認証有効化後に行い、R2、Queue、Containerは未着手。
+            Phase 4は安全な自己完結HTML rendererと段階表示schemaまで実装・自動検証済み。
+            R2 bucket作成はCloudflareアカウントでR2が未有効のため保留し、preview／publish toolは有効化後に接続する。
+            ChatGPT実クライアント確認は認証有効化後に行い、Queue、Containerは未着手。
           </p>
         </div>
 
@@ -1569,7 +1571,7 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 4</div>
             <div class="phase-main">
               <h3>プレビューと公開</h3>
-              <p>既存rendererを構造化データへ接続し、Workers Static Assetsとprivate／public R2でpreview、承認、固定版publishを非同期化する。</p>
+              <p>既存rendererを構造化データへ接続し、Workers Static Assetsとprivate／public R2でpreview、承認、固定版publishを非同期化する。自己完結HTML rendererは完了し、R2有効化後の保存・配信接続を残す。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>Cloudflareだけで発表URLを安全に生成・配信できる。</p></div>
           </article>
