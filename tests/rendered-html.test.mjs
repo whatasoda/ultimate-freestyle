@@ -102,6 +102,7 @@ test("keeps VOICEVOX MP3 generation opt-in and incremental", async () => {
   assert.match(generator, /bitrateKbps/);
   assert.match(sync, /textHash/);
   assert.match(gitignore, /public\/\.voicevox-preview/);
+  assert.match(gitignore, /public\/researches\/\*\/audio\/\*\.mp3/);
 });
 
 test("persists volume locally and presentation progress in the URL", async () => {

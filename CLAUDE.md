@@ -55,7 +55,7 @@
 - 引用・素材の出典は、スライド内または研究READMEに必ず残す。
 - 音声ファイルを追加する場合は各segmentの `audioSrc` を使い、ファイルがなくても発表が止まらない構成にする。
 - ローカルVOICEVOX生成ファイルは `public/.voicevox-preview/researches/<slug>/audio/<slide-id>-<at>.mp3` に置かれ、コミットしない。通常開発はブラウザ読み上げを使う。
-- 最終採用する固定音声だけを `public/researches/<slug>/audio/` へ通常のGitファイルとして置き、segmentの `audioSrc` から参照する。Git LFSは使わない。
+- 本番用VOICEVOX MP3もGitHub Actionsだけで生成し、Pages成果物へ配置する。`public/researches/<slug>/audio/` へ生成MP3をコミットせず、Git LFSも使わない。
 - ページ・段階の移動後は対応するsegmentを自動再生し、音声終了時だけ自動送りする。個別の再読み上げ操作は追加しない。
 - 読み上げ時間と再生位置は下部のインジケーターへ反映する。音声ファイルがない場合もブラウザ読み上げの推定値を表示する。
 - 音量は `ultimate-freestyle:narration-volume` として `localStorage` に保存する。進行位置は保存せず、`?slide=<1始まり>&step=<0始まり>` とHistory APIで管理する。

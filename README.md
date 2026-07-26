@@ -296,21 +296,11 @@ git push origin voice-2026-08-01
 
 各segmentの原稿、話者、話速、ENGINEバージョン等からfingerprintを作り、前回と一致するMP3はActionsキャッシュから再利用します。キャッシュがない場合、設定を変更した場合、または `regenerate_all` を選んだ場合は再生成します。
 
-生成後は同じworkflow runからPagesへデプロイされます。これは公開中のサイトを更新する操作なので、URLを知る人から閲覧可能になります。MP3はworkflow runの `Artifacts` にも7日間保存され、試聴や最終採用に利用できます。Actionからmainへの自動コミットは行いません。
+生成後は同じworkflow runからPagesへデプロイされます。これは公開中のサイトを更新する操作なので、URLを知る人から閲覧可能になります。MP3はworkflow runの `Artifacts` にも7日間保存され、試聴に利用できます。
 
-最終的に音声をリポジトリへ固定する場合は、artifact内の採用MP3を `public/researches/<slug>/audio/` に置き、そのsegmentだけ明示的なパスを設定します。
+ローカル確認用・Actions生成用・本番用を問わず、VOICEVOXのMP3はリポジトリへコミットしません。`public/researches/*/audio/*.mp3` も `.gitignore` の対象です。本番の音声はActionsキャッシュからPages成果物へ配置し、キャッシュが失効した場合は原稿と設定から再生成します。Git LFSも使いません。
 
-```tsx
-{
-  at: 0,
-  text: "まず、研究を始めたきっかけなのだ。",
-  audioSrc: "/researches/example/audio/question-0.mp3"
-}
-```
-
-この最終採用MP3は通常のGitファイルとして管理します。Git LFSは使いません。
-
-音声は意図やイントネーションを人が確認してから固定する必要があるため、Actionからmainへの自動コミットは行いません。また、Release公開とタグpushの両方をトリガーにすると同じ版で二重実行しやすいため、専用タグだけを自動トリガーにしています。
+音声は意図やイントネーションを人が確認してから公開する必要があるため、Actionからmainへの自動コミットは行いません。また、Release公開とタグpushの両方をトリガーにすると同じ版で二重実行しやすいため、専用タグだけを自動トリガーにしています。
 
 `main` pushのPages workflowはVOICEVOX ENGINEを起動しません。利用可能なActionsキャッシュから、現在の原稿ハッシュと一致するMP3だけを配置してビルドし、音声がないsegmentはブラウザ読み上げへ戻します。したがって、原稿だけ変更したpushで古い読み上げが流れることはありません。
 

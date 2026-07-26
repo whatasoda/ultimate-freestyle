@@ -8,6 +8,8 @@
 /work/
 /.voicevox-cache/
 /public/.voicevox-preview/
+/public/researches/*/audio/*.mp3
+/public/researches/*/audio/.voicevox-manifest.json
 .DS_Store
 *.pem
 *.log

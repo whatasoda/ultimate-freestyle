@@ -33,5 +33,5 @@ Webスライドの見本を兼ねた研究テンプレートです。
 開発中の読み上げはブラウザ音声を標準とします。ローカルVOICEVOXの確認用MP3は
 `public/.voicevox-preview/researches/starter/audio/` に生成され、Gitには含まれません。
 
-採用する読み上げ音声を固定素材として管理する場合は、モノラル64kbpsのMP3を
-段階ごとに `audio/<slide-id>-<at>.mp3` として置き、segmentの `audioSrc` から参照します。
+本番用VOICEVOX MP3もGitHub Actionsだけで生成し、Pages成果物へ組み込みます。
+`public/researches/starter/audio/` へ生成MP3を手動追加・コミットしません。
