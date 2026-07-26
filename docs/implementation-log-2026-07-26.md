@@ -21,7 +21,7 @@ Web UI堅牢化、研究詳細、画像upload、VOICEVOX複数話者・調声、
 - D1 migration: `0001`〜`0004`適用済み。
 - Private R2: `ultimate-freestyle-media`（APAC、public accessなし）。
 - Bindings: OAuth KV、state KV、D1、R2、Images。
-- Worker: v0.5.0、Version ID `5db62a2c-96f2-4244-b310-2a052eead617`。
+- Worker: v0.5.0、Version ID `848b0855-08ed-48b4-8354-a385bc0e6a63`。
 - 本番smoke: health v0.5.0、OAuth必須、Web dashboard、authorization endpointを確認済み。
 
 ## 検証
