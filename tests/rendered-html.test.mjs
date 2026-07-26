@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 async function render(pathname = "/") {
@@ -66,33 +66,42 @@ test("keeps Claude and project assumptions in the repository", async () => {
   assert.match(rubric, /根拠不足は `NE`/);
 });
 
-test("includes generated VOICEVOX audio for every starter narration segment", async () => {
-  const audioRoot = new URL("../public/researches/starter/audio/", import.meta.url);
-  const files = (await readdir(audioRoot)).filter((file) => file.endsWith(".wav"));
-  assert.equal(files.length, 20);
-
-  const titleAudio = await readFile(new URL("title-0.wav", audioRoot));
-  assert.equal(titleAudio.subarray(0, 4).toString("ascii"), "RIFF");
-  assert.equal(titleAudio.subarray(8, 12).toString("ascii"), "WAVE");
-});
-
-test("keeps VOICEVOX generation opt-in on GitHub Actions", async () => {
-  const [workflow, generator] = await Promise.all([
+test("keeps VOICEVOX MP3 generation opt-in and incremental", async () => {
+  const [workflow, deployWorkflow, generator, sync, gitignore] = await Promise.all([
     readFile(
       new URL("../.github/workflows/generate-voicevox.yml", import.meta.url),
       "utf8"
     ),
     readFile(
+      new URL("../.github/workflows/deploy-pages.yml", import.meta.url),
+      "utf8"
+    ),
+    readFile(
       new URL("../scripts/generate-voicevox.ts", import.meta.url),
       "utf8"
-    )
+    ),
+    readFile(
+      new URL("../scripts/sync-voicevox-audio.ts", import.meta.url),
+      "utf8"
+    ),
+    readFile(new URL("../.gitignore", import.meta.url), "utf8")
   ]);
 
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /"voice-\*"/);
   assert.doesNotMatch(workflow, /branches:/);
+  assert.match(workflow, /actions\/cache@v4/);
+  assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /retention-days: 7/);
+  assert.doesNotMatch(deployWorkflow, /voicevox_engine/);
+  assert.doesNotMatch(deployWorkflow, /voicevox:generate/);
+  assert.match(deployWorkflow, /voicevox:sync/);
   assert.match(generator, /args\.includes\("--all"\)/);
+  assert.match(generator, /libmp3lame/);
+  assert.match(generator, /\.voicevox-manifest\.json/);
+  assert.match(generator, /bitrateKbps/);
+  assert.match(sync, /textHash/);
+  assert.match(gitignore, /public\/\.voicevox-preview/);
 });
 
 test("persists volume locally and presentation progress in the URL", async () => {

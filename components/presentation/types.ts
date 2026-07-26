@@ -13,7 +13,10 @@ export type NarrationSegment = {
   /** この段階表示になった時に有効になる。最初の文は0。 */
   at: number;
   text: string;
-  /** public/ からのパス。配信先のbase pathは自動付与される。 */
+  /**
+   * public/ からの任意の固定音声パス。配信先のbase pathは自動付与される。
+   * 通常のVOICEVOX生成音声は命名規則から解決するため指定不要。
+   */
   audioSrc?: string;
 };
 

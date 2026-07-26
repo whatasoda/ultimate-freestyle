@@ -1,6 +1,6 @@
-name: Generate VOICEVOX audio
+name: Generate and publish VOICEVOX audio
 
-run-name: Generate VOICEVOX audio for ${{ inputs.slug || github.ref_name }}
+run-name: Generate and publish VOICEVOX audio for ${{ inputs.slug || github.ref_name }}
 
 on:
   workflow_dispatch:
@@ -20,26 +20,36 @@ on:
         required: true
         default: ノーマル
         type: string
+      regenerate_all:
+        description: Ignore the MP3 cache and regenerate selected segments
+        required: true
+        default: false
+        type: boolean
   push:
     tags:
       - "voice-*"
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 concurrency:
-  group: voicevox-${{ github.ref }}
+  group: pages
   cancel-in-progress: false
 
 env:
   VOICEVOX_IMAGE: voicevox/voicevox_engine:cpu-latest
   VOICEVOX_URL: http://127.0.0.1:50021
+  VOICEVOX_OUTPUT_ROOT: .voicevox-cache/researches
+  VOICEVOX_MP3_BITRATE: 64
   RESEARCH_SLUG: ${{ inputs.slug || 'all' }}
   VOICEVOX_SPEAKER: ${{ inputs.speaker || 'ずんだもん' }}
   VOICEVOX_STYLE: ${{ inputs.style || 'ノーマル' }}
+  REGENERATE_ALL: ${{ inputs.regenerate_all || false }}
 
 jobs:
-  generate:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -49,8 +59,28 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Setup GitHub Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Restore generated audio cache
+        uses: actions/cache@v4
+        with:
+          path: .voicevox-cache
+          key: voicevox-mp3-${{ runner.os }}-${{ github.run_id }}
+          restore-keys: |
+            voicevox-mp3-${{ runner.os }}-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Ensure ffmpeg is available
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install --yes ffmpeg
+          fi
+          ffmpeg -version
 
       - name: Start VOICEVOX ENGINE
         run: >-
@@ -69,32 +99,66 @@ jobs:
           docker logs voicevox
           exit 1
 
-      - name: Generate audio
+      - name: Generate changed MP3 audio
         run: |
+          arguments=()
           if [[ "$RESEARCH_SLUG" == "all" ]]; then
-            bun run voicevox:generate -- --all
+            arguments+=(--all)
           else
-            bun run voicevox:generate -- "$RESEARCH_SLUG"
+            arguments+=("$RESEARCH_SLUG")
           fi
-
-      - name: Record generation summary
-        run: |
-          {
-            echo "## VOICEVOX audio"
-            echo "- Engine: $(curl --fail --silent "$VOICEVOX_URL/version")"
-            echo "- Research: $RESEARCH_SLUG"
-            echo "- Speaker: $VOICEVOX_SPEAKER / $VOICEVOX_STYLE"
-            echo "- WAV files: $(find public/researches -type f -name '*.wav' | wc -l)"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Upload generated audio
-        uses: actions/upload-artifact@v4
-        with:
-          name: voicevox-audio-${{ github.ref_name }}
-          path: public/researches/*/audio/*.wav
-          if-no-files-found: error
-          retention-days: 7
+          if [[ "$REGENERATE_ALL" == "true" ]]; then
+            arguments+=(--force)
+          fi
+          bun run voicevox:generate -- "${arguments[@]}"
 
       - name: Stop VOICEVOX ENGINE
         if: always()
         run: docker stop voicevox || true
+
+      - name: Select audio matching the current narration
+        id: audio
+        run: bun run voicevox:sync
+
+      - name: Build static site with generated audio
+        run: bun run build:pages
+        env:
+          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          NEXT_PUBLIC_USE_GENERATED_AUDIO: ${{ steps.audio.outputs.count != '0' }}
+          NEXT_PUBLIC_GENERATED_AUDIO_ROOT: /researches
+
+      - name: Record generation summary
+        run: |
+          {
+            echo "## VOICEVOX MP3 publication"
+            echo "- Engine: $(docker image inspect "$VOICEVOX_IMAGE" --format '{{ index .RepoDigests 0 }}')"
+            echo "- Research: $RESEARCH_SLUG"
+            echo "- Speaker: $VOICEVOX_SPEAKER / $VOICEVOX_STYLE"
+            echo "- MP3 bitrate: ${VOICEVOX_MP3_BITRATE}kbps mono"
+            echo "- Published files: ${{ steps.audio.outputs.count }}"
+            echo "- Browser fallbacks: ${{ steps.audio.outputs.missing }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload generated MP3 for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicevox-mp3-${{ github.ref_name }}
+          path: .voicevox-cache/researches/*/audio/*.mp3
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist/client
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

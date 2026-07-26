@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, readdir, stat } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
@@ -34,8 +34,6 @@ async function verify(basePath: string) {
     new RegExp(`href=["']${assetPrefix.replace("/", "\\/")}`)
   );
   assert.match(manifest, /"path": "\/present\/starter"/);
-  await stat(resolve(output, "researches/starter/audio/title-0.wav"));
-
   const presentationBundle = assetNames.find(
     (name) => name.startsWith("Presentation-") && name.endsWith(".js")
   );

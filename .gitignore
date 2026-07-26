@@ -6,9 +6,12 @@
 /coverage/
 /outputs/
 /work/
+/.voicevox-cache/
+/public/.voicevox-preview/
 .DS_Store
 *.pem
 *.log
 .env*
 !.env.example
 next-env.d.ts
+*.tsbuildinfo

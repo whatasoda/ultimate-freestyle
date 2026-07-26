@@ -19,6 +19,10 @@ import type {
 
 const EMPTY_NARRATION_SEGMENTS: NarrationSegment[] = [];
 const VOLUME_STORAGE_KEY = "ultimate-freestyle:narration-volume";
+const USE_GENERATED_AUDIO =
+  process.env.NEXT_PUBLIC_USE_GENERATED_AUDIO === "true";
+const GENERATED_AUDIO_ROOT =
+  process.env.NEXT_PUBLIC_GENERATED_AUDIO_ROOT ?? "/researches";
 const LAYOUT_OPTIONS: Array<{ value: PresentationLayout; label: string }> = [
   { value: "cinematic", label: "演出" },
   { value: "biim", label: "BIIM" },
@@ -229,6 +233,11 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
   const hasNarration = deck.slides.some(
     (item) => (item.narration?.segments.length ?? 0) > 0
   );
+  const usesAudioFiles =
+    USE_GENERATED_AUDIO ||
+    deck.slides.some((item) =>
+      item.narration?.segments.some((segment) => Boolean(segment.audioSrc))
+    );
 
   const stopNarration = useCallback(() => {
     playbackId.current += 1;
@@ -394,12 +403,17 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       const id = playbackId.current;
       setNarrating(true);
 
-      if (!segment.audioSrc) {
+      const generatedAudioSrc = USE_GENERATED_AUDIO
+        ? `${GENERATED_AUDIO_ROOT}/${deck.slug}/audio/${slide.id}-${segment.at}.mp3`
+        : undefined;
+      const audioSrc = segment.audioSrc ?? generatedAudioSrc;
+
+      if (!audioSrc) {
         speakWithBrowser(segment.text, id);
         return;
       }
 
-      const player = new Audio(resolvePublicAssetUrl(segment.audioSrc));
+      const player = new Audio(resolvePublicAssetUrl(audioSrc));
       player.volume = volumeRef.current;
       let usingFallback = false;
       const fallback = () => {
@@ -427,7 +441,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       audio.current = player;
       void player.play().catch(fallback);
     },
-    [finishNarration, speakWithBrowser, stopNarration]
+    [deck.slug, finishNarration, slide.id, speakWithBrowser, stopNarration]
   );
 
   const toggleAutoNarration = useCallback(() => {
@@ -779,7 +793,9 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
           </div>
         ) : null}
         <div className="footer-actions">
-          {slideIndex === deck.slides.length - 1 && deck.narrationDefaults?.credit ? (
+          {slideIndex === deck.slides.length - 1 &&
+          usesAudioFiles &&
+          deck.narrationDefaults?.credit ? (
             <span className="voice-credit">{deck.narrationDefaults.credit}</span>
           ) : null}
           {hasNarration ? (

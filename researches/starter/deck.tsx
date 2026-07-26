@@ -9,10 +9,9 @@ import {
 } from "@/components/presentation/SlidePrimitives";
 import type { ResearchDeck } from "@/components/presentation/types";
 
-const spoken = (slideId: string, at: number, text: string) => ({
+const spoken = (_slideId: string, at: number, text: string) => ({
   at,
-  text,
-  audioSrc: `/researches/starter/audio/${slideId}-${at}.wav`
+  text
 });
 
 export const starterDeck: ResearchDeck = {

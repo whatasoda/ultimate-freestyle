@@ -28,13 +28,27 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
 
+      - name: Restore the latest generated audio
+        uses: actions/cache/restore@v4
+        with:
+          path: .voicevox-cache
+          key: voicevox-mp3-${{ runner.os }}-deploy-${{ github.run_id }}
+          restore-keys: |
+            voicevox-mp3-${{ runner.os }}-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Select audio matching the current narration
+        id: audio
+        run: bun run voicevox:sync
 
       - name: Build static site
         run: bun run build:pages
         env:
           PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
+          NEXT_PUBLIC_USE_GENERATED_AUDIO: ${{ steps.audio.outputs.count != '0' }}
+          NEXT_PUBLIC_GENERATED_AUDIO_ROOT: /researches
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
