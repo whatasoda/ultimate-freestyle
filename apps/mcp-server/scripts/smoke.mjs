@@ -49,7 +49,7 @@ assert.equal(initialize.body.jsonrpc, "2.0");
 assert.equal(initialize.body.id, 1);
 assert.deepEqual(initialize.body.result?.serverInfo, {
   name: "ultimate-freestyle-mcp",
-  version: "0.2.0"
+  version: "0.3.0"
 });
 
 console.log(

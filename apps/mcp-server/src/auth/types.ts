@@ -52,6 +52,7 @@ export const twitchIdentitySchema = z.object({
 export type TwitchIdentity = z.infer<typeof twitchIdentitySchema>;
 
 export const twitchGrantPropsSchema = z.object({
+  subject_id: z.string().min(1).max(128),
   mcp_scopes: z.array(z.enum(MCP_SCOPES)),
   identity: z.object({
     user_id: z.string().min(1),

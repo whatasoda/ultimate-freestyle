@@ -111,6 +111,7 @@ async function consumeTwitchState(
 }
 
 function createGrantProps(options: {
+  subjectId: string;
   scopes: string[];
   identity: { user_id: string; login: string };
   eligibility: TwitchGrantProps["eligibility"];
@@ -123,6 +124,7 @@ function createGrantProps(options: {
   now: Date;
 }): TwitchGrantProps {
   return twitchGrantPropsSchema.parse({
+    subject_id: options.subjectId,
     mcp_scopes: options.scopes,
     identity: options.identity,
     eligibility: options.eligibility,
@@ -274,6 +276,7 @@ async function handleTwitchCallback(
 
   const scopes = validateRequestedScopes(authRequest);
   const props = createGrantProps({
+    subjectId: userId,
     scopes,
     identity,
     eligibility,
@@ -496,6 +499,7 @@ export function createOAuthProvider(
 
         return {
           newProps: createGrantProps({
+            subjectId: userId,
             scopes: previous.mcp_scopes,
             identity,
             eligibility,

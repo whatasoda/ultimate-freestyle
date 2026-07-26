@@ -1,10 +1,13 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import { createServer } from "../src/server";
+import { projectRecordSchema } from "../src/projects/schema";
 
 const eligibilityConfig = {
+  DB: env.DB,
   TWITCH_BROADCASTER_ID: "67879379",
   TWITCH_BROADCASTER_LOGIN: "kashiwo",
   MIN_FOLLOW_DAYS: "30"
@@ -38,7 +41,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.2.0",
+        version: "0.3.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -91,6 +94,7 @@ describe("MCP contract", () => {
     const [clientTransport, serverTransport] =
       InMemoryTransport.createLinkedPair();
     const server = createServer(eligibilityConfig, () => ({
+      subject_id: "00112233-4455-4677-8899-aabbccddeeff",
       mcp_scopes: ["research:read"],
       identity: { user_id: "viewer-id", login: "viewer" },
       eligibility: {
@@ -130,6 +134,233 @@ describe("MCP contract", () => {
         error: null
       });
       expect(JSON.stringify(result)).not.toContain("must-not-leak");
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("creates, resumes, updates, and detects a project version conflict", async () => {
+    const subjectId = "twitch-project-owner";
+    const now = "2026-07-26T12:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO users (
+         id, twitch_user_id, twitch_login, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?)`
+    )
+      .bind(subjectId, "project-owner", "project-owner", now, now)
+      .run();
+
+    const authProps = {
+      subject_id: subjectId,
+      mcp_scopes: ["research:read", "research:write"],
+      identity: { user_id: "project-owner", login: "project-owner" },
+      eligibility: {
+        eligible: true,
+        reason: "subscriber",
+        checked_at: "2026-07-26T12:00:00.000Z",
+        expires_at: "2026-07-26T12:30:00.000Z",
+        followed_at: null,
+        follow_days: null,
+        subscribed: true,
+        override: null
+      },
+      twitch_tokens: {
+        access_token: "not-returned",
+        refresh_token: "not-returned",
+        expires_at: "2026-07-26T13:00:00.000Z",
+        scopes: ["user:read:follows", "user:read:subscriptions"]
+      }
+    };
+    let activeAuthProps = authProps;
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const server = createServer(eligibilityConfig, () => activeAuthProps);
+    const client = new Client({ name: "contract-test", version: "0.1.0" });
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const firstCreate = await client.callTool({
+        name: "create_project",
+        arguments: {
+          title: "記憶と泥団子の研究",
+          idempotency_key: "project-contract-001"
+        }
+      });
+      const firstProject = projectRecordSchema.parse(
+        (firstCreate.structuredContent as { project?: unknown } | undefined)
+          ?.project
+      );
+      expect(firstCreate.structuredContent).toMatchObject({
+        ok: true,
+        replayed: false,
+        project: { version: 1 }
+      });
+
+      const replay = await client.callTool({
+        name: "create_project",
+        arguments: {
+          title: "このタイトルは採用されない",
+          idempotency_key: "project-contract-001"
+        }
+      });
+      expect(replay.structuredContent).toMatchObject({
+        ok: true,
+        replayed: true,
+        project: { project_id: firstProject.project_id, version: 1 }
+      });
+
+      const updatedDocument = {
+        ...firstProject.document,
+        stage: "design" as const,
+        question: "子どもの頃の記憶だけで、どこまで丸く作れるか？"
+      };
+      const update = await client.callTool({
+        name: "update_project",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 1,
+          document: updatedDocument
+        }
+      });
+      expect(update.structuredContent).toMatchObject({
+        ok: true,
+        current_version: 2,
+        project: {
+          version: 2,
+          document: { stage: "design", question: updatedDocument.question }
+        }
+      });
+
+      const conflict = await client.callTool({
+        name: "update_project",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 1,
+          document: updatedDocument
+        }
+      });
+      expect(conflict.isError).toBe(true);
+      expect(conflict.structuredContent).toMatchObject({
+        ok: false,
+        current_version: 2,
+        error: { code: "PROJECT_VERSION_CONFLICT" }
+      });
+
+      const list = await client.callTool({
+        name: "list_projects",
+        arguments: {}
+      });
+      expect(list.structuredContent).toMatchObject({
+        ok: true,
+        projects: [
+          {
+            project_id: firstProject.project_id,
+            title: "記憶と泥団子の研究",
+            stage: "design",
+            version: 2
+          }
+        ]
+      });
+      expect(JSON.stringify(list)).not.toContain("not-returned");
+
+      const evaluation = await client.callTool({
+        name: "evaluate_project",
+        arguments: { project_id: firstProject.project_id }
+      });
+      expect(evaluation.structuredContent).toMatchObject({
+        ok: true,
+        project: { project_id: firstProject.project_id, version: 2 },
+        rubric_markdown: expect.stringContaining("根拠不足は0ではなくNE")
+      });
+
+      const { resourceTemplates } = await client.listResourceTemplates();
+      expect(resourceTemplates).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/deck"
+          })
+        ])
+      );
+      const projectResource = await client.readResource({
+        uri: `research://projects/${firstProject.project_id}`
+      });
+      expect(projectResource.contents).toContainEqual(
+        expect.objectContaining({
+          mimeType: "application/json",
+          text: expect.stringContaining(updatedDocument.question)
+        })
+      );
+
+      const { prompts } = await client.listPrompts();
+      expect(prompts.map((prompt) => prompt.name)).toEqual(
+        expect.arrayContaining([
+          "start_research",
+          "review_research",
+          "compose_presentation"
+        ])
+      );
+      const reviewPrompt = await client.getPrompt({
+        name: "review_research",
+        arguments: { project_id: firstProject.project_id }
+      });
+      expect(reviewPrompt.messages[0]?.content).toMatchObject({
+        type: "text",
+        text: expect.stringContaining(firstProject.project_id)
+      });
+
+      const otherSubjectId = "twitch-other-project-owner";
+      await env.DB.prepare(
+        `INSERT OR IGNORE INTO users (
+           id, twitch_user_id, twitch_login, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?)`
+      )
+        .bind(otherSubjectId, "other-owner", "other-owner", now, now)
+        .run();
+      activeAuthProps = { ...authProps, subject_id: otherSubjectId };
+      const crossOwnerRead = await client.callTool({
+        name: "get_project",
+        arguments: { project_id: firstProject.project_id }
+      });
+      expect(crossOwnerRead.isError).toBe(true);
+      expect(crossOwnerRead.structuredContent).toMatchObject({
+        ok: false,
+        project: null,
+        error: { code: "PROJECT_NOT_FOUND" }
+      });
+      expect(JSON.stringify(crossOwnerRead)).not.toContain(
+        "記憶と泥団子の研究"
+      );
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("rejects project reads without an authenticated scope", async () => {
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const server = createServer(eligibilityConfig);
+    const client = new Client({ name: "contract-test", version: "0.1.0" });
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const result = await client.callTool({
+        name: "list_projects",
+        arguments: {}
+      });
+      expect(result.isError).toBe(true);
+      expect(result.structuredContent).toMatchObject({
+        ok: false,
+        projects: [],
+        error: { code: "AUTH_REQUIRED" }
+      });
     } finally {
       await client.close();
       await server.close();

@@ -1,0 +1,216 @@
+import {
+  projectDocumentSchema,
+  type ProjectDocument,
+  type ProjectRecord,
+  type ProjectSummary
+} from "./schema";
+
+export type ProjectRepositoryErrorCode =
+  | "PROJECT_NOT_FOUND"
+  | "PROJECT_VERSION_CONFLICT"
+  | "PROJECT_LIMIT_REACHED";
+
+export class ProjectRepositoryError extends Error {
+  constructor(
+    readonly code: ProjectRepositoryErrorCode,
+    message: string,
+    readonly currentVersion?: number
+  ) {
+    super(message);
+  }
+}
+
+type ProjectRow = {
+  id: string;
+  title: string;
+  stage: string;
+  document_json: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+};
+
+const MAX_PROJECTS_PER_USER = 20;
+
+function toProject(row: ProjectRow): ProjectRecord {
+  return {
+    project_id: row.id,
+    version: row.version,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    document: projectDocumentSchema.parse(JSON.parse(row.document_json))
+  };
+}
+
+export async function listProjects(
+  db: D1Database,
+  ownerUserId: string
+): Promise<ProjectSummary[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, title, stage, version, created_at, updated_at
+       FROM research_projects
+       WHERE owner_user_id = ?
+       ORDER BY updated_at DESC
+       LIMIT ?`
+    )
+    .bind(ownerUserId, MAX_PROJECTS_PER_USER)
+    .all<Omit<ProjectRow, "document_json">>();
+
+  return result.results.map((row) => ({
+    project_id: row.id,
+    title: row.title,
+    stage: projectDocumentSchema.shape.stage.parse(row.stage),
+    version: row.version,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  }));
+}
+
+export async function getProject(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string
+): Promise<ProjectRecord | null> {
+  const row = await db
+    .prepare(
+      `SELECT id, title, stage, document_json, version, created_at, updated_at
+       FROM research_projects
+       WHERE id = ? AND owner_user_id = ?`
+    )
+    .bind(projectId, ownerUserId)
+    .first<ProjectRow>();
+  return row === null ? null : toProject(row);
+}
+
+export async function createProject(
+  db: D1Database,
+  options: {
+    ownerUserId: string;
+    idempotencyKey: string;
+    document: ProjectDocument;
+    now?: Date;
+  }
+): Promise<{ project: ProjectRecord; replayed: boolean }> {
+  const existing = await db
+    .prepare(
+      `SELECT id, title, stage, document_json, version, created_at, updated_at
+       FROM research_projects
+       WHERE owner_user_id = ? AND idempotency_key = ?`
+    )
+    .bind(options.ownerUserId, options.idempotencyKey)
+    .first<ProjectRow>();
+  if (existing !== null) {
+    return { project: toProject(existing), replayed: true };
+  }
+
+  const count = await db
+    .prepare(
+      "SELECT COUNT(*) AS count FROM research_projects WHERE owner_user_id = ?"
+    )
+    .bind(options.ownerUserId)
+    .first<{ count: number }>();
+  if ((count?.count ?? 0) >= MAX_PROJECTS_PER_USER) {
+    throw new ProjectRepositoryError(
+      "PROJECT_LIMIT_REACHED",
+      `A user can own at most ${MAX_PROJECTS_PER_USER} projects.`
+    );
+  }
+
+  const now = (options.now ?? new Date()).toISOString();
+  const projectId = crypto.randomUUID();
+  try {
+    await db
+      .prepare(
+        `INSERT INTO research_projects (
+           id, owner_user_id, title, stage, document_json, version,
+           idempotency_key, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      )
+      .bind(
+        projectId,
+        options.ownerUserId,
+        options.document.title,
+        options.document.stage,
+        JSON.stringify(options.document),
+        options.idempotencyKey,
+        now,
+        now
+      )
+      .run();
+  } catch (error) {
+    const replay = await db
+      .prepare(
+        `SELECT id, title, stage, document_json, version, created_at, updated_at
+         FROM research_projects
+         WHERE owner_user_id = ? AND idempotency_key = ?`
+      )
+      .bind(options.ownerUserId, options.idempotencyKey)
+      .first<ProjectRow>();
+    if (replay !== null) {
+      return { project: toProject(replay), replayed: true };
+    }
+    throw error;
+  }
+
+  const project = await getProject(db, options.ownerUserId, projectId);
+  if (project === null) {
+    throw new Error("Created project could not be read.");
+  }
+  return { project, replayed: false };
+}
+
+export async function updateProject(
+  db: D1Database,
+  options: {
+    ownerUserId: string;
+    projectId: string;
+    expectedVersion: number;
+    document: ProjectDocument;
+    now?: Date;
+  }
+): Promise<ProjectRecord> {
+  const now = (options.now ?? new Date()).toISOString();
+  const result = await db
+    .prepare(
+      `UPDATE research_projects
+       SET title = ?, stage = ?, document_json = ?,
+           version = version + 1, updated_at = ?
+       WHERE id = ? AND owner_user_id = ? AND version = ?`
+    )
+    .bind(
+      options.document.title,
+      options.document.stage,
+      JSON.stringify(options.document),
+      now,
+      options.projectId,
+      options.ownerUserId,
+      options.expectedVersion
+    )
+    .run();
+
+  if (result.meta.changes === 0) {
+    const current = await getProject(
+      db,
+      options.ownerUserId,
+      options.projectId
+    );
+    if (current === null) {
+      throw new ProjectRepositoryError(
+        "PROJECT_NOT_FOUND",
+        "The project does not exist."
+      );
+    }
+    throw new ProjectRepositoryError(
+      "PROJECT_VERSION_CONFLICT",
+      "The project was changed after it was read.",
+      current.version
+    );
+  }
+
+  const project = await getProject(db, options.ownerUserId, options.projectId);
+  if (project === null) {
+    throw new Error("Updated project could not be read.");
+  }
+  return project;
+}

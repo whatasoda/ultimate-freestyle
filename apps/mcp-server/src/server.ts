@@ -6,9 +6,11 @@ import {
   eligibilityReasonSchema,
   twitchGrantPropsSchema
 } from "./auth/types";
+import { registerProjectTools } from "./projects/tools";
+import { registerResearchGuides } from "./projects/guides";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.2.0";
+export const SERVICE_VERSION = "0.3.0";
 
 export type EligibilityConfig = Pick<
   Env,
@@ -16,6 +18,8 @@ export type EligibilityConfig = Pick<
   | "TWITCH_BROADCASTER_LOGIN"
   | "MIN_FOLLOW_DAYS"
 >;
+
+export type ServerConfig = EligibilityConfig & Pick<Env, "DB">;
 
 export function createHealthResult(config: EligibilityConfig) {
   const minFollowDays = Number.parseInt(config.MIN_FOLLOW_DAYS, 10);
@@ -37,7 +41,7 @@ export function createHealthResult(config: EligibilityConfig) {
 }
 
 export function createServer(
-  config: EligibilityConfig,
+  config: ServerConfig,
   getAuthProps: () => Record<string, unknown> | undefined = () =>
     getMcpAuthContext()?.props
 ): McpServer {
@@ -48,7 +52,7 @@ export function createServer(
     },
     {
       instructions:
-        "最自由研究の制作を支援するサーバーです。まずhealthを呼び、利用可能な機能を確認してください。現段階のtoolは読み取り専用です。"
+        "最自由研究の制作を支援するサーバーです。まずhealthを呼び、次にget_access_statusを確認してください。変更前はget_projectでversionを取得し、update_projectへexpected_versionを渡します。競合時は再取得してユーザーの変更を失わないでください。"
     }
   );
 
@@ -182,6 +186,9 @@ export function createServer(
       ]
     })
   );
+
+  registerProjectTools(server, config.DB, getAuthProps);
+  registerResearchGuides(server, config.DB, getAuthProps);
 
   return server;
 }
