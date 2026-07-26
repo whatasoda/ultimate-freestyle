@@ -15,6 +15,7 @@
     "check": "bun run types:check && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "0.8.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "agents": "^0.17.4",
     "zod": "^4.4.3"

@@ -13,10 +13,31 @@
     }
   ],
   "vars": {
+    "MCP_AUTH_MODE": "disabled",
     "TWITCH_BROADCASTER_ID": "67879379",
     "TWITCH_BROADCASTER_LOGIN": "kashiwo",
-    "MIN_FOLLOW_DAYS": "30"
+    "TWITCH_REDIRECT_URI": "https://saijiyu-kenkyu.2764.moe/oauth/twitch/callback",
+    "MIN_FOLLOW_DAYS": "30",
+    "ELIGIBILITY_CACHE_TTL_SECONDS": "1800"
   },
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "8b0100c3df27417fb5772ffc0447da7a"
+    },
+    {
+      "binding": "AUTH_STATE_KV",
+      "id": "7d25e9a7a8b34d6a901a7b93c28c2c3d"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "ultimate-freestyle",
+      "database_id": "3f1c3347-44a2-48c4-967b-405a9fe985d6",
+      "migrations_dir": "migrations"
+    }
+  ],
   "observability": {
     "enabled": true,
     "logs": {
