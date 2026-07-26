@@ -27,7 +27,7 @@ assert.equal(health.body.ok, true);
 assert.equal(health.body.service, "ultimate-freestyle-mcp");
 assert.equal(health.body.eligibility?.broadcaster_id, "67879379");
 
-const initialize = await fetchJson("/mcp", {
+const protectedResponse = await fetch(new URL("/mcp", baseUrl), {
   method: "POST",
   headers: {
     accept: "application/json, text/event-stream",
@@ -42,15 +42,49 @@ const initialize = await fetchJson("/mcp", {
       capabilities: {},
       clientInfo: { name: "production-smoke-test", version: "0.1.0" }
     }
-  })
+  }),
+  signal: AbortSignal.timeout(15_000)
 });
-assert.equal(initialize.response.status, 200);
-assert.equal(initialize.body.jsonrpc, "2.0");
-assert.equal(initialize.body.id, 1);
-assert.deepEqual(initialize.body.result?.serverInfo, {
-  name: "ultimate-freestyle-mcp",
-  version: "0.3.0"
-});
+assert.equal(protectedResponse.status, 401);
+assert.match(
+  protectedResponse.headers.get("www-authenticate") ?? "",
+  /resource_metadata=/
+);
+
+const metadata = await fetchJson("/.well-known/oauth-protected-resource");
+assert.equal(metadata.response.status, 200);
+assert.deepEqual(metadata.body.authorization_servers, [
+  "https://saijiyu-kenkyu.2764.moe"
+]);
+assert.equal(
+  metadata.body.resource,
+  "https://saijiyu-kenkyu.2764.moe/mcp"
+);
+assert.deepEqual(metadata.body.scopes_supported, [
+  "research:read",
+  "research:write",
+  "research:publish"
+]);
+
+const authorizationMetadata = await fetchJson(
+  "/.well-known/oauth-authorization-server"
+);
+assert.equal(authorizationMetadata.response.status, 200);
+assert.equal(
+  authorizationMetadata.body.authorization_endpoint,
+  "https://saijiyu-kenkyu.2764.moe/authorize"
+);
+assert.equal(
+  authorizationMetadata.body.token_endpoint,
+  "https://saijiyu-kenkyu.2764.moe/token"
+);
+assert.equal(
+  authorizationMetadata.body.registration_endpoint,
+  "https://saijiyu-kenkyu.2764.moe/register"
+);
+assert.deepEqual(authorizationMetadata.body.code_challenge_methods_supported, [
+  "S256"
+]);
 
 console.log(
   JSON.stringify({
@@ -58,6 +92,7 @@ console.log(
     origin: baseUrl.origin,
     service: health.body.service,
     version: health.body.version,
-    mcp_server: initialize.body.result.serverInfo
+    mcp_auth: "required",
+    authorization_endpoint: authorizationMetadata.body.authorization_endpoint
   })
 );

@@ -45,7 +45,7 @@ describe("MCP Worker", () => {
     expect(body.request_id).toBeTruthy();
   });
 
-  it("accepts an MCP initialize request over Streamable HTTP", async () => {
+  it("protects MCP requests and advertises OAuth metadata", async () => {
     const response = await exports.default.fetch("https://example.com/mcp", {
       method: "POST",
       headers: {
@@ -63,26 +63,23 @@ describe("MCP Worker", () => {
         }
       })
     });
-    const body = await response.json<{
-      jsonrpc: string;
-      id: number;
-      result: {
-        serverInfo: { name: string; version: string };
-        instructions?: string;
-      };
-    }>();
+    expect(response.status).toBe(401);
+    expect(response.headers.get("www-authenticate")).toContain(
+      "resource_metadata"
+    );
 
-    expect(response.status).toBe(200);
-    expect(body).toMatchObject({
-      jsonrpc: "2.0",
-      id: 1,
-      result: {
-        serverInfo: {
-          name: "ultimate-freestyle-mcp",
-          version: "0.3.0"
-        }
-      }
+    const metadata = await exports.default.fetch(
+      "https://example.com/.well-known/oauth-protected-resource"
+    );
+    expect(metadata.status).toBe(200);
+    await expect(metadata.json()).resolves.toMatchObject({
+      resource: "https://saijiyu-kenkyu.2764.moe/mcp",
+      authorization_servers: ["https://saijiyu-kenkyu.2764.moe"],
+      scopes_supported: [
+        "research:read",
+        "research:write",
+        "research:publish"
+      ]
     });
-    expect(body.result.instructions).toContain("まずhealthを呼び");
   });
 });

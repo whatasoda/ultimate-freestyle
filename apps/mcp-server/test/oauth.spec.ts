@@ -13,7 +13,7 @@ function createAuthEnv(): Env {
     OAUTH_KV: env.OAUTH_KV,
     AUTH_STATE_KV: env.AUTH_STATE_KV,
     DB: env.DB,
-    MCP_AUTH_MODE: "disabled",
+    MCP_AUTH_MODE: "twitch",
     TWITCH_BROADCASTER_ID: "67879379",
     TWITCH_BROADCASTER_LOGIN: "kashiwo",
     TWITCH_REDIRECT_URI: "https://saijiyu-kenkyu.2764.moe/oauth/twitch/callback",
