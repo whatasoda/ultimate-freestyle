@@ -926,6 +926,7 @@
           </p>
           <div class="meta-row">
             <span class="pill">Remote MCPのみ提供</span>
+            <span class="pill">Codex / ChatGPTを優先</span>
             <span class="pill">Twitch OAuthで認証</span>
             <span class="pill">公開・音声もCloudflareで完結</span>
             <span class="pill">任意コードは受け付けない</span>
@@ -937,6 +938,7 @@
           <h2>利用者はMCP対応AIクライアントを用意する</h2>
           <ul>
             <li>専用チャット画面は作らない</li>
+            <li>初期の対応・検証対象はCodexとChatGPTを優先する</li>
             <li>接続後の認証はブラウザでTwitchへ委譲</li>
             <li>対象配信者へのフォロー期間、または現在のサブスクで許可</li>
             <li>LLM利用料は原則として利用者側の契約に含める</li>
@@ -956,8 +958,8 @@
         <div class="grid three">
           <article class="card">
             <div class="number">01</div>
-            <h3>AIは利用者側</h3>
-            <p>ChatGPT、Claude、Codexなどが対話を担当。サーバーはモデルAPIを持たず、MCPのresources・prompts・toolsを提供する。</p>
+            <h3>OpenAIクライアントを先行</h3>
+            <p>CodexとChatGPTを第一の受け入れ対象にする。Claudeなども標準MCPの範囲で維持するが、初期開発の判断はOpenAIクライアントを優先する。</p>
           </article>
           <article class="card">
             <div class="number">02</div>
@@ -1219,14 +1221,33 @@
             </tbody>
           </table>
         </div>
+
+        <div class="grid two" style="margin-top: 22px">
+          <article class="card">
+            <h3>AIが自律検証できる契約</h3>
+            <p>
+              すべてのtoolはJSON Schema、安定したerror code、<code>request_id</code>、
+              変更後のversionを返す。初期化時の<code>instructions</code>先頭には、推奨手順、
+              destructive操作、quota、再試行条件を短く完結して記載する。
+            </p>
+          </article>
+          <article class="card">
+            <h3>ブラウザに依存しない検証</h3>
+            <p>
+              Twitch API adapterのfixture、資格判定のtable test、MCP protocol contract test、
+              previewのsnapshot、公開URLのsmoke testを用意する。実OAuthログインだけを人による最終確認に残す。
+            </p>
+          </article>
+        </div>
       </section>
 
       <section id="data">
         <div class="section-heading">
           <p class="section-kicker">05 / Data &amp; repository</p>
-          <h2>既存の研究基盤と疎結合にする</h2>
+          <h2>このリポジトリを新しい基盤へ直接育てる</h2>
           <p>
-            現在のスライド実装を壊さず、共有schemaとレンダラーだけを再利用できる構成へ段階的に整理する。
+            現行形式の利用者や移行対象はまだ存在しない。後方互換のための二重構成は作らず、
+            現在のスライド実装から共有schemaとrendererを抽出して、そのままCloudflare構成へ移す。
           </p>
         </div>
 
@@ -1500,19 +1521,19 @@ docs/                  # 設計・運用手順</pre>
           <article class="phase">
             <div class="phase-id">PHASE 0</div>
             <div class="phase-main">
-              <h3>契約と設定値を確定</h3>
-              <p>対象broadcaster ID、必要フォロー日数、サブスクの扱い、失効猶予、データ保持期間を決める。</p>
+              <h3>リポジトリと可変設定を固定</h3>
+              <p>このリポジトリを直接再構成し、<code>TWITCH_BROADCASTER_ID=67879379</code>、<code>MIN_FOLLOW_DAYS=30</code>を初期値にする。日数はコード変更なしで差し替え可能にする。</p>
             </div>
-            <div class="phase-done"><strong>DONE WHEN</strong><p>設定値と利用規約の草案をレビューできる。</p></div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>workspace構成、環境変数一覧、検証コマンドをリポジトリ内で確認できる。</p></div>
           </article>
 
           <article class="phase">
             <div class="phase-id">PHASE 1</div>
             <div class="phase-main">
-              <h3>認証なしRemote MCP</h3>
-              <p>Worker、<code>createMcpHandler</code>、Streamable HTTPを構成し、<code>health</code>と固定resourceをMCP Inspectorから確認する。</p>
+              <h3>OpenAI優先の認証なしRemote MCP</h3>
+              <p>Worker、<code>createMcpHandler</code>、Streamable HTTPを構成する。protocol testとMCP Inspectorに加え、まずCodexから<code>health</code>と固定resourceを確認し、ChatGPT用pluginから同じMCPへ接続できる形を用意する。</p>
             </div>
-            <div class="phase-done"><strong>DONE WHEN</strong><p>対応クライアントから接続し、toolを1回呼べる。</p></div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>自動contract testが通り、CodexとChatGPTの双方からtoolを1回呼べる。</p></div>
           </article>
 
           <article class="phase">
@@ -1574,10 +1595,13 @@ docs/                  # 設計・運用手順</pre>
             </thead>
             <tbody>
               <tr><td>フォロー期間</td><td>30日</td><td>実装後に環境変数／設定テーブルから変更できるようにする。</td></tr>
+              <tr><td>対象配信者</td><td><code>kashiwo</code> / broadcaster ID <code>67879379</code></td><td>判定には変更されにくいIDを使い、表示名は運用上のラベルとして扱う。</td></tr>
               <tr><td>サブスク判定</td><td>現在有効なら許可</td><td>継続月数の履歴管理をMVPから外せる。</td></tr>
               <tr><td>資格キャッシュ</td><td>通常30分、公開時は再照会</td><td>API負荷と資格変更への追従を両立する運用上の初期案。</td></tr>
               <tr><td>Twitch token保持</td><td>暗号化して保持</td><td>MCP接続中の定期検証と資格再照会に必要。</td></tr>
               <tr><td>MCP runtime</td><td>ステートレス<code>createMcpHandler</code></td><td>研究状態をD1へ置き、Durable Objectの常時接続課金を避ける。</td></tr>
+              <tr><td>優先クライアント</td><td>Codex → ChatGPT → その他</td><td>Codexは開発中の直接接続と自動検証、ChatGPTは限定利用者向けplugin経由を主経路にする。</td></tr>
+              <tr><td>互換性方針</td><td>現リポジトリを直接再構成</td><td>現行形式の利用者がいないため、旧Pages構成との並行運用や移行層を作らない。</td></tr>
               <tr><td>公開基盤</td><td>Workers Static Assets + public R2</td><td>GitHub Pagesを使わず、認証から配信までCloudflareを正本にする。</td></tr>
               <tr><td>公開形式</td><td>R2上のversion付き固定成果物</td><td>上書きせず、切替・ロールバック・キャッシュ整合性を保つ。</td></tr>
               <tr><td>音声runtime</td><td>Cloudflare Container <code>standard-2</code></td><td>公式VOICEVOX CPU imageを使い、実測後にstandard-3と比較する。</td></tr>
@@ -1593,7 +1617,8 @@ docs/                  # 設計・運用手順</pre>
           <h2>最初の実装は「資格を答えるだけのMCP」</h2>
           <p>
             <code>get_access_status</code>だけを持つRemote MCPをCloudflareへ配置し、
-            Twitchログイン、フォロー期間、サブスク、拒否、token失効までを先に通す。
+            自動contract testとCodexからの直接接続を先に通す。その後、同じMCPをChatGPT用pluginから呼び出し、
+            Twitchログイン、フォロー期間、サブスク、拒否、token失効までを検証する。
             ここが安定してから研究CRUDを追加すれば、最大の不確実性を小さな実装で検証できる。
           </p>
         </div>
@@ -1602,6 +1627,8 @@ docs/                  # 設計・運用手順</pre>
       <section class="sources" aria-labelledby="sources-title">
         <h2 id="sources-title">参照した公式資料</h2>
         <ul>
+          <li><a href="https://learn.chatgpt.com/docs/extend/mcp">OpenAI: Model Context Protocol</a></li>
+          <li><a href="https://developers.openai.com/plugins/build/mcp-server">OpenAI: Build an MCP server</a></li>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/">Cloudflare: Build a Remote MCP server</a></li>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/apis/handler-api/">Cloudflare: createMcpHandler API</a></li>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/">Cloudflare: MCP Authorization</a></li>
