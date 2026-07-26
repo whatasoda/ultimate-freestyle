@@ -1,0 +1,88 @@
+import { exports } from "cloudflare:workers";
+import { describe, expect, it } from "vitest";
+
+describe("MCP Worker", () => {
+  it("returns machine-readable health information", async () => {
+    const response = await exports.default.fetch("https://example.com/healthz");
+    const body = await response.json<{
+      ok: boolean;
+      service: string;
+      version: string;
+      request_id: string;
+      eligibility: {
+        broadcaster_id: string;
+        broadcaster_login: string;
+        min_follow_days: number;
+      };
+    }>();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(body).toMatchObject({
+      ok: true,
+      service: "ultimate-freestyle-mcp",
+      version: "0.1.0",
+      eligibility: {
+        broadcaster_id: "67879379",
+        broadcaster_login: "kashiwo",
+        min_follow_days: 30
+      }
+    });
+    expect(body.request_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+    );
+  });
+
+  it("returns a stable structured error for unknown routes", async () => {
+    const response = await exports.default.fetch("https://example.com/unknown");
+    const body = await response.json<{
+      error: { code: string; message: string };
+      request_id: string;
+    }>();
+
+    expect(response.status).toBe(404);
+    expect(body.error.code).toBe("NOT_FOUND");
+    expect(body.request_id).toBeTruthy();
+  });
+
+  it("accepts an MCP initialize request over Streamable HTTP", async () => {
+    const response = await exports.default.fetch("https://example.com/mcp", {
+      method: "POST",
+      headers: {
+        accept: "application/json, text/event-stream",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-06-18",
+          capabilities: {},
+          clientInfo: { name: "contract-test", version: "0.1.0" }
+        }
+      })
+    });
+    const body = await response.json<{
+      jsonrpc: string;
+      id: number;
+      result: {
+        serverInfo: { name: string; version: string };
+        instructions?: string;
+      };
+    }>();
+
+    expect(response.status).toBe(200);
+    expect(body).toMatchObject({
+      jsonrpc: "2.0",
+      id: 1,
+      result: {
+        serverInfo: {
+          name: "ultimate-freestyle-mcp",
+          version: "0.1.0"
+        }
+      }
+    });
+    expect(body.result.instructions).toContain("まずhealthを呼び");
+  });
+});

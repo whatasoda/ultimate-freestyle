@@ -6,6 +6,8 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
+現在はCloudflare構成への移行初期です。新しいRemote MCPは `apps/mcp-server/` にあり、発表UIはまだリポジトリ直下にあります。現行形式の外部利用者はいないため、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
+
 ## できること
 
 - クリック、Space、Enter、矢印キーでスライドと段階表示を進める
@@ -46,9 +48,21 @@ bun run dev
 bun run test
 ```
 
-## GitHub Pagesへ公開する
+## Remote MCPを開発する
 
-公開先はGitHub Pagesを標準とし、GitHub Actionsで静的HTMLを生成します。リポジトリの `Settings` → `Pages` → `Build and deployment` で、`Source` を `GitHub Actions` に設定してください。以後は `main` へのpush、またはActions画面からの手動実行で公開されます。
+CodexとChatGPTを優先するRemote MCPの最小実装があります。現段階は認証前で、`health` toolと固定の制作ガイドresourceを提供します。
+
+```bash
+bun run dev:mcp
+bun run test:mcp
+bun run build:mcp
+```
+
+`bun run test:mcp` は、設定から生成したWorker型、型検査、Workers runtime上のMCP contract、Cloudflare deployのdry-run buildをブラウザなしで確認します。詳しくは [MCP server README](apps/mcp-server/README.md) を参照してください。
+
+## 移行前の発表UIをGitHub Pagesへ公開する
+
+以下はリポジトリ直下に残る発表UIの現行手順です。新構成の標準公開先ではなく、Cloudflareへの置換が終わるまでの開発用として残しています。GitHub Actionsで静的HTMLを生成する場合は、リポジトリの `Settings` → `Pages` → `Build and deployment` で、`Source` を `GitHub Actions` に設定してください。
 
 公開経路は音声生成の有無で分かれます。
 
@@ -284,7 +298,7 @@ bun run dev:voicevox
 
 通常の `bun run dev` はプレビューMP3を参照せず、ブラウザ読み上げを使います。生成済み音声を使う場合は、最終スライド等に話者の規約に沿ったクレジットを表示してください。テンプレートは `VOICEVOX:ずんだもん` を最終スライドで表示します。
 
-### GitHub Actionsで試験公開する
+### 移行前のGitHub Actionsで試験公開する
 
 ローカルへVOICEVOXを導入せず、GitHub Actions上の公式CPU DockerイメージでMP3を生成し、そのままGitHub Pagesへ試験公開できます。通常のpushでは音声生成せず、次のどちらかで明示的に起動します。
 

@@ -1,8 +1,8 @@
-/node_modules
+**/node_modules/
 /.next/
 /.vinext/
-/dist/
-/.wrangler/
+**/dist/
+**/.wrangler/
 /coverage/
 /outputs/
 /work/

@@ -8,8 +8,9 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".vinext/**",
-    "dist/**",
+    "**/dist/**",
     "build/**",
+    "apps/mcp-server/src/worker-configuration.d.ts",
     "next-env.d.ts"
   ])
 ]);
