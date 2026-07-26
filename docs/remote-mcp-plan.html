@@ -634,6 +634,10 @@
         background: var(--green);
       }
 
+      .phase:nth-child(7) .phase-id {
+        background: var(--green);
+      }
+
       .phase-main,
       .phase-done {
         padding: 20px 22px;
@@ -903,7 +907,9 @@
           <a href="#architecture">構成</a>
           <a href="#auth">認証</a>
           <a href="#tools">MCP設計</a>
+          <a href="#voice">音声生成</a>
           <a href="#security">安全性</a>
+          <a href="#cost">費用</a>
           <a href="#roadmap">実装計画</a>
         </nav>
       </div>
@@ -921,6 +927,7 @@
           <div class="meta-row">
             <span class="pill">Remote MCPのみ提供</span>
             <span class="pill">Twitch OAuthで認証</span>
+            <span class="pill">公開・音声もCloudflareで完結</span>
             <span class="pill">任意コードは受け付けない</span>
           </div>
         </div>
@@ -933,6 +940,7 @@
             <li>接続後の認証はブラウザでTwitchへ委譲</li>
             <li>対象配信者へのフォロー期間、または現在のサブスクで許可</li>
             <li>LLM利用料は原則として利用者側の契約に含める</li>
+            <li>公開はR2、VOICEVOXはCloudflare Containersで処理</li>
           </ul>
         </aside>
       </header>
@@ -982,8 +990,8 @@
                 <small>ChatGPT / Claude / Codex など<br />利用者自身のLLM契約</small>
               </div>
               <div class="arch-box external">
-                <strong>利用者のブラウザ</strong>
-                <small>Twitchログインと同意画面だけを表示</small>
+                <strong>利用者・閲覧者のブラウザ</strong>
+                <small>Twitchログイン、同意画面、公開プレゼンテーション</small>
               </div>
             </div>
 
@@ -995,8 +1003,8 @@
                 <small><code>/mcp</code> <code>/authorize</code> <code>/token</code> <code>/register</code></small>
               </div>
               <div class="arch-box primary">
-                <strong>McpAgent + OAuth Provider</strong>
-                <small>ユーザー文脈、MCP scope、利用資格を各toolへ渡す</small>
+                <strong>createMcpHandler + OAuth Provider</strong>
+                <small>ステートレスMCP。ユーザー文脈、scope、利用資格を各toolへ渡す</small>
               </div>
               <div class="arch-box primary">
                 <strong>研究サービス</strong>
@@ -1016,13 +1024,17 @@
                 <small>利用者・研究・監査 / OAuth一時state・短期キャッシュ</small>
               </div>
               <div class="arch-box">
-                <strong>R2 + Queue / Workflow</strong>
-                <small>素材・公開物 / ビルド・音声生成などの非同期処理</small>
+                <strong>Queue / Workflow + Container</strong>
+                <small>公開ビルドとVOICEVOX音声生成の非同期処理</small>
+              </div>
+              <div class="arch-box">
+                <strong>Private / Public R2</strong>
+                <small>下書き素材 / 固定版HTML・画像・MP3</small>
               </div>
             </div>
           </div>
           <p class="arch-caption">
-            GitHub Pagesの既存発表基盤はレンダラーの参照実装として残す。個人の下書きと認証情報はPagesへ置かない。
+            認証、下書き、公開、配信、音声生成までCloudflareを正本にする。GitHubはソース管理とCIだけに限定する。
           </p>
         </div>
       </section>
@@ -1187,6 +1199,18 @@
                 <td>回数・容量・実行時間を制限</td>
               </tr>
               <tr>
+                <td><code>request_voice_generation</code></td>
+                <td><span class="tag write">WRITE</span></td>
+                <td>変更原稿のVOICEVOX生成ジョブを登録</td>
+                <td>即時完了を待たずjob IDを返す</td>
+              </tr>
+              <tr>
+                <td><code>get_voice_job</code></td>
+                <td><span class="tag">READ</span></td>
+                <td>音声生成の進捗・失敗・成果物を取得</td>
+                <td>自分のjobだけを参照可能</td>
+              </tr>
+              <tr>
                 <td><code>publish_project</code></td>
                 <td><span class="tag danger">PUBLISH</span></td>
                 <td>公開版を固定し、配信用URLを発行</td>
@@ -1208,7 +1232,7 @@
 
         <div class="grid two">
           <pre class="folder-tree" aria-label="提案するリポジトリ構成">apps/
-  presentation/        # 現在のWebスライド
+  presentation/        # 共通UI・Workers Static Assets
   mcp-server/          # Cloudflare Worker
     src/
       auth/twitch.ts
@@ -1218,6 +1242,10 @@
       mcp/tools.ts
       services/projects.ts
       services/publish.ts
+      services/voice.ts
+containers/
+  voicevox/
+    Dockerfile          # 固定versionのCPU ENGINE + ffmpeg
 packages/
   research-schema/     # 研究・deckの共通schema
   research-guides/     # 対話フロー・評価基準
@@ -1236,15 +1264,118 @@ docs/                  # 設計・運用手順</pre>
             </article>
             <article class="card">
               <h3>R2</h3>
-              <p>検査済み素材、プレビュー、公開版HTML、生成音声。下書き用と公開用のkey prefixを分離する。</p>
+              <p>下書き用private bucketと、固定版HTML・画像・MP3用public bucketを分ける。公開版はversion付きの不変keyに保存する。</p>
+            </article>
+            <article class="card">
+              <h3>Workers Static Assets</h3>
+              <p>全研究で共有するJavaScript、CSS、フォントだけを配置。実行中に増えるユーザー成果物は置かない。</p>
             </article>
           </div>
         </div>
+        <p class="callout">
+          <code>mcp.example.com</code>をMCPとOAuth、<code>present.example.com/{user}/{slug}</code>を公開入口、
+          <code>assets.example.com</code>をpublic R2へ割り当てる。GitHub Pagesは公開経路に含めない。
+        </p>
+      </section>
+
+      <section id="voice">
+        <div class="section-heading">
+          <p class="section-kicker">06 / VOICEVOX on Containers</p>
+          <h2>音声はCloudflare内の短命ジョブで作る</h2>
+          <p>
+            Workers上ではなくCloudflare Containersで公式VOICEVOX ENGINEのCPU版を動かす。
+            MCPの応答を待たせず、差分segmentをまとめた非同期ジョブとして処理する。
+          </p>
+        </div>
+
+        <div class="architecture" role="img" aria-label="VOICEVOX音声生成の非同期フロー">
+          <div class="arch-flow">
+            <div class="arch-column">
+              <div class="arch-box external">
+                <strong>request_voice_generation</strong>
+                <small>資格、project所有権、月間quota、原稿versionを確認</small>
+              </div>
+              <div class="arch-box external">
+                <strong>get_voice_job</strong>
+                <small>queued / running / completed / failedを取得</small>
+              </div>
+            </div>
+
+            <div class="arrow" aria-hidden="true">→</div>
+
+            <div class="arch-column">
+              <div class="arch-box primary">
+                <strong>D1 + Queue</strong>
+                <small>jobを冪等登録し、Workerから即座にjob IDを返す</small>
+              </div>
+              <div class="arch-box primary">
+                <strong>VOICEVOX Container</strong>
+                <small><code>standard-2</code>を初期値に、変更segmentを一括生成</small>
+              </div>
+              <div class="arch-box primary">
+                <strong>ffmpeg</strong>
+                <small>一時WAVをモノラルMP3へ変換し、変換後に削除</small>
+              </div>
+            </div>
+
+            <div class="arrow" aria-hidden="true">→</div>
+
+            <div class="arch-column">
+              <div class="arch-box">
+                <strong>Public R2</strong>
+                <small>project version配下へMP3を保存</small>
+              </div>
+              <div class="arch-box">
+                <strong>Fingerprint cache</strong>
+                <small>原稿・話者・設定・ENGINE version一致時は再利用</small>
+              </div>
+              <div class="arch-box">
+                <strong>Scale to zero</strong>
+                <small>一括生成後は短いsleepAfterでContainerを停止</small>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid three" style="margin-top: 22px">
+          <article class="card">
+            <h3>初期インスタンス</h3>
+            <p><code>standard-2</code>：1 vCPU、6GiBメモリ、12GBディスク。約1.85GBの公式CPUイメージと一時音声を扱う余裕を持たせる。</p>
+          </article>
+          <article class="card">
+            <h3>デプロイ方針</h3>
+            <p><code>latest</code>を実行時に直接参照せず、ENGINE versionまたはdigestを固定したDockerfileをCloudflare管理レジストリへ配置する。</p>
+          </article>
+          <article class="card">
+            <h3>切替条件</h3>
+            <p>10分以内に20分発表相当の変更分を生成できない、またはメモリが収まらない場合は<code>standard-3</code>を試す。それでも不十分ならCloud Run Jobsを代替候補にする。</p>
+          </article>
+        </div>
+
+        <div class="table-wrap" style="margin-top: 22px">
+          <table>
+            <thead>
+              <tr><th>事前ベンチマーク</th><th>確認する値</th><th>初期判定</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Container起動</td><td>起動から<code>/speakers</code>応答まで</td><td>タイムアウトと再試行設計を決める</td></tr>
+              <tr><td>文章長</td><td>100・500・2,000文字の合成時間</td><td>segment上限と分割規則を決める</td></tr>
+              <tr><td>発表一式</td><td>20分相当の変更segment一括生成</td><td>10分以内を目標</td></tr>
+              <tr><td>資源</td><td>ピークメモリ、展開後イメージ、一時WAV</td><td>standard-2内に収まるか確認</td></tr>
+              <tr><td>再実行</td><td>同じfingerprint、途中失敗、二重要求</td><td>再生成せず安全に収束</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="callout">
+          ContainerへTwitch tokenやMCP tokenを渡さない。VOICEVOXの内部HTTPポートは公開せず、専用R2 bucketへの必要最小限の経路だけを持たせる。
+          公開画面には「VOICEVOX:キャラクター名」のクレジットと、音声ライブラリ・キャラクター固有規約への導線を表示する。
+        </p>
       </section>
 
       <section id="security">
         <div class="section-heading">
-          <p class="section-kicker">06 / Security boundary</p>
+          <p class="section-kicker">07 / Security boundary</p>
           <h2>AIから来る値を信用しない</h2>
           <p>
             MCPクライアントが正規でも、モデルの誤操作、プロンプトインジェクション、利用者入力の悪用は起こり得る。
@@ -1279,6 +1410,7 @@ docs/                  # 設計・運用手順</pre>
               <li>利用者に許可されないtoolは条件付き登録でモデルから隠す</li>
               <li>公開・削除・音声生成には確認用previewと明示承認を要求</li>
               <li>汎用shell、任意URL fetch、秘密情報の読取toolを公開しない</li>
+              <li>VOICEVOX Containerには原稿と生成設定だけを渡し、Twitch・MCPの秘密情報を渡さない</li>
               <li>エラー本文へ内部パス、SQL、token、stack traceを含めない</li>
             </ul>
           </article>
@@ -1286,6 +1418,7 @@ docs/                  # 設計・運用手順</pre>
             <h3>運用・費用</h3>
             <ul class="checklist">
               <li>Twitch user、IP、tool、日単位のrate limitとquotaを設定</li>
+              <li>音声生成は月間回数、総文字数、同時job数を利用者ごとに制限</li>
               <li>同じ要求を重複実行しないidempotency keyを採用</li>
               <li>監査ログに誰が・いつ・何をしたかを残す</li>
               <li>管理画面はCloudflare Access等で別に保護</li>
@@ -1310,9 +1443,55 @@ docs/                  # 設計・運用手順</pre>
         </div>
       </section>
 
+      <section id="cost">
+        <div class="section-heading">
+          <p class="section-kicker">08 / Monthly cost model</p>
+          <h2>30 MAUなら月5〜10ドルを基準にする</h2>
+          <p>
+            制作者30 MAU、閲覧200 DAU、1人あたり月4回の音声生成を初期モデルとする。
+            閲覧はCloudflare配信で完結し、GitHub PagesとGitHub Actionsは構成に含めない。
+          </p>
+        </div>
+
+        <div class="grid three">
+          <article class="card">
+            <div class="number">$5</div>
+            <h3>基盤</h3>
+            <p>Workers Paidの最低料金。約14万Worker request、D1、KV、Queue、10GB以内のR2は初期想定では包含枠内。</p>
+          </article>
+          <article class="card">
+            <div class="number">$0</div>
+            <h3>静的配信・egress</h3>
+            <p>Workers Static Assetsへのrequestは無料。R2は10GBまでと月1,000万Class B操作が無料で、Internet egressも無料。</p>
+          </article>
+          <article class="card">
+            <div class="number">+$5</div>
+            <h3>音声生成の上振れ枠</h3>
+            <p>月120jobをCPUで処理し、1jobが20分近くかかった場合まで見た概算余裕。差分生成により通常は小さくなる。</p>
+          </article>
+        </div>
+
+        <div class="table-wrap" style="margin-top: 22px">
+          <table>
+            <thead>
+              <tr><th>月120回のVOICEVOX生成</th><th>Container稼働</th><th>基盤込み概算</th><th>判断</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>平均3分／job</td><td>月6時間</td><td>約$5.10</td><td>CPU包含枠内。メモリ超過のみ小額</td></tr>
+              <tr><td>平均10分／job</td><td>月20時間</td><td>約$6.90</td><td>初期運用の現実的な上限候補</td></tr>
+              <tr><td>平均20分／job</td><td>月40時間</td><td>約$9.50</td><td>性能改善またはstandard-3比較を行う</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="callout">
+          この金額は実測前の計画値。D1にjobごとのContainer実行時間、生成文字数、cache hit、出力byte数を記録し、
+          運用開始後に「1,000文字あたりの原価」と「1公開あたりの原価」へ更新する。
+        </p>
+      </section>
+
       <section id="roadmap">
         <div class="section-heading">
-          <p class="section-kicker">07 / Implementation roadmap</p>
+          <p class="section-kicker">09 / Implementation roadmap</p>
           <h2>認証を先に証明し、制作機能を後から載せる</h2>
           <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
         </div>
@@ -1331,7 +1510,7 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 1</div>
             <div class="phase-main">
               <h3>認証なしRemote MCP</h3>
-              <p>Worker、McpAgent、Streamable HTTPを構成し、<code>health</code>と固定resourceをMCP Inspectorから確認する。</p>
+              <p>Worker、<code>createMcpHandler</code>、Streamable HTTPを構成し、<code>health</code>と固定resourceをMCP Inspectorから確認する。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>対応クライアントから接続し、toolを1回呼べる。</p></div>
           </article>
@@ -1358,16 +1537,25 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 4</div>
             <div class="phase-main">
               <h3>プレビューと公開</h3>
-              <p>既存スライドrendererを構造化データへ接続し、R2 preview、承認、固定版publishを非同期化する。</p>
+              <p>既存rendererを構造化データへ接続し、Workers Static Assetsとprivate／public R2でpreview、承認、固定版publishを非同期化する。</p>
             </div>
-            <div class="phase-done"><strong>DONE WHEN</strong><p>任意コードなしで発表URLを安全に生成できる。</p></div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>Cloudflareだけで発表URLを安全に生成・配信できる。</p></div>
           </article>
 
           <article class="phase">
             <div class="phase-id">PHASE 5</div>
             <div class="phase-main">
+              <h3>VOICEVOX Container</h3>
+              <p>固定ENGINE image、standard-2、Queue、差分fingerprint、ffmpeg、R2保存を実装し、文章長・発表一式・資源のベンチマークを取る。</p>
+            </div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>非同期jobが冪等に完了し、性能と実測原価を説明できる。</p></div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-id">PHASE 6</div>
+            <div class="phase-main">
               <h3>限定パイロット</h3>
-              <p>少人数をmanual allowlistへ追加し、quota、監査、削除、障害対応、クライアント別の接続手順を検証する。</p>
+              <p>少人数をmanual allowlistへ追加し、quota、監査、削除、Container障害、クライアント別の接続手順を検証する。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>運営者の介助なしで接続から初回保存まで完了できる。</p></div>
           </article>
@@ -1376,8 +1564,8 @@ docs/                  # 設計・運用手順</pre>
 
       <section id="decisions">
         <div class="section-heading">
-          <p class="section-kicker">08 / Decisions before coding</p>
-          <h2>着手前に決めるのは五つだけ</h2>
+          <p class="section-kicker">10 / Confirmed decisions &amp; defaults</p>
+          <h2>確定方針と初期設定値</h2>
         </div>
         <div class="table-wrap">
           <table>
@@ -1389,7 +1577,11 @@ docs/                  # 設計・運用手順</pre>
               <tr><td>サブスク判定</td><td>現在有効なら許可</td><td>継続月数の履歴管理をMVPから外せる。</td></tr>
               <tr><td>資格キャッシュ</td><td>通常30分、公開時は再照会</td><td>API負荷と資格変更への追従を両立する運用上の初期案。</td></tr>
               <tr><td>Twitch token保持</td><td>暗号化して保持</td><td>MCP接続中の定期検証と資格再照会に必要。</td></tr>
-              <tr><td>公開形式</td><td>R2上の固定静的成果物</td><td>ユーザー入力を実行時コードにせず、公開版を再現しやすい。</td></tr>
+              <tr><td>MCP runtime</td><td>ステートレス<code>createMcpHandler</code></td><td>研究状態をD1へ置き、Durable Objectの常時接続課金を避ける。</td></tr>
+              <tr><td>公開基盤</td><td>Workers Static Assets + public R2</td><td>GitHub Pagesを使わず、認証から配信までCloudflareを正本にする。</td></tr>
+              <tr><td>公開形式</td><td>R2上のversion付き固定成果物</td><td>上書きせず、切替・ロールバック・キャッシュ整合性を保つ。</td></tr>
+              <tr><td>音声runtime</td><td>Cloudflare Container <code>standard-2</code></td><td>公式VOICEVOX CPU imageを使い、実測後にstandard-3と比較する。</td></tr>
+              <tr><td>音声生成方式</td><td>Queueによる差分一括生成</td><td>MCPを待たせず、Container起動とmodel loadをsegment間で共有する。</td></tr>
             </tbody>
           </table>
         </div>
@@ -1411,14 +1603,23 @@ docs/                  # 設計・運用手順</pre>
         <h2 id="sources-title">参照した公式資料</h2>
         <ul>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/">Cloudflare: Build a Remote MCP server</a></li>
-          <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/apis/agent-api/">Cloudflare: McpAgent API</a></li>
+          <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/apis/handler-api/">Cloudflare: createMcpHandler API</a></li>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/">Cloudflare: MCP Authorization</a></li>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/guides/securing-mcp-server/">Cloudflare: Securing MCP servers</a></li>
+          <li><a href="https://developers.cloudflare.com/workers/static-assets/">Cloudflare: Workers Static Assets</a></li>
+          <li><a href="https://developers.cloudflare.com/r2/buckets/public-buckets/">Cloudflare: R2 Public Buckets</a></li>
+          <li><a href="https://developers.cloudflare.com/r2/pricing/">Cloudflare: R2 Pricing</a></li>
+          <li><a href="https://developers.cloudflare.com/containers/">Cloudflare: Containers</a></li>
+          <li><a href="https://developers.cloudflare.com/containers/platform-details/limits/">Cloudflare: Container Limits</a></li>
+          <li><a href="https://developers.cloudflare.com/containers/pricing/">Cloudflare: Container Pricing</a></li>
+          <li><a href="https://developers.cloudflare.com/containers/platform-details/image-management/">Cloudflare: Container Image Management</a></li>
           <li><a href="https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/">Twitch: OAuth Access Tokens</a></li>
           <li><a href="https://dev.twitch.tv/docs/authentication/validate-tokens">Twitch: Validating Tokens</a></li>
           <li><a href="https://dev.twitch.tv/docs/authentication/scopes/">Twitch: Access Token Scopes</a></li>
           <li><a href="https://dev.twitch.tv/docs/api/reference/#get-followed-channels">Twitch: Get Followed Channels</a></li>
           <li><a href="https://dev.twitch.tv/docs/api/reference/#check-user-subscription">Twitch: Check User Subscription</a></li>
+          <li><a href="https://github.com/VOICEVOX/voicevox_engine">VOICEVOX ENGINE</a></li>
+          <li><a href="https://voicevox.hiroshiba.jp/term/">VOICEVOX ソフトウェア利用規約</a></li>
         </ul>
       </section>
     </main>
