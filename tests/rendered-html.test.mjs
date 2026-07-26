@@ -25,6 +25,8 @@ test("renders the default presentation", async () => {
   assert.match(html, /最自由研究 Web Presentation/);
   assert.match(html, /読み上げ進捗/);
   assert.match(html, /読み上げ音量/);
+  assert.match(html, /発表レイアウト/);
+  assert.match(html, />BIIM</);
   assert.match(html, /自動送りをオン/);
 });
 
@@ -50,6 +52,9 @@ test("keeps Claude and project assumptions in the repository", async () => {
   assert.match(design, /16:9/);
   assert.match(styles, /aspect-ratio:\s*16 \/ 9/);
   assert.match(styles, /container-name:\s*presentation-stage/);
+  assert.match(styles, /data-layout="biim"/);
+  assert.match(styles, /data-layout="broadcast"/);
+  assert.match(styles, /data-layout="minimal"/);
 });
 
 test("includes generated VOICEVOX audio for every starter narration segment", async () => {
@@ -73,4 +78,5 @@ test("persists volume locally and presentation progress in the URL", async () =>
   assert.match(presentation, /addEventListener\("popstate"/);
   assert.match(presentation, /searchParams\.set\("slide"/);
   assert.match(presentation, /searchParams\.set\("step"/);
+  assert.match(presentation, /searchParams\.set\("layout"/);
 });

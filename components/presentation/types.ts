@@ -4,6 +4,12 @@ export type SlideTone = "dark" | "light" | "signal" | "quiet";
 
 export type NarrationDisplay = "dialogue" | "commentary" | "inline";
 
+export type PresentationLayout =
+  | "cinematic"
+  | "biim"
+  | "broadcast"
+  | "minimal";
+
 export type NarrationSegment = {
   /** この段階表示になった時に有効になる。最初の文は0。 */
   at: number;
@@ -39,6 +45,8 @@ export type ResearchDeck = {
   author: string;
   year: number;
   accent: string;
+  /** 発表全体の既定レイアウト。画面上からも一時的に切り替えられる。 */
+  layout?: PresentationLayout;
   narrationDefaults?: {
     display: NarrationDisplay;
     speaker?: string;

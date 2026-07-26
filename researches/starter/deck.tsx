@@ -23,6 +23,7 @@ export const starterDeck: ResearchDeck = {
   author: "あなたの名前",
   year: 2026,
   accent: "#ffcf32",
+  layout: "cinematic",
   narrationDefaults: {
     display: "dialogue",
     credit: "VOICEVOX:ずんだもん"

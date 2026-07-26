@@ -12,12 +12,19 @@ import { RevealProvider } from "./Reveal";
 import type {
   NarrationDisplay,
   NarrationSegment,
+  PresentationLayout,
   ResearchDeck,
   ResearchSlide
 } from "./types";
 
 const EMPTY_NARRATION_SEGMENTS: NarrationSegment[] = [];
 const VOLUME_STORAGE_KEY = "ultimate-freestyle:narration-volume";
+const LAYOUT_OPTIONS: Array<{ value: PresentationLayout; label: string }> = [
+  { value: "cinematic", label: "演出" },
+  { value: "biim", label: "BIIM" },
+  { value: "broadcast", label: "番組" },
+  { value: "minimal", label: "資料" }
+];
 
 type PresentationPosition = {
   slideIndex: number;
@@ -49,6 +56,19 @@ function writePositionToUrl(
     "",
     url
   );
+}
+
+function readLayoutFromUrl(fallback: PresentationLayout): PresentationLayout {
+  const requested = new URL(window.location.href).searchParams.get("layout");
+  return LAYOUT_OPTIONS.some((option) => option.value === requested)
+    ? (requested as PresentationLayout)
+    : fallback;
+}
+
+function writeLayoutToUrl(layout: PresentationLayout) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("layout", layout);
+  window.history.replaceState(window.history.state, "", url);
 }
 
 function formatTime(totalSeconds: number) {
@@ -145,6 +165,9 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
   const [narrationElapsed, setNarrationElapsed] = useState(0);
   const [narrationDuration, setNarrationDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [layout, setLayout] = useState<PresentationLayout>(
+    deck.layout ?? "cinematic"
+  );
   const timerStartedAt = useRef(0);
   const timerBaseSeconds = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
@@ -418,6 +441,11 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
     }
   }, []);
 
+  const updateLayout = useCallback((nextLayout: PresentationLayout) => {
+    setLayout(nextLayout);
+    writeLayoutToUrl(nextLayout);
+  }, []);
+
   const toggleAutoAdvance = useCallback(() => {
     const next = !autoAdvance;
     autoAdvanceRef.current = next;
@@ -485,17 +513,21 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
 
   useEffect(() => {
     const initialPosition = readPositionFromUrl(deck.slides);
+    const initialLayout = readLayoutFromUrl(deck.layout ?? "cinematic");
     writePositionToUrl(initialPosition, "replace");
+    writeLayoutToUrl(initialLayout);
 
     const restoreInitialPosition = window.setTimeout(() => {
       positionRef.current = initialPosition;
       previousPosition.current = `${initialPosition.slideIndex}:${initialPosition.revealStep}`;
       setSlideIndex(initialPosition.slideIndex);
       setRevealStep(initialPosition.revealStep);
+      setLayout(initialLayout);
     }, 0);
 
     const restoreFromHistory = () => {
       const nextPosition = readPositionFromUrl(deck.slides);
+      const nextLayout = readLayoutFromUrl(deck.layout ?? "cinematic");
       const current = positionRef.current;
       const currentUnit = current.slideIndex * 1000 + current.revealStep;
       const nextUnit = nextPosition.slideIndex * 1000 + nextPosition.revealStep;
@@ -504,6 +536,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       setDirection(nextUnit >= currentUnit ? "forward" : "backward");
       setSlideIndex(nextPosition.slideIndex);
       setRevealStep(nextPosition.revealStep);
+      setLayout(nextLayout);
     };
 
     window.addEventListener("popstate", restoreFromHistory);
@@ -511,7 +544,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       window.clearTimeout(restoreInitialPosition);
       window.removeEventListener("popstate", restoreFromHistory);
     };
-  }, [deck.slides, stopNarration]);
+  }, [deck.layout, deck.slides, stopNarration]);
 
   useEffect(() => {
     if (!timerRunning) return;
@@ -553,7 +586,10 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.target instanceof HTMLInputElement) return;
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLSelectElement
+      ) return;
       if (["ArrowRight", " ", "Enter", "PageDown"].includes(event.key)) {
         event.preventDefault();
         goNext();
@@ -602,10 +638,12 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       className="presentation"
       style={{ "--accent": deck.accent } as React.CSSProperties}
       data-tone={slide.tone ?? "dark"}
+      data-layout={layout}
       data-narration-display={activeNarration ? narrationDisplay : "none"}
     >
       <article
         className="stage"
+        data-layout={layout}
         onClick={handleStageClick}
         aria-label={`${deck.title}：${slide.title}`}
       >
@@ -630,6 +668,21 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
             {String(slideIndex + 1).padStart(2, "0")}
           </p>
         </div>
+        <aside className="biim-sidebar" aria-hidden="true">
+          <p>RESEARCH MEMO</p>
+          <strong>{slide.title}</strong>
+          <dl>
+            <div><dt>SLIDE</dt><dd>{slideIndex + 1} / {deck.slides.length}</dd></div>
+            <div><dt>STEP</dt><dd>{revealStep} / {slide.revealSteps ?? 0}</dd></div>
+            <div><dt>PACE</dt><dd>{formatTime(plannedElapsed)}</dd></div>
+          </dl>
+          <small>{deck.shortTitle}</small>
+        </aside>
+        <div className="broadcast-chrome" aria-hidden="true">
+          <b>LIVE</b>
+          <span>{deck.shortTitle}</span>
+          <time>{formatTime(elapsedSeconds)}</time>
+        </div>
       </article>
 
       <header className="presentation-header">
@@ -637,7 +690,24 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
           <p className="header-kicker">{deck.year} · 最自由研究</p>
           <p className="header-title">{deck.shortTitle}</p>
         </div>
-        <div className="time-panel" data-behind={delta > 30}>
+        <div className="presentation-tools">
+          <label className="layout-control">
+            <span>STYLE</span>
+            <select
+              value={layout}
+              onChange={(event) =>
+                updateLayout(event.currentTarget.value as PresentationLayout)
+              }
+              aria-label="発表レイアウト"
+            >
+              {LAYOUT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="time-panel" data-behind={delta > 30}>
           <div>
             <span>予定</span>
             <strong>{formatTime(plannedElapsed)}</strong>
@@ -672,6 +742,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
           >
             <Icon name="reset" />
           </button>
+          </div>
         </div>
       </header>
 
