@@ -6,7 +6,7 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-現在はCloudflare構成への移行初期です。新しいRemote MCPは `apps/mcp-server/` にあり、発表UIはまだリポジトリ直下にあります。現行形式の外部利用者はいないため、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
+現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成への移行初期です。新しいRemote MCPは `apps/mcp-server/` にあり、発表UIはまだリポジトリ直下にあります。現行形式の外部利用者はいないため、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
 
 ## できること
 

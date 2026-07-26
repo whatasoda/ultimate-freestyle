@@ -1294,8 +1294,9 @@ docs/                  # 設計・運用手順</pre>
           </div>
         </div>
         <p class="callout">
-          <code>mcp.example.com</code>をMCPとOAuth、<code>present.example.com/{user}/{slug}</code>を公開入口、
-          <code>assets.example.com</code>をpublic R2へ割り当てる。GitHub Pagesは公開経路に含めない。
+          公開ドメインは<code>saijiyu-kenkyu.2764.moe</code>とし、<code>/mcp</code>をMCP、
+          <code>/oauth/*</code>を認証、<code>/p/{public-id}</code>を公開発表、<code>/assets/*</code>を成果物配信に使う。
+          ひとつのCustom Domainを入口にしてWorker内でpath routingし、GitHub Pagesは公開経路に含めない。
         </p>
       </section>
 
@@ -1602,6 +1603,7 @@ docs/                  # 設計・運用手順</pre>
               <tr><td>MCP runtime</td><td>ステートレス<code>createMcpHandler</code></td><td>研究状態をD1へ置き、Durable Objectの常時接続課金を避ける。</td></tr>
               <tr><td>優先クライアント</td><td>Codex → ChatGPT → その他</td><td>Codexは開発中の直接接続と自動検証、ChatGPTは限定利用者向けplugin経由を主経路にする。</td></tr>
               <tr><td>互換性方針</td><td>現リポジトリを直接再構成</td><td>現行形式の利用者がいないため、旧Pages構成との並行運用や移行層を作らない。</td></tr>
+              <tr><td>公開ドメイン</td><td><code>saijiyu-kenkyu.2764.moe</code></td><td>MCP・OAuth・公開発表・成果物をpathで分け、ひとつのCloudflare Custom Domainへ集約する。</td></tr>
               <tr><td>公開基盤</td><td>Workers Static Assets + public R2</td><td>GitHub Pagesを使わず、認証から配信までCloudflareを正本にする。</td></tr>
               <tr><td>公開形式</td><td>R2上のversion付き固定成果物</td><td>上書きせず、切替・ロールバック・キャッシュ整合性を保つ。</td></tr>
               <tr><td>音声runtime</td><td>Cloudflare Container <code>standard-2</code></td><td>公式VOICEVOX CPU imageを使い、実測後にstandard-3と比較する。</td></tr>

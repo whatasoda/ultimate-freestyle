@@ -11,6 +11,7 @@
 ## 現在の移行状態
 
 - `apps/mcp-server/` は新しいCloudflare Remote MCP。
+- 本番入口は `saijiyu-kenkyu.2764.moe`。MCP、OAuth、公開発表、成果物は同一host内のpathで分ける。
 - 発表アプリはまだリポジトリ直下にある。共有schemaとrendererを抽出する段階で `apps/presentation/` へ移す。
 - 現行形式の外部利用者はいないため、GitHub Pagesとの後方互換層や二重公開は作らない。Cloudflare公開が成立した段階でPages固有処理を削除する。
 - MCPはCodexとChatGPTを第一の受け入れ対象にする。標準MCPから外れる独自tool契約は作らない。
