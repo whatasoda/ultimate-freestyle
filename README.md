@@ -48,6 +48,17 @@ bun run test
 
 公開先はGitHub Pagesを標準とし、GitHub Actionsで静的HTMLを生成します。リポジトリの `Settings` → `Pages` → `Build and deployment` で、`Source` を `GitHub Actions` に設定してください。以後は `main` へのpush、またはActions画面からの手動実行で公開されます。
 
+公開経路は音声生成の有無で分かれます。
+
+| 操作 | VOICEVOX生成 | Pagesへの反映 |
+|---|---|---|
+| `main` へpush | しない | 現在の原稿と一致する既存MP3だけを使い、残りはブラウザ読み上げで公開 |
+| `Deploy to GitHub Pages` を手動実行 | しない | `main` pushと同じ |
+| `Generate and publish VOICEVOX audio` を手動実行 | 変更segmentだけ | MP3生成後にそのまま公開 |
+| `voice-*` タグをpush | 変更segmentだけ | タグ時点の内容をMP3生成後に公開 |
+
+したがって、原稿を編集して `main` へpushしただけでVOICEVOXの実行時間は消費しません。音声付きの公開確認をしたい時だけ、生成・公開workflowを明示的に実行します。
+
 同梱のワークフローは、GitHub Pagesが返す実際の公開パスをビルドへ渡します。このため、利用者側でURLをソースコードへ書く必要はありません。
 
 | 公開方法 | URL例 | ビルド時の基準パス |
@@ -67,7 +78,7 @@ bun run build:pages
 PAGES_BASE_PATH=/ultimate-freestyle bun run build:pages
 ```
 
-成果物は `dist/client/` に生成されます。`bun run test` ではルート配置とサブパス配置を両方ビルドし、研究ページ、CSS・JavaScript、VOICEVOX音声のパスまで確認します。
+成果物は `dist/client/` に生成されます。`bun run test` ではルート配置とサブパス配置を両方ビルドし、研究ページとCSS・JavaScriptのパスを確認します。
 
 GitHub Pages版は完全な静的サイトです。公開後にサーバー処理を追加することはできませんが、現在のスライド進行、URL履歴、音声再生、`localStorage` による音量保存はすべてブラウザ内で動くため、そのまま利用できます。
 
@@ -159,13 +170,11 @@ narration: {
   segments: [
     {
       at: 0,
-      text: "まず、研究を始めたきっかけなのだ。",
-      audioSrc: "/researches/example/audio/question-0.wav"
+      text: "まず、研究を始めたきっかけなのだ。"
     },
     {
       at: 1,
-      text: "最初の疑問はこちらなのだ。",
-      audioSrc: "/researches/example/audio/question-1.wav"
+      text: "最初の疑問はこちらなのだ。"
     }
   ]
 }
@@ -200,11 +209,11 @@ sidebar: (
 
 ## 読み上げについて
 
-音声ファイルがない場合は、Web Speech APIによるブラウザ標準の日本語読み上げを使います。声質はOS・ブラウザごとに異なります。ページや段階を進めると、その位置に対応する原稿が自動再生されます。再生済みの原稿を個別に再生する操作は設けていないため、もう一度聞く場合は一度前へ戻ってから進めます。
+音声ファイルがない場合は、Web Speech APIによるブラウザ標準の日本語読み上げを使います。これが通常の開発方法です。声質はOS・ブラウザごとに異なります。ページや段階を進めると、その位置に対応する原稿が自動再生されます。再生済みの原稿を個別に再生する操作は設けていないため、もう一度聞く場合は一度前へ戻ってから進めます。
 
 右下の音声ボタンは今後の自動読み上げを止めるミュート切替です。`≫` の自動送りをオンにすると、音声の終了後に次の段階へ進み、そのまま発表を連続再生します。音声のない段階では短い待ち時間の後に進みます。初期状態では自動読み上げがオン、自動送りがオフです。
 
-`VOL` スライダーの音量はブラウザの `localStorage` に保存され、次回同じ端末で開いたときに復元されます。WAV・MP3は再生中にも変更が反映されます。ブラウザ標準読み上げは、現在の文が終わった後、次の文から新しい音量になります。
+`VOL` スライダーの音量はブラウザの `localStorage` に保存され、次回同じ端末で開いたときに復元されます。MP3等の音声ファイルは再生中にも変更が反映されます。ブラウザ標準読み上げは、現在の文が終わった後、次の文から新しい音量になります。
 
 ### 開発環境で読み上げを確認する
 
@@ -218,9 +227,11 @@ bun run dev
 4. `A` キーまたは `≫` ボタンで自動送りをオンにし、音声終了後に次へ進むことを確認する
 5. 音声を止めたい場合は `M` キーまたは音声ボタンで自動読み上げをオフにする
 
-`audioSrc` がないsegmentはブラウザ標準音声、あるsegmentは指定したWAV・MP3を再生します。ブラウザ標準音声が聞こえない場合は、OSの音声出力、ブラウザのサイト音声設定、日本語音声のインストール状況を確認してください。
+`audioSrc` がないsegmentはブラウザ標準音声、あるsegmentは指定した音声ファイルを再生します。ブラウザ標準音声が聞こえない場合は、OSの音声出力、ブラウザのサイト音声設定、日本語音声のインストール状況を確認してください。
 
-### VOICEVOX音声を生成する
+### ローカルでVOICEVOX音声を確認する
+
+この手順は任意です。VOICEVOX ENGINEとffmpegを用意できない場合は、通常のブラウザ読み上げだけで制作を進められます。
 
 VOICEVOX ENGINEを起動します。Dockerを使う場合：
 
@@ -237,7 +248,7 @@ docker run -d --rm \
 bun run voicevox:list
 ```
 
-登録済み研究の全segmentを一括生成します。
+別途 `ffmpeg` コマンドをインストールしたうえで、登録済み研究の全segmentを一括生成します。
 
 ```bash
 bun run voicevox:generate -- starter
@@ -257,25 +268,25 @@ VOICEVOX_STYLE="ノーマル" \
 bun run voicevox:generate -- starter
 ```
 
-話速等は `VOICEVOX_SPEED`、`VOICEVOX_INTONATION`、`VOICEVOX_VOLUME` で変更できます。生成先は次の形式です。
+話速等は `VOICEVOX_SPEED`、`VOICEVOX_INTONATION`、`VOICEVOX_VOLUME` で変更できます。MP3のビットレートは `VOICEVOX_MP3_BITRATE` で変更でき、既定は音声向けのモノラル64kbpsです。生成先は次の形式です。
 
 ```text
-public/researches/<slug>/audio/<slide-id>-<at>.wav
+public/.voicevox-preview/researches/<slug>/audio/<slide-id>-<at>.mp3
 ```
 
-テンプレートでは各segmentの `audioSrc` がこの命名規則を参照しています。開発サーバーの再起動なしで、次回再生時から生成音声が使われます。
+この領域は `.gitignore` の対象で、ローカル確認用MP3を誤ってコミットしません。生成後はVOICEVOX確認用サーバーを起動します。
 
-```tsx
-audioSrc: "/researches/starter/audio/question-0.wav"
+```bash
+bun run dev:voicevox
 ```
 
-生成済み音声を使う場合は、最終スライド等に話者の規約に沿ったクレジットを表示してください。テンプレートは `VOICEVOX:ずんだもん` を最終スライドで表示します。
+通常の `bun run dev` はプレビューMP3を参照せず、ブラウザ読み上げを使います。生成済み音声を使う場合は、最終スライド等に話者の規約に沿ったクレジットを表示してください。テンプレートは `VOICEVOX:ずんだもん` を最終スライドで表示します。
 
-### GitHub Actionsで生成する
+### GitHub Actionsで試験公開する
 
-ローカルへVOICEVOXを導入せず、GitHub Actions上の公式CPU Dockerイメージで音声を生成できます。通常のpushやPages公開では実行せず、次のどちらかで明示的に起動します。
+ローカルへVOICEVOXを導入せず、GitHub Actions上の公式CPU DockerイメージでMP3を生成し、そのままGitHub Pagesへ試験公開できます。通常のpushでは音声生成せず、次のどちらかで明示的に起動します。
 
-- Actions画面の `Generate VOICEVOX audio` → `Run workflow` から、研究slug・話者・スタイルを指定する
+- Actions画面の `Generate and publish VOICEVOX audio` → `Run workflow` から、研究slug・話者・スタイルを指定する
 - `voice-*` 形式のタグをpushし、登録済みの全研究を既定の「ずんだもん／ノーマル」で生成する
 
 ```bash
@@ -283,11 +294,27 @@ git tag voice-2026-08-01
 git push origin voice-2026-08-01
 ```
 
-生成後はworkflow runの `Artifacts` から `voicevox-audio-...` をダウンロードします。展開すると `<slug>/audio/` ごとにWAVが入っているため、内容を `public/researches/` 配下へコピーします。保存期間は7日です。音声を試聴し、問題なければリポジトリへコミットしてください。
+各segmentの原稿、話者、話速、ENGINEバージョン等からfingerprintを作り、前回と一致するMP3はActionsキャッシュから再利用します。キャッシュがない場合、設定を変更した場合、または `regenerate_all` を選んだ場合は再生成します。
 
-音声は意図やイントネーションを人が確認してから公開する必要があるため、Actionからmainへの自動コミットは行いません。また、Release公開とタグpushの両方をトリガーにすると同じ版で二重実行しやすいため、専用タグだけを自動トリガーにしています。
+生成後は同じworkflow runからPagesへデプロイされます。これは公開中のサイトを更新する操作なので、URLを知る人から閲覧可能になります。MP3はworkflow runの `Artifacts` にも7日間保存され、試聴や最終採用に利用できます。Actionからmainへの自動コミットは行いません。
 
-ずんだもん等の特徴的な声を使いたい場合は、外部の音声合成環境で音声を生成し、WAVやMP3を `public/researches/<slug>/audio/` に配置して `audioSrc` を設定する方式を想定しています。採用前に、音声合成ソフト・話者・キャラクターそれぞれの最新の利用規約とクレジット条件を確認してください。
+最終的に音声をリポジトリへ固定する場合は、artifact内の採用MP3を `public/researches/<slug>/audio/` に置き、そのsegmentだけ明示的なパスを設定します。
+
+```tsx
+{
+  at: 0,
+  text: "まず、研究を始めたきっかけなのだ。",
+  audioSrc: "/researches/example/audio/question-0.mp3"
+}
+```
+
+この最終採用MP3は通常のGitファイルとして管理します。Git LFSは使いません。
+
+音声は意図やイントネーションを人が確認してから固定する必要があるため、Actionからmainへの自動コミットは行いません。また、Release公開とタグpushの両方をトリガーにすると同じ版で二重実行しやすいため、専用タグだけを自動トリガーにしています。
+
+`main` pushのPages workflowはVOICEVOX ENGINEを起動しません。利用可能なActionsキャッシュから、現在の原稿ハッシュと一致するMP3だけを配置してビルドし、音声がないsegmentはブラウザ読み上げへ戻します。したがって、原稿だけ変更したpushで古い読み上げが流れることはありません。
+
+ずんだもん等の特徴的な声を使う前に、音声合成ソフト・話者・キャラクターそれぞれの最新の利用規約とクレジット条件を確認してください。
 
 ## 資料
 

@@ -30,4 +30,8 @@ Webスライドの見本を兼ねた研究テンプレートです。
 画像や音声は `public/researches/starter/` に置き、
 `/researches/starter/ファイル名` として参照します。
 
-読み上げ音声は段階ごとに `audio/<slide-id>-<at>.wav` とするのを推奨します。
+開発中の読み上げはブラウザ音声を標準とします。ローカルVOICEVOXの確認用MP3は
+`public/.voicevox-preview/researches/starter/audio/` に生成され、Gitには含まれません。
+
+採用する読み上げ音声を固定素材として管理する場合は、モノラル64kbpsのMP3を
+段階ごとに `audio/<slide-id>-<at>.mp3` として置き、segmentの `audioSrc` から参照します。

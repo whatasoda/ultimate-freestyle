@@ -18,11 +18,12 @@
 このプロジェクトではBunを使う。package.jsonのscriptを実行するときは、必ず `bun run <script>` を使う。
 
 - 開発: `bun run dev`
+- ローカルVOICEVOX音声で開発: `bun run dev:voicevox`（先に生成が必要）
 - ビルド: `bun run build`
 - 検証: `bun run test`
 - lint: `bun run lint`
 - VOICEVOX話者一覧: `bun run voicevox:list`（ENGINE起動中のみ）
-- VOICEVOX一括生成: `bun run voicevox:generate -- <slug>`（ENGINE起動中のみ）
+- VOICEVOX MP3一括生成: `bun run voicevox:generate -- <slug>`（ENGINEとffmpegが必要）
 
 `bun test`、`bun build`、`bun deploy` はpackage.jsonのscript実行には使わない。
 
@@ -53,7 +54,8 @@
 - 1スライド1メッセージを基本とし、配信画面の縮小表示でも読める文字量にする。
 - 引用・素材の出典は、スライド内または研究READMEに必ず残す。
 - 音声ファイルを追加する場合は各segmentの `audioSrc` を使い、ファイルがなくても発表が止まらない構成にする。
-- VOICEVOX生成ファイルは `public/researches/<slug>/audio/<slide-id>-<at>.wav` に置く。ENGINE本体やモデルはコミットしない。
+- ローカルVOICEVOX生成ファイルは `public/.voicevox-preview/researches/<slug>/audio/<slide-id>-<at>.mp3` に置かれ、コミットしない。通常開発はブラウザ読み上げを使う。
+- 最終採用する固定音声だけを `public/researches/<slug>/audio/` へ通常のGitファイルとして置き、segmentの `audioSrc` から参照する。Git LFSは使わない。
 - ページ・段階の移動後は対応するsegmentを自動再生し、音声終了時だけ自動送りする。個別の再読み上げ操作は追加しない。
 - 読み上げ時間と再生位置は下部のインジケーターへ反映する。音声ファイルがない場合もブラウザ読み上げの推定値を表示する。
 - 音量は `ultimate-freestyle:narration-volume` として `localStorage` に保存する。進行位置は保存せず、`?slide=<1始まり>&step=<0始まり>` とHistory APIで管理する。
