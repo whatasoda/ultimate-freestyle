@@ -163,6 +163,12 @@ describe("Twitch OAuth proxy", () => {
     const consentHtml = await consent.text();
     const csrfToken = consentHtml.match(/name="csrf_token" value="([^"]+)"/)?.[1];
     expect(csrfToken).toBeTruthy();
+    expect(consentHtml).toContain("id=\"authorize-feedback\"");
+    expect(consentHtml).toContain("Twitchへの接続を準備しています");
+    expect(consentHtml).toContain("requestAnimationFrame");
+    expect(consent.headers.get("content-security-policy")).toContain(
+      "script-src 'nonce-"
+    );
 
     const formBody = new URLSearchParams({ csrf_token: csrfToken ?? "" });
     const upstreamRedirect = await requestProvider(
@@ -180,6 +186,8 @@ describe("Twitch OAuth proxy", () => {
     );
     expect(upstreamRedirect.status).toBe(200);
     const upstreamHtml = await upstreamRedirect.text();
+    expect(upstreamHtml).toContain('http-equiv="refresh"');
+    expect(upstreamHtml).toContain("Twitchへ移動しています");
     const twitchAuthorize = new URL(
       upstreamHtml.match(/class="button" href="([^"]+)"/)?.[1].replaceAll(
         "&amp;",
@@ -202,9 +210,15 @@ describe("Twitch OAuth proxy", () => {
       }),
       authEnv
     );
-    expect(clientRedirect.status).toBe(302);
+    expect(clientRedirect.status).toBe(200);
+    const clientRedirectHtml = await clientRedirect.text();
+    expect(clientRedirectHtml).toContain("Twitchでの確認が完了しました");
+    expect(clientRedirectHtml).toContain("Twitch verification complete.");
+    expect(clientRedirectHtml).toContain('http-equiv="refresh"');
     const clientCallback = new URL(
-      clientRedirect.headers.get("location") ?? "https://invalid.example"
+      clientRedirectHtml
+        .match(/data-redirect-url="([^"]+)"/)?.[1]
+        .replaceAll("&amp;", "&") ?? "https://invalid.example"
     );
     expect(clientCallback.origin).toBe("https://client.example");
     expect(clientCallback.searchParams.get("state")).toBe("client-state");

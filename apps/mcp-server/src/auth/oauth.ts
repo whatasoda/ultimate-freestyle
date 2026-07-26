@@ -9,6 +9,7 @@ import {
 import { evaluateEligibility } from "./eligibility";
 import { readAuthConfig } from "./config";
 import {
+  authorizationCompletePage,
   consentPage,
   externalAuthorizationPage,
   messagePage
@@ -295,13 +296,10 @@ async function handleTwitchCallback(
     scope: scopes,
     props
   });
-  return new Response(null, {
-    status: 302,
-    headers: {
-      location: redirectTo,
-      "set-cookie": clearSecureCookie(TWITCH_STATE_COOKIE)
-    }
-  });
+  return authorizationCompletePage(
+    redirectTo,
+    clearSecureCookie(TWITCH_STATE_COOKIE)
+  );
 }
 
 function toOAuthError(error: unknown): OAuthError {
