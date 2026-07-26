@@ -6,7 +6,7 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成へ移行中です。新しいRemote MCP v0.3.0は `apps/mcp-server/` から本番稼働し、Twitch OAuthと資格判定、所有者分離されたversion付き研究CRUD、伴走promptまで実装済みです。本番認証はTwitchアプリの秘密情報を投入するまで無効です。発表UIはまだリポジトリ直下にあり、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
+現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成へ移行中です。新しいRemote MCP v0.3.0は `apps/mcp-server/` からTwitch OAuth必須で本番稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走promptまで実装済みです。発表UIはまだリポジトリ直下にあり、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
 
 ## できること
 

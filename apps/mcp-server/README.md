@@ -1,6 +1,6 @@
 # Remote MCP server
 
-最自由研究の制作機能をCodexやChatGPTへ提供するCloudflare Workerです。Twitch OAuthによる利用資格判定と、所有者分離された研究データの作成・再開・更新・評価・発表構成を標準MCPで提供します。本番はTwitchアプリの秘密情報を投入するまで認証無効で運用します。
+最自由研究の制作機能をCodexやChatGPTへ提供するCloudflare Workerです。Twitch OAuthによる利用資格判定と、所有者分離された研究データの作成・再開・更新・評価・発表構成を標準MCPで提供します。本番MCPはTwitch OAuthを必須とし、`/healthz`とOAuth metadataだけを未認証で公開します。
 
 ## 開発と検証
 
@@ -37,7 +37,7 @@ bun run smoke:mcp
 
 - `TWITCH_BROADCASTER_ID=67879379`
 - `TWITCH_BROADCASTER_LOGIN=kashiwo`
-- `MCP_AUTH_MODE=disabled`
+- `MCP_AUTH_MODE=twitch`
 - `MIN_FOLLOW_DAYS=30`
 - `ELIGIBILITY_CACHE_TTL_SECONDS=1800`
 
