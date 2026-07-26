@@ -29,6 +29,7 @@
     "voicevox:sync": "bun scripts/sync-voicevox-audio.ts"
   },
   "dependencies": {
+    "@ultimate-freestyle/research-schema": "workspace:*",
     "next": "16.2.6",
     "react": "19.2.6",
     "react-dom": "19.2.6"

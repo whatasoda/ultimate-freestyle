@@ -5,6 +5,7 @@
     "": {
       "name": "ultimate-freestyle",
       "dependencies": {
+        "@ultimate-freestyle/research-schema": "workspace:*",
         "next": "16.2.6",
         "react": "19.2.6",
         "react-dom": "19.2.6",
@@ -27,10 +28,11 @@
     },
     "apps/mcp-server": {
       "name": "@ultimate-freestyle/mcp-server",
-      "version": "0.1.0",
+      "version": "0.4.0",
       "dependencies": {
         "@cloudflare/workers-oauth-provider": "0.8.2",
         "@modelcontextprotocol/sdk": "^1.29.0",
+        "@ultimate-freestyle/research-schema": "workspace:*",
         "agents": "^0.17.4",
         "zod": "^4.4.3",
       },
@@ -41,6 +43,10 @@
         "vitest": "^4.1.0",
         "wrangler": "^4.112.0",
       },
+    },
+    "packages/research-schema": {
+      "name": "@ultimate-freestyle/research-schema",
+      "version": "0.1.0",
     },
   },
   "packages": {
@@ -445,6 +451,8 @@
     "@typescript/typescript-win32-x64": ["@typescript/typescript-win32-x64@7.0.2", "", { "os": "win32", "cpu": "x64" }, "sha512-0BQ3HkAHHlKLSp1qRvf3SUhGpGsDuhB/jgFw75guyqbxJqEaS0Cw/VFO8i2nHglJUzQCRtMMR/IBAKE3ETMC4g=="],
 
     "@ultimate-freestyle/mcp-server": ["@ultimate-freestyle/mcp-server@workspace:apps/mcp-server"],
+
+    "@ultimate-freestyle/research-schema": ["@ultimate-freestyle/research-schema@workspace:packages/research-schema"],
 
     "@unpic/core": ["@unpic/core@1.0.3", "", { "dependencies": { "unpic": "^4.2.2" } }, "sha512-aum9YNVUGso7MjGLD0Rp/08kywCGLqZ03/q6VQBFFakDBOXWEc8D4kPGcZ8v5wEnGRex3lE+++bOuucBp3KJ/w=="],
 

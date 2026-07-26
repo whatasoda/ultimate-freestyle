@@ -99,6 +99,15 @@ jobs:
           docker logs voicevox
           exit 1
 
+      - name: Record immutable ENGINE image identity
+        run: |
+          digest=$(docker image inspect "$VOICEVOX_IMAGE" --format '{{ index .RepoDigests 0 }}')
+          if [[ -z "$digest" || "$digest" != *@sha256:* ]]; then
+            echo "Unable to resolve the VOICEVOX image digest." >&2
+            exit 1
+          fi
+          echo "VOICEVOX_ENGINE_IMAGE_DIGEST=$digest" >> "$GITHUB_ENV"
+
       - name: Generate changed MP3 audio
         run: |
           arguments=()
@@ -133,7 +142,8 @@ jobs:
             echo "## VOICEVOX MP3 publication"
             echo "- Engine: $(docker image inspect "$VOICEVOX_IMAGE" --format '{{ index .RepoDigests 0 }}')"
             echo "- Research: $RESEARCH_SLUG"
-            echo "- Speaker: $VOICEVOX_SPEAKER / $VOICEVOX_STYLE"
+            echo "- Legacy deck fallback: $VOICEVOX_SPEAKER / $VOICEVOX_STYLE"
+            echo "- Profile-based decks use their speaker UUID, style ID, and tuning settings."
             echo "- MP3 bitrate: ${VOICEVOX_MP3_BITRATE}kbps mono"
             echo "- Published files: ${{ steps.audio.outputs.count }}"
             echo "- Browser fallbacks: ${{ steps.audio.outputs.missing }}"

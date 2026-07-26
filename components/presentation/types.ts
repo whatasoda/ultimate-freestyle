@@ -1,4 +1,8 @@
 import type { ReactNode } from "react";
+import type {
+  VoicevoxSettings,
+  VoicevoxTuningOverride
+} from "@ultimate-freestyle/research-schema/voice";
 
 export type SlideTone = "dark" | "light" | "signal" | "quiet";
 
@@ -18,6 +22,10 @@ export type NarrationSegment = {
    * 通常のVOICEVOX生成音声は命名規則から解決するため指定不要。
    */
   audioSrc?: string;
+  /** VOICEVOX設定。省略時は研究全体のdefault profileを使う。 */
+  voiceProfileId?: string;
+  /** この文だけに適用する調声差分。 */
+  voiceTuning?: VoicevoxTuningOverride;
 };
 
 export type Narration = {
@@ -57,5 +65,7 @@ export type ResearchDeck = {
     /** 最終スライド等に表示するクレジット。 */
     credit?: string;
   };
+  /** 複数話者・スタイルと調声値。表示用speakerとは独立している。 */
+  voicevox?: VoicevoxSettings;
   slides: ResearchSlide[];
 };

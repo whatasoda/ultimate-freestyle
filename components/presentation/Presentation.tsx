@@ -238,6 +238,18 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
     deck.slides.some((item) =>
       item.narration?.segments.some((segment) => Boolean(segment.audioSrc))
     );
+  const voiceCredit = useMemo(() => {
+    const profileCredits = Array.from(
+      new Set(
+        deck.voicevox?.profiles.map(
+          (profile) => `VOICEVOX:${profile.speakerName}`
+        ) ?? []
+      )
+    );
+    return profileCredits.length > 0
+      ? profileCredits.join(" / ")
+      : deck.narrationDefaults?.credit;
+  }, [deck.narrationDefaults?.credit, deck.voicevox?.profiles]);
 
   const stopNarration = useCallback(() => {
     playbackId.current += 1;
@@ -795,8 +807,8 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
         <div className="footer-actions">
           {slideIndex === deck.slides.length - 1 &&
           usesAudioFiles &&
-          deck.narrationDefaults?.credit ? (
-            <span className="voice-credit">{deck.narrationDefaults.credit}</span>
+          voiceCredit ? (
+            <span className="voice-credit">{voiceCredit}</span>
           ) : null}
           {hasNarration ? (
             <label className="volume-control" title="読み上げ音量">

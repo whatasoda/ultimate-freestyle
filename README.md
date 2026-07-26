@@ -276,7 +276,27 @@ bun run voicevox:generate -- starter
 bun run voicevox:generate -- --all
 ```
 
-既定値は「ずんだもん／ノーマル」です。変更する場合：
+`voicevox:list` は `style_id / speaker_uuid / 話者名 / style名` を表示します。研究ごとの`deck.tsx`では、名前ではなく`voicevox.profiles`の`speakerUuid + styleId`で声を固定します。`starter`には、ずんだもんと四国めたんの例が入っています。
+
+```tsx
+voicevox: {
+  catalogRevision: "voicevox-engine-0.25.1",
+  defaultProfileId: "zundamon-normal",
+  profiles: [{
+    id: "zundamon-normal",
+    label: "ずんだもん（ノーマル）",
+    speakerUuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
+    speakerName: "ずんだもん",
+    styleId: 3,
+    styleName: "ノーマル",
+    tuning: { speedScale: 1.05, pitchScale: 0 }
+  }]
+}
+```
+
+segmentごとに`voiceProfileId`を選び、`voiceTuning`でその文だけ調整できます。対応値は話速`speedScale`、音高`pitchScale`、抑揚`intonationScale`、音量`volumeScale`、ポーズ倍率`pauseLengthScale`、前後無音`prePhonemeLength`／`postPhonemeLength`です。
+
+`voicevox`がまだない旧deckだけは、既定の「ずんだもん／ノーマル」を使います。環境変数で変更する場合：
 
 ```bash
 VOICEVOX_SPEAKER="四国めたん" \
@@ -284,7 +304,7 @@ VOICEVOX_STYLE="ノーマル" \
 bun run voicevox:generate -- starter
 ```
 
-話速等は `VOICEVOX_SPEED`、`VOICEVOX_INTONATION`、`VOICEVOX_VOLUME` で変更できます。MP3のビットレートは `VOICEVOX_MP3_BITRATE` で変更でき、既定は音声向けのモノラル64kbpsです。生成先は次の形式です。
+旧deckの調声は`VOICEVOX_SPEED`、`VOICEVOX_PITCH`、`VOICEVOX_INTONATION`、`VOICEVOX_VOLUME`、`VOICEVOX_PAUSE_LENGTH`、`VOICEVOX_PRE_PHONEME`、`VOICEVOX_POST_PHONEME`で変更できます。profileがあるdeckではdeck側の値を正本にします。MP3のビットレートは`VOICEVOX_MP3_BITRATE`で変更でき、既定は音声向けのモノラル64kbpsです。生成先は次の形式です。
 
 ```text
 public/.voicevox-preview/researches/<slug>/audio/<slide-id>-<at>.mp3
@@ -296,7 +316,9 @@ public/.voicevox-preview/researches/<slug>/audio/<slide-id>-<at>.mp3
 bun run dev:voicevox
 ```
 
-通常の `bun run dev` はプレビューMP3を参照せず、ブラウザ読み上げを使います。生成済み音声を使う場合は、最終スライド等に話者の規約に沿ったクレジットを表示してください。テンプレートは `VOICEVOX:ずんだもん` を最終スライドで表示します。
+通常の`bun run dev`はプレビューMP3を参照せず、ブラウザ読み上げを使います。生成音声を使う表示では、profileに含まれる話者から`VOICEVOX:キャラクター名`のクレジットを重複なく自動表示します。公開前には各話者・キャラクターの最新規約も確認してください。
+
+manifest v2のfingerprintには原稿、speaker UUID、style ID、全調声値、ENGINE／core／話者version、話者catalog、ユーザー辞書、MP3設定を含めます。ローカル生成は`unverified-local`として扱い、将来のCloudflare Container本番cacheとは混ぜません。
 
 ### 移行前のGitHub Actionsで試験公開する
 

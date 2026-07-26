@@ -27,6 +27,29 @@ export const starterDeck: ResearchDeck = {
     display: "dialogue",
     credit: "VOICEVOX:ずんだもん"
   },
+  voicevox: {
+    catalogRevision: "voicevox-engine-0.25.1",
+    defaultProfileId: "zundamon-normal",
+    profiles: [
+      {
+        id: "zundamon-normal",
+        label: "ずんだもん（ノーマル）",
+        speakerUuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
+        speakerName: "ずんだもん",
+        styleId: 3,
+        styleName: "ノーマル",
+        tuning: { speedScale: 1.05 }
+      },
+      {
+        id: "metan-normal",
+        label: "四国めたん（ノーマル）",
+        speakerUuid: "7ffcb7ce-00ec-4bdc-82cd-45a8889e43ff",
+        speakerName: "四国めたん",
+        styleId: 2,
+        styleName: "ノーマル"
+      }
+    ]
+  },
   slides: [
     {
       id: "title",
@@ -64,7 +87,11 @@ export const starterDeck: ResearchDeck = {
         display: "dialogue",
         speaker: "研究者",
         segments: [
-          spoken("question", 0, "まず、なぜこの研究を始めたのかを説明します。"),
+          {
+            ...spoken("question", 0, "まず、なぜこの研究を始めたのかを説明します。"),
+            voiceProfileId: "metan-normal",
+            voiceTuning: { intonationScale: 1.1 }
+          },
           spoken("question", 1, "日常で見つけた小さな違和感。なぜ、こうなる？"),
           spoken("question", 2, "条件を変えたら、結果も変わるだろうか？"),
           spoken("question", 3, "そして、どこまで行けるのか。三つの問いを立てました。")

@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { researchDecks } from "../researches/registry";
 
 type AudioManifest = {
-  version: 1;
+  version: 2;
   entries: Record<string, { textHash: string }>;
 };
 
@@ -30,7 +30,8 @@ for (const deck of researchDecks) {
   const manifestPath = resolve(cachedDirectory, ".voicevox-manifest.json");
   let manifest: AudioManifest | undefined;
   try {
-    manifest = JSON.parse(await readFile(manifestPath, "utf8")) as AudioManifest;
+    const candidate = JSON.parse(await readFile(manifestPath, "utf8")) as AudioManifest;
+    if (candidate.version === 2) manifest = candidate;
   } catch {
     console.log(`cache missing ${deck.slug}`);
   }

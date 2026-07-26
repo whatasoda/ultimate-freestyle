@@ -1532,7 +1532,7 @@ docs/                  # 設計・運用手順</pre>
             Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価tool、動的resource、3つの伴走promptまで実装・本番配置済み。
             Phase 4は安全な自己完結HTML rendererと段階表示schemaまで実装・自動検証済み。
             Web UIはトップページ、Twitchログイン、D1上の24時間Web専用セッション、CSRF付きログアウト、所有者限定の研究一覧・詳細と空状態まで実装済み。
-            private R2 bucketとImages binding、Web UIの画像追加・閲覧・削除は実装済み。入力10 MiB、40 MP、一辺10,000 px、保存2 MiB・最大辺2,560 px、100画像/project・300画像/user・150 MiB/userを上限とし、原本を残さずWebPへ正規化する。preview／publish用成果物の保存経路は後続で接続する。
+            private R2 bucketとImages binding、Web UIの画像追加・閲覧・削除は実装済み。入力10 MiB、40 MP、一辺10,000 px、保存2 MiB・最大辺2,560 px、100画像/project・300画像/user・150 MiB/userを上限とし、原本を残さずWebPへ正規化する。VOICEVOXは全talk styleを対象に、UUID + style IDの複数profile、segment別profile、7種の調声値、生成manifest v2、使用話者の自動クレジットまでschemaとローカル生成へ実装済み。preview／publish用成果物の保存経路とContainer jobは後続で接続する。
             Codexでは<code>health</code>と<code>get_access_status</code>の実呼び出しまで確認済み。ChatGPT実クライアント確認を残し、Queue、Containerは未着手。
           </p>
         </div>
@@ -1587,7 +1587,7 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 5</div>
             <div class="phase-main">
               <h3>VOICEVOX Container</h3>
-              <p>固定ENGINE image、standard-2、Queue、差分fingerprint、ffmpeg、R2保存を実装し、文章長・発表一式・資源のベンチマークを取る。</p>
+              <p>複数talk profile、全調声値、差分fingerprint v2、ローカルffmpeg生成は実装済み。固定ENGINE image、standard-2、Queue、R2保存を接続し、文章長・発表一式・資源のベンチマークを取る。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>非同期jobが冪等に完了し、性能と実測原価を説明できる。</p></div>
           </article>

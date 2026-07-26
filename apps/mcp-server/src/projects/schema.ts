@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VOICEVOX_TUNING_LIMITS } from "@ultimate-freestyle/research-schema/voice";
 
 export const projectStageSchema = z.enum([
   "discovery",
@@ -12,8 +13,69 @@ export const projectStageSchema = z.enum([
 export const narrationSegmentSchema = z.object({
   at: z.number().int().nonnegative().max(100),
   text: z.string().min(1).max(2_000),
-  audio_src: z.string().max(500).nullable()
+  audio_src: z.string().max(500).nullable(),
+  voice_profile_id: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+    .nullable()
+    .optional(),
+  voice_tuning: z
+    .object(
+      Object.fromEntries(
+        Object.entries(VOICEVOX_TUNING_LIMITS).map(([key, range]) => [
+          key,
+          z.number().min(range.min).max(range.max).multipleOf(0.01).optional()
+        ])
+      ) as {
+        speedScale: z.ZodOptional<z.ZodNumber>;
+        pitchScale: z.ZodOptional<z.ZodNumber>;
+        intonationScale: z.ZodOptional<z.ZodNumber>;
+        volumeScale: z.ZodOptional<z.ZodNumber>;
+        pauseLengthScale: z.ZodOptional<z.ZodNumber>;
+        prePhonemeLength: z.ZodOptional<z.ZodNumber>;
+        postPhonemeLength: z.ZodOptional<z.ZodNumber>;
+      }
+    )
+    .nullable()
+    .optional()
 });
+
+const voicevoxProfileSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+  label: z.string().min(1).max(80),
+  speaker_uuid: z.string().uuid(),
+  speaker_name: z.string().min(1).max(80),
+  style_id: z.number().int().nonnegative(),
+  style_name: z.string().min(1).max(80),
+  tuning: narrationSegmentSchema.shape.voice_tuning
+});
+
+const voicevoxSettingsSchema = z
+  .object({
+    catalog_revision: z.string().min(1).max(128),
+    default_profile_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+    profiles: z.array(voicevoxProfileSchema).min(1).max(16)
+  })
+  .superRefine((settings, context) => {
+    const ids = new Set<string>();
+    for (const [index, profile] of settings.profiles.entries()) {
+      if (ids.has(profile.id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["profiles", index, "id"],
+          message: "VOICEVOX profile IDs must be unique."
+        });
+      }
+      ids.add(profile.id);
+    }
+    if (!ids.has(settings.default_profile_id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["default_profile_id"],
+        message: "The default VOICEVOX profile must exist in profiles."
+      });
+    }
+  });
 
 export const projectSlideSchema = z
   .object({
@@ -93,7 +155,8 @@ export const researchLogEntrySchema = z.object({
   source_url: z.string().url().max(2_000).nullable()
 });
 
-export const projectDocumentSchema = z.object({
+export const projectDocumentSchema = z
+  .object({
   schema_version: z.literal(1),
   stage: projectStageSchema,
   title: z.string().min(1).max(120),
@@ -104,8 +167,8 @@ export const projectDocumentSchema = z.object({
   findings: z.array(z.string().min(1).max(4_000)).max(100),
   limitations: z.array(z.string().min(1).max(4_000)).max(100),
   logs: z.array(researchLogEntrySchema).max(500),
-  deck: z
-    .object({
+    deck: z
+      .object({
       short_title: z.string().min(1).max(60),
       description: z.string().max(500),
       author: z.string().max(120),
@@ -119,10 +182,43 @@ export const projectDocumentSchema = z.object({
           credit: z.string().max(500).nullable()
         })
         .nullable(),
+      voicevox: voicevoxSettingsSchema.nullable().optional(),
       slides: z.array(projectSlideSchema).max(100)
-    })
-    .nullable()
-});
+      })
+      .nullable()
+  })
+  .superRefine((document, context) => {
+    const profiles = new Set(
+      document.deck?.voicevox?.profiles.map((profile) => profile.id) ?? []
+    );
+    for (const [slideIndex, slide] of (
+      document.deck?.slides ?? []
+    ).entries()) {
+      for (const [segmentIndex, segment] of (
+        slide.narration?.segments ?? []
+      ).entries()) {
+        if (
+          segment.voice_profile_id !== undefined &&
+          segment.voice_profile_id !== null &&
+          !profiles.has(segment.voice_profile_id)
+        ) {
+          context.addIssue({
+            code: "custom",
+            path: [
+              "deck",
+              "slides",
+              slideIndex,
+              "narration",
+              "segments",
+              segmentIndex,
+              "voice_profile_id"
+            ],
+            message: "The referenced VOICEVOX profile does not exist."
+          });
+        }
+      }
+    }
+  });
 
 export type ProjectDocument = z.infer<typeof projectDocumentSchema>;
 
