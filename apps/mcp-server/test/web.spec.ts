@@ -161,6 +161,9 @@ describe("Web dashboard", () => {
 
     const now = "2026-07-26T10:00:00.000Z";
     const ownDocument = createEmptyProject("自分の研究 <script>alert(1)</script>");
+    ownDocument.summary = "研究の概要です";
+    ownDocument.question = "なぜこうなるのか？";
+    ownDocument.findings = ["観察した結果"];
     const otherDocument = createEmptyProject("他人だけに見える研究");
     await env.DB.batch([
       env.DB.prepare(
@@ -212,6 +215,37 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("viewer&lt;script&gt;");
     expect(dashboardHtml).not.toContain("viewer<script>");
     expect(dashboardHtml).toContain("1 / 20 件");
+    expect(dashboardHtml).toContain(
+      'href="/dashboard/projects/10000000-0000-4000-8000-000000000001"'
+    );
+
+    const detail = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
+        { headers: { cookie: sessionCookie } }
+      ),
+      authEnv
+    );
+    const detailHtml = await detail.text();
+    expect(detail.status).toBe(200);
+    expect(detailHtml).toContain("研究の概要です");
+    expect(detailHtml).toContain("なぜこうなるのか？");
+    expect(detailHtml).toContain("観察した結果");
+    expect(detailHtml).toContain(
+      "自分の研究 &lt;script&gt;alert(1)&lt;/script&gt;"
+    );
+
+    const otherDetail = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/20000000-0000-4000-8000-000000000002",
+        { headers: { cookie: sessionCookie } }
+      ),
+      authEnv
+    );
+    expect(otherDetail.status).toBe(404);
+    expect(await otherDetail.text()).not.toContain("他人だけに見える研究");
 
     const csrfToken = dashboardHtml.match(
       /name="csrf_token" value="([^"]+)"/

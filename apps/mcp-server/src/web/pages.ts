@@ -1,5 +1,5 @@
 import { escapeHtml } from "../auth/pages";
-import type { ProjectSummary } from "../projects/schema";
+import type { ProjectRecord, ProjectSummary } from "../projects/schema";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   discovery: "発見",
@@ -60,7 +60,11 @@ function shell(title: string, body: string): string {
       .count { color: var(--muted); }
       .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 1rem; }
       .card, .empty { border: 1px solid var(--line); border-radius: 1rem; background: linear-gradient(150deg, #182437e8, #101925e8); box-shadow: 0 1rem 3rem #0004; }
+      .card-link { display: block; border-radius: 1rem; color: inherit; text-decoration: none; }
+      .card-link:hover .card { border-color: #8062dfaa; transform: translateY(-2px); }
+      .card-link:focus-visible { outline: .2rem solid #c4b5fd; outline-offset: .2rem; }
       .card { min-height: 13rem; padding: 1.25rem; }
+      .card { transition: border-color .15s ease, transform .15s ease; }
       .card-top { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
       .stage { display: inline-flex; padding: .3rem .58rem; border: 1px solid #7f68c977; border-radius: 999px; background: #8062df20; color: #c7b9ff; font-size: .78rem; font-weight: 800; }
       .version { color: var(--muted); font-size: .78rem; }
@@ -70,7 +74,30 @@ function shell(title: string, body: string): string {
       .empty h2 { margin-top: 0; }
       .empty p { color: var(--muted); line-height: 1.7; }
       .hint { margin: 1.5rem 0 0; padding: 1rem 1.15rem; border-left: .2rem solid #62d6ff; background: #112334; color: #bfcedd; line-height: 1.7; }
+      .back { display: inline-flex; margin-bottom: 1.5rem; color: #b9c7d8; text-decoration: none; }
+      .detail-title { font-size: clamp(2rem, 6vw, 4.5rem); overflow-wrap: anywhere; }
+      .detail-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); gap: 1rem; margin-top: 1.5rem; }
+      .detail-column { display: grid; align-content: start; gap: 1rem; }
+      .panel { padding: 1.25rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--panel); }
+      .panel h2 { margin: 0 0 .8rem; font-size: 1.05rem; }
+      .panel h3 { margin: 1rem 0 .35rem; font-size: .95rem; }
+      .panel p, .panel li { color: #bdc9d8; line-height: 1.75; }
+      .prose { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .plain-list { margin: 0; padding-left: 1.25rem; }
+      .plain-list li + li { margin-top: .45rem; }
+      .stat-list { display: grid; grid-template-columns: 1fr auto; gap: .55rem 1rem; margin: 0; }
+      .stat-list dt { color: var(--muted); }
+      .stat-list dd { margin: 0; font-weight: 750; text-align: right; }
+      .log { padding: .8rem 0; border-top: 1px solid var(--line); }
+      .log:first-of-type { padding-top: 0; border-top: 0; }
+      .log small { color: var(--muted); }
+      .slide-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; gap: .75rem; align-items: baseline; padding: .7rem 0; border-top: 1px solid var(--line); }
+      .slide-row:first-of-type { border-top: 0; }
+      .slide-row span { color: var(--muted); font-size: .85rem; }
+      .slide-row strong { overflow-wrap: anywhere; }
+      .notice { max-width: 42rem; margin: 3rem auto; text-align: center; }
       form { margin: 0; }
+      @media (max-width: 48rem) { .detail-grid { grid-template-columns: 1fr; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
     </style>
@@ -82,6 +109,28 @@ function shell(title: string, body: string): string {
 function formatDate(iso: string): string {
   const [date] = iso.split("T");
   return date?.replaceAll("-", "/") ?? iso;
+}
+
+function accountHeader(twitchLogin: string, csrfToken: string): string {
+  return `<header class="site-header">
+    <a class="brand" href="/dashboard">最自由研究</a>
+    <div class="account"><span><strong>${escapeHtml(twitchLogin)}</strong> でログイン中</span>
+      <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="${escapeHtml(csrfToken)}"><button class="ghost" type="submit">ログアウト</button></form>
+    </div>
+  </header>`;
+}
+
+function textPanel(title: string, value: string | null): string {
+  return `<section class="panel"><h2>${escapeHtml(title)}</h2><p class="prose">${escapeHtml(value?.trim() || "未記入")}</p></section>`;
+}
+
+function listPanel(title: string, values: string[]): string {
+  const limited = values.slice(0, 20);
+  const items = limited.length
+    ? `<ul class="plain-list">${limited.map((value) => `<li>${escapeHtml(value)}</li>`).join("")}</ul>`
+    : `<p class="prose">未記入</p>`;
+  const remaining = values.length - limited.length;
+  return `<section class="panel"><h2>${escapeHtml(title)}</h2>${items}${remaining > 0 ? `<p class="meta">ほか ${remaining} 件</p>` : ""}</section>`;
 }
 
 export function landingPage(): Response {
@@ -107,11 +156,11 @@ export function dashboardPage(options: {
 }): Response {
   const cards = options.projects
     .map(
-      (project) => `<article class="card" data-project-id="${escapeHtml(project.project_id)}">
+      (project) => `<a class="card-link" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
         <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
         <p class="meta">最終更新 ${escapeHtml(formatDate(project.updated_at))}</p>
-      </article>`
+      </article></a>`
     )
     .join("");
   const content =
@@ -122,12 +171,7 @@ export function dashboardPage(options: {
   return new Response(
     shell(
       "自分の研究 — 最自由研究",
-      `<header class="site-header">
-         <a class="brand" href="/dashboard">最自由研究</a>
-         <div class="account"><span><strong>${escapeHtml(options.twitchLogin)}</strong> でログイン中</span>
-           <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="${escapeHtml(options.csrfToken)}"><button class="ghost" type="submit">ログアウト</button></form>
-         </div>
-       </header>
+      `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main>
          <div class="section-head"><div><p class="eyebrow">My research</p><h1>自分の研究</h1></div><span class="count">${options.projects.length} / 20 件</span></div>
          ${content}
@@ -135,6 +179,75 @@ export function dashboardPage(options: {
        </main>`
     ),
     { headers: headers() }
+  );
+}
+
+export function projectDetailPage(options: {
+  twitchLogin: string;
+  csrfToken: string;
+  project: ProjectRecord;
+}): Response {
+  const document = options.project.document;
+  const recentLogs = document.logs.slice(-20).reverse();
+  const logs = recentLogs.length
+    ? recentLogs
+        .map(
+          (entry) => `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p></article>`
+        )
+        .join("")
+    : `<p class="prose">まだ研究ログがありません。</p>`;
+  const slides = document.deck?.slides ?? [];
+  const slideRows = slides.length
+    ? slides
+        .map(
+          (slide, index) => `<div class="slide-row"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}</strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></div>`
+        )
+        .join("")
+    : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
+
+  return new Response(
+    shell(
+      `${document.title} — 最自由研究`,
+      `${accountHeader(options.twitchLogin, options.csrfToken)}
+       <main>
+         <a class="back" href="/dashboard">← 自分の研究へ戻る</a>
+         <div class="card-top"><span class="stage">${STAGE_LABELS[document.stage]}</span><span class="version">v${options.project.version}</span></div>
+         <h1 class="detail-title">${escapeHtml(document.title)}</h1>
+         <p class="lead">${escapeHtml(document.summary || "概要はまだ記入されていません。")}</p>
+         <div class="detail-grid">
+           <div class="detail-column">
+             ${textPanel("研究の問い", document.question)}
+             ${textPanel("仮説", document.hypothesis)}
+             ${textPanel("方法", document.method)}
+             ${listPanel("わかったこと", document.findings)}
+             ${listPanel("限界・今後の課題", document.limitations)}
+             <section class="panel"><h2>研究ログ</h2>${logs}${document.logs.length > recentLogs.length ? `<p class="meta">最新20件を表示 · 全${document.logs.length}件</p>` : ""}</section>
+           </div>
+           <aside class="detail-column">
+             <section class="panel"><h2>研究情報</h2><dl class="stat-list">
+               <dt>段階</dt><dd>${STAGE_LABELS[document.stage]}</dd>
+               <dt>version</dt><dd>${options.project.version}</dd>
+               <dt>更新日</dt><dd>${escapeHtml(formatDate(options.project.updated_at))}</dd>
+               <dt>ログ</dt><dd>${document.logs.length}件</dd>
+               <dt>スライド</dt><dd>${slides.length}枚</dd>
+             </dl></section>
+             <section class="panel"><h2>発表構成</h2>${slideRows}</section>
+             <p class="hint">編集・評価・スライド構成は、接続したAIクライアントから行えます。</p>
+           </aside>
+         </div>
+       </main>`
+    ),
+    { headers: headers() }
+  );
+}
+
+export function projectNotFoundPage(): Response {
+  return new Response(
+    shell(
+      "研究が見つかりません — 最自由研究",
+      `<main><section class="panel notice"><p class="eyebrow">Not found</p><h1 class="detail-title">研究が見つかりません</h1><p class="lead">削除されたか、このアカウントでは表示できない研究です。</p><a class="button primary" href="/dashboard">自分の研究へ戻る</a></section></main>`
+    ),
+    { status: 404, headers: headers() }
   );
 }
 

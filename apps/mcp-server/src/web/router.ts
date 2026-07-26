@@ -14,11 +14,13 @@ import {
   deleteWebSession,
   readWebSession
 } from "../auth/web-session";
-import { listProjects } from "../projects/repository";
+import { getProject, listProjects } from "../projects/repository";
 import { readUrlEncodedFormCapped } from "../lib/http";
 import {
   dashboardPage,
   landingPage,
+  projectDetailPage,
+  projectNotFoundPage,
   redirectPage
 } from "./pages";
 
@@ -55,6 +57,29 @@ async function handleDashboard(request: Request, env: Env): Promise<Response> {
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
     projects: await listProjects(env.DB, session.userId)
+  });
+}
+
+async function handleProjectDetail(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.AUTH_STATE_KV);
+  if (session === null) {
+    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
+  }
+  const project = await getProject(env.DB, session.userId, projectId);
+  if (project === null) {
+    return projectNotFoundPage();
+  }
+  return projectDetailPage({
+    twitchLogin: session.twitchLogin,
+    csrfToken: session.csrfToken,
+    project
   });
 }
 
@@ -106,6 +131,12 @@ export async function handleWebRequest(
   }
   if (path === "/dashboard") {
     return handleDashboard(request, env);
+  }
+  const projectMatch = path.match(
+    /^\/dashboard\/projects\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/i
+  );
+  if (projectMatch?.[1] !== undefined) {
+    return handleProjectDetail(request, env, projectMatch[1]);
   }
   if (path === "/logout") {
     return handleLogout(request, env);
