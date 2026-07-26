@@ -25,6 +25,8 @@ bun run smoke:mcp
 
 `bun run smoke:mcp` は、本番のヘルスチェックとMCP初期化をブラウザなしで検証します。別環境を検証するときだけ、`MCP_BASE_URL` にoriginを指定してください。デプロイはリポジトリルートで `bun run deploy:mcp` を実行します。
 
+2026-07-26時点でWorker、Custom Domain、DNS、TLSは本番配置済みです。D1、KV、R2、Queue、ContainerとTwitch secretは、対応する機能を実装する段階で追加します。
+
 ## 設定
 
 秘密ではない初期値は `wrangler.jsonc` の `vars` に置きます。

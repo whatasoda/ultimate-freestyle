@@ -1516,6 +1516,12 @@ docs/                  # 設計・運用手順</pre>
           <p class="section-kicker">09 / Implementation roadmap</p>
           <h2>認証を先に証明し、制作機能を後から載せる</h2>
           <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
+          <p class="callout">
+            <strong>2026-07-26現在：</strong>Phase 0は完了。Phase 1のWorkerを
+            <code>https://saijiyu-kenkyu.2764.moe/mcp</code>へデプロイし、
+            自動contract testと本番スモークテストでStreamable HTTP初期化を確認済み。
+            Phase 1の残作業はCodex・ChatGPT実クライアントからの接続確認で、Twitch認証、D1、R2、Queue、Containerはまだ作成しない。
+          </p>
         </div>
 
         <div class="roadmap">
