@@ -5,6 +5,7 @@ import {
   type AuthRequest,
   type OAuthHelpers
 } from "@cloudflare/workers-oauth-provider";
+import { z } from "zod";
 
 import { evaluateEligibility } from "./eligibility";
 import { readAuthConfig } from "./config";
@@ -22,6 +23,7 @@ import {
 import {
   CSRF_COOKIE,
   TWITCH_STATE_COOKIE,
+  WEB_SESSION_COOKIE,
   clearSecureCookie,
   createSecureCookie,
   hashToken,
@@ -29,6 +31,11 @@ import {
   readCookie,
   secureTokenEqual
 } from "./security";
+import {
+  createWebSession,
+  deleteWebSession,
+  readWebSession
+} from "./web-session";
 import {
   defaultFetcher,
   TwitchApiError,
@@ -41,9 +48,28 @@ import {
   twitchGrantPropsSchema,
   type TwitchGrantProps
 } from "./types";
+import { listProjects } from "../projects/repository";
+import {
+  dashboardPage,
+  landingPage,
+  redirectPage,
+  webLoginCompletePage
+} from "../web/pages";
 
 const STATE_TTL_SECONDS = 600;
 const STATE_KEY_PREFIX = "oauth:twitch:state:";
+
+const pendingTwitchStateSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("mcp"),
+    authRequest: oauthAuthRequestSchema
+  }),
+  z.object({
+    kind: z.literal("web")
+  })
+]);
+
+type PendingTwitchState = z.infer<typeof pendingTwitchStateSchema>;
 
 type McpRequestHandler = (
   request: Request,
@@ -74,12 +100,12 @@ function validateRequestedScopes(request: AuthRequest): string[] {
 
 async function storeTwitchState(
   env: Env,
-  request: AuthRequest
+  pendingState: PendingTwitchState
 ): Promise<{ state: string; cookie: string }> {
   const state = randomToken();
   await env.AUTH_STATE_KV.put(
     `${STATE_KEY_PREFIX}${state}`,
-    JSON.stringify(request),
+    JSON.stringify(pendingState),
     { expirationTtl: STATE_TTL_SECONDS }
   );
   return {
@@ -96,7 +122,7 @@ async function consumeTwitchState(
   request: Request,
   env: Env,
   state: string
-): Promise<AuthRequest | null> {
+): Promise<PendingTwitchState | null> {
   const key = `${STATE_KEY_PREFIX}${state}`;
   const [stored, expectedHash] = await Promise.all([
     env.AUTH_STATE_KV.get(key, "json"),
@@ -112,7 +138,7 @@ async function consumeTwitchState(
   ) {
     return null;
   }
-  const parsed = oauthAuthRequestSchema.safeParse(stored);
+  const parsed = pendingTwitchStateSchema.safeParse(stored);
   return parsed.success ? parsed.data : null;
 }
 
@@ -196,7 +222,10 @@ async function handleAuthorize(
 
   const authConfig = readAuthConfig(env);
   const twitch = new TwitchClient(authConfig.twitch, fetcher);
-  const pending = await storeTwitchState(env, authRequest);
+  const pending = await storeTwitchState(env, {
+    kind: "mcp",
+    authRequest
+  });
   return externalAuthorizationPage(
     twitch.createAuthorizationUrl(pending.state),
     [pending.cookie, clearSecureCookie(CSRF_COOKIE)]
@@ -213,8 +242,8 @@ async function handleTwitchCallback(
   if (state === null) {
     return messagePage("認証エラー", "Twitch stateがありません。", 400);
   }
-  const authRequest = await consumeTwitchState(request, env, state);
-  if (authRequest === null) {
+  const pendingState = await consumeTwitchState(request, env, state);
+  if (pendingState === null) {
     return messagePage(
       "認証エラー",
       "認証リクエストが無効または期限切れです。",
@@ -274,6 +303,26 @@ async function handleTwitchCallback(
     );
   }
 
+  if (pendingState.kind === "web") {
+    const webSession = await createWebSession(env.AUTH_STATE_KV, {
+      userId,
+      twitchLogin: identity.login,
+      now
+    });
+    await recordAuditEvent(env.DB, {
+      userId,
+      eventType: "web.login",
+      outcome: "allowed",
+      details: { eligibility_reason: eligibility.reason },
+      createdAt: nowIso
+    });
+    return webLoginCompletePage([
+      webSession.cookie,
+      clearSecureCookie(TWITCH_STATE_COOKIE)
+    ]);
+  }
+
+  const authRequest = pendingState.authRequest;
   const scopes = validateRequestedScopes(authRequest);
   const props = createGrantProps({
     subjectId: userId,
@@ -300,6 +349,68 @@ async function handleTwitchCallback(
     redirectTo,
     clearSecureCookie(TWITCH_STATE_COOKIE)
   );
+}
+
+async function handleWebLogin(
+  request: Request,
+  env: Env,
+  fetcher: Fetcher
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  if ((await readWebSession(request, env.AUTH_STATE_KV)) !== null) {
+    return redirectPage("/dashboard");
+  }
+  const config = readAuthConfig(env);
+  const twitch = new TwitchClient(config.twitch, fetcher);
+  const pending = await storeTwitchState(env, { kind: "web" });
+  return externalAuthorizationPage(twitch.createAuthorizationUrl(pending.state), [
+    pending.cookie
+  ]);
+}
+
+async function handleDashboard(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.AUTH_STATE_KV);
+  if (session === null) {
+    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
+  }
+  return dashboardPage({
+    twitchLogin: session.twitchLogin,
+    csrfToken: session.csrfToken,
+    projects: await listProjects(env.DB, session.userId)
+  });
+}
+
+async function handleLogout(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await readWebSession(request, env.AUTH_STATE_KV);
+  if (session === null) {
+    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
+  }
+  const contentLength = Number(request.headers.get("content-length"));
+  if (!Number.isSafeInteger(contentLength) || contentLength > 16 * 1024) {
+    return messagePage("ログアウトエラー", "リクエストが大きすぎます。", 413);
+  }
+  const form = await request.formData();
+  const csrfToken = form.get("csrf_token");
+  if (
+    typeof csrfToken !== "string" ||
+    !(await secureTokenEqual(csrfToken, session.csrfToken))
+  ) {
+    return messagePage(
+      "ログアウトエラー",
+      "画面の有効期限が切れました。ページを読み込み直してください。",
+      403
+    );
+  }
+  await deleteWebSession(request, env.AUTH_STATE_KV);
+  return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
 }
 
 function toOAuthError(error: unknown): OAuthError {
@@ -389,6 +500,19 @@ export function createOAuthProvider(
     async fetch(request: Request, requestEnv: Env): Promise<Response> {
       const path = new URL(request.url).pathname;
       try {
+        if (path === "/" && request.method === "GET") {
+          const session = await readWebSession(request, requestEnv.AUTH_STATE_KV);
+          return session === null ? landingPage() : redirectPage("/dashboard");
+        }
+        if (path === "/login") {
+          return await handleWebLogin(request, requestEnv, fetcher);
+        }
+        if (path === "/dashboard") {
+          return await handleDashboard(request, requestEnv);
+        }
+        if (path === "/logout") {
+          return await handleLogout(request, requestEnv);
+        }
         if (path === "/authorize") {
           return await handleAuthorize(request, requestEnv, fetcher);
         }

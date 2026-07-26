@@ -10,7 +10,7 @@ import { registerProjectTools } from "./projects/tools";
 import { registerResearchGuides } from "./projects/guides";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.3.0";
+export const SERVICE_VERSION = "0.4.0";
 
 export type EligibilityConfig = Pick<
   Env,

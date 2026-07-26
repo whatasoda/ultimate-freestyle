@@ -27,6 +27,28 @@ assert.equal(health.body.ok, true);
 assert.equal(health.body.service, "ultimate-freestyle-mcp");
 assert.equal(health.body.eligibility?.broadcaster_id, "67879379");
 
+const landingResponse = await fetch(new URL("/", baseUrl), {
+  redirect: "manual",
+  signal: AbortSignal.timeout(15_000)
+});
+assert.equal(landingResponse.status, 200);
+assert.match(
+  landingResponse.headers.get("content-type") ?? "",
+  /^text\/html\b/
+);
+assert.match(
+  landingResponse.headers.get("content-security-policy") ?? "",
+  /default-src 'none'/
+);
+assert.match(await landingResponse.text(), /Twitchでログイン/);
+
+const dashboardResponse = await fetch(new URL("/dashboard", baseUrl), {
+  redirect: "manual",
+  signal: AbortSignal.timeout(15_000)
+});
+assert.equal(dashboardResponse.status, 303);
+assert.equal(dashboardResponse.headers.get("location"), "/");
+
 const protectedResponse = await fetch(new URL("/mcp", baseUrl), {
   method: "POST",
   headers: {
@@ -93,6 +115,7 @@ console.log(
     service: health.body.service,
     version: health.body.version,
     mcp_auth: "required",
+    web_dashboard: "available",
     authorization_endpoint: authorizationMetadata.body.authorization_endpoint
   })
 );

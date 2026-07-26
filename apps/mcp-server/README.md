@@ -1,6 +1,6 @@
 # Remote MCP server
 
-最自由研究の制作機能をCodexやChatGPTへ提供するCloudflare Workerです。Twitch OAuthによる利用資格判定と、所有者分離された研究データの作成・再開・更新・評価・発表構成を標準MCPで提供します。本番MCPはTwitch OAuthを必須とし、`/healthz`とOAuth metadataだけを未認証で公開します。
+最自由研究の制作機能をCodexやChatGPTへ提供するCloudflare Workerです。Twitch OAuthによる利用資格判定と、所有者分離された研究データの作成・再開・更新・評価・発表構成を標準MCPで提供します。本番MCPはTwitch OAuthを必須とし、未認証でもヘルスチェック、OAuth metadata、Web UIの入口を利用できます。
 
 ## 開発と検証
 
@@ -14,7 +14,7 @@ bun run types:mcp
 bun run smoke:mcp
 ```
 
-`bun run test:mcp` は生成型の同期、型検査、Workers runtime上のcontract test、deployのdry-run buildを連続実行します。MCP初期化とtool/resourceに加え、fixture化したTwitch APIを使って、Dynamic Client Registration、PKCE、CSRF、Twitch callback、資格判定、MCP token発行までをブラウザなしで検証します。
+`bun run test:mcp` は生成型の同期、型検査、Workers runtime上のcontract test、deployのdry-run buildを連続実行します。MCP初期化とtool/resourceに加え、fixture化したTwitch APIを使って、Dynamic Client Registration、PKCE、CSRF、Twitch callback、資格判定、MCP token発行、Webログイン、所有研究だけの一覧表示、ログアウトまでをブラウザなしで検証します。
 
 ローカル接続先は通常 `http://localhost:8787/mcp` です。MCP InspectorまたはCodexから接続し、`health`を呼び出してください。
 
@@ -22,12 +22,16 @@ bun run smoke:mcp
 
 - ヘルスチェック: `https://saijiyu-kenkyu.2764.moe/healthz`
 - Remote MCP: `https://saijiyu-kenkyu.2764.moe/mcp`
+- Web UI: `https://saijiyu-kenkyu.2764.moe/`
+- ログイン後の研究一覧: `https://saijiyu-kenkyu.2764.moe/dashboard`
 
 `bun run smoke:mcp` は、本番のヘルスチェックとMCP初期化をブラウザなしで検証します。別環境を検証するときだけ、`MCP_BASE_URL` にoriginを指定してください。デプロイはリポジトリルートで `bun run deploy:mcp` を実行します。
 
-2026-07-26時点でWorker v0.3.0、Custom Domain、DNS、TLS、OAuth用KV、state用KV、D1と期限切れOAuthデータを清掃するcronは本番配置済みです。D1の`0001_auth.sql`と`0002_projects.sql`も適用済みです。R2、Queue、Containerは後続Phaseで追加します。
+2026-07-26時点でWorker v0.4.0、Custom Domain、DNS、TLS、OAuth用KV、state／Web session用KV、D1と期限切れOAuthデータを清掃するcronは本番配置済みです。D1の`0001_auth.sql`と`0002_projects.sql`も適用済みです。R2、Queue、Containerは後続Phaseで追加します。
 
 研究データは512 KiB以内の固定schemaでD1へ保存します。`create_project`はidempotency key、`update_project`は`expected_version`を必須とし、再試行による重複作成と同時編集による上書きを防ぎます。全操作で認証中の所有者IDを強制し、他利用者のproject IDを指定しても存在を開示しません。
+
+Web UIも同じD1の所有者IDで絞り込みます。Twitch確認後は、Twitch tokenやMCP tokenをCookieへ保存せず、KVに保存した24時間のWeb専用セッションを`HttpOnly`、`Secure`、`SameSite=Lax`の不透明Cookieで参照します。現在の画面機能は一覧表示までで、研究の編集と公開はMCP対応AIクライアントから行います。
 
 構造化deckから自己完結HTMLを作るrendererも実装済みです。16:9枠、cinematic／BIIM／minimal、段階表示、字幕、ブラウザ読み上げ、音量保存、自動送り、進捗とURL復帰を含み、研究由来の文字列はHTMLと埋め込みJSONの両方でescapeします。R2保存と`request_preview`／`publish_project`は、Cloudflare Dashboardで対象アカウントのR2を有効化してから接続します。
 

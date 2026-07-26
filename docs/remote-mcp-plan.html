@@ -1286,7 +1286,7 @@ docs/                  # 設計・運用手順</pre>
             </article>
             <article class="card">
               <h3>KV</h3>
-              <p>OAuthの短寿命state、CSRF照合情報、短期的な資格キャッシュ。永続的な研究データの正本にはしない。</p>
+              <p>OAuthの短寿命state、CSRF照合情報、24時間のWeb用不透明セッション、短期的な資格キャッシュ。永続的な研究データの正本にはしない。</p>
             </article>
             <article class="card">
               <h3>R2</h3>
@@ -1300,7 +1300,8 @@ docs/                  # 設計・運用手順</pre>
         </div>
         <p class="callout">
           公開ドメインは<code>saijiyu-kenkyu.2764.moe</code>とし、<code>/mcp</code>をMCP、
-          <code>/oauth/*</code>を認証、<code>/p/{public-id}</code>を公開発表、<code>/assets/*</code>を成果物配信に使う。
+          <code>/login</code>と<code>/oauth/*</code>を認証、<code>/dashboard</code>を所有研究一覧、
+          <code>/p/{public-id}</code>を公開発表、<code>/assets/*</code>を成果物配信に使う。
           ひとつのCustom Domainを入口にしてWorker内でpath routingし、GitHub Pagesは公開経路に含めない。
         </p>
       </section>
@@ -1522,7 +1523,7 @@ docs/                  # 設計・運用手順</pre>
           <h2>認証を先に証明し、制作機能を後から載せる</h2>
           <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
           <p class="callout">
-            <strong>2026-07-26現在：</strong>Phase 0は完了。Phase 1のWorker v0.3.0を
+            <strong>2026-07-26現在：</strong>Phase 0は完了。Phase 1のWorker v0.4.0を
             <code>https://saijiyu-kenkyu.2764.moe/mcp</code>へデプロイし、
             自動contract test、本番スモークテスト、Codexからのtool／resource呼び出しを確認済み。
             Phase 2はOAuth用KV、state用KV、D1 migration、二段OAuth、PKCE、CSRF、
@@ -1530,6 +1531,7 @@ docs/                  # 設計・運用手順</pre>
             Twitchアプリのclient ID／secretをWorker secretへ投入し、本番MCPのOAuth必須化、metadata、未認証401、Twitch認可URLのcallback／scope一致、実アカウントによるCodex OAuth完走まで確認済み。
             Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価tool、動的resource、3つの伴走promptまで実装・本番配置済み。
             Phase 4は安全な自己完結HTML rendererと段階表示schemaまで実装・自動検証済み。
+            Web UIはトップページ、Twitchログイン、24時間のWeb専用セッション、CSRF付きログアウト、所有者限定の研究一覧と空状態まで実装済み。
             R2 bucket作成はCloudflareアカウントでR2が未有効のため保留し、preview／publish toolは有効化後に接続する。
             Codexでは<code>health</code>と<code>get_access_status</code>の実呼び出しまで確認済み。ChatGPT実クライアント確認を残し、Queue、Containerは未着手。
           </p>
