@@ -15,22 +15,69 @@ export const narrationSegmentSchema = z.object({
   audio_src: z.string().max(500).nullable()
 });
 
-export const projectSlideSchema = z.object({
-  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-  title: z.string().min(1).max(120),
-  duration_seconds: z.number().int().positive().max(1_200),
-  reveal_steps: z.number().int().nonnegative().max(100),
-  tone: z.enum(["dark", "light", "signal", "quiet"]),
-  content_markdown: z.string().min(1).max(20_000),
-  sidebar_markdown: z.string().max(10_000).nullable(),
-  narration: z
-    .object({
-      display: z.enum(["dialogue", "commentary", "inline"]),
-      speaker: z.string().max(80).nullable(),
-      segments: z.array(narrationSegmentSchema).max(101)
-    })
-    .nullable()
-});
+export const projectSlideSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+    title: z.string().min(1).max(120),
+    duration_seconds: z.number().int().positive().max(1_200),
+    reveal_steps: z.number().int().nonnegative().max(100),
+    tone: z.enum(["dark", "light", "signal", "quiet"]),
+    content_markdown: z.string().min(1).max(20_000),
+    reveal_blocks: z
+      .array(
+        z.object({
+          at: z.number().int().positive().max(100),
+          markdown: z.string().min(1).max(10_000)
+        })
+      )
+      .max(100),
+    sidebar_markdown: z.string().max(10_000).nullable(),
+    narration: z
+      .object({
+        display: z.enum(["dialogue", "commentary", "inline"]),
+        speaker: z.string().max(80).nullable(),
+        segments: z.array(narrationSegmentSchema).max(101)
+      })
+      .nullable()
+  })
+  .superRefine((slide, context) => {
+    const revealPositions = new Set<number>();
+    for (const block of slide.reveal_blocks) {
+      if (block.at > slide.reveal_steps) {
+        context.addIssue({
+          code: "custom",
+          path: ["reveal_blocks"],
+          message: "Reveal block positions must not exceed reveal_steps."
+        });
+      }
+      if (revealPositions.has(block.at)) {
+        context.addIssue({
+          code: "custom",
+          path: ["reveal_blocks"],
+          message: "Reveal block positions must be unique."
+        });
+      }
+      revealPositions.add(block.at);
+    }
+    const narrationPositions = new Set<number>();
+    for (const segment of slide.narration?.segments ?? []) {
+      if (segment.at > slide.reveal_steps) {
+        context.addIssue({
+          code: "custom",
+          path: ["narration", "segments"],
+          message: "Narration positions must not exceed reveal_steps."
+        });
+      }
+      if (narrationPositions.has(segment.at)) {
+        context.addIssue({
+          code: "custom",
+          path: ["narration", "segments"],
+          message: "Narration positions must be unique."
+        });
+      }
+      narrationPositions.add(segment.at);
+    }
+  });
 
 export const researchLogEntrySchema = z.object({
   id: z.string().uuid(),

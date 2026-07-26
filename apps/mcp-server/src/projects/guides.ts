@@ -193,7 +193,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_projectで${project_id}を取得してください。きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ってください。content_markdownは主張と証拠、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足に分けます。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。更新前のversionをexpected_versionに使ってupdate_projectで保存してください。`
+            text: `get_projectで${project_id}を取得してください。きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ってください。content_markdownは最初から見せる主張と証拠、reveal_blocksはクリック段階ごとの追加表示、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足に分けます。各atはreveal_steps以内で重複させません。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。更新前のversionをexpected_versionに使ってupdate_projectで保存してください。`
           }
         }
       ]
