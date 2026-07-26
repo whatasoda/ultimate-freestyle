@@ -1,5 +1,7 @@
 import { createMcpHandler } from "agents/mcp";
 
+import { createOAuthProvider } from "./auth/oauth";
+import { readAuthConfig } from "./auth/config";
 import {
   createHealthResult,
   createServer
@@ -15,6 +17,18 @@ function jsonResponse(body: object, init?: ResponseInit): Response {
   });
 }
 
+async function handleMcpRequest(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext
+): Promise<Response> {
+  const server = createServer(env);
+  return createMcpHandler(server, {
+    route: "/mcp",
+    enableJsonResponse: true
+  })(request, env, ctx);
+}
+
 export default {
   async fetch(
     request: Request,
@@ -26,6 +40,15 @@ export default {
     try {
       if (url.pathname === "/healthz") {
         return jsonResponse(createHealthResult(_env));
+      }
+
+      const authConfig = readAuthConfig(_env);
+      if (authConfig.mode === "twitch") {
+        return await createOAuthProvider(_env, handleMcpRequest).fetch(
+          request,
+          _env,
+          ctx
+        );
       }
 
       if (url.pathname !== "/mcp") {
@@ -41,11 +64,7 @@ export default {
         );
       }
 
-      const server = createServer(_env);
-      return await createMcpHandler(server, {
-        route: "/mcp",
-        enableJsonResponse: true
-      })(request, _env, ctx);
+      return await handleMcpRequest(request, _env, ctx);
     } catch (error) {
       const requestId = crypto.randomUUID();
       console.error(
@@ -66,5 +85,22 @@ export default {
         { status: 500 }
       );
     }
+  },
+  async scheduled(
+    _controller: ScheduledController,
+    env: Env,
+    ctx: ExecutionContext
+  ): Promise<void> {
+    const provider = createOAuthProvider(env, handleMcpRequest);
+    ctx.waitUntil(
+      provider.purgeExpiredData(env, { batchSize: 50 }).then((result) => {
+        console.log(
+          JSON.stringify({
+            message: "OAuth KV cleanup completed",
+            ...result
+          })
+        );
+      })
+    );
   }
 } satisfies ExportedHandler<Env>;

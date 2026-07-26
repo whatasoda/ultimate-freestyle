@@ -21,7 +21,7 @@ describe("MCP Worker", () => {
     expect(body).toMatchObject({
       ok: true,
       service: "ultimate-freestyle-mcp",
-      version: "0.1.0",
+      version: "0.2.0",
       eligibility: {
         broadcaster_id: "67879379",
         broadcaster_login: "kashiwo",
@@ -79,7 +79,7 @@ describe("MCP Worker", () => {
       result: {
         serverInfo: {
           name: "ultimate-freestyle-mcp",
-          version: "0.1.0"
+          version: "0.2.0"
         }
       }
     });

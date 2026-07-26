@@ -38,7 +38,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.1.0",
+        version: "0.2.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -81,6 +81,55 @@ describe("MCP contract", () => {
           text: expect.stringContaining("最自由研究 制作ガイド")
         })
       );
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("returns authenticated eligibility without exposing Twitch tokens", async () => {
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const server = createServer(eligibilityConfig, () => ({
+      mcp_scopes: ["research:read"],
+      identity: { user_id: "viewer-id", login: "viewer" },
+      eligibility: {
+        eligible: true,
+        reason: "follow_duration",
+        checked_at: "2026-07-26T12:00:00.000Z",
+        expires_at: "2026-07-26T12:30:00.000Z",
+        followed_at: "2020-01-01T00:00:00.000Z",
+        follow_days: 2398,
+        subscribed: false,
+        override: null
+      },
+      twitch_tokens: {
+        access_token: "must-not-leak",
+        refresh_token: "must-not-leak",
+        expires_at: "2026-07-26T13:00:00.000Z",
+        scopes: ["user:read:follows", "user:read:subscriptions"]
+      }
+    }));
+    const client = new Client({ name: "contract-test", version: "0.1.0" });
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    try {
+      const result = await client.callTool({
+        name: "get_access_status",
+        arguments: {}
+      });
+      expect(result.structuredContent).toMatchObject({
+        authenticated: true,
+        access: {
+          user: { id: "viewer-id", login: "viewer" },
+          scopes: ["research:read"],
+          eligibility: { eligible: true, reason: "follow_duration" }
+        },
+        error: null
+      });
+      expect(JSON.stringify(result)).not.toContain("must-not-leak");
     } finally {
       await client.close();
       await server.close();

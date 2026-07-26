@@ -1,8 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { getMcpAuthContext } from "agents/mcp";
 import { z } from "zod";
 
+import {
+  eligibilityReasonSchema,
+  twitchGrantPropsSchema
+} from "./auth/types";
+
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.1.0";
+export const SERVICE_VERSION = "0.2.0";
 
 export type EligibilityConfig = Pick<
   Env,
@@ -30,7 +36,11 @@ export function createHealthResult(config: EligibilityConfig) {
   } as const;
 }
 
-export function createServer(config: EligibilityConfig): McpServer {
+export function createServer(
+  config: EligibilityConfig,
+  getAuthProps: () => Record<string, unknown> | undefined = () =>
+    getMcpAuthContext()?.props
+): McpServer {
   const server = new McpServer(
     {
       name: SERVICE_NAME,
@@ -69,6 +79,78 @@ export function createServer(config: EligibilityConfig): McpServer {
     },
     () => {
       const result = createHealthResult(config);
+
+      return {
+        content: [{ type: "text", text: JSON.stringify(result) }],
+        structuredContent: result
+      };
+    }
+  );
+
+  server.registerTool(
+    "get_access_status",
+    {
+      title: "最自由研究の利用資格を確認",
+      description:
+        "認証中のTwitch利用者、許可scope、資格判定と有効期限を返します。Twitch tokenは返しません。",
+      inputSchema: {},
+      outputSchema: {
+        authenticated: z.boolean(),
+        request_id: z.string().uuid(),
+        access: z
+          .object({
+            user: z.object({ id: z.string(), login: z.string() }),
+            scopes: z.array(z.enum(["research:read", "research:write", "research:publish"])),
+            eligibility: z.object({
+              eligible: z.boolean(),
+              reason: eligibilityReasonSchema,
+              checked_at: z.string().datetime(),
+              expires_at: z.string().datetime(),
+              followed_at: z.string().datetime().nullable(),
+              follow_days: z.number().int().nonnegative().nullable(),
+              subscribed: z.boolean(),
+              override: z.enum(["allow", "deny"]).nullable()
+            })
+          })
+          .nullable(),
+        error: z
+          .object({ code: z.string(), message: z.string() })
+          .nullable()
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    () => {
+      const parsed = twitchGrantPropsSchema.safeParse(
+        getAuthProps()
+      );
+      const result = parsed.success
+        ? {
+            authenticated: true,
+            request_id: crypto.randomUUID(),
+            access: {
+              user: {
+                id: parsed.data.identity.user_id,
+                login: parsed.data.identity.login
+              },
+              scopes: parsed.data.mcp_scopes,
+              eligibility: parsed.data.eligibility
+            },
+            error: null
+          }
+        : {
+            authenticated: false,
+            request_id: crypto.randomUUID(),
+            access: null,
+            error: {
+              code: "AUTH_REQUIRED",
+              message: "Twitch OAuth authentication is required."
+            }
+          };
 
       return {
         content: [{ type: "text", text: JSON.stringify(result) }],
