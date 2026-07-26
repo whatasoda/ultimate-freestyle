@@ -13,7 +13,9 @@ function createAuthEnv(): Env {
   return {
     OAUTH_KV: env.OAUTH_KV,
     AUTH_STATE_KV: env.AUTH_STATE_KV,
+    MEDIA_BUCKET: env.MEDIA_BUCKET,
     DB: env.DB,
+    IMAGES: env.IMAGES,
     MCP_AUTH_MODE: "twitch",
     TWITCH_BROADCASTER_ID: "67879379",
     TWITCH_BROADCASTER_LOGIN: "kashiwo",
@@ -248,6 +250,34 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       "自分の研究 &lt;script&gt;alert(1)&lt;/script&gt;"
     );
+    expect(detailHtml).toContain(
+      'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
+    );
+    expect(detailHtml).toContain('src="/assets/dashboard.js"');
+
+    const dashboardScript = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js"),
+      authEnv
+    );
+    expect(dashboardScript.status).toBe(200);
+    expect(dashboardScript.headers.get("content-type")).toContain(
+      "text/javascript"
+    );
+
+    const rejectedUpload = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/images",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "image/png" },
+          body: new Uint8Array([1, 2, 3])
+        }
+      ),
+      authEnv
+    );
+    expect(rejectedUpload.status).toBe(403);
 
     const otherDetail = await requestProvider(
       provider,
@@ -264,6 +294,27 @@ describe("Web dashboard", () => {
       /name="csrf_token" value="([^"]+)"/
     )?.[1];
     expect(csrfToken).toBeTruthy();
+    const unsupportedUpload = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/images?filename=bad.svg",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "image/svg+xml",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: "<svg></svg>"
+        }
+      ),
+      authEnv
+    );
+    expect(unsupportedUpload.status).toBe(422);
+    expect(await unsupportedUpload.json()).toMatchObject({
+      ok: false,
+      error: { code: "IMAGE_TYPE_UNSUPPORTED" }
+    });
     const logoutBody = new URLSearchParams({ csrf_token: csrfToken ?? "" });
     const logout = await requestProvider(
       provider,

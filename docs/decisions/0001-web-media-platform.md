@@ -44,8 +44,8 @@ KV sessionは即時失効とread-after-writeに向かない。OAuthの一回限�
 初期フローは次の通り。
 
 ```text
-Web UI / MCP upload intent
-  -> 認証済みWorkerへone-time token付きPUT
+Web UIの認証済みsession + CSRF付きraw upload
+  -> hard byte cap付きWorker
   -> hard byte cap
   -> Images binding .info()で形式・寸法検査
   -> scale-down + WebP quality 85 + anim false
@@ -66,7 +66,7 @@ Web UI / MCP upload intent
 
 MAU 30人が全media quotaを使っても7.5 GBで、現在のR2 Standard free tier 10 GB以内に収まる。閲覧時に毎回変換せずupload時に一度だけ正規化し、変換数を予測可能にする。
 
-Direct Creator Uploadとpresigned R2 uploadは、10 MiB超、resume、動画対応が必要になった場合だけprivate staging + Queueとして導入する。初期には検査前objectと掃除対象が増えるため採用しない。
+MCP upload intent、Direct Creator Upload、presigned R2 uploadは、AIクライアントからのbinary転送、10 MiB超、resume、動画対応が必要になった場合だけprivate staging + Queueとして導入する。初期には検査前objectと掃除対象が増えるため採用しない。
 
 ### 5. VOICEVOXは全talk styleと複数voice profileへ対応する
 
@@ -103,9 +103,9 @@ Direct Creator Uploadとpresigned R2 uploadは、10 MiB超、resume、動画対�
 
 ## 人間操作が必要だが実装を止めない項目
 
-1. Cloudflare DashboardでR2 subscriptionを有効化
-2. private R2 bucket作成とbinding追加
-3. Images binding／plan有効化
+1. ~~Cloudflare DashboardでR2 subscriptionを有効化~~（2026-07-26完了）
+2. ~~private R2 bucket作成とbinding追加~~（`ultimate-freestyle-media`、2026-07-26完了）
+3. Images bindingの本番動作確認
 4. Queue、DLQ、Containerの作成
 5. VOICEVOX image digestの確定
 

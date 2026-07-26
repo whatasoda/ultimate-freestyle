@@ -1,4 +1,5 @@
 import { escapeHtml } from "../auth/pages";
+import type { ProjectAsset } from "../assets/schema";
 import type { ProjectRecord, ProjectSummary } from "../projects/schema";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
@@ -16,6 +17,9 @@ function headers(setCookies: string[] = []): Headers {
     "content-security-policy": [
       "default-src 'none'",
       "style-src 'unsafe-inline'",
+      "script-src 'self'",
+      "connect-src 'self'",
+      "img-src 'self' blob: data:",
       "form-action 'self'",
       "frame-ancestors 'none'",
       "base-uri 'none'"
@@ -95,6 +99,17 @@ function shell(title: string, body: string): string {
       .slide-row:first-of-type { border-top: 0; }
       .slide-row span { color: var(--muted); font-size: .85rem; }
       .slide-row strong { overflow-wrap: anywhere; }
+      .asset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .8rem; }
+      .asset { overflow: hidden; border: 1px solid var(--line); border-radius: .8rem; background: #0b1420; }
+      .asset img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #08101a; }
+      .asset-body { display: grid; gap: .55rem; padding: .75rem; }
+      .asset-body p { margin: 0; font-size: .86rem; }
+      .asset-body button { justify-self: start; min-height: 2.2rem; padding: .45rem .7rem; font-size: .8rem; }
+      .upload { display: grid; gap: .8rem; margin-bottom: 1rem; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; background: #0c1724; }
+      .upload label { display: grid; gap: .35rem; color: #c9d5e4; font-size: .9rem; }
+      .upload input { width: 100%; padding: .65rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; }
+      .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+      .feedback { min-height: 1.4em; margin: 0; color: #9fddf5; font-size: .88rem; }
       .notice { max-width: 42rem; margin: 3rem auto; text-align: center; }
       form { margin: 0; }
       @media (max-width: 48rem) { .detail-grid { grid-template-columns: 1fr; } }
@@ -186,6 +201,7 @@ export function projectDetailPage(options: {
   twitchLogin: string;
   csrfToken: string;
   project: ProjectRecord;
+  assets: ProjectAsset[];
 }): Response {
   const document = options.project.document;
   const recentLogs = document.logs.slice(-20).reverse();
@@ -204,6 +220,13 @@ export function projectDetailPage(options: {
         )
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
+  const assetCards = options.assets.length
+    ? `<div class="asset-grid">${options.assets
+        .map(
+          (asset) => `<article class="asset" data-asset><img src="${escapeHtml(asset.content_url)}" alt="${escapeHtml(asset.alt_text)}" loading="lazy"><div class="asset-body"><p>${escapeHtml(asset.alt_text || "装飾画像")}</p><p class="meta">${asset.width}×${asset.height} · ${Math.ceil(asset.byte_size / 1024)} KiB</p><button class="ghost" type="button" data-image-delete="/api/images/${escapeHtml(asset.asset_id)}" data-csrf="${escapeHtml(options.csrfToken)}">削除</button></div></article>`
+        )
+        .join("")}</div>`
+    : `<p class="prose">まだ画像がありません。</p>`;
 
   return new Response(
     shell(
@@ -221,6 +244,15 @@ export function projectDetailPage(options: {
              ${textPanel("方法", document.method)}
              ${listPanel("わかったこと", document.findings)}
              ${listPanel("限界・今後の課題", document.limitations)}
+             <section class="panel"><h2>研究画像</h2>
+               <form class="upload" action="/api/projects/${escapeHtml(options.project.project_id)}/images" data-image-upload data-csrf="${escapeHtml(options.csrfToken)}">
+                 <label>画像ファイル<input type="file" accept="image/jpeg,image/png,image/webp" required></label>
+                 <label>画像の説明<input name="alt_text" maxlength="500" placeholder="写真や図が何を示しているか"></label>
+                 <div class="upload-actions"><button type="submit">画像を追加</button><span class="meta">JPEG / PNG / 静止WebP、10MiBまで</span></div>
+                 <p class="feedback" data-feedback aria-live="polite"></p>
+               </form>
+               ${assetCards}
+             </section>
              <section class="panel"><h2>研究ログ</h2>${logs}${document.logs.length > recentLogs.length ? `<p class="meta">最新20件を表示 · 全${document.logs.length}件</p>` : ""}</section>
            </div>
            <aside class="detail-column">
@@ -235,7 +267,7 @@ export function projectDetailPage(options: {
              <p class="hint">編集・評価・スライド構成は、接続したAIクライアントから行えます。</p>
            </aside>
          </div>
-       </main>`
+       </main><script src="/assets/dashboard.js" defer></script>`
     ),
     { headers: headers() }
   );

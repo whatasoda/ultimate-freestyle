@@ -38,6 +38,15 @@
       "migrations_dir": "migrations"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "MEDIA_BUCKET",
+      "bucket_name": "ultimate-freestyle-media"
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  },
   "triggers": {
     "crons": ["17 3 * * *"]
   },

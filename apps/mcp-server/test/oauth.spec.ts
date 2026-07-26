@@ -12,7 +12,9 @@ function createAuthEnv(): Env {
   return {
     OAUTH_KV: env.OAUTH_KV,
     AUTH_STATE_KV: env.AUTH_STATE_KV,
+    MEDIA_BUCKET: env.MEDIA_BUCKET,
     DB: env.DB,
+    IMAGES: env.IMAGES,
     MCP_AUTH_MODE: "twitch",
     TWITCH_BROADCASTER_ID: "67879379",
     TWITCH_BROADCASTER_LOGIN: "kashiwo",
