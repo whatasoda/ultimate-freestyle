@@ -21,6 +21,11 @@ export type Fetcher = (
   init?: RequestInit
 ) => Promise<Response>;
 
+// Workers の global fetch は、関数参照をそのまま保持してメソッドとして
+// 呼び出すと receiver が変わり `Illegal invocation` になることがある。
+// 必ずラッパー越しにグローバル関数として呼ぶ。
+export const defaultFetcher: Fetcher = (input, init) => fetch(input, init);
+
 export class TwitchApiError extends Error {
   constructor(
     readonly code:
@@ -101,7 +106,7 @@ function apiError(response: Response, message: string): TwitchApiError {
 export class TwitchClient {
   constructor(
     private readonly config: TwitchConfig,
-    private readonly fetcher: Fetcher = fetch
+    private readonly fetcher: Fetcher = defaultFetcher
   ) {}
 
   createAuthorizationUrl(state: string): URL {

@@ -29,6 +29,7 @@ import {
   secureTokenEqual
 } from "./security";
 import {
+  defaultFetcher,
   TwitchApiError,
   TwitchClient,
   type Fetcher
@@ -383,7 +384,7 @@ function validateClientRegistration(
 export function createOAuthProvider(
   env: Env,
   handleMcpRequest: McpRequestHandler,
-  fetcher: Fetcher = fetch
+  fetcher: Fetcher = defaultFetcher
 ): OAuthProvider<Env> {
   const config = readAuthConfig(env);
   const defaultHandler = {
