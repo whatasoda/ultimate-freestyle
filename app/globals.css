@@ -332,6 +332,76 @@ button {
   backdrop-filter: blur(14px);
 }
 
+.volume-control {
+  display: grid;
+  grid-template-columns: auto 82px 28px;
+  gap: 7px;
+  height: 34px;
+  padding: 0 9px;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.55);
+  border-radius: 10px;
+  background: rgba(13, 12, 10, 0.68);
+  font: 700 9px / 1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.05em;
+  backdrop-filter: blur(14px);
+}
+
+.volume-control input {
+  width: 82px;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.volume-control input::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 99px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0 var(--volume),
+    rgba(255, 255, 255, 0.18) var(--volume) 100%
+  );
+}
+
+.volume-control input::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  appearance: none;
+  border: 2px solid #17120b;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.volume-control input::-moz-range-track {
+  height: 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.volume-control input::-moz-range-progress {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--accent);
+}
+
+.volume-control input::-moz-range-thumb {
+  width: 10px;
+  height: 10px;
+  border: 2px solid #17120b;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.volume-control output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .key-hint {
   margin-left: 4px;
   color: rgba(255, 255, 255, 0.42);
@@ -924,7 +994,13 @@ h2 {
   }
 
   .presentation-footer {
+    flex-wrap: wrap;
     gap: 8px;
+  }
+
+  .presentation-footer .footer-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .header-title,
@@ -950,6 +1026,20 @@ h2 {
     display: none;
   }
 
+  .volume-control {
+    grid-template-columns: 54px;
+    padding-inline: 7px;
+  }
+
+  .volume-control > span,
+  .volume-control output {
+    display: none;
+  }
+
+  .volume-control input {
+    width: 54px;
+  }
+
   .time-panel {
     gap: 7px;
     padding-left: 10px;
@@ -963,7 +1053,6 @@ h2 {
 
 @media (max-height: 620px) {
   .presentation {
-    --stage-width: min(100%, 1600px, max(280px, calc(177.7778dvh - 231.1112px)));
     gap: 6px;
     padding-block: 8px;
   }

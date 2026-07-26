@@ -24,6 +24,7 @@ test("renders the default presentation", async () => {
   assert.match(html, /研究タイトルを/);
   assert.match(html, /最自由研究 Web Presentation/);
   assert.match(html, /読み上げ進捗/);
+  assert.match(html, /読み上げ音量/);
   assert.match(html, /自動送りをオン/);
 });
 
@@ -59,4 +60,17 @@ test("includes generated VOICEVOX audio for every starter narration segment", as
   const titleAudio = await readFile(new URL("title-0.wav", audioRoot));
   assert.equal(titleAudio.subarray(0, 4).toString("ascii"), "RIFF");
   assert.equal(titleAudio.subarray(8, 12).toString("ascii"), "WAVE");
+});
+
+test("persists volume locally and presentation progress in the URL", async () => {
+  const presentation = await readFile(
+    new URL("../components/presentation/Presentation.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(presentation, /ultimate-freestyle:narration-volume/);
+  assert.match(presentation, /localStorage\.setItem/);
+  assert.match(presentation, /history\[.*pushState/);
+  assert.match(presentation, /addEventListener\("popstate"/);
+  assert.match(presentation, /searchParams\.set\("slide"/);
+  assert.match(presentation, /searchParams\.set\("step"/);
 });

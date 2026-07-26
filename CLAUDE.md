@@ -50,6 +50,7 @@
 - VOICEVOX生成ファイルは `public/researches/<slug>/audio/<slide-id>-<at>.wav` に置く。ENGINE本体やモデルはコミットしない。
 - ページ・段階の移動後は対応するsegmentを自動再生し、音声終了時だけ自動送りする。個別の再読み上げ操作は追加しない。
 - 読み上げ時間と再生位置は下部のインジケーターへ反映する。音声ファイルがない場合もブラウザ読み上げの推定値を表示する。
+- 音量は `ultimate-freestyle:narration-volume` として `localStorage` に保存する。進行位置は保存せず、`?slide=<1始まり>&step=<0始まり>` とHistory APIで管理する。
 - カシヲ氏本人の協力が必要な研究は、公式FAQに従い事前連絡が必要であることを研究READMEへ明記する。
 
 ## 完了条件

@@ -17,6 +17,39 @@ import type {
 } from "./types";
 
 const EMPTY_NARRATION_SEGMENTS: NarrationSegment[] = [];
+const VOLUME_STORAGE_KEY = "ultimate-freestyle:narration-volume";
+
+type PresentationPosition = {
+  slideIndex: number;
+  revealStep: number;
+};
+
+function readPositionFromUrl(slides: ResearchSlide[]): PresentationPosition {
+  const params = new URL(window.location.href).searchParams;
+  const requestedSlide = Number.parseInt(params.get("slide") ?? "1", 10) - 1;
+  const slideIndex = Number.isFinite(requestedSlide)
+    ? Math.min(Math.max(requestedSlide, 0), slides.length - 1)
+    : 0;
+  const requestedStep = Number.parseInt(params.get("step") ?? "0", 10);
+  const revealStep = Number.isFinite(requestedStep)
+    ? Math.min(Math.max(requestedStep, 0), slides[slideIndex].revealSteps ?? 0)
+    : 0;
+  return { slideIndex, revealStep };
+}
+
+function writePositionToUrl(
+  position: PresentationPosition,
+  mode: "push" | "replace"
+) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("slide", String(position.slideIndex + 1));
+  url.searchParams.set("step", String(position.revealStep));
+  window.history[mode === "push" ? "pushState" : "replaceState"](
+    position,
+    "",
+    url
+  );
+}
 
 function formatTime(totalSeconds: number) {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
@@ -111,15 +144,21 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
   const [autoAdvance, setAutoAdvance] = useState(false);
   const [narrationElapsed, setNarrationElapsed] = useState(0);
   const [narrationDuration, setNarrationDuration] = useState(0);
+  const [volume, setVolume] = useState(1);
   const timerStartedAt = useRef(0);
   const timerBaseSeconds = useRef(0);
   const audio = useRef<HTMLAudioElement | null>(null);
   const speechProgressTimer = useRef<number | null>(null);
   const autoAdvanceTimer = useRef<number | null>(null);
   const playbackId = useRef(0);
+  const volumeRef = useRef(1);
   const autoAdvanceRef = useRef(false);
   const goNextRef = useRef<() => void>(() => undefined);
   const previousPosition = useRef("0:0");
+  const positionRef = useRef<PresentationPosition>({
+    slideIndex: 0,
+    revealStep: 0
+  });
 
   const slide = deck.slides[slideIndex];
   const narrationDisplay =
@@ -191,35 +230,48 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
     }, delay);
   }, []);
 
+  const moveTo = useCallback(
+    (
+      nextPosition: PresentationPosition,
+      nextDirection: "forward" | "backward"
+    ) => {
+      stopNarration();
+      positionRef.current = nextPosition;
+      setDirection(nextDirection);
+      setSlideIndex(nextPosition.slideIndex);
+      setRevealStep(nextPosition.revealStep);
+      writePositionToUrl(nextPosition, "push");
+    },
+    [stopNarration]
+  );
+
   const goNext = useCallback(() => {
     const maxReveal = slide.revealSteps ?? 0;
-    setDirection("forward");
     if (revealStep < maxReveal) {
-      stopNarration();
-      setRevealStep((current) => current + 1);
+      moveTo({ slideIndex, revealStep: revealStep + 1 }, "forward");
       return;
     }
     if (slideIndex < deck.slides.length - 1) {
-      stopNarration();
-      setSlideIndex((current) => current + 1);
-      setRevealStep(0);
+      moveTo({ slideIndex: slideIndex + 1, revealStep: 0 }, "forward");
     }
-  }, [deck.slides.length, revealStep, slide.revealSteps, slideIndex, stopNarration]);
+  }, [deck.slides.length, moveTo, revealStep, slide.revealSteps, slideIndex]);
 
   const goPrevious = useCallback(() => {
-    setDirection("backward");
     if (revealStep > 0) {
-      stopNarration();
-      setRevealStep((current) => current - 1);
+      moveTo({ slideIndex, revealStep: revealStep - 1 }, "backward");
       return;
     }
     if (slideIndex > 0) {
-      stopNarration();
       const previousIndex = slideIndex - 1;
-      setSlideIndex(previousIndex);
-      setRevealStep(deck.slides[previousIndex].revealSteps ?? 0);
+      moveTo(
+        {
+          slideIndex: previousIndex,
+          revealStep: deck.slides[previousIndex].revealSteps ?? 0
+        },
+        "backward"
+      );
     }
-  }, [deck.slides, revealStep, slideIndex, stopNarration]);
+  }, [deck.slides, moveTo, revealStep, slideIndex]);
 
   useEffect(() => {
     goNextRef.current = goNext;
@@ -276,6 +328,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = "ja-JP";
       utterance.rate = 1;
+      utterance.volume = volumeRef.current;
       const japaneseVoice = window.speechSynthesis
         .getVoices()
         .find((voice) => voice.lang.startsWith("ja"));
@@ -318,6 +371,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       }
 
       const player = new Audio(segment.audioSrc);
+      player.volume = volumeRef.current;
       let usingFallback = false;
       const fallback = () => {
         if (usingFallback || id !== playbackId.current) return;
@@ -351,6 +405,18 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
     if (autoNarrationEnabled) stopNarration();
     setAutoNarrationEnabled((current) => !current);
   }, [autoNarrationEnabled, stopNarration]);
+
+  const updateVolume = useCallback((nextVolume: number) => {
+    const safeVolume = Math.min(Math.max(nextVolume, 0), 1);
+    volumeRef.current = safeVolume;
+    setVolume(safeVolume);
+    if (audio.current) audio.current.volume = safeVolume;
+    try {
+      window.localStorage.setItem(VOLUME_STORAGE_KEY, String(safeVolume));
+    } catch {
+      // 保存できない環境でも、このセッション中の音量調整は続ける。
+    }
+  }, []);
 
   const toggleAutoAdvance = useCallback(() => {
     const next = !autoAdvance;
@@ -388,15 +454,64 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
 
   const jumpTo = useCallback(
     (index: number, reveal: "start" | "end" = "start") => {
-      stopNarration();
       const safeIndex = Math.min(Math.max(index, 0), deck.slides.length - 1);
-      setSlideIndex(safeIndex);
-      setRevealStep(
-        reveal === "end" ? deck.slides[safeIndex].revealSteps ?? 0 : 0
+      const nextReveal =
+        reveal === "end" ? deck.slides[safeIndex].revealSteps ?? 0 : 0;
+      const currentUnit = slideIndex * 1000 + revealStep;
+      const nextUnit = safeIndex * 1000 + nextReveal;
+      moveTo(
+        { slideIndex: safeIndex, revealStep: nextReveal },
+        nextUnit >= currentUnit ? "forward" : "backward"
       );
     },
-    [deck.slides, stopNarration]
+    [deck.slides, moveTo, revealStep, slideIndex]
   );
+
+  useEffect(() => {
+    let savedVolume: string | null = null;
+    try {
+      savedVolume = window.localStorage.getItem(VOLUME_STORAGE_KEY);
+    } catch {
+      // localStorageを利用できない場合は既定値の100%を使う。
+    }
+    const parsedVolume = savedVolume === null ? 1 : Number(savedVolume);
+    if (!Number.isFinite(parsedVolume)) return;
+    const restoreVolume = window.setTimeout(
+      () => updateVolume(parsedVolume),
+      0
+    );
+    return () => window.clearTimeout(restoreVolume);
+  }, [updateVolume]);
+
+  useEffect(() => {
+    const initialPosition = readPositionFromUrl(deck.slides);
+    writePositionToUrl(initialPosition, "replace");
+
+    const restoreInitialPosition = window.setTimeout(() => {
+      positionRef.current = initialPosition;
+      previousPosition.current = `${initialPosition.slideIndex}:${initialPosition.revealStep}`;
+      setSlideIndex(initialPosition.slideIndex);
+      setRevealStep(initialPosition.revealStep);
+    }, 0);
+
+    const restoreFromHistory = () => {
+      const nextPosition = readPositionFromUrl(deck.slides);
+      const current = positionRef.current;
+      const currentUnit = current.slideIndex * 1000 + current.revealStep;
+      const nextUnit = nextPosition.slideIndex * 1000 + nextPosition.revealStep;
+      stopNarration();
+      positionRef.current = nextPosition;
+      setDirection(nextUnit >= currentUnit ? "forward" : "backward");
+      setSlideIndex(nextPosition.slideIndex);
+      setRevealStep(nextPosition.revealStep);
+    };
+
+    window.addEventListener("popstate", restoreFromHistory);
+    return () => {
+      window.clearTimeout(restoreInitialPosition);
+      window.removeEventListener("popstate", restoreFromHistory);
+    };
+  }, [deck.slides, stopNarration]);
 
   useEffect(() => {
     if (!timerRunning) return;
@@ -438,6 +553,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.target instanceof HTMLInputElement) return;
       if (["ArrowRight", " ", "Enter", "PageDown"].includes(event.key)) {
         event.preventDefault();
         goNext();
@@ -589,6 +705,22 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
         <div className="footer-actions">
           {slideIndex === deck.slides.length - 1 && deck.narrationDefaults?.credit ? (
             <span className="voice-credit">{deck.narrationDefaults.credit}</span>
+          ) : null}
+          {hasNarration ? (
+            <label className="volume-control" title="読み上げ音量">
+              <span aria-hidden="true">VOL</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={volume}
+                onChange={(event) => updateVolume(event.currentTarget.valueAsNumber)}
+                aria-label="読み上げ音量"
+                style={{ "--volume": `${volume * 100}%` } as React.CSSProperties}
+              />
+              <output>{Math.round(volume * 100)}</output>
+            </label>
           ) : null}
           {hasNarration ? (
             <button
