@@ -9,6 +9,8 @@
 3. 対象研究の `researches/<slug>/README.md` を読み、研究内容と進捗を把握する。
 4. `git status --short` を確認し、ユーザーの既存変更を保持する。
 
+研究テーマ、問い、方法、記録、発表構成、評価をユーザーと対話して作る依頼では、`.claude/skills/research-companion/SKILL.md` を使う。正本である `.agents/skills/research-companion/SKILL.md` と、必要な参照ファイルを完全に読む。
+
 ## コマンド
 
 このプロジェクトではBunを使う。package.jsonのscriptを実行するときは、必ず `bun run <script>` を使う。

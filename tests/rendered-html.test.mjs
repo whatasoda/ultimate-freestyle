@@ -39,11 +39,14 @@ test("renders a registered research at its direct URL", async () => {
 });
 
 test("keeps Claude and project assumptions in the repository", async () => {
-  const [claude, assumptions, design, styles] = await Promise.all([
+  const [claude, assumptions, design, styles, skill, dialogue, rubric] = await Promise.all([
     readFile(new URL("../CLAUDE.md", import.meta.url), "utf8"),
     readFile(new URL("../docs/最自由研究2026.md", import.meta.url), "utf8"),
     readFile(new URL("../docs/設計.md", import.meta.url), "utf8"),
-    readFile(new URL("../app/globals.css", import.meta.url), "utf8")
+    readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
+    readFile(new URL("../.agents/skills/research-companion/SKILL.md", import.meta.url), "utf8"),
+    readFile(new URL("../.agents/skills/research-companion/references/dialogue-flow.md", import.meta.url), "utf8"),
+    readFile(new URL("../.agents/skills/research-companion/references/evaluation-rubric.md", import.meta.url), "utf8")
   ]);
   assert.match(claude, /bun run test/);
   assert.match(assumptions, /2026年9月1日〜5日/);
@@ -57,6 +60,10 @@ test("keeps Claude and project assumptions in the repository", async () => {
   assert.match(styles, /data-layout="biim"/);
   assert.match(styles, /data-layout="minimal"/);
   assert.doesNotMatch(styles, /data-layout="broadcast"/);
+  assert.match(skill, /一度に一問/);
+  assert.match(dialogue, /種を見つける/);
+  assert.match(rubric, /8観点/);
+  assert.match(rubric, /根拠不足は `NE`/);
 });
 
 test("includes generated VOICEVOX audio for every starter narration segment", async () => {

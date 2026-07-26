@@ -44,6 +44,31 @@ bun run dev
 bun run test
 ```
 
+## 対話しながら研究を作る
+
+リポジトリ内の `research-companion` スキルが、テーマ探しから提出前評価まで一問ずつ伴走します。Codexでは `.agents/skills/research-companion/`、Claudeでは `.claude/skills/research-companion/` から同じ正本を利用します。
+
+依頼例：
+
+```text
+$research-companion を使って、最自由研究のテーマ探しから相談したい。
+```
+
+スキルは次の流れで進みます。
+
+1. 今回の対象とゴールを確認する
+2. 一度に一問だけ尋ね、本人の関心・問い・方法を深掘りする
+3. 節目で `researches/<slug>/README.md` に決定と未確定事項を残す
+4. 8観点の基準で根拠付き評価を行う
+5. 最優先の弱点につながる一問へ戻る
+6. 内容が固まってからdeck、読み上げ、BIIM補足欄を制作する
+
+評価では、問い、仮説、方法、証拠、考察、本人性、発表構成、信頼性を各0〜4で確認します。判断材料がない項目は無理に採点せず `NE` とし、提出可能判定では時間・出典・規約・公開URL・通し確認などの必須条件も別に確認します。
+
+- [スキル本体](.agents/skills/research-companion/SKILL.md)
+- [対話フロー](.agents/skills/research-companion/references/dialogue-flow.md)
+- [評価基準](.agents/skills/research-companion/references/evaluation-rubric.md)
+
 ## 発表操作
 
 | 操作 | キー／動作 |

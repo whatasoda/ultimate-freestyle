@@ -1,0 +1,4 @@
+interface:
+  display_name: "最自由研究 伴走者"
+  short_description: "対話で最自由研究を組み立て、評価基準に沿って改善まで伴走する"
+  default_prompt: "Use $research-companion to develop and evaluate my 最自由研究 one focused question at a time."
