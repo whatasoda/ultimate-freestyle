@@ -404,11 +404,16 @@ export function createOAuthProvider(
           { status: 404 }
         );
       } catch (error) {
+        const twitchError =
+          error instanceof TwitchApiError
+            ? { code: error.code, status: error.status }
+            : undefined;
         console.error(
           JSON.stringify({
             message: "OAuth request failed",
             path,
-            error: error instanceof Error ? error.message : String(error)
+            error: error instanceof Error ? error.message : String(error),
+            twitch_error: twitchError
           })
         );
         return messagePage(
