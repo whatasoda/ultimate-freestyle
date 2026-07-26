@@ -1,0 +1,1430 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Twitchのフォロー期間・サブスク状態で利用者を限定するCloudflare Remote MCPサーバーの構成と実装計画"
+    />
+    <title>最自由研究 Remote MCP — 構成・実装計画</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #f7f5ee;
+        --muted: #a7abb7;
+        --panel: rgba(21, 24, 32, 0.84);
+        --panel-strong: #191d27;
+        --line: rgba(255, 255, 255, 0.12);
+        --orange: #ff7a45;
+        --purple: #9b7bff;
+        --cyan: #56d5d0;
+        --green: #80d99b;
+        --yellow: #ffd166;
+        --red: #ff7f91;
+        --max: 1180px;
+        --radius: 22px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 84px;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", "Noto Sans JP", sans-serif;
+        line-height: 1.75;
+        background:
+          radial-gradient(circle at 12% -8%, rgba(155, 123, 255, 0.24), transparent 31rem),
+          radial-gradient(circle at 93% 8%, rgba(255, 122, 69, 0.18), transparent 29rem),
+          #0b0d12;
+      }
+
+      a {
+        color: var(--cyan);
+      }
+
+      code {
+        padding: 0.14em 0.4em;
+        color: #fff;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 0.92em;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-bottom: 1px solid var(--line);
+        background: rgba(11, 13, 18, 0.82);
+        backdrop-filter: blur(18px);
+      }
+
+      .topbar-inner {
+        width: min(calc(100% - 32px), var(--max));
+        min-height: 64px;
+        margin: 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        color: var(--ink);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .brand-mark {
+        width: 26px;
+        height: 26px;
+        display: grid;
+        place-items: center;
+        color: #120c08;
+        font-size: 12px;
+        background: linear-gradient(135deg, var(--orange), var(--yellow));
+        border-radius: 8px;
+        box-shadow: 0 0 24px rgba(255, 122, 69, 0.34);
+      }
+
+      nav {
+        display: flex;
+        gap: 18px;
+        overflow-x: auto;
+      }
+
+      nav a {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      nav a:hover,
+      nav a:focus-visible {
+        color: var(--ink);
+      }
+
+      main {
+        width: min(calc(100% - 32px), var(--max));
+        margin: 0 auto;
+        padding: 72px 0 112px;
+      }
+
+      .hero {
+        min-height: 520px;
+        display: grid;
+        grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr);
+        align-items: center;
+        gap: 64px;
+      }
+
+      .eyebrow,
+      .section-kicker {
+        color: var(--orange);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin-bottom: 24px;
+        font-size: clamp(44px, 7vw, 88px);
+        line-height: 0.98;
+        letter-spacing: -0.065em;
+      }
+
+      .hero h1 span {
+        color: transparent;
+        background: linear-gradient(100deg, var(--orange), var(--yellow) 46%, var(--purple));
+        background-clip: text;
+        -webkit-background-clip: text;
+      }
+
+      .lead {
+        max-width: 680px;
+        color: #d4d5dc;
+        font-size: clamp(17px, 2vw, 21px);
+      }
+
+      .meta-row {
+        margin-top: 32px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 12px;
+        color: #d8d8df;
+        font-size: 12px;
+        font-weight: 750;
+        background: rgba(255, 255, 255, 0.055);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+      }
+
+      .pill::before {
+        width: 7px;
+        height: 7px;
+        content: "";
+        background: var(--green);
+        border-radius: 50%;
+        box-shadow: 0 0 12px var(--green);
+      }
+
+      .decision-card {
+        position: relative;
+        padding: 28px;
+        overflow: hidden;
+        background: linear-gradient(150deg, rgba(255, 122, 69, 0.16), rgba(155, 123, 255, 0.1));
+        border: 1px solid rgba(255, 209, 102, 0.28);
+        border-radius: 28px;
+        box-shadow: 0 30px 80px rgba(0, 0, 0, 0.32);
+      }
+
+      .decision-card::after {
+        position: absolute;
+        right: -56px;
+        bottom: -56px;
+        width: 170px;
+        height: 170px;
+        content: "";
+        background: var(--orange);
+        border-radius: 50%;
+        filter: blur(70px);
+        opacity: 0.2;
+      }
+
+      .decision-label {
+        color: var(--yellow);
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+      }
+
+      .decision-card h2 {
+        margin: 10px 0 16px;
+        font-size: 30px;
+        line-height: 1.22;
+        letter-spacing: -0.035em;
+      }
+
+      .decision-card ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .decision-card li {
+        display: grid;
+        grid-template-columns: 20px 1fr;
+        gap: 9px;
+        padding: 9px 0;
+        color: #d4d5dd;
+        border-top: 1px solid var(--line);
+      }
+
+      .decision-card li::before {
+        color: var(--green);
+        content: "✓";
+        font-weight: 900;
+      }
+
+      section {
+        padding-top: 96px;
+      }
+
+      .section-heading {
+        max-width: 760px;
+        margin-bottom: 36px;
+      }
+
+      .section-heading h2 {
+        margin: 8px 0 14px;
+        font-size: clamp(34px, 5vw, 56px);
+        line-height: 1.06;
+        letter-spacing: -0.05em;
+      }
+
+      .section-heading p {
+        color: var(--muted);
+        font-size: 17px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 16px;
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .card {
+        padding: 26px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .card h3 {
+        margin-bottom: 10px;
+        font-size: 20px;
+        letter-spacing: -0.025em;
+      }
+
+      .card p,
+      .card li {
+        color: var(--muted);
+      }
+
+      .card p:last-child,
+      .card ul:last-child {
+        margin-bottom: 0;
+      }
+
+      .number {
+        width: 38px;
+        height: 38px;
+        margin-bottom: 36px;
+        display: grid;
+        place-items: center;
+        color: #0c0d11;
+        font-family: ui-monospace, monospace;
+        font-size: 13px;
+        font-weight: 900;
+        background: var(--cyan);
+        border-radius: 11px;
+      }
+
+      .architecture {
+        padding: 28px;
+        background:
+          linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+          rgba(15, 18, 25, 0.92);
+        background-size: 28px 28px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+      }
+
+      .arch-flow {
+        display: grid;
+        grid-template-columns: 1fr 52px 1.12fr 52px 1fr;
+        align-items: center;
+        gap: 4px;
+      }
+
+      .arch-column {
+        display: grid;
+        gap: 12px;
+      }
+
+      .arch-box {
+        min-height: 92px;
+        padding: 18px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        background: rgba(8, 10, 15, 0.9);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+      }
+
+      .arch-box strong {
+        display: block;
+        font-size: 15px;
+      }
+
+      .arch-box small {
+        margin-top: 5px;
+        color: var(--muted);
+        line-height: 1.4;
+      }
+
+      .arch-box.primary {
+        border-color: rgba(255, 122, 69, 0.62);
+        box-shadow: inset 0 0 28px rgba(255, 122, 69, 0.08);
+      }
+
+      .arch-box.external {
+        border-color: rgba(155, 123, 255, 0.5);
+      }
+
+      .arrow {
+        color: var(--orange);
+        font-family: ui-monospace, monospace;
+        font-size: 24px;
+        font-weight: 900;
+        text-align: center;
+      }
+
+      .arch-caption {
+        margin: 22px 0 0;
+        color: var(--muted);
+        font-size: 13px;
+        text-align: center;
+      }
+
+      .sequence {
+        position: relative;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        counter-reset: auth-step;
+      }
+
+      .sequence::before {
+        position: absolute;
+        top: 22px;
+        bottom: 22px;
+        left: 22px;
+        width: 1px;
+        content: "";
+        background: linear-gradient(var(--purple), var(--orange), var(--green));
+      }
+
+      .sequence li {
+        position: relative;
+        min-height: 70px;
+        padding: 0 0 26px 68px;
+        counter-increment: auth-step;
+      }
+
+      .sequence li::before {
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        color: #0b0d12;
+        content: counter(auth-step, decimal-leading-zero);
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        font-weight: 900;
+        background: var(--ink);
+        border: 5px solid #0b0d12;
+        border-radius: 50%;
+      }
+
+      .sequence strong {
+        display: block;
+        margin-bottom: 3px;
+        font-size: 16px;
+      }
+
+      .sequence span {
+        color: var(--muted);
+      }
+
+      .policy {
+        padding: 28px;
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        align-items: center;
+        gap: 16px;
+        background: linear-gradient(120deg, rgba(155, 123, 255, 0.11), rgba(86, 213, 208, 0.08));
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      .policy-part {
+        min-height: 124px;
+        padding: 18px;
+        display: grid;
+        align-content: center;
+        background: rgba(4, 6, 10, 0.42);
+        border-radius: 15px;
+      }
+
+      .policy-part small {
+        color: var(--muted);
+      }
+
+      .operator {
+        color: var(--yellow);
+        font-family: ui-monospace, monospace;
+        font-size: 22px;
+        font-weight: 900;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 14px;
+      }
+
+      th,
+      td {
+        padding: 17px 19px;
+        text-align: left;
+        vertical-align: top;
+        border-bottom: 1px solid var(--line);
+      }
+
+      th {
+        color: #c3c6d0;
+        font-size: 11px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      td {
+        color: var(--muted);
+      }
+
+      td:first-child {
+        color: var(--ink);
+        font-weight: 750;
+      }
+
+      tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .tag {
+        display: inline-block;
+        padding: 3px 8px;
+        color: #0b0d12;
+        font-size: 10px;
+        font-weight: 900;
+        line-height: 1.5;
+        background: var(--green);
+        border-radius: 999px;
+      }
+
+      .tag.write {
+        background: var(--yellow);
+      }
+
+      .tag.danger {
+        background: var(--red);
+      }
+
+      .folder-tree {
+        margin: 0;
+        padding: 22px;
+        overflow-x: auto;
+        color: #cfd2db;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+        line-height: 1.8;
+        background: #080a0f;
+        border: 1px solid var(--line);
+        border-radius: 17px;
+        white-space: pre;
+      }
+
+      .callout {
+        margin-top: 22px;
+        padding: 18px 20px;
+        color: #d6d8df;
+        background: rgba(255, 209, 102, 0.075);
+        border-left: 3px solid var(--yellow);
+        border-radius: 4px 14px 14px 4px;
+      }
+
+      .checklist {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .checklist li {
+        display: grid;
+        grid-template-columns: 24px 1fr;
+        gap: 10px;
+        padding: 11px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .checklist li:first-child {
+        border-top: 0;
+      }
+
+      .checklist li::before {
+        color: var(--cyan);
+        content: "□";
+        font-size: 18px;
+        line-height: 1.5;
+      }
+
+      .roadmap {
+        display: grid;
+        gap: 14px;
+      }
+
+      .phase {
+        display: grid;
+        grid-template-columns: 115px minmax(0, 1fr) minmax(220px, 0.55fr);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        overflow: hidden;
+      }
+
+      .phase-id {
+        padding: 22px;
+        color: #0b0d12;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        font-weight: 900;
+        background: var(--cyan);
+      }
+
+      .phase:nth-child(2) .phase-id,
+      .phase:nth-child(3) .phase-id {
+        background: var(--purple);
+      }
+
+      .phase:nth-child(4) .phase-id,
+      .phase:nth-child(5) .phase-id {
+        background: var(--orange);
+      }
+
+      .phase:nth-child(6) .phase-id {
+        background: var(--green);
+      }
+
+      .phase-main,
+      .phase-done {
+        padding: 20px 22px;
+      }
+
+      .phase-main h3 {
+        margin: 0 0 5px;
+        font-size: 18px;
+      }
+
+      .phase-main p,
+      .phase-done p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .phase-done {
+        border-left: 1px solid var(--line);
+      }
+
+      .phase-done strong {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--green);
+        font-size: 11px;
+        letter-spacing: 0.1em;
+      }
+
+      .risk {
+        display: grid;
+        grid-template-columns: 80px 1fr;
+        gap: 16px;
+        padding: 18px 0;
+        border-top: 1px solid var(--line);
+      }
+
+      .risk:first-child {
+        border-top: 0;
+      }
+
+      .risk-level {
+        height: fit-content;
+        padding: 4px 8px;
+        color: #0b0d12;
+        font-size: 10px;
+        font-weight: 900;
+        text-align: center;
+        background: var(--red);
+        border-radius: 999px;
+      }
+
+      .risk-level.medium {
+        background: var(--yellow);
+      }
+
+      .risk strong {
+        display: block;
+        margin-bottom: 3px;
+      }
+
+      .risk p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .final-plan {
+        padding: clamp(26px, 5vw, 54px);
+        background: linear-gradient(135deg, rgba(255, 122, 69, 0.17), rgba(155, 123, 255, 0.15));
+        border: 1px solid rgba(255, 209, 102, 0.32);
+        border-radius: 30px;
+      }
+
+      .final-plan h2 {
+        max-width: 720px;
+        margin-bottom: 18px;
+        font-size: clamp(34px, 5vw, 58px);
+        line-height: 1.06;
+        letter-spacing: -0.05em;
+      }
+
+      .final-plan p {
+        max-width: 780px;
+        color: #d5d6dd;
+      }
+
+      .sources {
+        margin-top: 56px;
+        padding-top: 28px;
+        border-top: 1px solid var(--line);
+      }
+
+      .sources h2 {
+        font-size: 19px;
+      }
+
+      .sources ul {
+        columns: 2;
+        gap: 34px;
+        padding-left: 20px;
+      }
+
+      .sources li {
+        margin-bottom: 9px;
+        color: var(--muted);
+        break-inside: avoid;
+      }
+
+      footer {
+        padding: 38px 16px;
+        color: #777c89;
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        text-align: center;
+        border-top: 1px solid var(--line);
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid.three,
+        .grid.two {
+          grid-template-columns: 1fr;
+        }
+
+        .hero {
+          gap: 34px;
+        }
+
+        .arch-flow {
+          grid-template-columns: 1fr;
+        }
+
+        .arrow {
+          transform: rotate(90deg);
+        }
+
+        .policy {
+          grid-template-columns: 1fr;
+        }
+
+        .operator {
+          text-align: center;
+        }
+
+        .phase {
+          grid-template-columns: 86px 1fr;
+        }
+
+        .phase-done {
+          grid-column: 2;
+          padding-top: 0;
+          border-left: 0;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .topbar-inner {
+          width: min(calc(100% - 22px), var(--max));
+          align-items: flex-start;
+          flex-direction: column;
+          gap: 6px;
+          padding: 10px 0;
+        }
+
+        main {
+          width: min(calc(100% - 22px), var(--max));
+          padding-top: 42px;
+        }
+
+        .hero {
+          min-height: auto;
+        }
+
+        section {
+          padding-top: 72px;
+        }
+
+        .architecture,
+        .card,
+        .decision-card {
+          padding: 20px;
+        }
+
+        .phase {
+          grid-template-columns: 1fr;
+        }
+
+        .phase-id,
+        .phase-main,
+        .phase-done {
+          grid-column: 1;
+        }
+
+        .phase-done {
+          padding-top: 16px;
+          border-top: 1px solid var(--line);
+        }
+
+        .sources ul {
+          columns: 1;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+
+      @media print {
+        :root {
+          color-scheme: light;
+          --ink: #121318;
+          --muted: #4e5360;
+          --panel: #fff;
+          --line: #d8dbe2;
+        }
+
+        body {
+          background: #fff;
+        }
+
+        .topbar {
+          display: none;
+        }
+
+        main {
+          width: 100%;
+          padding: 0;
+        }
+
+        section {
+          padding-top: 48px;
+          break-inside: avoid;
+        }
+
+        .hero {
+          min-height: 0;
+        }
+
+        .card,
+        .architecture,
+        .table-wrap,
+        .phase,
+        .final-plan {
+          box-shadow: none;
+          break-inside: avoid;
+        }
+
+        .folder-tree,
+        .arch-box {
+          color: #20232b;
+          background: #f5f6f8;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="#top">
+          <span class="brand-mark">M</span>
+          最自由研究 MCP
+        </a>
+        <nav aria-label="ページ内ナビゲーション">
+          <a href="#architecture">構成</a>
+          <a href="#auth">認証</a>
+          <a href="#tools">MCP設計</a>
+          <a href="#security">安全性</a>
+          <a href="#roadmap">実装計画</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Architecture &amp; Delivery Plan / 2026-07-26</p>
+          <h1>研究制作をひらく、<span>限定Remote MCP</span></h1>
+          <p class="lead">
+            Twitchで利用資格を確認し、認可されたMCP対応AIクライアントからだけ、
+            最自由研究の作成・評価・Webスライド化を行えるCloudflare基盤の計画。
+          </p>
+          <div class="meta-row">
+            <span class="pill">Remote MCPのみ提供</span>
+            <span class="pill">Twitch OAuthで認証</span>
+            <span class="pill">任意コードは受け付けない</span>
+          </div>
+        </div>
+
+        <aside class="decision-card" aria-label="今回確定した方針">
+          <span class="decision-label">DECISION</span>
+          <h2>利用者はMCP対応AIクライアントを用意する</h2>
+          <ul>
+            <li>専用チャット画面は作らない</li>
+            <li>接続後の認証はブラウザでTwitchへ委譲</li>
+            <li>対象配信者へのフォロー期間、または現在のサブスクで許可</li>
+            <li>LLM利用料は原則として利用者側の契約に含める</li>
+          </ul>
+        </aside>
+      </header>
+
+      <section id="principles">
+        <div class="section-heading">
+          <p class="section-kicker">01 / Design principles</p>
+          <h2>責務を小さく、境界を明確にする</h2>
+          <p>
+            MCPサーバーは会話AIそのものではなく、研究データと制作機能を安全に提供する道具箱として設計する。
+          </p>
+        </div>
+        <div class="grid three">
+          <article class="card">
+            <div class="number">01</div>
+            <h3>AIは利用者側</h3>
+            <p>ChatGPT、Claude、Codexなどが対話を担当。サーバーはモデルAPIを持たず、MCPのresources・prompts・toolsを提供する。</p>
+          </article>
+          <article class="card">
+            <div class="number">02</div>
+            <h3>データは構造化</h3>
+            <p>研究、スライド、読み上げ、BIIM補足を検証可能なJSONとして保存。HTMLやJavaScriptをそのまま実行しない。</p>
+          </article>
+          <article class="card">
+            <div class="number">03</div>
+            <h3>公開だけ強く守る</h3>
+            <p>下書き編集と公開を分離。公開・音声生成・削除など影響の大きな処理は再認可、明示確認、監査の対象にする。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="architecture">
+        <div class="section-heading">
+          <p class="section-kicker">02 / System architecture</p>
+          <h2>ひとつのWorkerを入口にする</h2>
+          <p>
+            MCP OAuth、Twitch OAuth、権限判定、ツール呼び出しを同じ信頼境界に置く。
+            永続データと生成物だけを用途別サービスへ逃がす。
+          </p>
+        </div>
+
+        <div class="architecture" role="img" aria-label="Remote MCPの全体構成図">
+          <div class="arch-flow">
+            <div class="arch-column">
+              <div class="arch-box external">
+                <strong>MCP対応AIクライアント</strong>
+                <small>ChatGPT / Claude / Codex など<br />利用者自身のLLM契約</small>
+              </div>
+              <div class="arch-box external">
+                <strong>利用者のブラウザ</strong>
+                <small>Twitchログインと同意画面だけを表示</small>
+              </div>
+            </div>
+
+            <div class="arrow" aria-hidden="true">⇄</div>
+
+            <div class="arch-column">
+              <div class="arch-box primary">
+                <strong>Cloudflare Worker</strong>
+                <small><code>/mcp</code> <code>/authorize</code> <code>/token</code> <code>/register</code></small>
+              </div>
+              <div class="arch-box primary">
+                <strong>McpAgent + OAuth Provider</strong>
+                <small>ユーザー文脈、MCP scope、利用資格を各toolへ渡す</small>
+              </div>
+              <div class="arch-box primary">
+                <strong>研究サービス</strong>
+                <small>schema検証、所有権確認、版管理、公開ジョブ投入</small>
+              </div>
+            </div>
+
+            <div class="arrow" aria-hidden="true">⇄</div>
+
+            <div class="arch-column">
+              <div class="arch-box external">
+                <strong>Twitch OAuth / Helix API</strong>
+                <small>本人確認、フォロー開始日時、現在のサブスク状態</small>
+              </div>
+              <div class="arch-box">
+                <strong>D1 + KV</strong>
+                <small>利用者・研究・監査 / OAuth一時state・短期キャッシュ</small>
+              </div>
+              <div class="arch-box">
+                <strong>R2 + Queue / Workflow</strong>
+                <small>素材・公開物 / ビルド・音声生成などの非同期処理</small>
+              </div>
+            </div>
+          </div>
+          <p class="arch-caption">
+            GitHub Pagesの既存発表基盤はレンダラーの参照実装として残す。個人の下書きと認証情報はPagesへ置かない。
+          </p>
+        </div>
+      </section>
+
+      <section id="auth">
+        <div class="section-heading">
+          <p class="section-kicker">03 / Authentication &amp; eligibility</p>
+          <h2>二段のOAuthをWorkerでつなぐ</h2>
+          <p>
+            MCPクライアントが受け取るのはWorker発行のMCPトークン。TwitchトークンはWorkerの外へ出さない。
+          </p>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <ol class="sequence">
+              <li>
+                <strong>MCPクライアントが接続</strong>
+                <span><code>/mcp</code>が401を返し、OAuth metadataを案内する。</span>
+              </li>
+              <li>
+                <strong>Workerの認可画面を開始</strong>
+                <span>MCP OAuth 2.1のcode challengeと要求scopeを検証する。</span>
+              </li>
+              <li>
+                <strong>Twitchへリダイレクト</strong>
+                <span>Authorization Code Grantで本人の同意を得る。</span>
+              </li>
+              <li>
+                <strong>利用資格を照会</strong>
+                <span>対象配信者のIDでフォロー日時と現在のサブスクを確認する。</span>
+              </li>
+              <li>
+                <strong>MCP用トークンを発行</strong>
+                <span>資格と同意scopeを紐づけ、MCPクライアントへ返す。</span>
+              </li>
+              <li>
+                <strong>各toolで再度認可</strong>
+                <span>所有者・scope・資格期限をhandler側でも必ず確認する。</span>
+              </li>
+            </ol>
+          </article>
+
+          <div class="grid">
+            <article class="card">
+              <h3>Twitchに要求するscope</h3>
+              <p><code>user:read:follows</code><br />本人が対象チャンネルをいつからフォローしているか確認する。</p>
+              <p><code>user:read:subscriptions</code><br />本人が対象チャンネルを現在サブスクしているか確認する。</p>
+            </article>
+            <article class="card">
+              <h3>MCPで分けるscope</h3>
+              <p><code>research:read</code> 閲覧・評価</p>
+              <p><code>research:write</code> 作成・編集</p>
+              <p><code>research:publish</code> 公開・音声生成</p>
+            </article>
+          </div>
+        </div>
+
+        <div class="policy" aria-label="利用資格の判定式">
+          <div class="policy-part">
+            <strong>現在サブスク中</strong>
+            <small>継続月数はMVPの条件にしない</small>
+          </div>
+          <span class="operator">OR</span>
+          <div class="policy-part">
+            <strong>フォロー経過日数 ≥ 設定値</strong>
+            <small><code>followed_at</code>から計算</small>
+          </div>
+          <span class="operator">AND</span>
+          <div class="policy-part">
+            <strong>denylist対象外</strong>
+            <small>運営上の停止・不正利用へ対応</small>
+          </div>
+        </div>
+        <p class="callout">
+          対象配信者はログイン名ではなく変更されないTwitch broadcaster IDで設定する。
+          フォロー解除後に再フォローした場合は新しい<code>followed_at</code>を基準にする。
+        </p>
+      </section>
+
+      <section id="tools">
+        <div class="section-heading">
+          <p class="section-kicker">04 / MCP contract</p>
+          <h2>対話を支える三つの面</h2>
+          <p>
+            クライアント側AIが迷わないよう、知識はresources、対話の入口はprompts、変更操作はtoolsとして分離する。
+          </p>
+        </div>
+
+        <div class="grid three">
+          <article class="card">
+            <h3>Resources</h3>
+            <p><code>research://guide/overview</code></p>
+            <p><code>research://guide/evaluation</code></p>
+            <p><code>research://projects/{id}</code></p>
+            <p><code>research://projects/{id}/deck</code></p>
+          </article>
+          <article class="card">
+            <h3>Prompts</h3>
+            <p><code>start_research</code><br />テーマ探しから一問ずつ進める。</p>
+            <p><code>review_research</code><br />8観点の基準で不足を見つける。</p>
+            <p><code>compose_presentation</code><br />内容確定後にdeckを構成する。</p>
+          </article>
+          <article class="card">
+            <h3>Tools</h3>
+            <p>入力・出力をJSON Schemaで固定し、すべての変更に<code>project_id</code>と版番号を要求する。</p>
+            <p>AIへファイルシステムや汎用シェルを直接公開しない。</p>
+          </article>
+        </div>
+
+        <div class="table-wrap" style="margin-top: 22px">
+          <table>
+            <thead>
+              <tr>
+                <th>Tool</th>
+                <th>Scope</th>
+                <th>役割</th>
+                <th>重要な制約</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>get_access_status</code></td>
+                <td><span class="tag">READ</span></td>
+                <td>利用者、資格の理由、期限を確認</td>
+                <td>Twitch tokenは返さない</td>
+              </tr>
+              <tr>
+                <td><code>list_projects</code></td>
+                <td><span class="tag">READ</span></td>
+                <td>自分の研究一覧を取得</td>
+                <td>所有者IDを常に強制</td>
+              </tr>
+              <tr>
+                <td><code>get_project</code></td>
+                <td><span class="tag">READ</span></td>
+                <td>研究ログ、deck、評価を取得</td>
+                <td>必要な範囲だけ返す</td>
+              </tr>
+              <tr>
+                <td><code>create_project</code></td>
+                <td><span class="tag write">WRITE</span></td>
+                <td>空の研究プロジェクトを作成</td>
+                <td>件数上限と冪等キー</td>
+              </tr>
+              <tr>
+                <td><code>update_project</code></td>
+                <td><span class="tag write">WRITE</span></td>
+                <td>研究内容・スライド・読み上げを更新</td>
+                <td>schema検証と楽観ロック</td>
+              </tr>
+              <tr>
+                <td><code>evaluate_project</code></td>
+                <td><span class="tag">READ</span></td>
+                <td>評価基準と現在データを返す</td>
+                <td>採点自体はクライアントAIが担当</td>
+              </tr>
+              <tr>
+                <td><code>request_preview</code></td>
+                <td><span class="tag write">WRITE</span></td>
+                <td>安全なレンダラーで確認用HTMLを生成</td>
+                <td>回数・容量・実行時間を制限</td>
+              </tr>
+              <tr>
+                <td><code>publish_project</code></td>
+                <td><span class="tag danger">PUBLISH</span></td>
+                <td>公開版を固定し、配信用URLを発行</td>
+                <td>明示確認・資格再照会・監査必須</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="data">
+        <div class="section-heading">
+          <p class="section-kicker">05 / Data &amp; repository</p>
+          <h2>既存の研究基盤と疎結合にする</h2>
+          <p>
+            現在のスライド実装を壊さず、共有schemaとレンダラーだけを再利用できる構成へ段階的に整理する。
+          </p>
+        </div>
+
+        <div class="grid two">
+          <pre class="folder-tree" aria-label="提案するリポジトリ構成">apps/
+  presentation/        # 現在のWebスライド
+  mcp-server/          # Cloudflare Worker
+    src/
+      auth/twitch.ts
+      auth/eligibility.ts
+      mcp/resources.ts
+      mcp/prompts.ts
+      mcp/tools.ts
+      services/projects.ts
+      services/publish.ts
+packages/
+  research-schema/     # 研究・deckの共通schema
+  research-guides/     # 対話フロー・評価基準
+  renderer/            # 検証済みデータ → 静的HTML
+migrations/            # D1 schema
+docs/                  # 設計・運用手順</pre>
+
+          <div class="grid">
+            <article class="card">
+              <h3>D1</h3>
+              <p><code>users</code> <code>oauth_accounts</code> <code>entitlements</code> <code>projects</code> <code>project_versions</code> <code>jobs</code> <code>audit_events</code></p>
+            </article>
+            <article class="card">
+              <h3>KV</h3>
+              <p>OAuthの短寿命state、CSRF照合情報、短期的な資格キャッシュ。永続的な研究データの正本にはしない。</p>
+            </article>
+            <article class="card">
+              <h3>R2</h3>
+              <p>検査済み素材、プレビュー、公開版HTML、生成音声。下書き用と公開用のkey prefixを分離する。</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="security">
+        <div class="section-heading">
+          <p class="section-kicker">06 / Security boundary</p>
+          <h2>AIから来る値を信用しない</h2>
+          <p>
+            MCPクライアントが正規でも、モデルの誤操作、プロンプトインジェクション、利用者入力の悪用は起こり得る。
+          </p>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <h3>認証・認可</h3>
+            <ul class="checklist">
+              <li>OAuth stateをSecure・HttpOnly・SameSite cookieへ結びつけ、使用後に削除</li>
+              <li>MCP consent画面に要求scopeと実行可能な操作を表示</li>
+              <li>Twitch access/refresh tokenは暗号化して保存し、ブラウザ・MCP・ログへ出さない</li>
+              <li>起動時・定期的にTwitch tokenを検証し、失効時はMCPセッションを停止</li>
+              <li>公開など高コスト操作の直前に利用資格を再確認</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>入力・生成物</h3>
+            <ul class="checklist">
+              <li>toolごとに厳格なJSON Schema、文字数、配列件数、容量上限を設定</li>
+              <li>Markdownをサニタイズし、任意HTML・JS・CSS・SVG・ZIPはMVPで拒否</li>
+              <li>画像は拡張子でなく実MIME、サイズ、ピクセル数を検査</li>
+              <li>R2へはWorker経由で限定keyにだけ保存し、公開bucketへの直接writeを許さない</li>
+              <li>HTML生成はサーバー所有のrendererだけで行う</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>AI・MCP固有</h3>
+            <ul class="checklist">
+              <li>アップロード文書内の命令をシステム指示として扱わない</li>
+              <li>利用者に許可されないtoolは条件付き登録でモデルから隠す</li>
+              <li>公開・削除・音声生成には確認用previewと明示承認を要求</li>
+              <li>汎用shell、任意URL fetch、秘密情報の読取toolを公開しない</li>
+              <li>エラー本文へ内部パス、SQL、token、stack traceを含めない</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>運用・費用</h3>
+            <ul class="checklist">
+              <li>Twitch user、IP、tool、日単位のrate limitとquotaを設定</li>
+              <li>同じ要求を重複実行しないidempotency keyを採用</li>
+              <li>監査ログに誰が・いつ・何をしたかを残す</li>
+              <li>管理画面はCloudflare Access等で別に保護</li>
+              <li>緊急停止、denylist、全token失効の手順を用意</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="card" style="margin-top: 22px">
+          <div class="risk">
+            <span class="risk-level">HIGH</span>
+            <div><strong>任意コード実行</strong><p>MVPでは実装しない。将来必要になった場合だけ、ユーザー／ジョブごとに隔離したSandboxを追加する。</p></div>
+          </div>
+          <div class="risk">
+            <span class="risk-level">HIGH</span>
+            <div><strong>公開操作の誤実行</strong><p>下書き更新とは別scope・別toolにし、preview hashへの承認を要求して公開内容を固定する。</p></div>
+          </div>
+          <div class="risk">
+            <span class="risk-level medium">MEDIUM</span>
+            <div><strong>資格キャッシュ中のフォロー解除・サブスク終了</strong><p>通常toolは短期キャッシュ、高コスト・公開toolはTwitchへ再照会する。猶予期間の有無は運用規約で決める。</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="roadmap">
+        <div class="section-heading">
+          <p class="section-kicker">07 / Implementation roadmap</p>
+          <h2>認証を先に証明し、制作機能を後から載せる</h2>
+          <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
+        </div>
+
+        <div class="roadmap">
+          <article class="phase">
+            <div class="phase-id">PHASE 0</div>
+            <div class="phase-main">
+              <h3>契約と設定値を確定</h3>
+              <p>対象broadcaster ID、必要フォロー日数、サブスクの扱い、失効猶予、データ保持期間を決める。</p>
+            </div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>設定値と利用規約の草案をレビューできる。</p></div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-id">PHASE 1</div>
+            <div class="phase-main">
+              <h3>認証なしRemote MCP</h3>
+              <p>Worker、McpAgent、Streamable HTTPを構成し、<code>health</code>と固定resourceをMCP Inspectorから確認する。</p>
+            </div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>対応クライアントから接続し、toolを1回呼べる。</p></div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-id">PHASE 2</div>
+            <div class="phase-main">
+              <h3>Twitch OAuth + 資格判定</h3>
+              <p>二段OAuth、scope、state、token暗号化、フォロー／サブスク判定、allow・deny overrideを実装する。</p>
+            </div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>資格あり／なし／拒否／失効のE2Eテストが通る。</p></div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-id">PHASE 3</div>
+            <div class="phase-main">
+              <h3>研究データMVP</h3>
+              <p>共通schema、D1 migration、resource、prompt、project CRUD、版番号による競合防止を実装する。</p>
+            </div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>AIクライアントとの対話だけで研究を作成・再開できる。</p></div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-id">PHASE 4</div>
+            <div class="phase-main">
+              <h3>プレビューと公開</h3>
+              <p>既存スライドrendererを構造化データへ接続し、R2 preview、承認、固定版publishを非同期化する。</p>
+            </div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>任意コードなしで発表URLを安全に生成できる。</p></div>
+          </article>
+
+          <article class="phase">
+            <div class="phase-id">PHASE 5</div>
+            <div class="phase-main">
+              <h3>限定パイロット</h3>
+              <p>少人数をmanual allowlistへ追加し、quota、監査、削除、障害対応、クライアント別の接続手順を検証する。</p>
+            </div>
+            <div class="phase-done"><strong>DONE WHEN</strong><p>運営者の介助なしで接続から初回保存まで完了できる。</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="decisions">
+        <div class="section-heading">
+          <p class="section-kicker">08 / Decisions before coding</p>
+          <h2>着手前に決めるのは五つだけ</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>決定項目</th><th>推奨初期値</th><th>理由</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>フォロー期間</td><td>30日</td><td>実装後に環境変数／設定テーブルから変更できるようにする。</td></tr>
+              <tr><td>サブスク判定</td><td>現在有効なら許可</td><td>継続月数の履歴管理をMVPから外せる。</td></tr>
+              <tr><td>資格キャッシュ</td><td>通常30分、公開時は再照会</td><td>API負荷と資格変更への追従を両立する運用上の初期案。</td></tr>
+              <tr><td>Twitch token保持</td><td>暗号化して保持</td><td>MCP接続中の定期検証と資格再照会に必要。</td></tr>
+              <tr><td>公開形式</td><td>R2上の固定静的成果物</td><td>ユーザー入力を実行時コードにせず、公開版を再現しやすい。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <div class="final-plan">
+          <p class="section-kicker">Recommended first move</p>
+          <h2>最初の実装は「資格を答えるだけのMCP」</h2>
+          <p>
+            <code>get_access_status</code>だけを持つRemote MCPをCloudflareへ配置し、
+            Twitchログイン、フォロー期間、サブスク、拒否、token失効までを先に通す。
+            ここが安定してから研究CRUDを追加すれば、最大の不確実性を小さな実装で検証できる。
+          </p>
+        </div>
+      </section>
+
+      <section class="sources" aria-labelledby="sources-title">
+        <h2 id="sources-title">参照した公式資料</h2>
+        <ul>
+          <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/guides/remote-mcp-server/">Cloudflare: Build a Remote MCP server</a></li>
+          <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/apis/agent-api/">Cloudflare: McpAgent API</a></li>
+          <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/">Cloudflare: MCP Authorization</a></li>
+          <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/guides/securing-mcp-server/">Cloudflare: Securing MCP servers</a></li>
+          <li><a href="https://dev.twitch.tv/docs/authentication/getting-tokens-oauth/">Twitch: OAuth Access Tokens</a></li>
+          <li><a href="https://dev.twitch.tv/docs/authentication/validate-tokens">Twitch: Validating Tokens</a></li>
+          <li><a href="https://dev.twitch.tv/docs/authentication/scopes/">Twitch: Access Token Scopes</a></li>
+          <li><a href="https://dev.twitch.tv/docs/api/reference/#get-followed-channels">Twitch: Get Followed Channels</a></li>
+          <li><a href="https://dev.twitch.tv/docs/api/reference/#check-user-subscription">Twitch: Check User Subscription</a></li>
+        </ul>
+      </section>
+    </main>
+
+    <footer>
+      ULTIMATE FREESTYLE / REMOTE MCP ARCHITECTURE PLAN — UPDATED 2026-07-26
+    </footer>
+  </body>
+</html>
