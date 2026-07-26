@@ -44,6 +44,33 @@ bun run dev
 bun run test
 ```
 
+## GitHub Pagesへ公開する
+
+公開先はGitHub Pagesを標準とし、GitHub Actionsで静的HTMLを生成します。リポジトリの `Settings` → `Pages` → `Build and deployment` で、`Source` を `GitHub Actions` に設定してください。以後は `main` へのpush、またはActions画面からの手動実行で公開されます。
+
+同梱のワークフローは、GitHub Pagesが返す実際の公開パスをビルドへ渡します。このため、利用者側でURLをソースコードへ書く必要はありません。
+
+| 公開方法 | URL例 | ビルド時の基準パス |
+|---|---|---|
+| 通常のプロジェクトPages | `https://owner.github.io/repository/` | `/repository` |
+| カスタムドメイン | `https://research.example.com/` | 空 |
+
+カスタムドメインはリポジトリのPages設定とDNS側で設定します。Actionsから公開する場合、判定用の `CNAME` ファイルは使わず、GitHub Pagesの設定を正本にします。
+
+ローカルで静的出力だけを確認する場合：
+
+```bash
+# カスタムドメインと同じルート配置
+bun run build:pages
+
+# 通常のプロジェクトPagesと同じサブパス配置
+PAGES_BASE_PATH=/ultimate-freestyle bun run build:pages
+```
+
+成果物は `dist/client/` に生成されます。`bun run test` ではルート配置とサブパス配置を両方ビルドし、研究ページ、CSS・JavaScript、VOICEVOX音声のパスまで確認します。
+
+GitHub Pages版は完全な静的サイトです。公開後にサーバー処理を追加することはできませんが、現在のスライド進行、URL履歴、音声再生、`localStorage` による音量保存はすべてブラウザ内で動くため、そのまま利用できます。
+
 ## 対話しながら研究を作る
 
 リポジトリ内の `research-companion` スキルが、テーマ探しから提出前評価まで一問ずつ伴走します。Codexでは `.agents/skills/research-companion/`、Claudeでは `.claude/skills/research-companion/` から同じ正本を利用します。

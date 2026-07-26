@@ -11,6 +11,8 @@
 
 研究テーマ、問い、方法、記録、発表構成、評価をユーザーと対話して作る依頼では、`.claude/skills/research-companion/SKILL.md` を使う。正本である `.agents/skills/research-companion/SKILL.md` と、必要な参照ファイルを完全に読む。
 
+公開素材のURLへドメイン名やリポジトリ名を直接埋め込まない。研究データでは `/researches/<slug>/...` を使い、GitHub Pagesの基準パスはビルド設定と `Presentation` のURL解決に任せる。
+
 ## コマンド
 
 このプロジェクトではBunを使う。package.jsonのscriptを実行するときは、必ず `bun run <script>` を使う。

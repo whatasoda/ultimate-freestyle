@@ -1,5 +1,9 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
+import {
+  isGitHubPagesBuild,
+  pagesAssetBase
+} from "./build/github-pages-config";
 import { sites } from "./build/sites-vite-plugin";
 
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -11,6 +15,7 @@ export default defineConfig(async () => {
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
   return {
+    base: isGitHubPagesBuild ? pagesAssetBase : undefined,
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,

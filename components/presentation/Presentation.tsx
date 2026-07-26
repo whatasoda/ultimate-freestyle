@@ -25,6 +25,13 @@ const LAYOUT_OPTIONS: Array<{ value: PresentationLayout; label: string }> = [
   { value: "minimal", label: "資料" }
 ];
 
+function resolvePublicAssetUrl(source: string) {
+  if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(source)) return source;
+  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  const path = source.startsWith("/") ? source : `/${source}`;
+  return `${basePath}${path}`;
+}
+
 type PresentationPosition = {
   slideIndex: number;
   revealStep: number;
@@ -392,7 +399,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
         return;
       }
 
-      const player = new Audio(segment.audioSrc);
+      const player = new Audio(resolvePublicAssetUrl(segment.audioSrc));
       player.volume = volumeRef.current;
       let usingFallback = false;
       const fallback = () => {

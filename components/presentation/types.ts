@@ -13,7 +13,7 @@ export type NarrationSegment = {
   /** この段階表示になった時に有効になる。最初の文は0。 */
   at: number;
   text: string;
-  /** public/ からの絶対パス。未指定ならブラウザ標準読み上げを使う。 */
+  /** public/ からのパス。配信先のbase pathは自動付与される。 */
   audioSrc?: string;
 };
 
