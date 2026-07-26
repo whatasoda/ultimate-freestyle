@@ -5,7 +5,6 @@ import {
   type AuthRequest,
   type OAuthHelpers
 } from "@cloudflare/workers-oauth-provider";
-import { z } from "zod";
 
 import { evaluateEligibility } from "./eligibility";
 import { readAuthConfig } from "./config";
@@ -23,7 +22,6 @@ import {
 import {
   CSRF_COOKIE,
   TWITCH_STATE_COOKIE,
-  WEB_SESSION_COOKIE,
   clearSecureCookie,
   createSecureCookie,
   hashToken,
@@ -32,10 +30,12 @@ import {
   secureTokenEqual
 } from "./security";
 import {
-  createWebSession,
-  deleteWebSession,
-  readWebSession
-} from "./web-session";
+  consumeTwitchState,
+  mcpTwitchState,
+  storeTwitchState,
+  TWITCH_STATE_TTL_SECONDS
+} from "./twitch-state";
+import { createWebSession } from "./web-session";
 import {
   defaultFetcher,
   TwitchApiError,
@@ -44,32 +44,14 @@ import {
 } from "./twitch";
 import {
   MCP_SCOPES,
-  oauthAuthRequestSchema,
   twitchGrantPropsSchema,
   type TwitchGrantProps
 } from "./types";
-import { listProjects } from "../projects/repository";
-import {
-  dashboardPage,
-  landingPage,
-  redirectPage,
-  webLoginCompletePage
-} from "../web/pages";
+import { webLoginCompletePage } from "../web/pages";
+import { handleWebRequest } from "../web/router";
+import { readUrlEncodedFormCapped } from "../lib/http";
 
-const STATE_TTL_SECONDS = 600;
-const STATE_KEY_PREFIX = "oauth:twitch:state:";
-
-const pendingTwitchStateSchema = z.discriminatedUnion("kind", [
-  z.object({
-    kind: z.literal("mcp"),
-    authRequest: oauthAuthRequestSchema
-  }),
-  z.object({
-    kind: z.literal("web")
-  })
-]);
-
-type PendingTwitchState = z.infer<typeof pendingTwitchStateSchema>;
+const STATE_TTL_SECONDS = TWITCH_STATE_TTL_SECONDS;
 
 type McpRequestHandler = (
   request: Request,
@@ -96,50 +78,6 @@ function validateRequestedScopes(request: AuthRequest): string[] {
     });
   }
   return request.scope;
-}
-
-async function storeTwitchState(
-  env: Env,
-  pendingState: PendingTwitchState
-): Promise<{ state: string; cookie: string }> {
-  const state = randomToken();
-  await env.AUTH_STATE_KV.put(
-    `${STATE_KEY_PREFIX}${state}`,
-    JSON.stringify(pendingState),
-    { expirationTtl: STATE_TTL_SECONDS }
-  );
-  return {
-    state,
-    cookie: createSecureCookie(
-      TWITCH_STATE_COOKIE,
-      await hashToken(state),
-      STATE_TTL_SECONDS
-    )
-  };
-}
-
-async function consumeTwitchState(
-  request: Request,
-  env: Env,
-  state: string
-): Promise<PendingTwitchState | null> {
-  const key = `${STATE_KEY_PREFIX}${state}`;
-  const [stored, expectedHash] = await Promise.all([
-    env.AUTH_STATE_KV.get(key, "json"),
-    hashToken(state)
-  ]);
-  await env.AUTH_STATE_KV.delete(key);
-
-  const cookieHash = readCookie(request, TWITCH_STATE_COOKIE);
-  if (
-    stored === null ||
-    cookieHash === null ||
-    !(await secureTokenEqual(cookieHash, expectedHash))
-  ) {
-    return null;
-  }
-  const parsed = pendingTwitchStateSchema.safeParse(stored);
-  return parsed.success ? parsed.data : null;
 }
 
 function createGrantProps(options: {
@@ -205,12 +143,17 @@ async function handleAuthorize(
     });
   }
 
-  const contentLength = Number(request.headers.get("content-length"));
-  if (!Number.isSafeInteger(contentLength) || contentLength > 16 * 1024) {
-    return messagePage("接続エラー", "認可リクエストが大きすぎます。", 413);
+  const form = await readUrlEncodedFormCapped(request, 16 * 1024);
+  if (!form.ok) {
+    return messagePage(
+      "接続エラー",
+      form.reason === "over_cap"
+        ? "認可リクエストが大きすぎます。"
+        : "認可リクエストを読み取れませんでした。",
+      form.reason === "over_cap" ? 413 : 400
+    );
   }
-  const form = await request.formData();
-  const csrfToken = form.get("csrf_token");
+  const csrfToken = form.value.get("csrf_token");
   const csrfCookie = readCookie(request, CSRF_COOKIE);
   if (
     typeof csrfToken !== "string" ||
@@ -222,10 +165,7 @@ async function handleAuthorize(
 
   const authConfig = readAuthConfig(env);
   const twitch = new TwitchClient(authConfig.twitch, fetcher);
-  const pending = await storeTwitchState(env, {
-    kind: "mcp",
-    authRequest
-  });
+  const pending = await storeTwitchState(env, mcpTwitchState(authRequest));
   return externalAuthorizationPage(
     twitch.createAuthorizationUrl(pending.state),
     [pending.cookie, clearSecureCookie(CSRF_COOKIE)]
@@ -351,68 +291,6 @@ async function handleTwitchCallback(
   );
 }
 
-async function handleWebLogin(
-  request: Request,
-  env: Env,
-  fetcher: Fetcher
-): Promise<Response> {
-  if (request.method !== "GET") {
-    return new Response(null, { status: 405, headers: { allow: "GET" } });
-  }
-  if ((await readWebSession(request, env.AUTH_STATE_KV)) !== null) {
-    return redirectPage("/dashboard");
-  }
-  const config = readAuthConfig(env);
-  const twitch = new TwitchClient(config.twitch, fetcher);
-  const pending = await storeTwitchState(env, { kind: "web" });
-  return externalAuthorizationPage(twitch.createAuthorizationUrl(pending.state), [
-    pending.cookie
-  ]);
-}
-
-async function handleDashboard(request: Request, env: Env): Promise<Response> {
-  if (request.method !== "GET") {
-    return new Response(null, { status: 405, headers: { allow: "GET" } });
-  }
-  const session = await readWebSession(request, env.AUTH_STATE_KV);
-  if (session === null) {
-    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
-  }
-  return dashboardPage({
-    twitchLogin: session.twitchLogin,
-    csrfToken: session.csrfToken,
-    projects: await listProjects(env.DB, session.userId)
-  });
-}
-
-async function handleLogout(request: Request, env: Env): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: { allow: "POST" } });
-  }
-  const session = await readWebSession(request, env.AUTH_STATE_KV);
-  if (session === null) {
-    return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
-  }
-  const contentLength = Number(request.headers.get("content-length"));
-  if (!Number.isSafeInteger(contentLength) || contentLength > 16 * 1024) {
-    return messagePage("ログアウトエラー", "リクエストが大きすぎます。", 413);
-  }
-  const form = await request.formData();
-  const csrfToken = form.get("csrf_token");
-  if (
-    typeof csrfToken !== "string" ||
-    !(await secureTokenEqual(csrfToken, session.csrfToken))
-  ) {
-    return messagePage(
-      "ログアウトエラー",
-      "画面の有効期限が切れました。ページを読み込み直してください。",
-      403
-    );
-  }
-  await deleteWebSession(request, env.AUTH_STATE_KV);
-  return redirectPage("/", [clearSecureCookie(WEB_SESSION_COOKIE)]);
-}
-
 function toOAuthError(error: unknown): OAuthError {
   if (error instanceof TwitchApiError) {
     if (
@@ -500,18 +378,9 @@ export function createOAuthProvider(
     async fetch(request: Request, requestEnv: Env): Promise<Response> {
       const path = new URL(request.url).pathname;
       try {
-        if (path === "/" && request.method === "GET") {
-          const session = await readWebSession(request, requestEnv.AUTH_STATE_KV);
-          return session === null ? landingPage() : redirectPage("/dashboard");
-        }
-        if (path === "/login") {
-          return await handleWebLogin(request, requestEnv, fetcher);
-        }
-        if (path === "/dashboard") {
-          return await handleDashboard(request, requestEnv);
-        }
-        if (path === "/logout") {
-          return await handleLogout(request, requestEnv);
+        const webResponse = await handleWebRequest(request, requestEnv, fetcher);
+        if (webResponse !== null) {
+          return webResponse;
         }
         if (path === "/authorize") {
           return await handleAuthorize(request, requestEnv, fetcher);
