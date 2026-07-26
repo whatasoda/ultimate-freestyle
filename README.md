@@ -6,7 +6,7 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成へ移行中です。新しいRemote MCP v0.4.0は `apps/mcp-server/` からTwitch OAuth必須で本番稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走promptまで実装済みです。同じWorkerにTwitchログイン対応のWeb UIもあり、自分の研究一覧を確認できます。発表UIはまだリポジトリ直下にあり、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
+現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成へ移行中です。Remote MCP v0.5.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走promptまで実装済みです。同じWorkerのWeb UIでは自分の研究一覧・詳細と、正規化された研究画像を管理できます。発表UIはまだリポジトリ直下にあり、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
 
 ## できること
 
@@ -50,7 +50,7 @@ bun run test
 
 ## Remote MCPを開発する
 
-CodexとChatGPTを優先するRemote MCPがあります。`health`、`get_access_status`、研究の作成・一覧・取得・更新・評価材料取得、制作ガイドresource、3つの伴走prompt、Twitch OAuthによるフォロー期間・サブスク・運用overrideの資格判定を実装しています。`https://saijiyu-kenkyu.2764.moe/`では、同じTwitchアカウントでログインして自分の研究一覧を確認できます。
+CodexとChatGPTを優先するRemote MCPがあります。`health`、`get_access_status`、研究の作成・一覧・取得・更新・評価材料取得、研究画像の一覧・削除、制作ガイドresource、3つの伴走prompt、Twitch OAuthによるフォロー期間・サブスク・運用overrideの資格判定を実装しています。`https://saijiyu-kenkyu.2764.moe/`では、同じTwitchアカウントでログインして自分の研究一覧・詳細と画像を管理できます。画像binaryの追加はMCP JSONへ埋め込まずWeb UIから行います。
 
 ```bash
 bun run dev:mcp

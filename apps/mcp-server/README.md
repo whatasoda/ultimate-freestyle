@@ -27,9 +27,9 @@ bun run smoke:mcp
 
 `bun run smoke:mcp` は、本番のヘルスチェックとMCP初期化をブラウザなしで検証します。別環境を検証するときだけ、`MCP_BASE_URL` にoriginを指定してください。デプロイはリポジトリルートで `bun run deploy:mcp` を実行します。
 
-2026-07-26時点でWorker v0.4.0、Custom Domain、DNS、TLS、OAuth用KV、state用KV、D1と期限切れOAuthデータを清掃するcronは本番配置済みです。D1の`0001_auth.sql`と`0002_projects.sql`は適用済みで、Web session用の`0003_web_sessions.sql`と画像metadata用の`0004_project_assets.sql`は次回デプロイ時に適用します。private R2 bucketは作成済みで、QueueとContainerは後続Phaseで追加します。
+2026-07-26時点でWorker v0.5.0、Custom Domain、DNS、TLS、OAuth用KV、state用KV、D1、private R2、Images binding、期限切れOAuth／Web sessionを清掃するcronを構成しています。D1 migration `0001`〜`0004`が認証、研究、Web session、画像metadataを管理します。QueueとContainerは後続Phaseで追加します。
 
-研究データは512 KiB以内の固定schemaでD1へ保存します。`create_project`はidempotency key、`update_project`は`expected_version`を必須とし、再試行による重複作成と同時編集による上書きを防ぎます。全操作で認証中の所有者IDを強制し、他利用者のproject IDを指定しても存在を開示しません。
+研究データは512 KiB以内の固定schemaでD1へ保存します。`create_project`はidempotency key、`update_project`は`expected_version`を必須とし、再試行による重複作成と同時編集による上書きを防ぎます。`list_project_images`と`delete_project_image`も所有者を強制し、画像binaryやbase64はMCPレスポンスへ含めません。全操作で他利用者のproject／asset IDを指定しても存在を開示しません。
 
 Web UIも同じD1の所有者IDで絞り込みます。Twitch確認後は、Twitch tokenやMCP tokenをCookieへ保存せず、D1に保存した24時間のWeb専用セッションを`HttpOnly`、`Secure`、`SameSite=Lax`の不透明Cookieで参照します。D1を使うことでログアウトを即時反映し、session cookieとCSRF cookieの両方が揃った場合だけ認証済みとして扱います。現在の画面機能は一覧、研究詳細、研究画像の追加・閲覧・削除です。研究本文の編集と公開はMCP対応AIクライアントから行います。
 

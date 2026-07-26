@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { getMcpAuthContext } from "agents/mcp";
 import { z } from "zod";
 
+import { registerAssetTools } from "./assets/tools";
 import {
   eligibilityReasonSchema,
   twitchGrantPropsSchema
@@ -10,7 +11,7 @@ import { registerProjectTools } from "./projects/tools";
 import { registerResearchGuides } from "./projects/guides";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.4.0";
+export const SERVICE_VERSION = "0.5.0";
 
 export type EligibilityConfig = Pick<
   Env,
@@ -19,7 +20,7 @@ export type EligibilityConfig = Pick<
   | "MIN_FOLLOW_DAYS"
 >;
 
-export type ServerConfig = EligibilityConfig & Pick<Env, "DB">;
+export type ServerConfig = EligibilityConfig & Pick<Env, "DB" | "MEDIA_BUCKET">;
 
 export function createHealthResult(config: EligibilityConfig) {
   const minFollowDays = Number.parseInt(config.MIN_FOLLOW_DAYS, 10);
@@ -52,7 +53,7 @@ export function createServer(
     },
     {
       instructions:
-        "最自由研究の制作を支援するサーバーです。まずhealthを呼び、次にget_access_statusを確認してください。変更前はget_projectでversionを取得し、update_projectへexpected_versionを渡します。競合時は再取得してユーザーの変更を失わないでください。"
+        "最自由研究の制作を支援するサーバーです。まずhealthを呼び、次にget_access_statusを確認してください。変更前はget_projectでversionを取得し、update_projectへexpected_versionを渡します。競合時は再取得してユーザーの変更を失わないでください。画像binaryの追加はWeb UIを案内し、MCPでは一覧と削除だけを扱います。"
     }
   );
 
@@ -188,6 +189,7 @@ export function createServer(
   );
 
   registerProjectTools(server, config.DB, getAuthProps);
+  registerAssetTools(server, config, getAuthProps);
   registerResearchGuides(server, config.DB, getAuthProps);
 
   return server;

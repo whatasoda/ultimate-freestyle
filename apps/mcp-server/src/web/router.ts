@@ -10,6 +10,7 @@ import {
 } from "../assets/service";
 import { readAuthConfig } from "../auth/config";
 import { externalAuthorizationPage, messagePage } from "../auth/pages";
+import { recordAuditEvent } from "../auth/repository";
 import { secureTokenEqual } from "../auth/security";
 import { storeTwitchState, webTwitchState } from "../auth/twitch-state";
 import { TwitchClient, type Fetcher } from "../auth/twitch";
@@ -40,6 +41,23 @@ const IMAGE_CLIENT_ERROR_CODES = new Set([
   "IMAGE_OUTPUT_TOO_LARGE",
   "IMAGE_EMPTY"
 ]);
+
+async function recordWebAudit(
+  db: D1Database,
+  event: Parameters<typeof recordAuditEvent>[1]
+): Promise<void> {
+  try {
+    await recordAuditEvent(db, event);
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        message: "Web audit event could not be stored",
+        event_type: event.eventType,
+        error: error instanceof Error ? error.message : String(error)
+      })
+    );
+  }
+}
 
 function jsonResponse(body: object, status = 200): Response {
   return Response.json(body, {
@@ -179,6 +197,17 @@ async function handleImageUpload(
       filename: url.searchParams.get("filename"),
       altText: (url.searchParams.get("alt") ?? "").slice(0, 500)
     });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project_image.uploaded",
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        asset_id: asset.asset_id,
+        byte_size: asset.byte_size
+      },
+      createdAt: new Date().toISOString()
+    });
     return jsonResponse(
       { ok: true, asset, error: null, request_id: crypto.randomUUID() },
       201
@@ -229,6 +258,13 @@ async function handleImageDelete(
     );
   }
   const deleted = await removeProjectImage(env, session.userId, assetId);
+  await recordWebAudit(env.DB, {
+    userId: session.userId,
+    eventType: "project_image.deleted",
+    outcome: "succeeded",
+    details: { asset_id: assetId, deleted },
+    createdAt: new Date().toISOString()
+  });
   return deleted
     ? jsonResponse({ ok: true, error: null, request_id: crypto.randomUUID() })
     : jsonResponse(

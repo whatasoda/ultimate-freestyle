@@ -4,10 +4,12 @@ import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import { createServer } from "../src/server";
+import { createProjectAsset } from "../src/assets/repository";
 import { projectRecordSchema } from "../src/projects/schema";
 
 const eligibilityConfig = {
   DB: env.DB,
+  MEDIA_BUCKET: env.MEDIA_BUCKET,
   TWITCH_BROADCASTER_ID: "67879379",
   TWITCH_BROADCASTER_LOGIN: "kashiwo",
   MIN_FOLLOW_DAYS: "30"
@@ -36,12 +38,23 @@ describe("MCP contract", () => {
           })
         })
       );
+      expect(tools).toContainEqual(
+        expect.objectContaining({
+          name: "delete_project_image",
+          annotations: expect.objectContaining({
+            readOnlyHint: false,
+            destructiveHint: true,
+            idempotentHint: true,
+            openWorldHint: false
+          })
+        })
+      );
 
       const result = await client.callTool({ name: "health", arguments: {} });
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.4.0",
+        version: "0.5.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -265,6 +278,40 @@ describe("MCP contract", () => {
         ]
       });
       expect(JSON.stringify(list)).not.toContain("not-returned");
+
+      const assetId = "40000000-0000-4000-8000-000000000004";
+      const objectKey = `project-images/${assetId}.webp`;
+      await env.MEDIA_BUCKET.put(objectKey, new Uint8Array([1, 2, 3]), {
+        httpMetadata: { contentType: "image/webp" }
+      });
+      await createProjectAsset(env.DB, {
+        assetId,
+        projectId: firstProject.project_id,
+        ownerUserId: subjectId,
+        objectKey,
+        originalFilename: "evidence.png",
+        altText: "実験結果",
+        width: 16,
+        height: 9,
+        byteSize: 3
+      });
+      const images = await client.callTool({
+        name: "list_project_images",
+        arguments: { project_id: firstProject.project_id }
+      });
+      expect(images.structuredContent).toMatchObject({
+        ok: true,
+        images: [{ asset_id: assetId, alt_text: "実験結果" }]
+      });
+      const deletedImage = await client.callTool({
+        name: "delete_project_image",
+        arguments: { asset_id: assetId }
+      });
+      expect(deletedImage.structuredContent).toMatchObject({
+        ok: true,
+        deleted: true
+      });
+      expect(await env.MEDIA_BUCKET.get(objectKey)).toBeNull();
 
       const evaluation = await client.callTool({
         name: "evaluate_project",

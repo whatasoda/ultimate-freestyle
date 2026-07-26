@@ -33,10 +33,10 @@ const projectErrorSchema = z.object({
   message: z.string()
 });
 
-type RequiredScope = "research:read" | "research:write";
+export type RequiredScope = "research:read" | "research:write";
 const MAX_PROJECT_DOCUMENT_BYTES = 512 * 1024;
 
-class ProjectToolError extends Error {
+export class ProjectToolError extends Error {
   constructor(
     readonly code: z.infer<typeof projectErrorCodeSchema>,
     message: string,
@@ -46,7 +46,7 @@ class ProjectToolError extends Error {
   }
 }
 
-function requireSubject(
+export function requireSubject(
   getAuthProps: () => Record<string, unknown> | undefined,
   scope: RequiredScope
 ): string {
@@ -89,7 +89,10 @@ function normalizeError(error: unknown): ProjectToolError {
   );
 }
 
-function toolResult(structuredContent: Record<string, unknown>, isError = false) {
+export function toolResult(
+  structuredContent: Record<string, unknown>,
+  isError = false
+) {
   return {
     content: [{ type: "text" as const, text: JSON.stringify(structuredContent) }],
     structuredContent,
