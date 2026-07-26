@@ -9,7 +9,7 @@ export function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
-function pageHeaders(setCookie?: string): Headers {
+function pageHeaders(setCookies?: string | string[]): Headers {
   const headers = new Headers({
     "cache-control": "no-store",
     "content-security-policy": [
@@ -24,8 +24,10 @@ function pageHeaders(setCookie?: string): Headers {
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY"
   });
-  if (setCookie !== undefined) {
-    headers.set("set-cookie", setCookie);
+  if (setCookies !== undefined) {
+    for (const cookie of Array.isArray(setCookies) ? setCookies : [setCookies]) {
+      headers.append("set-cookie", cookie);
+    }
   }
   return headers;
 }
@@ -44,7 +46,7 @@ function layout(title: string, body: string): string {
       h1 { margin-top: 0; font-size: clamp(1.5rem, 5vw, 2.25rem); }
       p, li { line-height: 1.7; color: #cad5e4; }
       code { color: #a9e2ff; }
-      button { width: 100%; margin-top: 1rem; padding: .9rem 1.2rem; border: 0; border-radius: .65rem; background: #8b5cf6; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+      button, .button { box-sizing: border-box; display: block; width: 100%; margin-top: 1rem; padding: .9rem 1.2rem; border: 0; border-radius: .65rem; background: #8b5cf6; color: white; font: inherit; font-weight: 700; text-align: center; text-decoration: none; cursor: pointer; }
       .muted { font-size: .9rem; color: #91a1b7; }
     </style>
   </head>
@@ -88,5 +90,22 @@ export function messagePage(
   return new Response(
     layout(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>`),
     { status, headers: pageHeaders(setCookie) }
+  );
+}
+
+export function externalAuthorizationPage(
+  authorizationUrl: URL,
+  setCookies: string[]
+): Response {
+  const href = escapeHtml(authorizationUrl.href);
+  return new Response(
+    layout(
+      "Twitchで認証",
+      `<h1>Twitchで認証</h1>
+       <p>最自由研究への接続を続けるには、Twitchの認可画面を開いてください。</p>
+       <a class="button" href="${href}">Twitchの認可画面を開く</a>
+       <p class="muted">新しい画面で許可した後、自動的にCodexへ戻ります。このページへ戻る必要はありません。</p>`
+    ),
+    { headers: pageHeaders(setCookies) }
   );
 }

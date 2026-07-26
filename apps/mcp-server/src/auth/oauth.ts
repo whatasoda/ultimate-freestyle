@@ -8,7 +8,11 @@ import {
 
 import { evaluateEligibility } from "./eligibility";
 import { readAuthConfig } from "./config";
-import { consentPage, messagePage } from "./pages";
+import {
+  consentPage,
+  externalAuthorizationPage,
+  messagePage
+} from "./pages";
 import {
   getEligibilityOverride,
   recordAuditEvent,
@@ -191,16 +195,10 @@ async function handleAuthorize(
   const authConfig = readAuthConfig(env);
   const twitch = new TwitchClient(authConfig.twitch, fetcher);
   const pending = await storeTwitchState(env, authRequest);
-  const headers = new Headers({
-    location: twitch.createAuthorizationUrl(pending.state).href
-  });
-  headers.append("set-cookie", pending.cookie);
-  headers.append("set-cookie", clearSecureCookie(CSRF_COOKIE));
-
-  return new Response(null, {
-    status: 302,
-    headers
-  });
+  return externalAuthorizationPage(
+    twitch.createAuthorizationUrl(pending.state),
+    [pending.cookie, clearSecureCookie(CSRF_COOKIE)]
+  );
 }
 
 async function handleTwitchCallback(

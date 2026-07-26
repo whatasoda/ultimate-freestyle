@@ -178,9 +178,13 @@ describe("Twitch OAuth proxy", () => {
       }),
       authEnv
     );
-    expect(upstreamRedirect.status).toBe(302);
+    expect(upstreamRedirect.status).toBe(200);
+    const upstreamHtml = await upstreamRedirect.text();
     const twitchAuthorize = new URL(
-      upstreamRedirect.headers.get("location") ?? "https://invalid.example"
+      upstreamHtml.match(/class="button" href="([^"]+)"/)?.[1].replaceAll(
+        "&amp;",
+        "&"
+      ) ?? "https://invalid.example"
     );
     expect(twitchAuthorize.origin).toBe("https://id.twitch.tv");
 
