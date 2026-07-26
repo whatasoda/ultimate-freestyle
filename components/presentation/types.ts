@@ -7,7 +7,6 @@ export type NarrationDisplay = "dialogue" | "commentary" | "inline";
 export type PresentationLayout =
   | "cinematic"
   | "biim"
-  | "broadcast"
   | "minimal";
 
 export type NarrationSegment = {
@@ -34,6 +33,8 @@ export type ResearchSlide = {
   revealSteps?: number;
   tone?: SlideTone;
   narration?: Narration;
+  /** BIIMレイアウトの右欄。読み上げ対象には含まれない任意の補足表示。 */
+  sidebar?: ReactNode;
   content: ReactNode;
 };
 

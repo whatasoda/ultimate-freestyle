@@ -970,8 +970,7 @@ h2 {
   font-size: clamp(7px, 0.9cqw, 14px);
 }
 
-.biim-sidebar,
-.broadcast-chrome {
+.biim-sidebar {
   display: none;
 }
 
@@ -1092,6 +1091,61 @@ h2 {
   opacity: 0.55;
 }
 
+.biim-sidebar img,
+.biim-sidebar video,
+.biim-sidebar canvas {
+  display: block;
+  max-width: 100%;
+  max-height: 32cqh;
+  object-fit: contain;
+}
+
+.biim-sidebar figure {
+  margin: 1.5cqh 0;
+}
+
+.biim-sidebar table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: clamp(7px, 0.8cqw, 13px);
+}
+
+.biim-sidebar th,
+.biim-sidebar td {
+  padding: 0.7cqh 0.4cqw;
+  border-bottom: 1px solid rgba(23, 21, 18, 0.2);
+  text-align: left;
+}
+
+.biim-custom-content {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.biim-custom-content > strong {
+  margin-top: 2cqh;
+  padding-bottom: 2cqh;
+  border-bottom: 0.3cqw solid #171512;
+  font-size: clamp(10px, 1.7cqw, 27px);
+  line-height: 1.35;
+}
+
+.biim-custom-content ul {
+  display: grid;
+  gap: 1.2cqh;
+  margin: 2.5cqh 0 0;
+  padding-left: 1.4cqw;
+  font-size: clamp(7px, 0.9cqw, 14px);
+  font-weight: 750;
+  line-height: 1.4;
+}
+
+.biim-custom-content small {
+  margin-top: auto;
+}
+
 .stage[data-layout="biim"] .narration-dialogue,
 .stage[data-layout="biim"] .narration-commentary,
 .stage[data-layout="biim"] .narration-inline {
@@ -1144,87 +1198,6 @@ h2 {
 
 .stage[data-layout="biim"] .narration-script p:not([data-active="true"]) {
   display: none;
-}
-
-/* Broadcast: 配信番組のオンエア表示と強いテロップを重ねる。 */
-.stage[data-layout="broadcast"] {
-  border-color: color-mix(in srgb, var(--accent) 70%, #ff4545);
-  border-radius: 2cqw;
-  box-shadow:
-    0 0 0 0.35cqw rgba(0, 0, 0, 0.78),
-    0 26px 85px rgba(0, 0, 0, 0.55);
-}
-
-.presentation .stage[data-layout="broadcast"] .slide {
-  padding-top: 14cqh;
-}
-
-.stage[data-layout="broadcast"] .broadcast-chrome {
-  position: absolute;
-  z-index: 35;
-  top: 3cqh;
-  right: 2.5cqw;
-  left: 2.5cqw;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  gap: 1.2cqw;
-  align-items: center;
-  color: #fff;
-  font: 800 clamp(7px, 0.85cqw, 14px) / 1 ui-monospace, monospace;
-  letter-spacing: 0.08em;
-}
-
-.broadcast-chrome b {
-  padding: 0.9cqh 0.9cqw;
-  border-radius: 99px;
-  background: #e92f3c;
-  box-shadow: 0 0 20px rgba(233, 47, 60, 0.45);
-}
-
-.broadcast-chrome span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.broadcast-chrome time {
-  font-variant-numeric: tabular-nums;
-}
-
-.stage[data-layout="broadcast"] .narration-dialogue,
-.stage[data-layout="broadcast"] .narration-commentary {
-  right: 4cqw;
-  bottom: 4cqh;
-  left: 4cqw;
-  padding: 1.8cqh 2cqw;
-  color: #fff;
-  border: 0;
-  border-left: 0.7cqw solid var(--accent);
-  border-radius: 0.7cqw;
-  background: linear-gradient(90deg, rgba(5, 5, 5, 0.94), rgba(5, 5, 5, 0.72));
-  box-shadow: 0 1.2cqh 3cqh rgba(0, 0, 0, 0.32);
-  text-align: left;
-}
-
-.stage[data-layout="broadcast"] .narration-dialogue::before,
-.stage[data-layout="broadcast"] .narration-dialogue::after,
-.stage[data-layout="broadcast"] .narration-steps {
-  display: none;
-}
-
-.stage[data-layout="broadcast"] .narration-speaker {
-  position: static;
-  width: fit-content;
-  padding: 0;
-  color: var(--accent);
-  background: transparent;
-  box-shadow: none;
-}
-
-.stage[data-layout="broadcast"] .narration-current {
-  font-size: clamp(12px, 2.2cqw, 35px);
-  line-height: 1.35;
-  text-shadow: 2px 2px 0 #000;
 }
 
 /* Minimal: 印刷資料に近い白地と罫線で、情報そのものを主役にする。 */

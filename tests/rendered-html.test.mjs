@@ -27,6 +27,8 @@ test("renders the default presentation", async () => {
   assert.match(html, /読み上げ音量/);
   assert.match(html, /発表レイアウト/);
   assert.match(html, />BIIM</);
+  assert.doesNotMatch(html, />番組</);
+  assert.match(html, /AUTHOR'S NOTE/);
   assert.match(html, /自動送りをオン/);
 });
 
@@ -53,8 +55,8 @@ test("keeps Claude and project assumptions in the repository", async () => {
   assert.match(styles, /aspect-ratio:\s*16 \/ 9/);
   assert.match(styles, /container-name:\s*presentation-stage/);
   assert.match(styles, /data-layout="biim"/);
-  assert.match(styles, /data-layout="broadcast"/);
   assert.match(styles, /data-layout="minimal"/);
+  assert.doesNotMatch(styles, /data-layout="broadcast"/);
 });
 
 test("includes generated VOICEVOX audio for every starter narration segment", async () => {

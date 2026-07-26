@@ -71,6 +71,18 @@ export const starterDeck: ResearchDeck = {
           spoken("question", 3, "そして、どこまで行けるのか。三つの問いを立てました。")
         ]
       },
+      sidebar: (
+        <div className="biim-custom-content">
+          <p>AUTHOR&apos;S NOTE</p>
+          <strong>「当たり前」を一度疑うところから始めました。</strong>
+          <ul>
+            <li>ここは読み上げない補足欄</li>
+            <li>作者コメントや注意点を置ける</li>
+            <li>画像などのReact要素も使用可能</li>
+          </ul>
+          <small>発表中に目で読んでもらう情報</small>
+        </div>
+      ),
       content: (
         <div className="content-layout">
           <Eyebrow>01 · QUESTION</Eyebrow>

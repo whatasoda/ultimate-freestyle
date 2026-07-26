@@ -22,7 +22,6 @@ const VOLUME_STORAGE_KEY = "ultimate-freestyle:narration-volume";
 const LAYOUT_OPTIONS: Array<{ value: PresentationLayout; label: string }> = [
   { value: "cinematic", label: "演出" },
   { value: "biim", label: "BIIM" },
-  { value: "broadcast", label: "番組" },
   { value: "minimal", label: "資料" }
 ];
 
@@ -668,21 +667,20 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
             {String(slideIndex + 1).padStart(2, "0")}
           </p>
         </div>
-        <aside className="biim-sidebar" aria-hidden="true">
-          <p>RESEARCH MEMO</p>
-          <strong>{slide.title}</strong>
-          <dl>
-            <div><dt>SLIDE</dt><dd>{slideIndex + 1} / {deck.slides.length}</dd></div>
-            <div><dt>STEP</dt><dd>{revealStep} / {slide.revealSteps ?? 0}</dd></div>
-            <div><dt>PACE</dt><dd>{formatTime(plannedElapsed)}</dd></div>
-          </dl>
-          <small>{deck.shortTitle}</small>
+        <aside className="biim-sidebar" aria-label="補足情報">
+          {slide.sidebar ?? (
+            <>
+              <p>RESEARCH MEMO</p>
+              <strong>{slide.title}</strong>
+              <dl>
+                <div><dt>SLIDE</dt><dd>{slideIndex + 1} / {deck.slides.length}</dd></div>
+                <div><dt>STEP</dt><dd>{revealStep} / {slide.revealSteps ?? 0}</dd></div>
+                <div><dt>PACE</dt><dd>{formatTime(plannedElapsed)}</dd></div>
+              </dl>
+              <small>{deck.shortTitle}</small>
+            </>
+          )}
         </aside>
-        <div className="broadcast-chrome" aria-hidden="true">
-          <b>LIVE</b>
-          <span>{deck.shortTitle}</span>
-          <time>{formatTime(elapsedSeconds)}</time>
-        </div>
       </article>
 
       <header className="presentation-header">

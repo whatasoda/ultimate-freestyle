@@ -9,7 +9,7 @@
 - クリック、Space、Enter、矢印キーでスライドと段階表示を進める
 - Googleスライドのワイド画面と同じ16:9の枠内に発表内容を収める
 - タイマー、進捗、音声、操作ボタンをスライド枠の外側に表示する
-- 同じ研究内容を演出型・BIIM型・番組型・資料型の4レイアウトで比較する
+- 同じ研究内容を演出型・BIIM型・資料型の3レイアウトで比較する
 - 研究ごとに独立したURLを持つ
 - スライド枚数、全体進捗、想定経過時間、実経過時間を常時表示する
 - スライドごとに想定時間を設定する
@@ -63,13 +63,12 @@ bun run test
 
 ## レイアウトパターン
 
-上部の `STYLE` から4種類を切り替えられます。選択中の形式はURLの `layout` に反映されるため、その見た目を指定したURLを共有できます。
+上部の `STYLE` から3種類を切り替えられます。選択中の形式はURLの `layout` に反映されるため、その見た目を指定したURLを共有できます。
 
 | 値 | 見た目 | 向いている研究 |
 |---|---|---|
 | `cinematic` | 現在の大きな文字・背景演出を使う標準形 | 写真、物語、印象的な結論 |
 | `biim` | 左の主画面、右の研究メモ、下の読み上げ欄に固定分割 | 情報量が多い解説、比較、実況形式 |
-| `broadcast` | LIVEバーと強い下部テロップを持つ番組風 | テンポの速い実演、動画中心の発表 |
 | `minimal` | 白地、罫線、控えめな装飾の資料風 | 数値、文章、論理構成を読ませる発表 |
 
 直接比較する例：`/present/starter?slide=2&step=1&layout=biim`
@@ -91,7 +90,8 @@ bun run test
 - `durationSeconds`: そのスライドの想定秒数
 - `revealSteps`: クリックで段階表示する回数
 - `tone`: `dark`、`light`、`signal`、`quiet` の画面テーマ
-- deckの `layout`: `cinematic`、`biim`、`broadcast`、`minimal` の既定レイアウト
+- deckの `layout`: `cinematic`、`biim`、`minimal` の既定レイアウト
+- スライドの `sidebar`: BIIM右欄にだけ表示する、読み上げない任意のReact要素
 - `narration.display`: `dialogue`、`commentary`、`inline` の表示形式
 - `narration.speaker`: このスライドだけ話者名を変える場合に指定
 - `narration.segments`: 段階表示ごとの原稿と音声
@@ -118,6 +118,23 @@ narration: {
   ]
 }
 ```
+
+BIIM型の右欄は `sidebar` へ自由に記述します。これは `narration` とは別のため、VOICEVOXの生成対象にはなりません。
+
+```tsx
+sidebar: (
+  <div className="biim-custom-content">
+    <p>AUTHOR&apos;S NOTE</p>
+    <strong>作者からの補足コメント</strong>
+    <ul>
+      <li>読み上げない注意点</li>
+      <li>追加データや観察メモ</li>
+    </ul>
+  </div>
+)
+```
+
+文字だけでなく、画像、表、独自コンポーネントなど任意のReact要素を配置できます。`sidebar` がないスライドには、スライド番号・段階・予定時刻の標準情報が表示されます。
 
 ### 原稿の表示形式
 
