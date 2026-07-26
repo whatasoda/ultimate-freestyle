@@ -1,9 +1,17 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
+  "account_id": "56d242f231458a289ad65217258b9e37",
   "name": "ultimate-freestyle-mcp",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-21",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "saijiyu-kenkyu.2764.moe",
+      "custom_domain": true
+    }
+  ],
   "vars": {
     "TWITCH_BROADCASTER_ID": "67879379",
     "TWITCH_BROADCASTER_LOGIN": "kashiwo",

@@ -11,11 +11,19 @@ bun run dev:mcp
 bun run build:mcp
 bun run test:mcp
 bun run types:mcp
+bun run smoke:mcp
 ```
 
 `bun run test:mcp` は生成型の同期、型検査、Workers runtime上のcontract test、deployのdry-run buildを連続実行します。`/healthz`、未知のURLに対する構造化404、`/mcp`のStreamable HTTP初期化、`health` tool呼び出し、固定resource取得をブラウザ操作なしで検証します。
 
 ローカル接続先は通常 `http://localhost:8787/mcp` です。MCP InspectorまたはCodexから接続し、`health`を呼び出してください。
+
+本番は `whatasoda` Cloudflareアカウントのカスタムドメインへ配置します。
+
+- ヘルスチェック: `https://saijiyu-kenkyu.2764.moe/healthz`
+- Remote MCP: `https://saijiyu-kenkyu.2764.moe/mcp`
+
+`bun run smoke:mcp` は、本番のヘルスチェックとMCP初期化をブラウザなしで検証します。別環境を検証するときだけ、`MCP_BASE_URL` にoriginを指定してください。デプロイはリポジトリルートで `bun run deploy:mcp` を実行します。
 
 ## 設定
 

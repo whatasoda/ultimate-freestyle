@@ -19,6 +19,8 @@
     "test:pages": "bun scripts/test-github-pages.ts",
     "dev:mcp": "bun run --cwd apps/mcp-server dev",
     "build:mcp": "bun run --cwd apps/mcp-server build",
+    "deploy:mcp": "bun run --cwd apps/mcp-server deploy",
+    "smoke:mcp": "bun run --cwd apps/mcp-server smoke",
     "test:mcp": "bun run --cwd apps/mcp-server check",
     "types:mcp": "bun run --cwd apps/mcp-server types",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
