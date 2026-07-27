@@ -232,7 +232,7 @@ export function projectDetailPage(options: {
   const slideRows = slides.length
     ? slides
         .map(
-          (slide, index) => `<div class="slide-row"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}</strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></div>`
+          (slide, index) => `<div class="slide-row"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}${slide.composition ? `<small class="stage">自由配置 ${slide.composition.blocks.length} block</small>` : ""}</strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></div>`
         )
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;

@@ -27,6 +27,7 @@ const projectErrorCodeSchema = z.enum([
   "DECK_REQUIRED",
   "SLIDE_NOT_FOUND",
   "SLIDE_EXISTS",
+  "BLOCK_NOT_FOUND",
   "TEMPLATE_NOT_FOUND",
   "TEMPLATE_IN_USE",
   "LOG_ENTRY_EXISTS",

@@ -28,7 +28,9 @@ import {
   PublicationError,
   publishPresentationPreview,
   readOwnerPreview,
-  readPublishedPresentation
+  readOwnerPresentationAsset,
+  readPublishedPresentation,
+  readPublishedPresentationAsset
 } from "../publications/service";
 import { z } from "zod";
 import { dashboardScriptResponse } from "./assets";
@@ -436,6 +438,22 @@ async function presentationResponse(
   });
 }
 
+function presentationAssetResponse(
+  object: R2ObjectBody | null,
+  cacheControl: string
+): Response {
+  if (object === null) return new Response(null, { status: 404 });
+  return new Response(object.body, {
+    headers: {
+      "cache-control": cacheControl,
+      "content-type": "image/webp",
+      etag: object.httpEtag,
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "default-src 'none'"
+    }
+  });
+}
+
 async function handleImageUpload(
   request: Request,
   env: Env,
@@ -627,6 +645,39 @@ export async function handleWebRequest(
     return presentationResponse(
       await readPublishedPresentation(env, publicPageMatch[1]),
       "public, max-age=60, stale-while-revalidate=300"
+    );
+  }
+  const presentationAssetMatch = path.match(
+    new RegExp(`^/presentation-assets/${UUID_PATH}/${UUID_PATH}$`, "i")
+  );
+  if (
+    presentationAssetMatch?.[1] !== undefined &&
+    presentationAssetMatch[2] !== undefined
+  ) {
+    if (request.method !== "GET") {
+      return new Response(null, { status: 405, headers: { allow: "GET" } });
+    }
+    const published = await readPublishedPresentationAsset(
+      env,
+      presentationAssetMatch[1],
+      presentationAssetMatch[2]
+    );
+    if (published !== null) {
+      return presentationAssetResponse(
+        published,
+        "public, max-age=31536000, immutable"
+      );
+    }
+    const session = await readWebSession(request, env.DB);
+    if (session === null) return new Response(null, { status: 404 });
+    return presentationAssetResponse(
+      await readOwnerPresentationAsset(
+        env,
+        session.userId,
+        presentationAssetMatch[1],
+        presentationAssetMatch[2]
+      ),
+      "private, no-store"
     );
   }
   const projectMatch = path.match(

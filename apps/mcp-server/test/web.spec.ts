@@ -6,6 +6,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { createOAuthProvider } from "../src/auth/oauth";
+import { createProjectAsset } from "../src/assets/repository";
 import { createEmptyProject } from "../src/projects/schema";
 import type { Fetcher } from "../src/auth/twitch";
 
@@ -175,6 +176,7 @@ describe("Web dashboard", () => {
     expect(await emptyDashboard.text()).toContain("まだ研究がありません");
 
     const now = "2026-07-26T10:00:00.000Z";
+    const presentationAssetId = "30000000-0000-4000-8000-000000000003";
     const ownDocument = createEmptyProject("自分の研究 <script>alert(1)</script>");
     ownDocument.summary = "研究の概要です";
     ownDocument.question = "なぜこうなるのか？";
@@ -201,7 +203,25 @@ describe("Web dashboard", () => {
           content_markdown: "# 自分の研究",
           reveal_blocks: [],
           sidebar_markdown: null,
-          narration: null
+          narration: null,
+          composition: {
+            mode: "canvas",
+            background: "#102030",
+            clip_content: true,
+            blocks: [
+              {
+                id: "evidence-photo",
+                kind: "image",
+                frame: { x: 8, y: 12, width: 84, height: 76 },
+                z_index: 1,
+                at: 0,
+                animation: "fade",
+                asset_id: presentationAssetId,
+                alt_text: "固定される観察画像",
+                fit: "contain"
+              }
+            ]
+          }
         }
       ]
     };
@@ -241,6 +261,23 @@ describe("Web dashboard", () => {
         now
       )
     ]);
+    const presentationSourceKey = `project-images/${presentationAssetId}.webp`;
+    await env.MEDIA_BUCKET.put(
+      presentationSourceKey,
+      new Uint8Array([82, 73, 70, 70]),
+      { httpMetadata: { contentType: "image/webp" } }
+    );
+    await createProjectAsset(env.DB, {
+      assetId: presentationAssetId,
+      projectId: "10000000-0000-4000-8000-000000000001",
+      ownerUserId: "twitch-dashboard-viewer-id",
+      objectKey: presentationSourceKey,
+      originalFilename: "evidence.webp",
+      altText: "固定される観察画像",
+      width: 16,
+      height: 9,
+      byteSize: 4
+    });
 
     const dashboard = await requestProvider(
       provider,
@@ -282,6 +319,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain('src="/assets/dashboard.js"');
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
+    expect(detailHtml).toContain("自由配置 1 block");
 
     const dashboardScript = await requestProvider(
       provider,
@@ -411,7 +449,27 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(previewPage.status).toBe(200);
-    expect(await previewPage.text()).toContain("Webで微調整した研究");
+    const previewHtml = await previewPage.text();
+    expect(previewHtml).toContain("Webで微調整した研究");
+    const presentationAssetUrl = `/presentation-assets/${previewResult.revision.revision_id}/${presentationAssetId}`;
+    expect(previewHtml).toContain(presentationAssetUrl);
+
+    const privateAssetWithoutSession = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${presentationAssetUrl}`),
+      authEnv
+    );
+    expect(privateAssetWithoutSession.status).toBe(404);
+    const privateAsset = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${presentationAssetUrl}`, {
+        headers: { cookie: browserCookies }
+      }),
+      authEnv
+    );
+    expect(privateAsset.status).toBe(200);
+    expect(privateAsset.headers.get("cache-control")).toBe("private, no-store");
+    await env.MEDIA_BUCKET.delete(presentationSourceKey);
 
     const publish = await requestProvider(
       provider,
@@ -442,6 +500,16 @@ describe("Web dashboard", () => {
       "frame-ancestors 'none'"
     );
     expect(await publicPage.text()).toContain("Webで微調整した研究");
+    const publishedAsset = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${presentationAssetUrl}`),
+      authEnv
+    );
+    expect(publishedAsset.status).toBe(200);
+    expect(publishedAsset.headers.get("cache-control")).toContain("immutable");
+    expect(new Uint8Array(await publishedAsset.arrayBuffer())).toEqual(
+      new Uint8Array([82, 73, 70, 70])
+    );
 
     const unsupportedUpload = await requestProvider(
       provider,

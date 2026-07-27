@@ -84,3 +84,26 @@ Web UI堅牢化、研究詳細、画像upload、VOICEVOX複数話者・調声、
 ### 残る目視確認
 
 ブラウザ制御環境に利用可能なbrowser backendがなかったため、認証済み研究詳細の目視操作だけを残した。自動contractは通過している。本番でTwitchログイン後、基本情報保存、プレビューの新規タブ表示、公開URLの順に一度確認する。
+
+---
+
+## 2026-07-27 追記: 自由配置スライド
+
+### schemaと編集契約
+
+- `49f4fb0`: ADR 0003で、既存flowを維持しながらslide単位で安全なblock canvasを選べる方針を採用。
+- markdown、project画像、矩形・楕円・線を、百分率frame、重なり順、段階表示、animation preset、検証済みstyle tokenで配置できる。
+- `set_slide_canvas`、`upsert_slide_block`、`delete_slide_block`を追加し、AI clientはslide全体を送り直さず一blockずつ編集できる。
+- 任意HTML、JavaScript、CSS、外部画像URLは受け付けず、従来のnarration、進行、URL、自動送りは共通runtimeへ残した。
+
+### previewと公開画像
+
+- D1 migration `0006_presentation_revision_assets.sql`で、発表revisionと画像snapshotの対応を保存する。
+- preview生成時、参照中のprivate project画像をrevision専用R2 keyへstream copyする。previewは所有者限定、publish後の現行revisionはimmutable cacheで公開する。
+- 元のproject画像を削除しても固定revisionが表示できるcontract testを追加した。
+- 1 revisionあたり画像30件・合計30 MiB、HTML 2 MiBを上限とする。
+
+### 検証
+
+- schema境界、自由配置renderer、MCP小粒度編集、所有者限定preview画像、公開画像の固定性を自動検証した。
+- Web研究詳細には自由配置block数を表示する。ドラッグ＆ドロップeditorはschemaの実利用を見てから実装する。

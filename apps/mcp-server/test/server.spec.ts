@@ -43,6 +43,9 @@ describe("MCP contract", () => {
           "get_project_outline",
           "get_project_slide",
           "upsert_voicevox_profile",
+          "set_slide_canvas",
+          "upsert_slide_block",
+          "delete_slide_block",
           "update_project_fields",
           "configure_deck",
           "upsert_presentation_template",
@@ -75,7 +78,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.6.0",
+        version: "0.7.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -491,6 +494,59 @@ describe("MCP contract", () => {
                 }
               ]
             }
+          }
+        }
+      });
+
+      const canvas = await client.callTool({
+        name: "set_slide_canvas",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 8,
+          slide_id: "question",
+          enabled: true,
+          background: "#101828"
+        }
+      });
+      expect(canvas.structuredContent).toMatchObject({ ok: true, version: 9 });
+      const block = await client.callTool({
+        name: "upsert_slide_block",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 9,
+          slide_id: "question",
+          block: {
+            id: "central-question",
+            kind: "markdown",
+            frame: { x: 12, y: 18, width: 76, height: 46 },
+            z_index: 10,
+            at: 0,
+            animation: "zoom",
+            markdown: "# どこまで丸くできる？",
+            style: {
+              text_align: "center",
+              vertical_align: "center",
+              font_scale: 1.3
+            }
+          }
+        }
+      });
+      expect(block.structuredContent).toMatchObject({ ok: true, version: 10 });
+      const canvasSlide = await client.callTool({
+        name: "get_project_slide",
+        arguments: {
+          project_id: firstProject.project_id,
+          slide_id: "question"
+        }
+      });
+      expect(canvasSlide.structuredContent).toMatchObject({
+        ok: true,
+        version: 10,
+        slide: {
+          composition: {
+            mode: "canvas",
+            background: "#101828",
+            blocks: [{ id: "central-question", kind: "markdown" }]
           }
         }
       });

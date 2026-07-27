@@ -1,13 +1,23 @@
-import { renderPresentationHtml } from "../presentation/render";
+import { getProjectAsset } from "../assets/repository";
+import type { StoredProjectAsset } from "../assets/schema";
+import {
+  listPresentationAssetIds,
+  renderPresentationHtml
+} from "../presentation/render";
 import { getProject } from "../projects/repository";
+import type { ProjectRecord } from "../projects/schema";
 
 const MAX_PRESENTATION_BYTES = 2 * 1024 * 1024;
+const MAX_PRESENTATION_ASSETS = 30;
+const MAX_PRESENTATION_ASSET_BYTES = 30 * 1024 * 1024;
 
 export type PublicationErrorCode =
   | "PROJECT_NOT_FOUND"
   | "DECK_REQUIRED"
   | "PREVIEW_NOT_FOUND"
   | "PREVIEW_STALE"
+  | "PRESENTATION_ASSET_LIMIT"
+  | "PRESENTATION_ASSET_NOT_FOUND"
   | "PRESENTATION_TOO_LARGE";
 
 export class PublicationError extends Error {
@@ -64,6 +74,100 @@ async function sha256(value: Uint8Array): Promise<string> {
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+type RevisionAsset = {
+  asset: StoredProjectAsset;
+  objectKey: string;
+  contentUrl: string;
+};
+
+async function removeObjects(
+  bucket: R2Bucket,
+  objectKeys: string[]
+): Promise<void> {
+  if (objectKeys.length === 0) return;
+  try {
+    await bucket.delete(objectKeys);
+  } catch (cleanupError) {
+    console.error(
+      JSON.stringify({
+        message: "Orphaned presentation objects could not be removed",
+        object_keys: objectKeys,
+        error:
+          cleanupError instanceof Error
+            ? cleanupError.message
+            : String(cleanupError)
+      })
+    );
+  }
+}
+
+async function snapshotPresentationAssets(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  ownerUserId: string,
+  project: ProjectRecord,
+  revisionId: string
+): Promise<RevisionAsset[]> {
+  const assetIds = listPresentationAssetIds(project);
+  if (assetIds.length > MAX_PRESENTATION_ASSETS) {
+    throw new PublicationError(
+      "PRESENTATION_ASSET_LIMIT",
+      `1つの発表で使用できる画像は${MAX_PRESENTATION_ASSETS}件までです。`
+    );
+  }
+  const assets: StoredProjectAsset[] = [];
+  for (const assetId of assetIds) {
+    const asset = await getProjectAsset(env.DB, ownerUserId, assetId);
+    if (asset === null || asset.project_id !== project.project_id) {
+      throw new PublicationError(
+        "PRESENTATION_ASSET_NOT_FOUND",
+        `発表で参照している画像 ${assetId} が見つかりません。`
+      );
+    }
+    assets.push(asset);
+  }
+  const totalBytes = assets.reduce((sum, asset) => sum + asset.byte_size, 0);
+  if (totalBytes > MAX_PRESENTATION_ASSET_BYTES) {
+    throw new PublicationError(
+      "PRESENTATION_ASSET_LIMIT",
+      "1つの発表で使用する画像は合計30MiBまでです。"
+    );
+  }
+
+  const snapshots: RevisionAsset[] = [];
+  const attemptedObjectKeys: string[] = [];
+  try {
+    for (const asset of assets) {
+      const source = await env.MEDIA_BUCKET.get(asset.object_key);
+      if (source === null) {
+        throw new PublicationError(
+          "PRESENTATION_ASSET_NOT_FOUND",
+          `発表で参照している画像 ${asset.asset_id} の実体が見つかりません。`
+        );
+      }
+      const objectKey = `presentation-revisions/${ownerUserId}/${project.project_id}/${revisionId}/assets/${asset.asset_id}.webp`;
+      attemptedObjectKeys.push(objectKey);
+      await env.MEDIA_BUCKET.put(objectKey, source.body, {
+        httpMetadata: { contentType: "image/webp" },
+        customMetadata: {
+          projectId: project.project_id,
+          projectVersion: String(project.version),
+          revisionId,
+          sourceAssetId: asset.asset_id
+        }
+      });
+      snapshots.push({
+        asset,
+        objectKey,
+        contentUrl: `/presentation-assets/${revisionId}/${asset.asset_id}`
+      });
+    }
+    return snapshots;
+  } catch (error) {
+    await removeObjects(env.MEDIA_BUCKET, attemptedObjectKeys);
+    throw error;
+  }
 }
 
 export async function getPublicationStatus(
@@ -142,29 +246,51 @@ export async function createPresentationPreview(
     );
   }
 
-  const html = renderPresentationHtml(project);
-  const bytes = new TextEncoder().encode(html);
-  if (bytes.byteLength > MAX_PRESENTATION_BYTES) {
-    throw new PublicationError(
-      "PRESENTATION_TOO_LARGE",
-      "生成された発表HTMLが2MiBを超えています。"
-    );
-  }
+  const existingPublication = await env.DB
+    .prepare(
+      `SELECT slug FROM project_publications
+       WHERE project_id = ? AND owner_user_id = ?`
+    )
+    .bind(projectId, ownerUserId)
+    .first<{ slug: string }>();
   const revisionId = crypto.randomUUID();
-  const slug = crypto.randomUUID();
+  const slug = existingPublication?.slug ?? crypto.randomUUID();
   const objectKey = `presentation-revisions/${ownerUserId}/${projectId}/${revisionId}.html`;
   const now = new Date().toISOString();
-  const contentHash = await sha256(bytes);
-  await env.MEDIA_BUCKET.put(objectKey, bytes, {
-    httpMetadata: { contentType: "text/html; charset=utf-8" },
-    customMetadata: {
-      projectId,
-      projectVersion: String(project.version),
-      contentHash
-    }
-  });
+  const snapshots = await snapshotPresentationAssets(
+    env,
+    ownerUserId,
+    project,
+    revisionId
+  );
+  const cleanupKeys = snapshots.map((snapshot) => snapshot.objectKey);
 
   try {
+    const assetUrls = Object.fromEntries(
+      snapshots.map((snapshot) => [
+        snapshot.asset.asset_id,
+        snapshot.contentUrl
+      ])
+    );
+    const html = renderPresentationHtml(project, { assetUrls });
+    const bytes = new TextEncoder().encode(html);
+    if (bytes.byteLength > MAX_PRESENTATION_BYTES) {
+      throw new PublicationError(
+        "PRESENTATION_TOO_LARGE",
+        "生成された発表HTMLが2MiBを超えています。"
+      );
+    }
+    const contentHash = await sha256(bytes);
+    await env.MEDIA_BUCKET.put(objectKey, bytes, {
+      httpMetadata: { contentType: "text/html; charset=utf-8" },
+      customMetadata: {
+        projectId,
+        projectVersion: String(project.version),
+        contentHash
+      }
+    });
+    cleanupKeys.push(objectKey);
+
     await env.DB.batch([
       env.DB
         .prepare(
@@ -193,39 +319,44 @@ export async function createPresentationPreview(
              latest_preview_revision_id = excluded.latest_preview_revision_id,
              updated_at = excluded.updated_at`
         )
-        .bind(projectId, ownerUserId, slug, revisionId, now)
+        .bind(projectId, ownerUserId, slug, revisionId, now),
+      ...snapshots.map((snapshot) =>
+        env.DB
+          .prepare(
+            `INSERT INTO presentation_revision_assets (
+               revision_id, asset_id, object_key, alt_text, mime_type,
+               width, height, byte_size, created_at
+             ) VALUES (?, ?, ?, ?, 'image/webp', ?, ?, ?, ?)`
+          )
+          .bind(
+            revisionId,
+            snapshot.asset.asset_id,
+            snapshot.objectKey,
+            snapshot.asset.alt_text,
+            snapshot.asset.width,
+            snapshot.asset.height,
+            snapshot.asset.byte_size,
+            now
+          )
+      )
     ]);
+
+    return {
+      revision: {
+        revision_id: revisionId,
+        project_id: projectId,
+        project_version: project.version,
+        object_key: objectKey,
+        content_hash: contentHash,
+        byte_size: bytes.byteLength,
+        created_at: now
+      },
+      slug
+    };
   } catch (error) {
-    try {
-      await env.MEDIA_BUCKET.delete(objectKey);
-    } catch (cleanupError) {
-      console.error(
-        JSON.stringify({
-          message: "Orphaned presentation object could not be removed",
-          object_key: objectKey,
-          error:
-            cleanupError instanceof Error
-              ? cleanupError.message
-              : String(cleanupError)
-        })
-      );
-    }
+    await removeObjects(env.MEDIA_BUCKET, cleanupKeys);
     throw error;
   }
-
-  return {
-    revision: {
-      revision_id: revisionId,
-      project_id: projectId,
-      project_version: project.version,
-      object_key: objectKey,
-      content_hash: contentHash,
-      byte_size: bytes.byteLength,
-      created_at: now
-    },
-    slug:
-      (await getPublicationStatus(env.DB, ownerUserId, projectId))?.slug ?? slug
-  };
 }
 
 export async function publishPresentationPreview(
@@ -305,6 +436,42 @@ export async function readPublishedPresentation(
        WHERE p.slug = ?`
     )
     .bind(slug)
+    .first<{ object_key: string }>();
+  return row === null ? null : env.MEDIA_BUCKET.get(row.object_key);
+}
+
+export async function readOwnerPresentationAsset(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  ownerUserId: string,
+  revisionId: string,
+  assetId: string
+): Promise<R2ObjectBody | null> {
+  const row = await env.DB
+    .prepare(
+      `SELECT a.object_key
+       FROM presentation_revision_assets a
+       JOIN presentation_revisions r ON r.id = a.revision_id
+       WHERE a.revision_id = ? AND a.asset_id = ? AND r.owner_user_id = ?`
+    )
+    .bind(revisionId, assetId, ownerUserId)
+    .first<{ object_key: string }>();
+  return row === null ? null : env.MEDIA_BUCKET.get(row.object_key);
+}
+
+export async function readPublishedPresentationAsset(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  revisionId: string,
+  assetId: string
+): Promise<R2ObjectBody | null> {
+  const row = await env.DB
+    .prepare(
+      `SELECT a.object_key
+       FROM presentation_revision_assets a
+       JOIN project_publications p
+         ON p.published_revision_id = a.revision_id
+       WHERE a.revision_id = ? AND a.asset_id = ?`
+    )
+    .bind(revisionId, assetId)
     .first<{ object_key: string }>();
   return row === null ? null : env.MEDIA_BUCKET.get(row.object_key);
 }

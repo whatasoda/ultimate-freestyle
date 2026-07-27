@@ -12,6 +12,97 @@ export const projectStageSchema = z.enum([
 
 const templateIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/);
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const blockIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/);
+const percentSchema = z.number().min(0).max(100).multipleOf(0.01);
+const animationSchema = z.enum(["none", "fade", "rise", "zoom", "wipe"]);
+
+const slideBlockFrameSchema = z.object({
+  x: percentSchema,
+  y: percentSchema,
+  width: z.number().positive().max(100).multipleOf(0.01),
+  height: z.number().positive().max(100).multipleOf(0.01)
+});
+
+const slideBlockStyleSchema = z.object({
+  background: hexColorSchema.nullable().optional(),
+  foreground: hexColorSchema.nullable().optional(),
+  border_color: hexColorSchema.nullable().optional(),
+  border_width_px: z.number().int().min(0).max(8).optional(),
+  corner_radius_px: z.number().int().min(0).max(64).optional(),
+  padding_px: z.number().int().min(0).max(64).optional(),
+  opacity: z.number().min(0.1).max(1).multipleOf(0.05).optional(),
+  text_align: z.enum(["start", "center", "end"]).optional(),
+  vertical_align: z.enum(["start", "center", "end"]).optional(),
+  font_scale: z.number().min(0.5).max(3).multipleOf(0.05).optional(),
+  shadow: z.enum(["none", "soft", "strong"]).optional()
+});
+
+const slideBlockBaseSchema = z.object({
+  id: blockIdSchema,
+  frame: slideBlockFrameSchema,
+  z_index: z.number().int().min(0).max(100),
+  at: z.number().int().nonnegative().max(100),
+  animation: animationSchema,
+  style: slideBlockStyleSchema.optional()
+});
+
+export const slideBlockSchema = z
+  .discriminatedUnion("kind", [
+    slideBlockBaseSchema.extend({
+      kind: z.literal("markdown"),
+      markdown: z.string().min(1).max(20_000)
+    }),
+    slideBlockBaseSchema.extend({
+      kind: z.literal("image"),
+      asset_id: z.string().uuid(),
+      alt_text: z.string().max(500),
+      fit: z.enum(["contain", "cover", "fill"])
+    }),
+    slideBlockBaseSchema.extend({
+      kind: z.literal("shape"),
+      shape: z.enum(["rectangle", "ellipse", "line"]),
+      label: z.string().max(500).nullable()
+    })
+  ])
+  .superRefine((block, context) => {
+    if (block.frame.x + block.frame.width > 100) {
+      context.addIssue({
+        code: "custom",
+        path: ["frame", "width"],
+        message: "A slide block must fit within the horizontal canvas."
+      });
+    }
+    if (block.frame.y + block.frame.height > 100) {
+      context.addIssue({
+        code: "custom",
+        path: ["frame", "height"],
+        message: "A slide block must fit within the vertical canvas."
+      });
+    }
+  });
+
+export type SlideBlock = z.infer<typeof slideBlockSchema>;
+
+export const slideCompositionSchema = z
+  .object({
+    mode: z.literal("canvas"),
+    background: hexColorSchema,
+    clip_content: z.boolean(),
+    blocks: z.array(slideBlockSchema).max(100)
+  })
+  .superRefine((composition, context) => {
+    const ids = new Set<string>();
+    for (const [index, block] of composition.blocks.entries()) {
+      if (ids.has(block.id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["blocks", index, "id"],
+          message: "Slide block IDs must be unique."
+        });
+      }
+      ids.add(block.id);
+    }
+  });
 
 export const presentationTemplateSchema = z.object({
   id: templateIdSchema,
@@ -31,8 +122,8 @@ export const presentationTemplateSchema = z.object({
   corner_radius_px: z.number().int().min(0).max(48),
   spacing_scale: z.number().min(0.75).max(1.5).multipleOf(0.05),
   font_scale: z.number().min(0.75).max(1.3).multipleOf(0.05),
-  enter_animation: z.enum(["none", "fade", "rise", "zoom", "wipe"]),
-  reveal_animation: z.enum(["none", "fade", "rise", "zoom", "wipe"])
+  enter_animation: animationSchema,
+  reveal_animation: animationSchema
 });
 
 export type PresentationTemplate = z.infer<typeof presentationTemplateSchema>;
@@ -112,10 +203,8 @@ export const projectSlideSchema = z
     reveal_steps: z.number().int().nonnegative().max(100),
     tone: z.enum(["dark", "light", "signal", "quiet"]),
     template_id: templateIdSchema.nullable().optional(),
-    enter_animation: z
-      .enum(["none", "fade", "rise", "zoom", "wipe"])
-      .nullable()
-      .optional(),
+    enter_animation: animationSchema.nullable().optional(),
+    composition: slideCompositionSchema.nullable().optional(),
     content_markdown: z.string().min(1).max(20_000),
     reveal_blocks: z
       .array(
@@ -170,6 +259,17 @@ export const projectSlideSchema = z
         });
       }
       narrationPositions.add(segment.at);
+    }
+    for (const [blockIndex, block] of (
+      slide.composition?.blocks ?? []
+    ).entries()) {
+      if (block.at > slide.reveal_steps) {
+        context.addIssue({
+          code: "custom",
+          path: ["composition", "blocks", blockIndex, "at"],
+          message: "Slide block positions must not exceed reveal_steps."
+        });
+      }
     }
   });
 

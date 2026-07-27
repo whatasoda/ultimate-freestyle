@@ -193,7 +193,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。content_markdownは最初から見せる主張と証拠、revealはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIで固定プレビューを確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。定型flowが合わない一枚はset_slide_canvasで自由配置へ切り替え、upsert_slide_blockでmarkdown、project画像、図形を一件ずつ百分率座標へ配置します。content_markdownは最初から見せる主張と証拠、revealまたはblock.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIで固定プレビューを確認してから公開するよう案内してください。`
           }
         }
       ]

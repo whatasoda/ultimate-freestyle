@@ -9,6 +9,7 @@ import {
   projectSlideSchema,
   projectStageSchema,
   researchLogEntrySchema,
+  slideBlockSchema,
   voicevoxProfileSchema,
   type ProjectDocument,
   type ProjectRecord
@@ -501,6 +502,157 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
+    "set_slide_canvas",
+    {
+      title: "スライドの自由配置canvasを設定",
+      description:
+        "一枚のslideを自由配置canvasへ切り替え、背景色と領域外clipを設定します。無効化すると従来の定型flow表示へ戻ります。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        enabled: z.boolean(),
+        background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        clip_content: z.boolean().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, enabled, background, clip_content }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_canvas_updated",
+        changedId: slide_id,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          if (!enabled) {
+            slide.composition = null;
+            slide.reveal_steps = Math.max(
+              ...slide.reveal_blocks.map((block) => block.at),
+              ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
+              0
+            );
+            return;
+          }
+          slide.composition ??= {
+            mode: "canvas",
+            background: background ?? "#111827",
+            clip_content: clip_content ?? true,
+            blocks: []
+          };
+          if (background !== undefined) {
+            slide.composition.background = background;
+          }
+          if (clip_content !== undefined) {
+            slide.composition.clip_content = clip_content;
+          }
+        }
+      })
+  );
+
+  server.registerTool(
+    "upsert_slide_block",
+    {
+      title: "自由配置blockを作成・更新",
+      description:
+        "markdown、project画像、図形のblockを一件だけ追加または置換します。frameは16:9 canvas内の百分率座標です。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        block: slideBlockSchema
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, block }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_block_upserted",
+        changedId: `${slide_id}:${block.id}`,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          slide.composition ??= {
+            mode: "canvas",
+            background: "#111827",
+            clip_content: true,
+            blocks: []
+          };
+          const index = slide.composition.blocks.findIndex(
+            (item) => item.id === block.id
+          );
+          if (index === -1) slide.composition.blocks.push(block);
+          else slide.composition.blocks[index] = block;
+          slide.composition.blocks.sort(
+            (a, b) => a.z_index - b.z_index || a.id.localeCompare(b.id)
+          );
+          slide.reveal_steps = Math.max(
+            ...slide.reveal_blocks.map((item) => item.at),
+            ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
+            ...slide.composition.blocks.map((item) => item.at),
+            0
+          );
+        }
+      })
+  );
+
+  server.registerTool(
+    "delete_slide_block",
+    {
+      title: "自由配置blockを削除",
+      description: "指定したslideからblockを一件だけ削除します。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        block_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, block_id }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_block_deleted",
+        changedId: `${slide_id}:${block_id}`,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          const index = slide.composition?.blocks.findIndex(
+            (block) => block.id === block_id
+          );
+          if (index === undefined || index === -1) {
+            throw new ProjectToolError(
+              "BLOCK_NOT_FOUND",
+              "The slide block does not exist."
+            );
+          }
+          slide.composition?.blocks.splice(index, 1);
+          slide.reveal_steps = Math.max(
+            ...slide.reveal_blocks.map((block) => block.at),
+            ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
+            ...(slide.composition?.blocks.map((block) => block.at) ?? []),
+            0
+          );
+        }
+      })
+  );
+
+  server.registerTool(
     "set_slide_reveal",
     {
       title: "段階表示を一件編集",
@@ -539,6 +691,7 @@ export function registerProjectMutationTools(
           slide.reveal_steps = Math.max(
             ...slide.reveal_blocks.map((block) => block.at),
             ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
+            ...(slide.composition?.blocks.map((block) => block.at) ?? []),
             0
           );
           slide.reveal_blocks.sort((a, b) => a.at - b.at);
@@ -617,6 +770,7 @@ export function registerProjectMutationTools(
           slide.reveal_steps = Math.max(
             ...slide.reveal_blocks.map((block) => block.at),
             ...slide.narration.segments.map((segment) => segment.at),
+            ...(slide.composition?.blocks.map((block) => block.at) ?? []),
             0
           );
         }

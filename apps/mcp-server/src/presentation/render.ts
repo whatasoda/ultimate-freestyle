@@ -1,4 +1,4 @@
-import type { ProjectRecord } from "../projects/schema";
+import type { ProjectRecord, SlideBlock } from "../projects/schema";
 
 function escapeHtml(value: string): string {
   return value
@@ -49,7 +49,78 @@ function safeJson(value: unknown): string {
     .replaceAll("\u2029", "\\u2029");
 }
 
-export function renderPresentationHtml(project: ProjectRecord): string {
+export type PresentationRenderOptions = {
+  assetUrls?: Readonly<Record<string, string>>;
+};
+
+export function listPresentationAssetIds(project: ProjectRecord): string[] {
+  return [
+    ...new Set(
+      (project.document.deck?.slides ?? []).flatMap(
+        (slide) =>
+          slide.composition?.blocks.flatMap((block) =>
+            block.kind === "image" ? [block.asset_id] : []
+          ) ?? []
+      )
+    )
+  ];
+}
+
+function blockCss(slideId: string, block: SlideBlock): string {
+  const style = block.style;
+  const verticalAlign =
+    style?.vertical_align === "center"
+      ? "center"
+      : style?.vertical_align === "end"
+        ? "flex-end"
+        : "flex-start";
+  const textAlign =
+    style?.text_align === "center"
+      ? "center"
+      : style?.text_align === "end"
+        ? "end"
+        : "start";
+  const shadow =
+    style?.shadow === "soft"
+      ? "0 6px 22px #0005"
+      : style?.shadow === "strong"
+        ? "0 12px 36px #0009"
+        : "none";
+  return `.slide[data-slide-id="${slideId}"] [data-block-id="${block.id}"] {
+      left: ${block.frame.x}%; top: ${block.frame.y}%;
+      width: ${block.frame.width}%; height: ${block.frame.height}%;
+      z-index: ${block.z_index};
+      background: ${style?.background ?? "transparent"};
+      color: ${style?.foreground ?? "inherit"};
+      border: ${style?.border_width_px ?? 0}px solid ${style?.border_color ?? "transparent"};
+      border-radius: ${style?.corner_radius_px ?? 0}px;
+      padding: ${style?.padding_px ?? 0}px;
+      --block-opacity: ${style?.opacity ?? 1};
+      text-align: ${textAlign}; justify-content: ${verticalAlign};
+      font-size: calc(1em * ${style?.font_scale ?? 1});
+      box-shadow: ${shadow};
+    }`;
+}
+
+function renderCanvasBlock(
+  block: SlideBlock,
+  assetUrls: Readonly<Record<string, string>>
+): string {
+  const attributes = `class="canvas-block reveal-block" data-block-id="${escapeHtml(block.id)}" data-block-kind="${block.kind}" data-reveal="${block.at}" data-reveal-at="${block.at}" data-animation="${block.animation}" aria-hidden="true"`;
+  if (block.kind === "markdown") {
+    return `<div ${attributes}>${renderTextBlocks(block.markdown)}</div>`;
+  }
+  if (block.kind === "image") {
+    const src = assetUrls[block.asset_id] ?? `/media/${block.asset_id}`;
+    return `<figure ${attributes}><img src="${escapeHtml(src)}" alt="${escapeHtml(block.alt_text)}" data-fit="${block.fit}"></figure>`;
+  }
+  return `<div ${attributes} data-shape="${block.shape}">${block.label === null ? "" : `<span>${escapeHtml(block.label)}</span>`}</div>`;
+}
+
+export function renderPresentationHtml(
+  project: ProjectRecord,
+  options: PresentationRenderOptions = {}
+): string {
   const deck = project.document.deck;
   if (deck === null || deck.slides.length === 0) {
     throw new Error("A non-empty deck is required to render a presentation.");
@@ -88,6 +159,17 @@ export function renderPresentationHtml(project: ProjectRecord): string {
     }`
     )
     .join("\n");
+  const canvasCss = deck.slides
+    .flatMap((slide) => {
+      if (slide.composition === null || slide.composition === undefined) {
+        return [];
+      }
+      return [
+        `.slide[data-slide-id="${slide.id}"] { --canvas-background: ${slide.composition.background}; --canvas-overflow: ${slide.composition.clip_content ? "hidden" : "visible"}; }`,
+        ...slide.composition.blocks.map((block) => blockCss(slide.id, block))
+      ];
+    })
+    .join("\n");
   const slideHtml = deck.slides
     .map((slide, index) => {
       const templateId = slide.template_id ?? deck.default_template_id ?? null;
@@ -96,15 +178,23 @@ export function renderPresentationHtml(project: ProjectRecord): string {
       const enterAnimation =
         slide.enter_animation ?? template?.enter_animation ?? "fade";
       const revealAnimation = template?.reveal_animation ?? "rise";
-      return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-tone="${slide.tone}" data-animation="${enterAnimation}" data-state="inactive" hidden>
-  <div class="slide-main" data-region="main">
+      const composition = slide.composition;
+      const content = composition
+        ? `<div class="slide-canvas" data-region="canvas">${composition.blocks
+            .map((block) =>
+              renderCanvasBlock(block, options.assetUrls ?? {})
+            )
+            .join("\n")}</div>`
+        : `<div class="slide-main" data-region="main">
     <p class="eyebrow">${String(index + 1).padStart(2, "0")} · ${escapeHtml(slide.title)}</p>
     <div class="slide-content">${renderTextBlocks(slide.content_markdown)}</div>
     ${slide.reveal_blocks.map((block) => `<div class="reveal-block" data-reveal="${block.at}" data-reveal-at="${block.at}" data-animation="${revealAnimation}" aria-hidden="true">${renderTextBlocks(block.markdown)}</div>`).join("\n")}
   </div>
   <aside class="slide-sidebar" data-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
     ${slide.sidebar_markdown === null ? "" : renderTextBlocks(slide.sidebar_markdown)}
-  </aside>
+  </aside>`;
+      return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-animation="${enterAnimation}" data-state="inactive" hidden>
+  ${content}
   <section class="narration" data-region="narration" aria-live="polite"></section>
 </article>`;
     })
@@ -141,6 +231,22 @@ export function renderPresentationHtml(project: ProjectRecord): string {
     .slide[data-region-layout="sidebar-left"] .slide-sidebar { grid-column: 1; grid-row: 1; border-left: 0; border-right: 1px solid #ffffff25; }
     .slide[data-region-layout="lower-third"] { grid-template: minmax(0, 1fr) auto auto / 1fr; }
     .slide[data-region-layout="lower-third"] .slide-sidebar { grid-row: 2; padding: 2% 6%; border-top: 1px solid #ffffff25; border-left: 0; }
+    .slide[data-composition="canvas"] { grid-template: minmax(0, 1fr) auto / 1fr; background: var(--canvas-background); overflow: var(--canvas-overflow); }
+    .slide-canvas { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; overflow: var(--canvas-overflow); }
+    .canvas-block { position: absolute; display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; min-height: 0; margin: 0; overflow: var(--canvas-overflow); }
+    .canvas-block > * { width: 100%; }
+    .reveal-block.canvas-block.is-visible { opacity: var(--block-opacity); }
+    .canvas-block h2, .canvas-block h3, .canvas-block h4 { margin: 0 0 .35em; line-height: 1.08; font-size: clamp(18px, 3.8vw, 58px); }
+    .canvas-block p, .canvas-block li { margin: 0; font-size: clamp(11px, 1.8vw, 28px); line-height: 1.45; }
+    .canvas-block p + p { margin-top: .55em; }
+    .canvas-block ul { margin: 0; padding-left: 1.25em; }
+    figure.canvas-block img { display: block; width: 100%; height: 100%; }
+    figure.canvas-block img[data-fit="contain"] { object-fit: contain; }
+    figure.canvas-block img[data-fit="cover"] { object-fit: cover; }
+    figure.canvas-block img[data-fit="fill"] { object-fit: fill; }
+    .canvas-block[data-shape="ellipse"] { border-radius: 50%; }
+    .canvas-block[data-shape="line"] { height: 0 !important; min-height: 0; border-width: 0 0 2px !important; border-radius: 0; overflow: visible; }
+    .canvas-block[data-shape] span { margin: auto; font-size: clamp(10px, 1.6vw, 24px); line-height: 1.3; }
     .slide[hidden] { display: none; }
     .slide-main { padding: 7% 7% 4%; overflow: hidden; }
     .slide-sidebar { padding: 9% 8%; border-left: 1px solid #ffffff25; background: #05080dbb; overflow: hidden; }
@@ -171,6 +277,7 @@ export function renderPresentationHtml(project: ProjectRecord): string {
     [data-layout="cinematic"] .slide-sidebar { display: none; }
     [data-layout="cinematic"] .slide { grid-template-columns: 1fr; }
     ${templateCss}
+    ${canvasCss}
     @keyframes slide-fade { from { opacity: 0; } }
     @keyframes slide-rise { from { opacity: 0; translate: 0 3%; } }
     @keyframes slide-zoom { from { opacity: 0; scale: .96; } }
