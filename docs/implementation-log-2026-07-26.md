@@ -107,3 +107,10 @@ Web UI堅牢化、研究詳細、画像upload、VOICEVOX複数話者・調声、
 
 - schema境界、自由配置renderer、MCP小粒度編集、所有者限定preview画像、公開画像の固定性を自動検証した。
 - Web研究詳細には自由配置block数を表示する。ドラッグ＆ドロップeditorはschemaの実利用を見てから実装する。
+- Worker型、TypeScript、11 test files／35 tests、Wrangler dry-runを通過した。
+
+### Cloudflare本番
+
+- 本番D1へ`0006_presentation_revision_assets.sql`を適用済み。
+- Worker v0.7.0、Version ID `f012d8a5-63e2-4ae1-a901-a3bfa4583618`。
+- 本番smokeでhealth v0.7.0、OAuth必須、Web dashboard、authorization endpointを確認済み。
