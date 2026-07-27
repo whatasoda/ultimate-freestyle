@@ -50,3 +50,37 @@ Web UI堅牢化、研究詳細、画像upload、VOICEVOX複数話者・調声、
 - ローカルVOICEVOX manifestは`unverified-local`。本番cacheへ昇格しない。
 - 人に見える話者名はsnapshotで、生成identityには使わない。
 - migrationを先に適用してから対応Workerをdeployする。
+
+---
+
+## 2026-07-27 追記: 小粒度編集・template・Web公開
+
+### 体験と契約
+
+- `9dba6c8`: ADR 0002で「AI/Webから小さく編集し、固定プレビューを確認してから公開する」体験と責務境界を採用。
+- `3ecd53c`: 巨大な`update_project`を廃止。軽量`get_project_outline`と、基本項目、箇条書き、ログ、deck、template、slide、reveal、narrationの小粒度toolへ移行。
+- MCP toolの最大input schemaを12,000文字未満に保つcontract testを追加。
+- 発表templateは任意HTML/CSS/JavaScriptではなく、領域配置、検証済み色、余白、文字scale、animation presetを宣言する方式を採用。
+- rendererへ`data-slide-id`、`data-template-id`、`data-region`、`data-reveal-at`、`data-animation`、`data-state`を追加。
+- VOICEVOX profileも`upsert_voicevox_profile`で一件ずつ更新できる。
+
+### Web UIと公開
+
+- `2284ef4`: タイトル、段階、概要、問い、仮説、方法の軽微編集をWeb UIへ追加。32 KiB JSON上限、CSRF、schema検証、version競合防止を適用。
+- D1 migration `0005_presentation_publications.sql`で不変revisionとstable公開pointerを追加。
+- 現在versionから自己完結HTMLをprivate R2へ保存し、所有者限定previewを開いた後、同じversionのrevisionだけを公開できる。
+- 公開下書きは公開版を暗黙更新しない。公開URLは`/p/<stable-slug>`、previewは`/preview/<revision-id>`。
+- `ae54640`: R2補償削除、APIの予期しない失敗応答、成果物配信のCSP／Permissions Policyを強化。
+
+### 検証と本番
+
+- Worker型、TypeScript、11 test files／33 tests、Wrangler dry-runを通過。
+- contract testでWeb編集、競合409、preview生成、所有者限定閲覧、publish、未認証public閲覧、CSPを確認。
+- 最新Workers型`5.20260727.1`を一時取得してR2/D1 contractを照合。依存更新はrepositoryの7日minimum-release-age方針により`5.20260718.1`を維持。
+- 本番D1へ`0005`適用済み。
+- Worker v0.6.0、Version ID `f36f9692-29e9-4035-af0c-289d5826ae31`。
+- 本番smokeでhealth v0.6.0、OAuth必須、Web dashboard、authorization endpointを確認済み。
+
+### 残る目視確認
+
+ブラウザ制御環境に利用可能なbrowser backendがなかったため、認証済み研究詳細の目視操作だけを残した。自動contractは通過している。本番でTwitchログイン後、基本情報保存、プレビューの新規タブ表示、公開URLの順に一度確認する。
