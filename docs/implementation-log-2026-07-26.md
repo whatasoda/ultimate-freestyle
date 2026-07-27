@@ -114,3 +114,28 @@ Web UI堅牢化、研究詳細、画像upload、VOICEVOX複数話者・調声、
 - 本番D1へ`0006_presentation_revision_assets.sql`を適用済み。
 - Worker v0.7.0、Version ID `f012d8a5-63e2-4ae1-a901-a3bfa4583618`。
 - 本番smokeでhealth v0.7.0、OAuth必須、Web dashboard、authorization endpointを確認済み。
+
+---
+
+## 2026-07-27 追記: リッチsceneと一枚編集workspace
+
+### 判断
+
+- `c0be3c3`: ADR 0004で、標準の自由構成を登録済み`uf-*` Web Componentsからなるscene node treeとした。
+- Web ComponentsとShadow DOMはsecurity boundaryではない。任意HTML／CSS／JavaScriptは親documentで実行せず、将来必要になった場合だけcookieなし別originのsandbox iframeを設計する。
+- Web UIは研究全体の縦長previewではなく、filmstrip、実rendererの16:9 iframe、inspector、読み上げを並べる一枚編集workspaceとする。
+
+### 実装
+
+- `def8145`: Worker v0.8.0へscene schema、renderer、MCP小粒度編集tool、component guide resource、一枚編集workspaceを追加。
+- `layer`、`stack`、`grid`へ`hero`、`markdown`、`quote`、`card`、`metric`、`callout`、`bar_chart`、`timeline`、project画像、図形を入れ子にできる。
+- scene nodeとdata itemの`at`を共通runtimeの段階表示・animationへ接続した。循環、存在しない親、leafへの子、配置規則、深さ、件数をschemaで拒否する。
+- MCP toolはlayout、text、info、data、mediaに分割し、最大input schemaを12,000文字未満に維持した。構成規則は`research://guide/presentation-components`へ分離した。
+- Web UIから一枚のタイトル、想定時間、tone、本文fallback、BIIM補足をversion付きで保存できる。編集iframeは所有者session必須、`frame-ancestors 'self'`、`SAMEORIGIN`、`private, no-store`とし、公開HTMLの埋め込み禁止は維持した。
+
+### 検証とCloudflare本番
+
+- Workers binding型、TypeScript、11 test files／37 tests、Wrangler dry-runを通過した。
+- Worker v0.8.0、Version ID `0579d200-04de-494c-97eb-b070de2905ed`。
+- 反映後にhealth v0.8.0を2回確認し、本番smokeでOAuth必須、Web dashboard、authorization endpointを確認済み。
+- 認証済みの実データを使ったworkspaceの目視確認は残る。自動contractではowner／non-owner、CSRF、version競合、iframe CSP、scene rendererを確認済み。
