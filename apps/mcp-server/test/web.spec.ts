@@ -179,6 +179,32 @@ describe("Web dashboard", () => {
     ownDocument.summary = "研究の概要です";
     ownDocument.question = "なぜこうなるのか？";
     ownDocument.findings = ["観察した結果"];
+    ownDocument.deck = {
+      short_title: "自分の研究",
+      description: "",
+      author: "viewer",
+      year: 2026,
+      accent: "#9d7bff",
+      layout: "minimal",
+      narration_defaults: null,
+      templates: [],
+      default_template_id: null,
+      slides: [
+        {
+          id: "intro",
+          title: "はじめに",
+          duration_seconds: 30,
+          reveal_steps: 0,
+          tone: "dark",
+          template_id: null,
+          enter_animation: "fade",
+          content_markdown: "# 自分の研究",
+          reveal_blocks: [],
+          sidebar_markdown: null,
+          narration: null
+        }
+      ]
+    };
     const otherDocument = createEmptyProject("他人だけに見える研究");
     await env.DB.batch([
       env.DB.prepare(
@@ -254,6 +280,8 @@ describe("Web dashboard", () => {
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
     expect(detailHtml).toContain('src="/assets/dashboard.js"');
+    expect(detailHtml).toContain("基本情報を編集");
+    expect(detailHtml).toContain("現在の下書きをプレビュー");
 
     const dashboardScript = await requestProvider(
       provider,
@@ -294,6 +322,124 @@ describe("Web dashboard", () => {
       /name="csrf_token" value="([^"]+)"/
     )?.[1];
     expect(csrfToken).toBeTruthy();
+    const fieldUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/fields",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 1,
+            title: "Webで微調整した研究",
+            stage: "design",
+            summary: "Webから保存した概要",
+            question: "微調整後の問い？",
+            hypothesis: "",
+            method: ""
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(fieldUpdate.status).toBe(200);
+    expect(await fieldUpdate.json()).toMatchObject({ ok: true, version: 2 });
+
+    const conflictUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/fields",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 1,
+            title: "競合する変更",
+            stage: "design",
+            summary: "",
+            question: "",
+            hypothesis: "",
+            method: ""
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(conflictUpdate.status).toBe(409);
+    expect(await conflictUpdate.json()).toMatchObject({
+      ok: false,
+      current_version: 2,
+      error: { code: "PROJECT_VERSION_CONFLICT" }
+    });
+
+    const previewCreate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/previews",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 2 })
+        }
+      ),
+      authEnv
+    );
+    expect(previewCreate.status).toBe(201);
+    const previewResult = (await previewCreate.json()) as {
+      revision: { revision_id: string; project_version: number };
+      preview_url: string;
+    };
+    expect(previewResult.revision.project_version).toBe(2);
+
+    const previewPage = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${previewResult.preview_url}`, {
+        headers: { cookie: browserCookies }
+      }),
+      authEnv
+    );
+    expect(previewPage.status).toBe(200);
+    expect(await previewPage.text()).toContain("Webで微調整した研究");
+
+    const publish = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/publish",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ revision_id: previewResult.revision.revision_id })
+        }
+      ),
+      authEnv
+    );
+    expect(publish.status).toBe(200);
+    const publishResult = (await publish.json()) as { public_url: string };
+    const publicPage = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${publishResult.public_url}`),
+      authEnv
+    );
+    expect(publicPage.status).toBe(200);
+    expect(publicPage.headers.get("cache-control")).toContain("max-age=60");
+    expect(await publicPage.text()).toContain("Webで微調整した研究");
+
     const unsupportedUpload = await requestProvider(
       provider,
       new Request(

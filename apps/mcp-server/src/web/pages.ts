@@ -1,6 +1,7 @@
 import { escapeHtml } from "../auth/pages";
 import type { ProjectAsset } from "../assets/schema";
 import type { ProjectRecord, ProjectSummary } from "../projects/schema";
+import type { PublicationStatus } from "../publications/service";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   discovery: "発見",
@@ -108,11 +109,25 @@ function shell(title: string, body: string): string {
       .upload { display: grid; gap: .8rem; margin-bottom: 1rem; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; background: #0c1724; }
       .upload label { display: grid; gap: .35rem; color: #c9d5e4; font-size: .9rem; }
       .upload input { width: 100%; padding: .65rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; }
+      .editor { display: grid; gap: 1rem; }
+      .editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; }
+      .editor label { display: grid; gap: .4rem; color: #c9d5e4; font-size: .9rem; }
+      .editor label.wide { grid-column: 1 / -1; }
+      .editor input, .editor textarea, .editor select { width: 100%; padding: .72rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; line-height: 1.5; }
+      .editor textarea { min-height: 7rem; resize: vertical; }
+      .actions { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
+      button:disabled { cursor: wait; opacity: .55; }
+      .publish-state { display: grid; gap: .8rem; }
+      .status-row { display: flex; justify-content: space-between; gap: 1rem; padding: .65rem 0; border-top: 1px solid var(--line); }
+      .status-row:first-of-type { border-top: 0; }
+      .status-row span { color: var(--muted); }
+      .success { color: #74e6b2 !important; }
+      .warning { color: #ffd681 !important; }
       .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
       .feedback { min-height: 1.4em; margin: 0; color: #9fddf5; font-size: .88rem; }
       .notice { max-width: 42rem; margin: 3rem auto; text-align: center; }
       form { margin: 0; }
-      @media (max-width: 48rem) { .detail-grid { grid-template-columns: 1fr; } }
+      @media (max-width: 48rem) { .detail-grid, .editor-grid { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
     </style>
@@ -190,7 +205,7 @@ export function dashboardPage(options: {
        <main>
          <div class="section-head"><div><p class="eyebrow">My research</p><h1>自分の研究</h1></div><span class="count">${options.projects.length} / 20 件</span></div>
          ${content}
-         <p class="hint">現在は一覧表示まで対応しています。研究内容の確認・編集・公開操作は、接続したAIクライアントから行えます。</p>
+         <p class="hint">研究を開くと、内容確認、文言の微調整、発表プレビュー、公開操作を行えます。大きな構成変更は接続したAIクライアントから進めます。</p>
        </main>`
     ),
     { headers: headers() }
@@ -202,6 +217,7 @@ export function projectDetailPage(options: {
   csrfToken: string;
   project: ProjectRecord;
   assets: ProjectAsset[];
+  publication: PublicationStatus;
 }): Response {
   const document = options.project.document;
   const recentLogs = document.logs.slice(-20).reverse();
@@ -227,6 +243,22 @@ export function projectDetailPage(options: {
         )
         .join("")}</div>`
     : `<p class="prose">まだ画像がありません。</p>`;
+  const preview = options.publication.latest_preview;
+  const published = options.publication.published;
+  const previewCurrent = preview?.project_version === options.project.version;
+  const publicationPanel = `<section class="panel publish-state" data-publication>
+    <h2>プレビューと公開</h2>
+    <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
+    <div class="status-row"><span>最新プレビュー</span><strong>${preview === null ? "未作成" : `v${preview.project_version}`}</strong></div>
+    <div class="status-row"><span>公開中</span><strong>${published === null ? "未公開" : `v${published.project_version}`}</strong></div>
+    ${preview !== null ? `<a class="button ghost" href="/preview/${escapeHtml(preview.revision_id)}" target="_blank" rel="noopener">最新プレビューを開く</a>` : ""}
+    ${published !== null && options.publication.slug !== null ? `<a class="button ghost" href="/p/${escapeHtml(options.publication.slug)}" target="_blank" rel="noopener">公開ページを開く</a>` : ""}
+    <div class="actions">
+      <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 ? " disabled" : ""}>現在の下書きをプレビュー</button>
+      <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}"${previewCurrent ? "" : " disabled"}>確認した版を公開</button>
+    </div>
+    <p class="feedback${preview !== null && !previewCurrent ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : preview !== null && !previewCurrent ? "下書きが変わったため、新しいプレビューの確認が必要です。" : "公開中の版は、下書きを編集しても自動では変わりません。"}</p>
+  </section>`;
 
   return new Response(
     shell(
@@ -239,6 +271,20 @@ export function projectDetailPage(options: {
          <p class="lead">${escapeHtml(document.summary || "概要はまだ記入されていません。")}</p>
          <div class="detail-grid">
            <div class="detail-column">
+             <section class="panel"><h2>基本情報を編集</h2>
+               <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+                 <div class="editor-grid">
+                   <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label>
+                   <label>段階<select name="stage">${Object.entries(STAGE_LABELS).map(([value, label]) => `<option value="${value}"${document.stage === value ? " selected" : ""}>${label}</option>`).join("")}</select></label>
+                   <label class="wide">概要<textarea name="summary" maxlength="2000">${escapeHtml(document.summary)}</textarea></label>
+                   <label class="wide">研究の問い<textarea name="question" maxlength="2000">${escapeHtml(document.question ?? "")}</textarea></label>
+                   <label class="wide">仮説<textarea name="hypothesis" maxlength="4000">${escapeHtml(document.hypothesis ?? "")}</textarea></label>
+                   <label class="wide">方法<textarea name="method" maxlength="20000">${escapeHtml(document.method ?? "")}</textarea></label>
+                 </div>
+                 <div class="actions"><button type="submit">変更を保存</button><span class="version" data-editor-version>v${options.project.version}</span></div>
+                 <p class="feedback" data-editor-feedback aria-live="polite"></p>
+               </form>
+             </section>
              ${textPanel("研究の問い", document.question)}
              ${textPanel("仮説", document.hypothesis)}
              ${textPanel("方法", document.method)}
@@ -264,7 +310,8 @@ export function projectDetailPage(options: {
                <dt>スライド</dt><dd>${slides.length}枚</dd>
              </dl></section>
              <section class="panel"><h2>発表構成</h2>${slideRows}</section>
-             <p class="hint">編集・評価・スライド構成は、接続したAIクライアントから行えます。</p>
+             ${publicationPanel}
+             <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>
            </aside>
          </div>
        </main><script src="/assets/dashboard.js" defer></script>`

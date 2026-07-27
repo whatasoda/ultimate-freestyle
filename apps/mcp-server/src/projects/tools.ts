@@ -12,6 +12,7 @@ import {
 import {
   createEmptyProject,
   projectRecordSchema,
+  projectSlideSchema,
   projectSummarySchema
 } from "./schema";
 import { RUBRIC_MARKDOWN } from "./rubric";
@@ -290,6 +291,73 @@ export function registerProjectTools(
             ok: false,
             request_id: requestId,
             project: null,
+            error: { code: normalized.code, message: normalized.message }
+          },
+          true
+        );
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_project_slide",
+    {
+      title: "スライドを一枚取得",
+      description:
+        "個別編集の前に、指定したslideと現在versionだけを取得します。研究全体は返しません。",
+      inputSchema: {
+        project_id: z.string().uuid(),
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+      },
+      outputSchema: {
+        ok: z.boolean(),
+        request_id: z.string().uuid(),
+        project_id: z.string().uuid().nullable(),
+        version: z.number().int().positive().nullable(),
+        slide: projectSlideSchema.nullable(),
+        error: projectErrorSchema.nullable()
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, slide_id }) => {
+      const requestId = crypto.randomUUID();
+      try {
+        const ownerUserId = requireSubject(getAuthProps, "research:read");
+        const project = await getProject(db, ownerUserId, project_id);
+        if (project === null) {
+          throw new ProjectToolError(
+            "PROJECT_NOT_FOUND",
+            "The project does not exist."
+          );
+        }
+        const slide = project.document.deck?.slides.find(
+          (item) => item.id === slide_id
+        );
+        if (slide === undefined) {
+          throw new ProjectToolError("SLIDE_NOT_FOUND", "The slide does not exist.");
+        }
+        return toolResult({
+          ok: true,
+          request_id: requestId,
+          project_id,
+          version: project.version,
+          slide,
+          error: null
+        });
+      } catch (error) {
+        const normalized = normalizeProjectToolError(error);
+        return toolResult(
+          {
+            ok: false,
+            request_id: requestId,
+            project_id,
+            version: null,
+            slide: null,
             error: { code: normalized.code, message: normalized.message }
           },
           true

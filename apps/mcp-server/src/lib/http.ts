@@ -91,3 +91,24 @@ export async function readUrlEncodedFormCapped(
     return { ok: false, reason: "invalid" };
   }
 }
+
+export async function readJsonCapped(
+  request: Request,
+  maxBytes: number
+): Promise<CappedReadResult<unknown>> {
+  const contentType = request.headers.get("content-type")?.split(";", 1)[0];
+  if (contentType !== "application/json") {
+    return { ok: false, reason: "invalid" };
+  }
+  const read = await readBytesCapped(request, maxBytes);
+  if (!read.ok) return read;
+  try {
+    const text = new TextDecoder("utf-8", {
+      fatal: true,
+      ignoreBOM: false
+    }).decode(read.value);
+    return { ok: true, value: JSON.parse(text) as unknown };
+  } catch {
+    return { ok: false, reason: "invalid" };
+  }
+}

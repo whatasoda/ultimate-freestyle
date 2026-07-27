@@ -41,6 +41,8 @@ describe("MCP contract", () => {
       expect(tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining([
           "get_project_outline",
+          "get_project_slide",
+          "upsert_voicevox_profile",
           "update_project_fields",
           "configure_deck",
           "upsert_presentation_template",
@@ -53,6 +55,10 @@ describe("MCP contract", () => {
         ])
       );
       expect(tools.map((tool) => tool.name)).not.toContain("update_project");
+      const largestInputSchema = Math.max(
+        ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
+      );
+      expect(largestInputSchema).toBeLessThan(12_000);
       expect(tools).toContainEqual(
         expect.objectContaining({
           name: "delete_project_image",
@@ -69,7 +75,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.5.0",
+        version: "0.6.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",

@@ -19,8 +19,18 @@ import {
   clearWebSessionCookies,
   readWebSession
 } from "../auth/web-session";
-import { readUrlEncodedFormCapped } from "../lib/http";
-import { getProject, listProjects } from "../projects/repository";
+import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
+import { getProject, listProjects, mutateProject } from "../projects/repository";
+import { projectStageSchema } from "../projects/schema";
+import {
+  createPresentationPreview,
+  getPublicationStatus,
+  PublicationError,
+  publishPresentationPreview,
+  readOwnerPreview,
+  readPublishedPresentation
+} from "../publications/service";
+import { z } from "zod";
 import { dashboardScriptResponse } from "./assets";
 import {
   dashboardPage,
@@ -31,6 +41,7 @@ import {
 } from "./pages";
 
 const MAX_FORM_BYTES = 16 * 1024;
+const MAX_JSON_BYTES = 32 * 1024;
 const UUID_PATH =
   "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const IMAGE_CLIENT_ERROR_CODES = new Set([
@@ -41,6 +52,24 @@ const IMAGE_CLIENT_ERROR_CODES = new Set([
   "IMAGE_OUTPUT_TOO_LARGE",
   "IMAGE_EMPTY"
 ]);
+
+const projectFieldsRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  title: z.string().min(1).max(120),
+  stage: projectStageSchema,
+  summary: z.string().max(2_000),
+  question: z.string().max(2_000),
+  hypothesis: z.string().max(4_000),
+  method: z.string().max(20_000)
+});
+
+const previewRequestSchema = z.object({
+  expected_version: z.number().int().positive()
+});
+
+const publishRequestSchema = z.object({
+  revision_id: z.string().uuid()
+});
 
 async function recordWebAudit(
   db: D1Database,
@@ -156,7 +185,234 @@ async function handleProjectDetail(
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
     project,
-    assets: await listProjectAssets(env.DB, session.userId, projectId)
+    assets: await listProjectAssets(env.DB, session.userId, projectId),
+    publication: (await getPublicationStatus(env.DB, session.userId, projectId))!
+  });
+}
+
+async function readRequestJson(
+  request: Request
+): Promise<{ ok: true; value: unknown } | { ok: false; response: Response }> {
+  const read = await readJsonCapped(request, MAX_JSON_BYTES);
+  if (read.ok) return read;
+  return {
+    ok: false,
+    response: jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: read.reason === "over_cap" ? "REQUEST_TOO_LARGE" : "INVALID_REQUEST",
+          message:
+            read.reason === "over_cap"
+              ? "リクエストが大きすぎます。"
+              : "JSONリクエストを読み取れませんでした。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      read.reason === "over_cap" ? 413 : 400
+    )
+  };
+}
+
+async function handleProjectFieldsUpdate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = projectFieldsRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_FIELDS", message: "入力内容を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const { expected_version, question, hypothesis, method, ...fields } = parsed.data;
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: expected_version,
+      mutate: (document) => {
+        Object.assign(document, fields, {
+          question: question.trim() || null,
+          hypothesis: hypothesis.trim() || null,
+          method: method.trim() || null
+        });
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.fields_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    const code =
+      error instanceof Error && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "INTERNAL_ERROR";
+    const currentVersion =
+      error instanceof Error && "currentVersion" in error
+        ? ((error as { currentVersion?: number }).currentVersion ?? null)
+        : null;
+    const status = code === "PROJECT_NOT_FOUND" ? 404 : code === "PROJECT_VERSION_CONFLICT" ? 409 : 500;
+    return jsonResponse(
+      {
+        ok: false,
+        current_version: currentVersion,
+        error: {
+          code,
+          message:
+            code === "PROJECT_VERSION_CONFLICT"
+              ? "別の場所で更新されました。画面を読み込み直してください。"
+              : code === "PROJECT_NOT_FOUND"
+                ? "研究が見つかりません。"
+                : "変更を保存できませんでした。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      status
+    );
+  }
+}
+
+function publicationErrorResponse(error: unknown): Response {
+  if (error instanceof PublicationError) {
+    const status = error.code === "PROJECT_NOT_FOUND" || error.code === "PREVIEW_NOT_FOUND" ? 404 : 409;
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: error.code, message: error.message },
+        request_id: crypto.randomUUID()
+      },
+      status
+    );
+  }
+  throw error;
+}
+
+async function handlePreviewCreate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = previewRequestSchema.safeParse(read.value);
+  if (!parsed.success) return jsonResponse({ ok: false, error: { code: "INVALID_REQUEST", message: "versionを確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  try {
+    const result = await createPresentationPreview(
+      env,
+      session.userId,
+      projectId,
+      parsed.data.expected_version
+    );
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "presentation.preview_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, revision_id: result.revision.revision_id, project_version: result.revision.project_version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      revision: result.revision,
+      preview_url: `/preview/${result.revision.revision_id}`,
+      error: null,
+      request_id: crypto.randomUUID()
+    }, 201);
+  } catch (error) {
+    return publicationErrorResponse(error);
+  }
+}
+
+async function handlePreviewPublish(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = publishRequestSchema.safeParse(read.value);
+  if (!parsed.success) return jsonResponse({ ok: false, error: { code: "INVALID_REQUEST", message: "プレビューを選び直してください。" }, request_id: crypto.randomUUID() }, 422);
+  try {
+    const status = await publishPresentationPreview(
+      env.DB,
+      session.userId,
+      projectId,
+      parsed.data.revision_id
+    );
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "presentation.published",
+      outcome: "succeeded",
+      details: { project_id: projectId, revision_id: parsed.data.revision_id },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      publication: status,
+      public_url: `/p/${status.slug}`,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return publicationErrorResponse(error);
+  }
+}
+
+async function presentationResponse(
+  object: R2ObjectBody | null,
+  cacheControl: string
+): Promise<Response> {
+  if (object === null) return new Response(null, { status: 404 });
+  return new Response(object.body, {
+    headers: {
+      "cache-control": cacheControl,
+      "content-type": "text/html; charset=utf-8",
+      etag: object.httpEtag,
+      "x-content-type-options": "nosniff",
+      "referrer-policy": "no-referrer"
+    }
   });
 }
 
@@ -329,6 +585,30 @@ export async function handleWebRequest(
   if (path === "/dashboard") {
     return handleDashboard(request, env);
   }
+  const previewPageMatch = path.match(
+    new RegExp(`^/preview/${UUID_PATH}$`, "i")
+  );
+  if (previewPageMatch?.[1] !== undefined) {
+    if (request.method !== "GET") {
+      return new Response(null, { status: 405, headers: { allow: "GET" } });
+    }
+    const session = await readWebSession(request, env.DB);
+    if (session === null) return redirectPage("/", clearWebSessionCookies());
+    return presentationResponse(
+      await readOwnerPreview(env, session.userId, previewPageMatch[1]),
+      "private, no-store"
+    );
+  }
+  const publicPageMatch = path.match(new RegExp(`^/p/${UUID_PATH}$`, "i"));
+  if (publicPageMatch?.[1] !== undefined) {
+    if (request.method !== "GET") {
+      return new Response(null, { status: 405, headers: { allow: "GET" } });
+    }
+    return presentationResponse(
+      await readPublishedPresentation(env, publicPageMatch[1]),
+      "public, max-age=60, stale-while-revalidate=300"
+    );
+  }
   const projectMatch = path.match(
     new RegExp(`^/dashboard/projects/${UUID_PATH}$`, "i")
   );
@@ -340,6 +620,24 @@ export async function handleWebRequest(
   );
   if (projectImageMatch?.[1] !== undefined) {
     return handleImageUpload(request, env, projectImageMatch[1]);
+  }
+  const projectFieldsMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/fields$`, "i")
+  );
+  if (projectFieldsMatch?.[1] !== undefined) {
+    return handleProjectFieldsUpdate(request, env, projectFieldsMatch[1]);
+  }
+  const projectPreviewMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/previews$`, "i")
+  );
+  if (projectPreviewMatch?.[1] !== undefined) {
+    return handlePreviewCreate(request, env, projectPreviewMatch[1]);
+  }
+  const projectPublishMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/publish$`, "i")
+  );
+  if (projectPublishMatch?.[1] !== undefined) {
+    return handlePreviewPublish(request, env, projectPublishMatch[1]);
   }
   const mediaMatch = path.match(new RegExp(`^/media/${UUID_PATH}$`, "i"));
   if (mediaMatch?.[1] !== undefined) {

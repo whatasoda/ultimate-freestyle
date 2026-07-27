@@ -147,7 +147,7 @@ export function registerResearchGuides(
               "本人の代わりにテーマを決めず、未回答を推測で確定しないでください。",
               "最初に対象、今日終えたいこと、使える時間を把握し、一度に質問は一問だけにしてください。",
               "各返答は『決まったこと』を短く確認してから『次の質問』を一つ出してください。",
-              "3〜5往復または重要事項が固まった時点で、list_projects／get_project／create_project／update_projectを使って記録してください。",
+              "3〜5往復または重要事項が固まった時点で、list_projects／get_project_outline／create_projectと目的別の小粒度編集toolを使って記録してください。研究全体を送り直さず、変更する項目だけを保存します。",
               current_context
                 ? `現在ユーザーが伝えている文脈：${current_context}`
                 : "現在の文脈はまだありません。"
@@ -193,7 +193,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_projectで${project_id}を取得してください。きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ってください。content_markdownは最初から見せる主張と証拠、reveal_blocksはクリック段階ごとの追加表示、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足に分けます。各atはreveal_steps以内で重複させません。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。更新前のversionをexpected_versionに使ってupdate_projectで保存してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。content_markdownは最初から見せる主張と証拠、revealはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIで固定プレビューを確認してから公開するよう案内してください。`
           }
         }
       ]

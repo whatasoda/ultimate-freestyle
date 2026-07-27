@@ -9,6 +9,7 @@ import {
   projectSlideSchema,
   projectStageSchema,
   researchLogEntrySchema,
+  voicevoxProfileSchema,
   type ProjectDocument,
   type ProjectRecord
 } from "./schema";
@@ -347,6 +348,52 @@ export function registerProjectMutationTools(
           const index = deck.templates.findIndex((item) => item.id === template.id);
           if (index === -1) deck.templates.push(template);
           else deck.templates[index] = template;
+        }
+      })
+  );
+
+  server.registerTool(
+    "upsert_voicevox_profile",
+    {
+      title: "VOICEVOX音声profileを作成・更新",
+      description:
+        "話者・style・調声値をprofile一件として保存します。既存IDは更新され、segmentからはprofile IDだけを参照します。",
+      inputSchema: {
+        ...projectIdInput,
+        catalog_revision: z.string().min(1).max(128),
+        profile: voicevoxProfileSchema,
+        make_default: z.boolean().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, catalog_revision, profile, make_default }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "voicevox_profile_upserted",
+        changedId: profile.id,
+        mutate: (document) => {
+          const deck = requireDeck(document);
+          deck.voicevox ??= {
+            catalog_revision,
+            default_profile_id: profile.id,
+            profiles: []
+          };
+          deck.voicevox.catalog_revision = catalog_revision;
+          const index = deck.voicevox.profiles.findIndex(
+            (item) => item.id === profile.id
+          );
+          if (index === -1) deck.voicevox.profiles.push(profile);
+          else deck.voicevox.profiles[index] = profile;
+          if (make_default === true || deck.voicevox.profiles.length === 1) {
+            deck.voicevox.default_profile_id = profile.id;
+          }
         }
       })
   );

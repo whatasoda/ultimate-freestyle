@@ -1,4 +1,123 @@
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const editor = document.querySelector("[data-project-editor]");
+  if (editor instanceof HTMLFormElement) {
+    const feedback = editor.querySelector("[data-editor-feedback]");
+    const versionLabel = editor.querySelector("[data-editor-version]");
+    const submit = editor.querySelector('button[type="submit"]');
+    editor.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!(feedback instanceof HTMLElement)) return;
+      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      feedback.textContent = "変更を保存しています…";
+      const data = new FormData(editor);
+      const nullableText = (name) => String(data.get(name) || "");
+      try {
+        const response = await fetch(editor.action, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": editor.dataset.csrf || ""
+          },
+          body: JSON.stringify({
+            expected_version: Number(editor.dataset.version),
+            title: String(data.get("title") || ""),
+            stage: String(data.get("stage") || ""),
+            summary: nullableText("summary"),
+            question: nullableText("question"),
+            hypothesis: nullableText("hypothesis"),
+            method: nullableText("method")
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
+        editor.dataset.version = String(result.version);
+        if (versionLabel instanceof HTMLElement) versionLabel.textContent = "v" + result.version;
+        const previewButton = document.querySelector("[data-create-preview]");
+        if (previewButton instanceof HTMLButtonElement) previewButton.dataset.version = String(result.version);
+        feedback.textContent = "v" + result.version + " として保存しました。";
+        feedback.classList.add("success");
+        const publishButton = document.querySelector("[data-publish-preview]");
+        if (publishButton instanceof HTMLButtonElement) publishButton.disabled = true;
+        const publishFeedback = document.querySelector("[data-publish-feedback]");
+        if (publishFeedback instanceof HTMLElement) {
+          publishFeedback.textContent = "下書きが変わったため、新しいプレビューの確認が必要です。";
+          publishFeedback.classList.add("warning");
+        }
+      } catch (error) {
+        feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
+        feedback.classList.remove("success");
+      } finally {
+        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+      }
+    });
+  }
+
+  const previewButton = document.querySelector("[data-create-preview]");
+  const publishButton = document.querySelector("[data-publish-preview]");
+  const publishFeedback = document.querySelector("[data-publish-feedback]");
+  if (previewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
+    previewButton.addEventListener("click", async () => {
+      previewButton.disabled = true;
+      publishFeedback.textContent = "現在の下書きから固定プレビューを生成しています…";
+      publishFeedback.classList.remove("warning", "success");
+      const previewWindow = window.open("", "_blank");
+      try {
+        const response = await fetch(previewButton.dataset.createPreview || "", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": previewButton.dataset.csrf || ""
+          },
+          body: JSON.stringify({ expected_version: Number(previewButton.dataset.version) })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || "プレビューを作成できませんでした。");
+        publishFeedback.textContent = "プレビューを作成しました。表示を確認してから公開してください。";
+        publishFeedback.classList.add("success");
+        if (publishButton instanceof HTMLButtonElement) {
+          publishButton.dataset.revision = result.revision.revision_id;
+          publishButton.disabled = false;
+        }
+        if (previewWindow) previewWindow.location.href = result.preview_url;
+        else window.open(result.preview_url, "_blank", "noopener");
+      } catch (error) {
+        previewWindow?.close();
+        publishFeedback.textContent = error instanceof Error ? error.message : "プレビューを作成できませんでした。";
+        publishFeedback.classList.add("warning");
+      } finally {
+        previewButton.disabled = false;
+      }
+    });
+  }
+
+  if (publishButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
+    publishButton.addEventListener("click", async () => {
+      if (!confirm("確認したこのプレビューを公開しますか？")) return;
+      publishButton.disabled = true;
+      publishFeedback.textContent = "公開版を切り替えています…";
+      publishFeedback.classList.remove("warning", "success");
+      try {
+        const response = await fetch(publishButton.dataset.publishPreview || "", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": publishButton.dataset.csrf || ""
+          },
+          body: JSON.stringify({ revision_id: publishButton.dataset.revision || "" })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || "公開できませんでした。");
+        publishFeedback.textContent = "公開しました: " + result.public_url;
+        publishFeedback.classList.add("success");
+        publishButton.disabled = false;
+      } catch (error) {
+        publishFeedback.textContent = error instanceof Error ? error.message : "公開できませんでした。";
+        publishFeedback.classList.add("warning");
+        publishButton.disabled = false;
+      }
+    });
+  }
+
   const uploadForm = document.querySelector("[data-image-upload]");
   if (uploadForm instanceof HTMLFormElement) {
     const fileInput = uploadForm.querySelector('input[type="file"]');
@@ -62,7 +181,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
 export function dashboardScriptResponse(): Response {
   return new Response(DASHBOARD_SCRIPT, {
     headers: {
-      "cache-control": "public, max-age=3600",
+      "cache-control": "public, max-age=60, must-revalidate",
       "content-type": "text/javascript; charset=utf-8",
       "x-content-type-options": "nosniff"
     }

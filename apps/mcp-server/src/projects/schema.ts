@@ -67,7 +67,7 @@ export const narrationSegmentSchema = z.object({
     .optional()
 });
 
-const voicevoxProfileSchema = z.object({
+export const voicevoxProfileSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
   label: z.string().min(1).max(80),
   speaker_uuid: z.string().uuid(),
@@ -77,7 +77,7 @@ const voicevoxProfileSchema = z.object({
   tuning: narrationSegmentSchema.shape.voice_tuning
 });
 
-const voicevoxSettingsSchema = z
+export const voicevoxSettingsSchema = z
   .object({
     catalog_revision: z.string().min(1).max(128),
     default_profile_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
