@@ -1,4 +1,8 @@
-import type { ProjectRecord, SlideBlock } from "../projects/schema";
+import type {
+  ProjectRecord,
+  SlideBlock,
+  SlideSceneNode
+} from "../projects/schema";
 
 function escapeHtml(value: string): string {
   return value
@@ -51,23 +55,31 @@ function safeJson(value: unknown): string {
 
 export type PresentationRenderOptions = {
   assetUrls?: Readonly<Record<string, string>>;
+  frameAncestors?: "'none'" | "'self'";
+  editorFrame?: boolean;
 };
 
 export function listPresentationAssetIds(project: ProjectRecord): string[] {
   return [
     ...new Set(
       (project.document.deck?.slides ?? []).flatMap(
-        (slide) =>
-          slide.composition?.blocks.flatMap((block) =>
-            block.kind === "image" ? [block.asset_id] : []
-          ) ?? []
+        (slide) => {
+          const composition = slide.composition;
+          if (!composition) return [];
+          return composition.mode === "canvas"
+            ? composition.blocks.flatMap((block) =>
+                block.kind === "image" ? [block.asset_id] : []
+              )
+            : composition.nodes.flatMap((node) =>
+                node.kind === "image" ? [node.asset_id] : []
+              );
+        }
       )
     )
   ];
 }
 
-function blockCss(slideId: string, block: SlideBlock): string {
-  const style = block.style;
+function styleCss(style: SlideBlock["style"] | SlideSceneNode["style"]): string {
   const verticalAlign =
     style?.vertical_align === "center"
       ? "center"
@@ -86,19 +98,24 @@ function blockCss(slideId: string, block: SlideBlock): string {
       : style?.shadow === "strong"
         ? "0 12px 36px #0009"
         : "none";
-  return `.slide[data-slide-id="${slideId}"] [data-block-id="${block.id}"] {
-      left: ${block.frame.x}%; top: ${block.frame.y}%;
-      width: ${block.frame.width}%; height: ${block.frame.height}%;
-      z-index: ${block.z_index};
+  return `
       background: ${style?.background ?? "transparent"};
       color: ${style?.foreground ?? "inherit"};
       border: ${style?.border_width_px ?? 0}px solid ${style?.border_color ?? "transparent"};
       border-radius: ${style?.corner_radius_px ?? 0}px;
       padding: ${style?.padding_px ?? 0}px;
-      --block-opacity: ${style?.opacity ?? 1};
+      --component-opacity: ${style?.opacity ?? 1};
       text-align: ${textAlign}; justify-content: ${verticalAlign};
       font-size: calc(1em * ${style?.font_scale ?? 1});
-      box-shadow: ${shadow};
+      box-shadow: ${shadow};`;
+}
+
+function blockCss(slideId: string, block: SlideBlock): string {
+  return `.slide[data-slide-id="${slideId}"] [data-block-id="${block.id}"] {
+      left: ${block.frame.x}%; top: ${block.frame.y}%;
+      width: ${block.frame.width}%; height: ${block.frame.height}%;
+      z-index: ${block.z_index};
+      ${styleCss(block.style)}
     }`;
 }
 
@@ -115,6 +132,108 @@ function renderCanvasBlock(
     return `<figure ${attributes}><img src="${escapeHtml(src)}" alt="${escapeHtml(block.alt_text)}" data-fit="${block.fit}"></figure>`;
   }
   return `<div ${attributes} data-shape="${block.shape}">${block.label === null ? "" : `<span>${escapeHtml(block.label)}</span>`}</div>`;
+}
+
+function sceneNodeCss(slideId: string, node: SlideSceneNode): string {
+  const selector = `.slide[data-slide-id="${slideId}"] [data-node-id="${node.id}"]`;
+  const frame = node.frame
+    ? `position: absolute; left: ${node.frame.x}%; top: ${node.frame.y}%; width: ${node.frame.width}%; height: ${node.frame.height}%; z-index: ${node.order};`
+    : "position: relative;";
+  const layout =
+    node.kind === "stack"
+      ? `display: flex; flex-direction: ${node.direction}; gap: ${node.gap_px}px; align-items: ${node.align === "start" ? "flex-start" : node.align === "end" ? "flex-end" : node.align}; justify-content: ${node.justify === "start" ? "flex-start" : node.justify === "end" ? "flex-end" : node.justify === "between" ? "space-between" : node.justify === "around" ? "space-around" : "center"}; flex-wrap: ${node.wrap ? "wrap" : "nowrap"};`
+      : node.kind === "grid"
+        ? `display: grid; grid-template-columns: repeat(${node.columns}, minmax(0, 1fr)); gap: ${node.gap_px}px; align-items: ${node.align === "start" ? "start" : node.align === "end" ? "end" : node.align};`
+        : node.kind === "layer"
+          ? "display: block; min-height: 100%;"
+          : "display: flex; flex-direction: column;";
+  const itemCss =
+    node.kind === "bar_chart"
+      ? node.items
+          .map((item) => {
+            const width = Math.min(100, Math.max(0, (item.value / node.max_value) * 100));
+            return `${selector} [data-item-id="${item.id}"] { --bar-width: ${width}%; --bar-color: ${item.color ?? "var(--accent)"}; }`;
+          })
+          .join("\n")
+      : "";
+  return `${selector} { ${frame} ${layout} ${styleCss(node.style)} }
+${itemCss}`;
+}
+
+function sceneAttributes(node: SlideSceneNode): string {
+  return `class="scene-node reveal-block" data-node-id="${escapeHtml(node.id)}" data-component="uf-${node.kind.replaceAll("_", "-")}" data-reveal="${node.at}" data-reveal-at="${node.at}" data-animation="${node.animation}" data-positioned="${String(node.frame !== null && node.frame !== undefined)}" aria-hidden="true"`;
+}
+
+function renderSceneNode(
+  node: SlideSceneNode,
+  children: string,
+  assetUrls: Readonly<Record<string, string>>
+): string {
+  const attributes = sceneAttributes(node);
+  if (node.kind === "layer" || node.kind === "stack" || node.kind === "grid") {
+    return `<uf-${node.kind} ${attributes}>${children}</uf-${node.kind}>`;
+  }
+  if (node.kind === "hero") {
+    return `<uf-hero ${attributes} data-align="${node.align}">${node.eyebrow === null ? "" : `<p class="component-eyebrow">${escapeHtml(node.eyebrow)}</p>`}<h2>${escapeHtml(node.heading)}</h2>${node.subtitle === null ? "" : `<p class="component-subtitle">${escapeHtml(node.subtitle)}</p>`}</uf-hero>`;
+  }
+  if (node.kind === "markdown") {
+    return `<uf-markdown ${attributes}>${renderTextBlocks(node.markdown)}</uf-markdown>`;
+  }
+  if (node.kind === "image") {
+    const src = assetUrls[node.asset_id] ?? `/media/${node.asset_id}`;
+    return `<uf-image ${attributes}><img src="${escapeHtml(src)}" alt="${escapeHtml(node.alt_text)}" data-fit="${node.fit}">${node.caption === null ? "" : `<small>${escapeHtml(node.caption)}</small>`}</uf-image>`;
+  }
+  if (node.kind === "shape") {
+    return `<uf-shape ${attributes} data-shape="${node.shape}">${node.label === null ? "" : `<span>${escapeHtml(node.label)}</span>`}</uf-shape>`;
+  }
+  if (node.kind === "card") {
+    return `<uf-card ${attributes} data-variant="${node.variant}">${node.label === null ? "" : `<p class="component-label">${escapeHtml(node.label)}</p>`}<div>${renderTextBlocks(node.markdown)}</div></uf-card>`;
+  }
+  if (node.kind === "metric") {
+    return `<uf-metric ${attributes} data-emphasis="${node.emphasis}"><p><strong>${escapeHtml(node.value)}</strong>${node.unit === null ? "" : `<span>${escapeHtml(node.unit)}</span>`}</p><small>${escapeHtml(node.caption)}</small></uf-metric>`;
+  }
+  if (node.kind === "quote") {
+    return `<uf-quote ${attributes}><blockquote>${escapeHtml(node.quote)}</blockquote>${node.attribution === null ? "" : `<cite>${escapeHtml(node.attribution)}</cite>`}</uf-quote>`;
+  }
+  if (node.kind === "callout") {
+    return `<uf-callout ${attributes} data-variant="${node.variant}">${node.label === null ? "" : `<p class="component-label">${escapeHtml(node.label)}</p>`}<h3>${escapeHtml(node.heading)}</h3>${node.markdown === null ? "" : `<div>${renderTextBlocks(node.markdown)}</div>`}</uf-callout>`;
+  }
+  if (node.kind === "bar_chart") {
+    return `<uf-bar-chart ${attributes}>${node.items
+      .map(
+        (item) => `<uf-bar-row class="reveal-block" data-item-id="${escapeHtml(item.id)}" data-reveal="${item.at}" data-reveal-at="${item.at}" data-animation="rise" aria-hidden="true"><span>${escapeHtml(item.label)}</span><i></i><strong>${item.value}</strong></uf-bar-row>`
+      )
+      .join("")}</uf-bar-chart>`;
+  }
+  return `<uf-timeline ${attributes}>${node.items
+    .map(
+      (item) => `<uf-timeline-item class="reveal-block" data-item-id="${escapeHtml(item.id)}" data-reveal="${item.at}" data-reveal-at="${item.at}" data-animation="rise" aria-hidden="true">${item.kicker === null ? "" : `<small>${escapeHtml(item.kicker)}</small>`}<strong>${escapeHtml(item.heading)}</strong>${item.detail === null ? "" : `<p>${escapeHtml(item.detail)}</p>`}</uf-timeline-item>`
+    )
+    .join("")}</uf-timeline>`;
+}
+
+function renderScene(
+  nodes: SlideSceneNode[],
+  assetUrls: Readonly<Record<string, string>>
+): string {
+  const children = new Map<string | null, SlideSceneNode[]>();
+  for (const node of nodes) {
+    const siblings = children.get(node.parent_id) ?? [];
+    siblings.push(node);
+    children.set(node.parent_id, siblings);
+  }
+  for (const siblings of children.values()) {
+    siblings.sort(
+      (left, right) => left.order - right.order || left.id.localeCompare(right.id)
+    );
+  }
+  const renderChildren = (parentId: string | null): string =>
+    (children.get(parentId) ?? [])
+      .map((node) =>
+        renderSceneNode(node, renderChildren(node.id), assetUrls)
+      )
+      .join("\n");
+  return renderChildren(null);
 }
 
 export function renderPresentationHtml(
@@ -159,14 +278,17 @@ export function renderPresentationHtml(
     }`
     )
     .join("\n");
-  const canvasCss = deck.slides
+  const compositionCss = deck.slides
     .flatMap((slide) => {
       if (slide.composition === null || slide.composition === undefined) {
         return [];
       }
+      const composition = slide.composition;
       return [
-        `.slide[data-slide-id="${slide.id}"] { --canvas-background: ${slide.composition.background}; --canvas-overflow: ${slide.composition.clip_content ? "hidden" : "visible"}; }`,
-        ...slide.composition.blocks.map((block) => blockCss(slide.id, block))
+        `.slide[data-slide-id="${slide.id}"] { --canvas-background: ${composition.background}; --canvas-overflow: ${composition.clip_content ? "hidden" : "visible"}; }`,
+        ...(composition.mode === "canvas"
+          ? composition.blocks.map((block) => blockCss(slide.id, block))
+          : composition.nodes.map((node) => sceneNodeCss(slide.id, node)))
       ];
     })
     .join("\n");
@@ -179,12 +301,10 @@ export function renderPresentationHtml(
         slide.enter_animation ?? template?.enter_animation ?? "fade";
       const revealAnimation = template?.reveal_animation ?? "rise";
       const composition = slide.composition;
-      const content = composition
-        ? `<div class="slide-canvas" data-region="canvas">${composition.blocks
-            .map((block) =>
-              renderCanvasBlock(block, options.assetUrls ?? {})
-            )
-            .join("\n")}</div>`
+      const content = composition?.mode === "canvas"
+        ? `<div class="slide-canvas" data-region="canvas">${composition.blocks.map((block) => renderCanvasBlock(block, options.assetUrls ?? {})).join("\n")}</div>`
+        : composition?.mode === "scene"
+          ? `<div class="slide-scene" data-region="scene" data-runtime-version="${composition.runtime_version}">${renderScene(composition.nodes, options.assetUrls ?? {})}</div>`
         : `<div class="slide-main" data-region="main">
     <p class="eyebrow">${String(index + 1).padStart(2, "0")} · ${escapeHtml(slide.title)}</p>
     <div class="slide-content">${renderTextBlocks(slide.content_markdown)}</div>
@@ -206,7 +326,7 @@ export function renderPresentationHtml(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${options.frameAncestors ?? "'none'"}">
   <title>${escapeHtml(project.document.title)}</title>
   <style nonce="saijiyu-static">
     :root { color-scheme: dark; --accent: ${escapeHtml(deck.accent)}; font-family: Inter, "Noto Sans JP", system-ui, sans-serif; }
@@ -214,6 +334,10 @@ export function renderPresentationHtml(
     body { margin: 0; min-height: 100vh; overflow: hidden; background: #090d14; color: #f8fafc; }
     button, input { font: inherit; }
     .app { width: 100vw; height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: 12px; }
+    body[data-editor-frame="true"] .app { grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0; }
+    body[data-editor-frame="true"] header, body[data-editor-frame="true"] footer { display: none; }
+    body[data-editor-frame="true"] .stage-wrap { grid-row: 1; }
+    body[data-editor-frame="true"] .stage { width: 100%; height: 100%; border: 0; box-shadow: none; }
     header, footer { display: flex; align-items: center; gap: 12px; min-height: 36px; color: #a9b5c7; }
     header strong { color: #fff; }
     header .time { margin-left: auto; font-variant-numeric: tabular-nums; }
@@ -232,10 +356,60 @@ export function renderPresentationHtml(
     .slide[data-region-layout="lower-third"] { grid-template: minmax(0, 1fr) auto auto / 1fr; }
     .slide[data-region-layout="lower-third"] .slide-sidebar { grid-row: 2; padding: 2% 6%; border-top: 1px solid #ffffff25; border-left: 0; }
     .slide[data-composition="canvas"] { grid-template: minmax(0, 1fr) auto / 1fr; background: var(--canvas-background); overflow: var(--canvas-overflow); }
+    .slide[data-composition="scene"] { grid-template: minmax(0, 1fr) auto / 1fr; background: radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--accent) 25%, transparent), transparent 36%), var(--canvas-background); overflow: var(--canvas-overflow); }
     .slide-canvas { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; overflow: var(--canvas-overflow); }
+    .slide-scene { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; padding: 6%; overflow: var(--canvas-overflow); container: slide-scene / size; }
+    .slide-scene > .scene-node:not([data-positioned="true"]) { width: 100%; height: 100%; }
+    .scene-node { min-width: 0; min-height: 0; max-width: 100%; overflow: hidden; }
+    .scene-node.is-visible { opacity: var(--component-opacity); }
+    uf-layer, uf-stack, uf-grid, uf-hero, uf-markdown, uf-image, uf-shape, uf-card, uf-metric, uf-quote, uf-callout, uf-bar-chart, uf-timeline, uf-bar-row, uf-timeline-item { box-sizing: border-box; }
+    uf-stack > .scene-node, uf-grid > .scene-node { min-height: 0; }
+    uf-hero { gap: clamp(8px, 1.5cqh, 20px); justify-content: center; }
+    uf-hero[data-align="center"] { align-items: center; text-align: center; }
+    uf-hero[data-align="end"] { align-items: flex-end; text-align: end; }
+    uf-hero h2 { max-width: 16ch; margin: 0; font-size: clamp(30px, 7.8cqw, 104px); line-height: .96; letter-spacing: -.055em; text-wrap: balance; }
+    .component-eyebrow, .component-label { margin: 0; color: var(--accent); font: 850 clamp(9px, 1.1cqw, 16px)/1.2 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .component-subtitle { max-width: 48rem; margin: 0; color: color-mix(in srgb, currentColor 68%, transparent); font-size: clamp(13px, 2cqw, 28px); line-height: 1.5; }
+    uf-markdown h2, uf-markdown h3, uf-card h2, uf-card h3 { margin: 0 0 .45em; font-size: clamp(20px, 4cqw, 58px); line-height: 1.05; }
+    uf-markdown p, uf-markdown li, uf-card p, uf-card li, uf-callout p { margin-top: 0; font-size: clamp(11px, 1.65cqw, 24px); line-height: 1.55; }
+    uf-card, uf-callout { gap: .55em; padding: clamp(14px, 2.4cqw, 34px); border: 1px solid #ffffff26; border-radius: clamp(12px, 2cqw, 28px); background: #ffffff0b; backdrop-filter: blur(18px); }
+    uf-card[data-variant="accent"] { border-color: color-mix(in srgb, var(--accent) 70%, transparent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+    uf-card[data-variant="glass"] { background: #ffffff14; box-shadow: 0 18px 55px #0005; }
+    uf-metric { justify-content: center; gap: .5em; padding: clamp(12px, 2cqw, 28px); }
+    uf-metric p { display: flex; align-items: baseline; gap: .3em; margin: 0; }
+    uf-metric strong { font: 900 clamp(36px, 7cqw, 96px)/.9 ui-monospace, monospace; letter-spacing: -.07em; }
+    uf-metric span { color: var(--accent); font-size: clamp(12px, 2cqw, 28px); font-weight: 850; }
+    uf-metric small { color: color-mix(in srgb, currentColor 62%, transparent); font-size: clamp(10px, 1.4cqw, 20px); }
+    uf-metric[data-emphasis="signal"] { color: #17120a; background: var(--accent); }
+    uf-quote { justify-content: center; gap: 1em; padding-left: 6%; border-left: clamp(4px, .7cqw, 10px) solid var(--accent); }
+    uf-quote blockquote { margin: 0; font-size: clamp(20px, 4.2cqw, 62px); font-weight: 750; line-height: 1.2; text-wrap: balance; }
+    uf-quote cite { color: color-mix(in srgb, currentColor 60%, transparent); font-style: normal; }
+    uf-callout[data-variant="success"] { --callout-color: #62e6ad; }
+    uf-callout[data-variant="warning"] { --callout-color: #ffd166; }
+    uf-callout[data-variant="danger"] { --callout-color: #ff786f; }
+    uf-callout { border-left: 5px solid var(--callout-color, #65ccff); }
+    uf-callout h3 { margin: 0; font-size: clamp(16px, 2.7cqw, 38px); }
+    uf-image { gap: .5em; margin: 0; }
+    uf-image img { display: block; width: 100%; min-height: 0; flex: 1; border-radius: inherit; }
+    uf-image img[data-fit="contain"] { object-fit: contain; }
+    uf-image img[data-fit="cover"] { object-fit: cover; }
+    uf-image img[data-fit="fill"] { object-fit: fill; }
+    uf-image small { color: color-mix(in srgb, currentColor 62%, transparent); font-size: clamp(9px, 1.1cqw, 15px); }
+    uf-shape[data-shape="ellipse"] { border-radius: 50%; }
+    uf-shape[data-shape="line"] { height: 0 !important; min-height: 0; border-width: 0 0 2px !important; overflow: visible; }
+    uf-shape span { margin: auto; }
+    uf-bar-chart { justify-content: center; gap: clamp(7px, 1.4cqh, 18px); }
+    uf-bar-row { display: grid; grid-template-columns: minmax(5em, 22%) 1fr auto; align-items: center; gap: 1em; }
+    uf-bar-row span, uf-bar-row strong { font: 750 clamp(10px, 1.45cqw, 21px)/1.2 ui-monospace, monospace; }
+    uf-bar-row i { height: clamp(10px, 1.7cqh, 20px); border-radius: 99px; background: linear-gradient(90deg, var(--bar-color) var(--bar-width), #ffffff15 var(--bar-width)); box-shadow: 0 0 28px color-mix(in srgb, var(--bar-color) 28%, transparent); }
+    uf-timeline { justify-content: center; gap: clamp(8px, 1.4cqh, 18px); }
+    uf-timeline-item { display: grid; grid-template-columns: minmax(4em, 16%) minmax(0, 1fr); gap: .2em 1.3em; padding-left: 1em; border-left: 3px solid var(--accent); }
+    uf-timeline-item small { grid-row: 1 / 3; color: var(--accent); font: 800 clamp(9px, 1.1cqw, 15px)/1.4 ui-monospace, monospace; }
+    uf-timeline-item strong { font-size: clamp(12px, 1.8cqw, 26px); }
+    uf-timeline-item p { margin: 0; color: color-mix(in srgb, currentColor 64%, transparent); font-size: clamp(10px, 1.2cqw, 17px); }
     .canvas-block { position: absolute; display: flex; flex-direction: column; justify-content: flex-start; min-width: 0; min-height: 0; margin: 0; overflow: var(--canvas-overflow); }
     .canvas-block > * { width: 100%; }
-    .reveal-block.canvas-block.is-visible { opacity: var(--block-opacity); }
+    .reveal-block.canvas-block.is-visible { opacity: var(--component-opacity); }
     .canvas-block h2, .canvas-block h3, .canvas-block h4 { margin: 0 0 .35em; line-height: 1.08; font-size: clamp(18px, 3.8vw, 58px); }
     .canvas-block p, .canvas-block li { margin: 0; font-size: clamp(11px, 1.8vw, 28px); line-height: 1.45; }
     .canvas-block p + p { margin-top: .55em; }
@@ -277,7 +451,7 @@ export function renderPresentationHtml(
     [data-layout="cinematic"] .slide-sidebar { display: none; }
     [data-layout="cinematic"] .slide { grid-template-columns: 1fr; }
     ${templateCss}
-    ${canvasCss}
+    ${compositionCss}
     @keyframes slide-fade { from { opacity: 0; } }
     @keyframes slide-rise { from { opacity: 0; translate: 0 3%; } }
     @keyframes slide-zoom { from { opacity: 0; scale: .96; } }
@@ -299,7 +473,7 @@ export function renderPresentationHtml(
     @media (prefers-reduced-motion: reduce) { .slide, .reveal-block { animation: none !important; transition: none !important; } }
   </style>
 </head>
-<body data-layout="${escapeHtml(deck.layout)}">
+<body data-layout="${escapeHtml(deck.layout)}" data-editor-frame="${String(options.editorFrame ?? false)}">
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time"><span id="elapsed">00:00</span> / <span id="expected">00:00</span></span></header>
     <div class="stage-wrap"><div class="stage" aria-label="${escapeHtml(project.document.title)}">${slideHtml}</div></div>
@@ -315,6 +489,9 @@ export function renderPresentationHtml(
     </footer>
   </main>
   <script nonce="saijiyu-static">const DECK=${safeJson(runtimeDeck)};
+  for (const name of ['uf-layer','uf-stack','uf-grid','uf-hero','uf-markdown','uf-image','uf-shape','uf-card','uf-metric','uf-quote','uf-callout','uf-bar-chart','uf-timeline','uf-bar-row','uf-timeline-item']) {
+    if (!customElements.get(name)) customElements.define(name, class extends HTMLElement { connectedCallback() { this.dataset.upgraded = 'true'; } });
+  }
   (() => {
     const slides = [...document.querySelectorAll('.slide')];
     const progress = document.querySelector('#progress');

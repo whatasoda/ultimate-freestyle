@@ -320,6 +320,45 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
     expect(detailHtml).toContain("自由配置 1 block");
+    expect(detailHtml).toContain(
+      '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
+    );
+
+    const workspaceUrl =
+      "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro";
+    const workspace = await requestProvider(
+      provider,
+      new Request(workspaceUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const workspaceHtml = await workspace.text();
+    expect(workspace.status).toBe(200);
+    expect(workspaceHtml).toContain("Slide workspace");
+    expect(workspaceHtml).toContain("このスライドを保存");
+    expect(workspaceHtml).toContain("自由配置 1 block");
+    expect(workspaceHtml).toContain("data-slide-frame");
+
+    const frameUrl = `${workspaceUrl}/frame?slide=1&step=0`;
+    const frame = await requestProvider(
+      provider,
+      new Request(frameUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const frameHtml = await frame.text();
+    expect(frame.status).toBe(200);
+    expect(frame.headers.get("cache-control")).toBe("private, no-store");
+    expect(frame.headers.get("content-security-policy")).toContain(
+      "frame-ancestors 'self'"
+    );
+    expect(frame.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(frameHtml).toContain('data-editor-frame="true"');
+    expect(frameHtml).toContain('frame-ancestors \'self\'');
+    const frameWithoutSession = await requestProvider(
+      provider,
+      new Request(frameUrl),
+      authEnv
+    );
+    expect(frameWithoutSession.status).toBe(404);
 
     const dashboardScript = await requestProvider(
       provider,
@@ -418,6 +457,72 @@ describe("Web dashboard", () => {
       error: { code: "PROJECT_VERSION_CONFLICT" }
     });
 
+    const slideUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 2,
+            title: "一枚ずつ確認できる結果",
+            duration_seconds: 45,
+            tone: "signal",
+            content_markdown: "# Webから調整したfallback",
+            sidebar_markdown: "読み上げない補足"
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(slideUpdate.status).toBe(200);
+    expect(await slideUpdate.json()).toMatchObject({
+      ok: true,
+      slide_id: "intro",
+      version: 3
+    });
+    const staleSlideUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 2,
+            title: "競合",
+            duration_seconds: 45,
+            tone: "signal",
+            content_markdown: "fallback",
+            sidebar_markdown: ""
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(staleSlideUpdate.status).toBe(409);
+    expect(await staleSlideUpdate.json()).toMatchObject({
+      current_version: 3,
+      error: { code: "PROJECT_VERSION_CONFLICT" }
+    });
+
+    const updatedWorkspace = await requestProvider(
+      provider,
+      new Request(workspaceUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    expect(updatedWorkspace.status).toBe(200);
+    expect(await updatedWorkspace.text()).toContain("一枚ずつ確認できる結果");
+
     const previewCreate = await requestProvider(
       provider,
       new Request(
@@ -429,7 +534,7 @@ describe("Web dashboard", () => {
             "content-type": "application/json",
             "x-csrf-token": csrfToken ?? ""
           },
-          body: JSON.stringify({ expected_version: 2 })
+          body: JSON.stringify({ expected_version: 3 })
         }
       ),
       authEnv
@@ -439,7 +544,7 @@ describe("Web dashboard", () => {
       revision: { revision_id: string; project_version: number };
       preview_url: string;
     };
-    expect(previewResult.revision.project_version).toBe(2);
+    expect(previewResult.revision.project_version).toBe(3);
 
     const previewPage = await requestProvider(
       provider,

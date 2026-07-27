@@ -21,6 +21,7 @@ function headers(setCookies: string[] = []): Headers {
       "script-src 'self'",
       "connect-src 'self'",
       "img-src 'self' blob: data:",
+      "frame-src 'self'",
       "form-action 'self'",
       "frame-ancestors 'none'",
       "base-uri 'none'"
@@ -97,6 +98,9 @@ function shell(title: string, body: string): string {
       .log:first-of-type { padding-top: 0; border-top: 0; }
       .log small { color: var(--muted); }
       .slide-row { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; gap: .75rem; align-items: baseline; padding: .7rem 0; border-top: 1px solid var(--line); }
+      a.slide-row { color: inherit; text-decoration: none; }
+      a.slide-row:hover strong { color: #c7b9ff; }
+      a.slide-row:focus-visible { outline: 2px solid #c4b5fd; outline-offset: 3px; }
       .slide-row:first-of-type { border-top: 0; }
       .slide-row span { color: var(--muted); font-size: .85rem; }
       .slide-row strong { overflow-wrap: anywhere; }
@@ -126,8 +130,30 @@ function shell(title: string, body: string): string {
       .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
       .feedback { min-height: 1.4em; margin: 0; color: #9fddf5; font-size: .88rem; }
       .notice { max-width: 42rem; margin: 3rem auto; text-align: center; }
+      main.workspace-main { width: min(96vw, 100rem); padding-top: 1rem; }
+      .workspace-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+      .workspace-head h1 { font-size: clamp(1.65rem, 3vw, 2.8rem); }
+      .workspace-version { display: flex; align-items: center; gap: .75rem; color: var(--muted); }
+      .slide-workspace { display: grid; grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr) minmax(17rem, 22rem); gap: 1rem; align-items: start; }
+      .filmstrip, .inspector { display: grid; gap: .65rem; align-content: start; max-height: calc(100vh - 10rem); overflow: auto; }
+      .filmstrip-link { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .55rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; color: #bdc9d8; text-decoration: none; }
+      .filmstrip-link span { color: var(--muted); font: 700 .76rem/1.3 ui-monospace, monospace; }
+      .filmstrip-link strong { overflow-wrap: anywhere; font-size: .86rem; line-height: 1.35; }
+      .filmstrip-link[data-active="true"] { border-color: #9d7bff; background: #8062df20; color: white; }
+      .workspace-preview { min-width: 0; padding: .8rem; }
+      .workspace-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #40516a; border-radius: .65rem; background: #05080d; box-shadow: 0 1.5rem 4rem #0006; }
+      .workspace-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+      .step-control { display: flex; align-items: center; justify-content: center; gap: .7rem; margin-top: .8rem; }
+      .step-control button { min-height: 2.2rem; padding: .45rem .75rem; }
+      .step-control output { min-width: 6rem; color: var(--muted); text-align: center; font: 700 .8rem/1 ui-monospace, monospace; }
+      .component-outline { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+      .component-outline li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .55rem; padding: .55rem; border: 1px solid var(--line); border-radius: .55rem; color: #bdc9d8; font-size: .8rem; }
+      .component-outline code { color: #91ddff; }
+      .component-outline small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+      .mode-note { margin: 0; padding: .75rem; border-left: 3px solid var(--accent); background: #0c1724; color: #bdc9d8; font-size: .84rem; line-height: 1.6; }
       form { margin: 0; }
-      @media (max-width: 48rem) { .detail-grid, .editor-grid { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } }
+      @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
+      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
     </style>
@@ -161,6 +187,18 @@ function listPanel(title: string, values: string[]): string {
     : `<p class="prose">未記入</p>`;
   const remaining = values.length - limited.length;
   return `<section class="panel"><h2>${escapeHtml(title)}</h2>${items}${remaining > 0 ? `<p class="meta">ほか ${remaining} 件</p>` : ""}</section>`;
+}
+
+function slideCompositionLabel(
+  slide: NonNullable<ProjectRecord["document"]["deck"]>["slides"][number]
+): string {
+  if (slide.composition?.mode === "canvas") {
+    return `自由配置 ${slide.composition.blocks.length} block`;
+  }
+  if (slide.composition?.mode === "scene") {
+    return `リッチ構成 ${slide.composition.nodes.length} component`;
+  }
+  return "定型flow";
 }
 
 export function landingPage(): Response {
@@ -232,7 +270,7 @@ export function projectDetailPage(options: {
   const slideRows = slides.length
     ? slides
         .map(
-          (slide, index) => `<div class="slide-row"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}${slide.composition ? `<small class="stage">自由配置 ${slide.composition.blocks.length} block</small>` : ""}</strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></div>`
+          (slide, index) => `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${escapeHtml(slideCompositionLabel(slide))}</small></strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></a>`
         )
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
@@ -312,6 +350,76 @@ export function projectDetailPage(options: {
              <section class="panel"><h2>発表構成</h2>${slideRows}</section>
              ${publicationPanel}
              <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>
+           </aside>
+         </div>
+       </main><script src="/assets/dashboard.js" defer></script>`
+    ),
+    { headers: headers() }
+  );
+}
+
+export function slideWorkspacePage(options: {
+  twitchLogin: string;
+  csrfToken: string;
+  project: ProjectRecord;
+  slideId: string;
+}): Response {
+  const deck = options.project.document.deck;
+  const slideIndex = deck?.slides.findIndex((slide) => slide.id === options.slideId) ?? -1;
+  if (deck === null || slideIndex === -1) return projectNotFoundPage();
+  const slide = deck.slides[slideIndex];
+  if (slide === undefined) return projectNotFoundPage();
+  const filmstrip = deck.slides
+    .map(
+      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}</strong></a>`
+    )
+    .join("");
+  const componentOutline =
+    slide.composition?.mode === "scene"
+      ? `<ul class="component-outline">${slide.composition.nodes
+          .map(
+            (node) => `<li><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>parent: ${escapeHtml(node.parent_id ?? "root")} · step ${node.at}</small></span></li>`
+          )
+          .join("")}</ul>`
+      : slide.composition?.mode === "canvas"
+        ? `<ul class="component-outline">${slide.composition.blocks
+            .map(
+              (block) => `<li><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}% · step ${block.at}</small></span></li>`
+            )
+            .join("")}</ul>`
+        : `<p class="mode-note">定型flowです。本文、段階表示、補足欄から構成されます。AIからsceneへ切り替えると、入れ子のリッチcomponentを利用できます。</p>`;
+  const modeNote =
+    slide.composition?.mode === "scene"
+      ? "登録済みWeb Componentsで構成されています。現在はAIからcomponentを一件ずつ編集でき、この画面では実表示と基本文言を確認できます。"
+      : slide.composition?.mode === "canvas"
+        ? "従来のflat canvasです。既存表示は維持されます。より複雑な構成はcomponent sceneへ移行できます。"
+        : "本文と補足欄を使う定型flowです。";
+  return new Response(
+    shell(
+      `${slide.title} — スライド編集`,
+      `${accountHeader(options.twitchLogin, options.csrfToken)}
+       <main class="workspace-main">
+         <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
+         <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span data-workspace-version>v${options.project.version}</span><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">大きく開く</a></div></div>
+         <div class="slide-workspace">
+           <nav class="filmstrip" aria-label="スライド一覧">${filmstrip}</nav>
+           <section class="panel workspace-preview">
+             <div class="workspace-frame"><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame></iframe></div>
+             <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output>STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>
+           </section>
+           <aside class="inspector">
+             <section class="panel"><h2>スライド設定</h2>
+               <form class="editor" data-slide-editor action="/api/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}" data-version="${options.project.version}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
+                 <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
+                 <div class="editor-grid"><label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"></label><label>tone<select name="tone">${["dark", "light", "signal", "quiet"].map((tone) => `<option value="${tone}"${slide.tone === tone ? " selected" : ""}>${tone}</option>`).join("")}</select></label></div>
+                 <label>定型本文／fallback<textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea></label>
+                 <label>補足欄<textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea></label>
+                 <div class="actions"><button type="submit">このスライドを保存</button><span class="version" data-slide-version>v${options.project.version}</span></div>
+                 <p class="feedback" data-slide-feedback aria-live="polite"></p>
+               </form>
+             </section>
+             <section class="panel"><h2>${escapeHtml(slideCompositionLabel(slide))}</h2><p class="mode-note">${escapeHtml(modeNote)}</p>${componentOutline}</section>
+             <section class="panel"><h2>読み上げ</h2><p class="prose">${escapeHtml(slide.narration?.segments.map((segment) => `STEP ${segment.at}: ${segment.text}`).join("\n\n") || "読み上げはまだありません。")}</p></section>
            </aside>
          </div>
        </main><script src="/assets/dashboard.js" defer></script>`

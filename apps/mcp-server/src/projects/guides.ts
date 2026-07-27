@@ -8,6 +8,39 @@ import { twitchGrantPropsSchema } from "../auth/types";
 import { getProject } from "./repository";
 import { RUBRIC_MARKDOWN } from "./rubric";
 
+const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
+
+## 選び方
+
+- 通常は \`scene\` を使う。登録済みcomponentを組み合わせるため、ローカル版に近いリッチな表現と安全な公開を両立できる。
+- \`flow\` はタイトル、本文、補足だけで十分な一枚に使う。
+- \`canvas\` は絶対位置が必要な単純な図版にだけ使う。sceneとcanvasを一枚の中で混在させることはできない。
+- 任意HTML、JavaScript、外部画像URLは入力しない。表示はプラットフォーム管理のrendererが担当する。
+
+## sceneの組み立て
+
+1. \`set_slide_scene\` で一枚をsceneへ切り替える。
+2. 最初に \`layer\`、\`stack\`、\`grid\` のいずれかをrootとして追加する。
+3. componentを一件ずつ追加し、\`parent_id\` で親layoutを指定する。rootは \`parent_id: null\`。
+4. \`order\` は同じ親の中の順番、\`at\` は表示step、\`animation\` は表示時の動き。
+5. \`stack\` と \`grid\` の子は自動配置されるため \`frame\` を付けない。\`layer\` の子には百分率の \`frame\` が必要。
+6. Web UIの一枚編集画面で実rendererを確認する。
+
+## component一覧
+
+- layout: \`layer\`、\`stack\`、\`grid\` → \`upsert_slide_layout_component\`
+- text: \`hero\`、\`markdown\`、\`quote\` → \`upsert_slide_text_component\`
+- info: \`card\`、\`metric\`、\`callout\` → \`upsert_slide_info_component\`
+- data: \`bar_chart\`、\`timeline\` → \`upsert_slide_data_component\`
+- media: project内の \`image\`、\`shape\` → \`upsert_slide_media_component\`
+- 削除: \`delete_slide_component\`。指定componentと子孫をまとめて削除する。
+
+## 構成例
+
+rootにcolumn方向のstackを置き、その子にhero、row方向のstackを置く。内側のrow stackへmetricとcardを追加すると、見出し・主要数値・根拠を一枚にまとめられる。棒グラフやtimelineのitemもそれぞれ \`at\` を持つため、クリック進行に同期できる。
+
+一度に研究全体やscene全体を送り直さず、成功時に返るversionを次の\`expected_version\`へ渡して一件ずつ更新する。`;
+
 function projectResourceBody(
   getAuthProps: () => Record<string, unknown> | undefined,
   requiredScope: "research:read"
@@ -41,6 +74,26 @@ export function registerResearchGuides(
           uri: uri.href,
           mimeType: "text/markdown",
           text: RUBRIC_MARKDOWN
+        }
+      ]
+    })
+  );
+
+  server.registerResource(
+    "presentation-component-guide",
+    "research://guide/presentation-components",
+    {
+      title: "発表scene componentガイド",
+      description:
+        "リッチな一枚を小粒度toolで安全に組み立てるためのcomponent一覧と構成規則です。",
+      mimeType: "text/markdown"
+    },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: PRESENTATION_COMPONENT_GUIDE
         }
       ]
     })
@@ -193,7 +246,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。定型flowが合わない一枚はset_slide_canvasで自由配置へ切り替え、upsert_slide_blockでmarkdown、project画像、図形を一件ずつ百分率座標へ配置します。content_markdownは最初から見せる主張と証拠、revealまたはblock.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIで固定プレビューを確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。research://guide/presentation-componentsを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererを確認してから公開するよう案内してください。`
           }
         }
       ]

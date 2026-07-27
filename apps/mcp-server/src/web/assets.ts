@@ -52,6 +52,89 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  const slideEditor = document.querySelector("[data-slide-editor]");
+  const slideFrame = document.querySelector("[data-slide-frame]");
+  if (slideEditor instanceof HTMLFormElement) {
+    const feedback = slideEditor.querySelector("[data-slide-feedback]");
+    const versionLabel = slideEditor.querySelector("[data-slide-version]");
+    const workspaceVersion = document.querySelector("[data-workspace-version]");
+    const submit = slideEditor.querySelector('button[type="submit"]');
+    slideEditor.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!(feedback instanceof HTMLElement)) return;
+      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      feedback.textContent = "このスライドを保存しています…";
+      feedback.classList.remove("success", "warning");
+      const data = new FormData(slideEditor);
+      try {
+        const response = await fetch(slideEditor.action, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": slideEditor.dataset.csrf || ""
+          },
+          body: JSON.stringify({
+            expected_version: Number(slideEditor.dataset.version),
+            title: String(data.get("title") || ""),
+            duration_seconds: Number(data.get("duration_seconds")),
+            tone: String(data.get("tone") || ""),
+            content_markdown: String(data.get("content_markdown") || ""),
+            sidebar_markdown: String(data.get("sidebar_markdown") || "")
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
+        slideEditor.dataset.version = String(result.version);
+        if (versionLabel instanceof HTMLElement) versionLabel.textContent = "v" + result.version;
+        if (workspaceVersion instanceof HTMLElement) workspaceVersion.textContent = "v" + result.version;
+        feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
+        feedback.classList.add("success");
+        if (slideFrame instanceof HTMLIFrameElement) {
+          const frameUrl = new URL(slideFrame.src);
+          frameUrl.searchParams.set("refresh", String(result.version));
+          slideFrame.src = frameUrl.toString();
+        }
+      } catch (error) {
+        feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
+        feedback.classList.add("warning");
+      } finally {
+        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+      }
+    });
+  }
+
+  const stepOutput = document.querySelector("[data-step-output]");
+  const stepButtons = [...document.querySelectorAll("[data-step-direction]")];
+  if (
+    slideEditor instanceof HTMLFormElement &&
+    slideFrame instanceof HTMLIFrameElement &&
+    stepOutput instanceof HTMLOutputElement
+  ) {
+    const maxStep = Number(slideEditor.dataset.maxStep || 0);
+    let currentStep = 0;
+    const updateStep = (nextStep) => {
+      currentStep = Math.min(Math.max(nextStep, 0), maxStep);
+      stepOutput.value = "STEP " + currentStep + " / " + maxStep;
+      const frameUrl = new URL(slideFrame.src);
+      frameUrl.searchParams.set("step", String(currentStep));
+      slideFrame.src = frameUrl.toString();
+      for (const button of stepButtons) {
+        if (!(button instanceof HTMLButtonElement)) continue;
+        button.disabled =
+          button.dataset.stepDirection === "previous"
+            ? currentStep === 0
+            : currentStep === maxStep;
+      }
+    };
+    for (const button of stepButtons) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      button.addEventListener("click", () => {
+        updateStep(currentStep + (button.dataset.stepDirection === "previous" ? -1 : 1));
+      });
+    }
+    updateStep(0);
+  }
+
   const previewButton = document.querySelector("[data-create-preview]");
   const publishButton = document.querySelector("[data-publish-preview]");
   const publishFeedback = document.querySelector("[data-publish-feedback]");

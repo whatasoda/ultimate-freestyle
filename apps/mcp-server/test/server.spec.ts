@@ -46,6 +46,13 @@ describe("MCP contract", () => {
           "set_slide_canvas",
           "upsert_slide_block",
           "delete_slide_block",
+          "set_slide_scene",
+          "upsert_slide_layout_component",
+          "upsert_slide_text_component",
+          "upsert_slide_info_component",
+          "upsert_slide_data_component",
+          "upsert_slide_media_component",
+          "delete_slide_component",
           "update_project_fields",
           "configure_deck",
           "upsert_presentation_template",
@@ -78,7 +85,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.7.0",
+        version: "0.8.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -110,6 +117,11 @@ describe("MCP contract", () => {
       expect(resources).toContainEqual(
         expect.objectContaining({ uri: "research://guide/overview" })
       );
+      expect(resources).toContainEqual(
+        expect.objectContaining({
+          uri: "research://guide/presentation-components"
+        })
+      );
 
       const result = await client.readResource({
         uri: "research://guide/overview"
@@ -119,6 +131,16 @@ describe("MCP contract", () => {
           uri: "research://guide/overview",
           mimeType: "text/markdown",
           text: expect.stringContaining("最自由研究 制作ガイド")
+        })
+      );
+
+      const componentGuide = await client.readResource({
+        uri: "research://guide/presentation-components"
+      });
+      expect(componentGuide.contents).toContainEqual(
+        expect.objectContaining({
+          mimeType: "text/markdown",
+          text: expect.stringContaining("upsert_slide_layout_component")
         })
       );
     } finally {
@@ -547,6 +569,118 @@ describe("MCP contract", () => {
             mode: "canvas",
             background: "#101828",
             blocks: [{ id: "central-question", kind: "markdown" }]
+          }
+        }
+      });
+
+      const scene = await client.callTool({
+        name: "set_slide_scene",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 10,
+          slide_id: "question",
+          enabled: true,
+          background: "#11100e"
+        }
+      });
+      expect(scene.structuredContent).toMatchObject({ ok: true, version: 11 });
+      const layoutComponent = await client.callTool({
+        name: "upsert_slide_layout_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 11,
+          slide_id: "question",
+          component: {
+            id: "result-stack",
+            kind: "stack",
+            parent_id: null,
+            order: 0,
+            at: 0,
+            animation: "none",
+            frame: null,
+            direction: "column",
+            gap_px: 24,
+            align: "stretch",
+            justify: "center",
+            wrap: false
+          }
+        }
+      });
+      expect(layoutComponent.structuredContent).toMatchObject({
+        ok: true,
+        version: 12
+      });
+      const infoComponent = await client.callTool({
+        name: "upsert_slide_info_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 12,
+          slide_id: "question",
+          component: {
+            id: "trial-count",
+            kind: "metric",
+            parent_id: "result-stack",
+            order: 0,
+            at: 1,
+            animation: "zoom",
+            frame: null,
+            value: "12",
+            unit: "回",
+            caption: "試した回数",
+            emphasis: "signal"
+          }
+        }
+      });
+      expect(infoComponent.structuredContent).toMatchObject({
+        ok: true,
+        version: 13
+      });
+      const dataComponent = await client.callTool({
+        name: "upsert_slide_data_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 13,
+          slide_id: "question",
+          component: {
+            id: "comparison",
+            kind: "bar_chart",
+            parent_id: "result-stack",
+            order: 1,
+            at: 1,
+            animation: "rise",
+            frame: null,
+            max_value: 100,
+            items: [
+              { id: "before", at: 1, label: "変更前", value: 42, color: null },
+              { id: "after", at: 2, label: "変更後", value: 91, color: "#ffcf32" }
+            ]
+          }
+        }
+      });
+      expect(dataComponent.structuredContent).toMatchObject({
+        ok: true,
+        version: 14
+      });
+      const sceneSlide = await client.callTool({
+        name: "get_project_slide",
+        arguments: {
+          project_id: firstProject.project_id,
+          slide_id: "question"
+        }
+      });
+      expect(sceneSlide.structuredContent).toMatchObject({
+        ok: true,
+        version: 14,
+        slide: {
+          reveal_steps: 2,
+          composition: {
+            mode: "scene",
+            runtime_version: "uf-runtime@1",
+            nodes: [
+              { id: "result-stack", kind: "stack" },
+              { id: "trial-count", kind: "metric" },
+              { id: "comparison", kind: "bar_chart" }
+            ]
           }
         }
       });

@@ -37,6 +37,177 @@ const slideBlockStyleSchema = z.object({
   shadow: z.enum(["none", "soft", "strong"]).optional()
 });
 
+const sceneNodeBaseSchema = z.object({
+  id: blockIdSchema,
+  parent_id: blockIdSchema.nullable(),
+  order: z.number().int().min(0).max(999),
+  at: z.number().int().nonnegative().max(100),
+  animation: animationSchema,
+  frame: slideBlockFrameSchema.nullable().optional(),
+  style: slideBlockStyleSchema.optional()
+});
+
+const sceneItemBaseSchema = z.object({
+  id: blockIdSchema,
+  at: z.number().int().nonnegative().max(100)
+});
+
+const sceneLayerNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("layer")
+});
+const sceneStackNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("stack"),
+  direction: z.enum(["row", "column"]),
+  gap_px: z.number().int().min(0).max(64),
+  align: z.enum(["start", "center", "end", "stretch"]),
+  justify: z.enum(["start", "center", "end", "between", "around"]),
+  wrap: z.boolean()
+});
+const sceneGridNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("grid"),
+  columns: z.number().int().min(1).max(6),
+  gap_px: z.number().int().min(0).max(64),
+  align: z.enum(["start", "center", "end", "stretch"])
+});
+const sceneHeroNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("hero"),
+  eyebrow: z.string().max(120).nullable(),
+  heading: z.string().min(1).max(500),
+  subtitle: z.string().max(2_000).nullable(),
+  align: z.enum(["start", "center", "end"])
+});
+const sceneMarkdownNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("markdown"),
+  markdown: z.string().min(1).max(20_000)
+});
+const sceneImageNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("image"),
+  asset_id: z.string().uuid(),
+  alt_text: z.string().max(500),
+  fit: z.enum(["contain", "cover", "fill"]),
+  caption: z.string().max(500).nullable()
+});
+const sceneShapeNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("shape"),
+  shape: z.enum(["rectangle", "ellipse", "line"]),
+  label: z.string().max(500).nullable()
+});
+const sceneCardNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("card"),
+  label: z.string().max(120).nullable(),
+  markdown: z.string().min(1).max(10_000),
+  variant: z.enum(["plain", "accent", "glass"])
+});
+const sceneMetricNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("metric"),
+  value: z.string().min(1).max(80),
+  unit: z.string().max(40).nullable(),
+  caption: z.string().max(500),
+  emphasis: z.enum(["normal", "strong", "signal"])
+});
+const sceneQuoteNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("quote"),
+  quote: z.string().min(1).max(4_000),
+  attribution: z.string().max(500).nullable()
+});
+const sceneCalloutNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("callout"),
+  label: z.string().max(120).nullable(),
+  heading: z.string().min(1).max(500),
+  markdown: z.string().max(4_000).nullable(),
+  variant: z.enum(["info", "success", "warning", "danger"])
+});
+const sceneBarChartNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("bar_chart"),
+  max_value: z.number().positive().max(1_000_000_000),
+  items: z
+    .array(
+      sceneItemBaseSchema.extend({
+        label: z.string().min(1).max(120),
+        value: z.number().min(0).max(1_000_000_000),
+        color: hexColorSchema.nullable()
+      })
+    )
+    .min(1)
+    .max(12)
+});
+const sceneTimelineNodeSchema = sceneNodeBaseSchema.extend({
+  kind: z.literal("timeline"),
+  items: z
+    .array(
+      sceneItemBaseSchema.extend({
+        kicker: z.string().max(120).nullable(),
+        heading: z.string().min(1).max(500),
+        detail: z.string().max(2_000).nullable()
+      })
+    )
+    .min(1)
+    .max(12)
+});
+
+export const slideSceneLayoutNodeSchema = z.discriminatedUnion("kind", [
+  sceneLayerNodeSchema,
+  sceneStackNodeSchema,
+  sceneGridNodeSchema
+]);
+export const slideSceneTextNodeSchema = z.discriminatedUnion("kind", [
+  sceneHeroNodeSchema,
+  sceneMarkdownNodeSchema,
+  sceneQuoteNodeSchema
+]);
+export const slideSceneInfoNodeSchema = z.discriminatedUnion("kind", [
+  sceneCardNodeSchema,
+  sceneMetricNodeSchema,
+  sceneCalloutNodeSchema
+]);
+export const slideSceneDataNodeSchema = z.discriminatedUnion("kind", [
+  sceneBarChartNodeSchema,
+  sceneTimelineNodeSchema
+]);
+export const slideSceneMediaNodeSchema = z.discriminatedUnion("kind", [
+  sceneImageNodeSchema,
+  sceneShapeNodeSchema
+]);
+export const slideSceneNodeSchema = z.discriminatedUnion("kind", [
+  sceneLayerNodeSchema,
+  sceneStackNodeSchema,
+  sceneGridNodeSchema,
+  sceneHeroNodeSchema,
+  sceneMarkdownNodeSchema,
+  sceneImageNodeSchema,
+  sceneShapeNodeSchema,
+  sceneCardNodeSchema,
+  sceneMetricNodeSchema,
+  sceneQuoteNodeSchema,
+  sceneCalloutNodeSchema,
+  sceneBarChartNodeSchema,
+  sceneTimelineNodeSchema
+]);
+
+export type SlideSceneNode = z.infer<typeof slideSceneNodeSchema>;
+
+const SCENE_CONTAINER_KINDS = new Set<SlideSceneNode["kind"]>([
+  "layer",
+  "stack",
+  "grid"
+]);
+
+function sceneNodeRevealPositions(node: SlideSceneNode): number[] {
+  if (node.kind === "bar_chart" || node.kind === "timeline") {
+    return [node.at, ...node.items.map((item) => item.at)];
+  }
+  return [node.at];
+}
+
+export function compositionRevealPositions(
+  composition: z.infer<typeof slideCompositionSchema> | null | undefined
+): number[] {
+  if (composition === null || composition === undefined) return [];
+  return composition.mode === "canvas"
+    ? composition.blocks.map((block) => block.at)
+    : composition.nodes.flatMap(sceneNodeRevealPositions);
+}
+
 const slideBlockBaseSchema = z.object({
   id: blockIdSchema,
   frame: slideBlockFrameSchema,
@@ -83,7 +254,7 @@ export const slideBlockSchema = z
 
 export type SlideBlock = z.infer<typeof slideBlockSchema>;
 
-export const slideCompositionSchema = z
+const slideCanvasCompositionSchema = z
   .object({
     mode: z.literal("canvas"),
     background: hexColorSchema,
@@ -103,6 +274,124 @@ export const slideCompositionSchema = z
       ids.add(block.id);
     }
   });
+
+const slideSceneCompositionSchema = z
+  .object({
+    mode: z.literal("scene"),
+    runtime_version: z.literal("uf-runtime@1"),
+    background: hexColorSchema,
+    clip_content: z.boolean(),
+    nodes: z.array(slideSceneNodeSchema).max(200)
+  })
+  .superRefine((composition, context) => {
+    const byId = new Map<string, SlideSceneNode>();
+    for (const [index, node] of composition.nodes.entries()) {
+      if (byId.has(node.id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "id"],
+          message: "Scene node IDs must be unique."
+        });
+      }
+      byId.set(node.id, node);
+      if (node.frame) {
+        if (node.frame.x + node.frame.width > 100) {
+          context.addIssue({
+            code: "custom",
+            path: ["nodes", index, "frame", "width"],
+            message: "A positioned scene node must fit horizontally."
+          });
+        }
+        if (node.frame.y + node.frame.height > 100) {
+          context.addIssue({
+            code: "custom",
+            path: ["nodes", index, "frame", "height"],
+            message: "A positioned scene node must fit vertically."
+          });
+        }
+      }
+      if (
+        (node.kind === "bar_chart" || node.kind === "timeline") &&
+        new Set(node.items.map((item) => item.id)).size !== node.items.length
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "items"],
+          message: "Component item IDs must be unique within a node."
+        });
+      }
+    }
+
+    for (const [index, node] of composition.nodes.entries()) {
+      if (node.parent_id === null) continue;
+      const parent = byId.get(node.parent_id);
+      if (parent === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "parent_id"],
+          message: "The scene node parent must exist."
+        });
+        continue;
+      }
+      if (!SCENE_CONTAINER_KINDS.has(parent.kind)) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "parent_id"],
+          message: "Only layer, stack, and grid nodes can contain children."
+        });
+      }
+      if (
+        parent.kind === "layer" &&
+        (node.frame === null || node.frame === undefined)
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "frame"],
+          message: "Children of a layer must have a frame."
+        });
+      }
+      if ((parent.kind === "stack" || parent.kind === "grid") && node.frame) {
+        context.addIssue({
+          code: "custom",
+          path: ["nodes", index, "frame"],
+          message: "Children of stack and grid use flow layout, not a frame."
+        });
+      }
+
+      const visited = new Set<string>([node.id]);
+      let ancestor: SlideSceneNode | undefined = parent;
+      let depth = 1;
+      while (ancestor !== undefined) {
+        if (visited.has(ancestor.id)) {
+          context.addIssue({
+            code: "custom",
+            path: ["nodes", index, "parent_id"],
+            message: "Scene nodes must not form a cycle."
+          });
+          break;
+        }
+        visited.add(ancestor.id);
+        depth += 1;
+        if (depth > 8) {
+          context.addIssue({
+            code: "custom",
+            path: ["nodes", index, "parent_id"],
+            message: "Scene nesting is limited to 8 levels."
+          });
+          break;
+        }
+        ancestor =
+          ancestor.parent_id === null
+            ? undefined
+            : byId.get(ancestor.parent_id);
+      }
+    }
+  });
+
+export const slideCompositionSchema = z.discriminatedUnion("mode", [
+  slideCanvasCompositionSchema,
+  slideSceneCompositionSchema
+]);
 
 export const presentationTemplateSchema = z.object({
   id: templateIdSchema,
@@ -260,14 +549,14 @@ export const projectSlideSchema = z
       }
       narrationPositions.add(segment.at);
     }
-    for (const [blockIndex, block] of (
-      slide.composition?.blocks ?? []
+    for (const [positionIndex, position] of compositionRevealPositions(
+      slide.composition
     ).entries()) {
-      if (block.at > slide.reveal_steps) {
+      if (position > slide.reveal_steps) {
         context.addIssue({
           code: "custom",
-          path: ["composition", "blocks", blockIndex, "at"],
-          message: "Slide block positions must not exceed reveal_steps."
+          path: ["composition", "reveal", positionIndex],
+          message: "Slide component positions must not exceed reveal_steps."
         });
       }
     }

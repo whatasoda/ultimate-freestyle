@@ -20,6 +20,7 @@ import {
   readWebSession
 } from "../auth/web-session";
 import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
+import { renderPresentationHtml } from "../presentation/render";
 import { getProject, listProjects, mutateProject } from "../projects/repository";
 import { projectStageSchema } from "../projects/schema";
 import {
@@ -39,7 +40,8 @@ import {
   landingPage,
   projectDetailPage,
   projectNotFoundPage,
-  redirectPage
+  redirectPage,
+  slideWorkspacePage
 } from "./pages";
 
 const MAX_FORM_BYTES = 16 * 1024;
@@ -71,6 +73,15 @@ const previewRequestSchema = z.object({
 
 const publishRequestSchema = z.object({
   revision_id: z.string().uuid()
+});
+
+const slideFieldsRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  title: z.string().min(1).max(120),
+  duration_seconds: z.number().int().positive().max(1_200),
+  tone: z.enum(["dark", "light", "signal", "quiet"]),
+  content_markdown: z.string().min(1).max(20_000),
+  sidebar_markdown: z.string().max(10_000)
 });
 
 async function recordWebAudit(
@@ -192,6 +203,67 @@ async function handleProjectDetail(
   });
 }
 
+async function handleSlideWorkspace(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) {
+    return redirectPage("/", clearWebSessionCookies());
+  }
+  const project = await getProject(env.DB, session.userId, projectId);
+  if (project === null) return projectNotFoundPage();
+  return slideWorkspacePage({
+    twitchLogin: session.twitchLogin,
+    csrfToken: session.csrfToken,
+    project,
+    slideId
+  });
+}
+
+async function handleSlideFrame(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return new Response(null, { status: 404 });
+  const project = await getProject(env.DB, session.userId, projectId);
+  if (
+    project === null ||
+    project.document.deck === null ||
+    !project.document.deck.slides.some((slide) => slide.id === slideId)
+  ) {
+    return new Response(null, { status: 404 });
+  }
+  const html = renderPresentationHtml(project, {
+    frameAncestors: "'self'",
+    editorFrame: true
+  });
+  return new Response(html, {
+    headers: {
+      "cache-control": "private, no-store",
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy":
+        "default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+      "permissions-policy":
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "SAMEORIGIN"
+    }
+  });
+}
+
 async function readRequestJson(
   request: Request
 ): Promise<{ ok: true; value: unknown } | { ok: false; response: Response }> {
@@ -299,6 +371,110 @@ async function handleProjectFieldsUpdate(
               : code === "PROJECT_NOT_FOUND"
                 ? "研究が見つかりません。"
                 : "変更を保存できませんでした。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      status
+    );
+  }
+}
+
+async function handleSlideFieldsUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = slideFieldsRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_FIELDS", message: "スライドの入力内容を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const { expected_version, sidebar_markdown, ...fields } = parsed.data;
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        Object.assign(slide, fields, {
+          sidebar_markdown: sidebar_markdown.trim() || null
+        });
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_fields_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    const code =
+      error instanceof Error && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "INTERNAL_ERROR";
+    const currentVersion =
+      error instanceof Error && "currentVersion" in error
+        ? ((error as { currentVersion?: number }).currentVersion ?? null)
+        : null;
+    const status =
+      code === "PROJECT_NOT_FOUND" || code === "SLIDE_NOT_FOUND"
+        ? 404
+        : code === "PROJECT_VERSION_CONFLICT"
+          ? 409
+          : 500;
+    return jsonResponse(
+      {
+        ok: false,
+        current_version: currentVersion,
+        error: {
+          code,
+          message:
+            code === "PROJECT_VERSION_CONFLICT"
+              ? "別の場所で更新されました。画面を読み込み直してください。"
+              : code === "SLIDE_NOT_FOUND"
+                ? "スライドが見つかりません。"
+                : code === "PROJECT_NOT_FOUND"
+                  ? "研究が見つかりません。"
+                  : "スライドを保存できませんでした。"
         },
         request_id: crypto.randomUUID()
       },
@@ -686,6 +862,26 @@ export async function handleWebRequest(
   if (projectMatch?.[1] !== undefined) {
     return handleProjectDetail(request, env, projectMatch[1]);
   }
+  const slideFrameMatch = path.match(
+    new RegExp(`^/dashboard/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/frame$`)
+  );
+  if (slideFrameMatch?.[1] !== undefined && slideFrameMatch[2] !== undefined) {
+    return handleSlideFrame(request, env, slideFrameMatch[1], slideFrameMatch[2]);
+  }
+  const slideWorkspaceMatch = path.match(
+    new RegExp(`^/dashboard/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})$`)
+  );
+  if (
+    slideWorkspaceMatch?.[1] !== undefined &&
+    slideWorkspaceMatch[2] !== undefined
+  ) {
+    return handleSlideWorkspace(
+      request,
+      env,
+      slideWorkspaceMatch[1],
+      slideWorkspaceMatch[2]
+    );
+  }
   const projectImageMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/images$`, "i")
   );
@@ -697,6 +893,17 @@ export async function handleWebRequest(
   );
   if (projectFieldsMatch?.[1] !== undefined) {
     return handleProjectFieldsUpdate(request, env, projectFieldsMatch[1]);
+  }
+  const slideFieldsMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})$`)
+  );
+  if (slideFieldsMatch?.[1] !== undefined && slideFieldsMatch[2] !== undefined) {
+    return handleSlideFieldsUpdate(
+      request,
+      env,
+      slideFieldsMatch[1],
+      slideFieldsMatch[2]
+    );
   }
   const projectPreviewMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/previews$`, "i")

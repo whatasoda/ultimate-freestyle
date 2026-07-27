@@ -12,7 +12,7 @@ import { registerProjectMutationTools } from "./projects/mutation-tools";
 import { registerResearchGuides } from "./projects/guides";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.7.0";
+export const SERVICE_VERSION = "0.8.0";
 
 export type EligibilityConfig = Pick<
   Env,
@@ -54,7 +54,7 @@ export function createServer(
     },
     {
       instructions:
-        "最自由研究の制作を支援するサーバーです。まずhealth、get_access_status、get_project_outlineを呼んでください。変更は目的に合う小粒度toolへexpected_versionを渡し、研究全体を送り直さないでください。競合時は該当範囲を再取得し、ユーザーの変更を失わないでください。画像binaryの追加と公開前確認はWeb UIを案内します。"
+        "最自由研究の制作を支援するサーバーです。まずhealth、get_access_status、get_project_outlineを呼んでください。変更は目的に合う小粒度toolへexpected_versionを渡し、研究全体を送り直さないでください。リッチな発表はresearch://guide/presentation-componentsを読んでscene componentを一件ずつ構成してください。競合時は該当範囲を再取得し、ユーザーの変更を失わないでください。画像binaryの追加と公開前確認はWeb UIを案内します。"
     }
   );
 

@@ -4,15 +4,22 @@ import { z } from "zod";
 import { recordAuditEvent } from "../auth/repository";
 import { mutateProject } from "./repository";
 import {
+  compositionRevealPositions,
   narrationSegmentSchema,
   presentationTemplateSchema,
   projectSlideSchema,
   projectStageSchema,
   researchLogEntrySchema,
   slideBlockSchema,
+  slideSceneDataNodeSchema,
+  slideSceneInfoNodeSchema,
+  slideSceneLayoutNodeSchema,
+  slideSceneMediaNodeSchema,
+  slideSceneTextNodeSchema,
   voicevoxProfileSchema,
   type ProjectDocument,
-  type ProjectRecord
+  type ProjectRecord,
+  type SlideSceneNode
 } from "./schema";
 import {
   normalizeProjectToolError,
@@ -128,6 +135,48 @@ function findSlide(document: ProjectDocument, slideId: string) {
     throw new ProjectToolError("SLIDE_NOT_FOUND", "The slide does not exist.");
   }
   return slide;
+}
+
+function recalculateSlideRevealSteps(
+  slide: ReturnType<typeof findSlide>
+): void {
+  slide.reveal_steps = Math.max(
+    ...slide.reveal_blocks.map((block) => block.at),
+    ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
+    ...compositionRevealPositions(slide.composition),
+    0
+  );
+}
+
+function upsertSceneComponent(
+  document: ProjectDocument,
+  slideId: string,
+  component: SlideSceneNode
+): void {
+  const slide = findSlide(document, slideId);
+  if (slide.composition?.mode === "canvas") {
+    throw new ProjectToolError(
+      "INVALID_COMPOSITION_MODE",
+      "This slide uses the flat canvas. Enable the component scene first."
+    );
+  }
+  slide.composition ??= {
+    mode: "scene",
+    runtime_version: "uf-runtime@1",
+    background: "#11100e",
+    clip_content: true,
+    nodes: []
+  };
+  const index = slide.composition.nodes.findIndex(
+    (node) => node.id === component.id
+  );
+  if (index === -1) slide.composition.nodes.push(component);
+  else slide.composition.nodes[index] = component;
+  slide.composition.nodes.sort(
+    (left, right) =>
+      left.order - right.order || left.id.localeCompare(right.id)
+  );
+  recalculateSlideRevealSteps(slide);
 }
 
 export function registerProjectMutationTools(
@@ -532,19 +581,25 @@ export function registerProjectMutationTools(
           const slide = findSlide(document, slide_id);
           if (!enabled) {
             slide.composition = null;
-            slide.reveal_steps = Math.max(
-              ...slide.reveal_blocks.map((block) => block.at),
-              ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
-              0
-            );
+            recalculateSlideRevealSteps(slide);
             return;
           }
-          slide.composition ??= {
-            mode: "canvas",
-            background: background ?? "#111827",
-            clip_content: clip_content ?? true,
-            blocks: []
-          };
+          if (slide.composition?.mode === "scene") {
+            slide.composition = {
+              mode: "canvas",
+              background: background ?? slide.composition.background,
+              clip_content:
+                clip_content ?? slide.composition.clip_content,
+              blocks: []
+            };
+          } else {
+            slide.composition ??= {
+              mode: "canvas",
+              background: background ?? "#111827",
+              clip_content: clip_content ?? true,
+              blocks: []
+            };
+          }
           if (background !== undefined) {
             slide.composition.background = background;
           }
@@ -582,6 +637,12 @@ export function registerProjectMutationTools(
         changedId: `${slide_id}:${block.id}`,
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
+          if (slide.composition?.mode === "scene") {
+            throw new ProjectToolError(
+              "INVALID_COMPOSITION_MODE",
+              "This slide uses a component scene. Use the matching upsert_slide_*_component tool."
+            );
+          }
           slide.composition ??= {
             mode: "canvas",
             background: "#111827",
@@ -596,12 +657,7 @@ export function registerProjectMutationTools(
           slide.composition.blocks.sort(
             (a, b) => a.z_index - b.z_index || a.id.localeCompare(b.id)
           );
-          slide.reveal_steps = Math.max(
-            ...slide.reveal_blocks.map((item) => item.at),
-            ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
-            ...slide.composition.blocks.map((item) => item.at),
-            0
-          );
+          recalculateSlideRevealSteps(slide);
         }
       })
   );
@@ -632,22 +688,281 @@ export function registerProjectMutationTools(
         changedId: `${slide_id}:${block_id}`,
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
-          const index = slide.composition?.blocks.findIndex(
+          if (slide.composition?.mode !== "canvas") {
+            throw new ProjectToolError(
+              "INVALID_COMPOSITION_MODE",
+              "This slide does not use the flat canvas."
+            );
+          }
+          const index = slide.composition.blocks.findIndex(
             (block) => block.id === block_id
           );
-          if (index === undefined || index === -1) {
+          if (index === -1) {
             throw new ProjectToolError(
               "BLOCK_NOT_FOUND",
               "The slide block does not exist."
             );
           }
-          slide.composition?.blocks.splice(index, 1);
-          slide.reveal_steps = Math.max(
-            ...slide.reveal_blocks.map((block) => block.at),
-            ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
-            ...(slide.composition?.blocks.map((block) => block.at) ?? []),
-            0
+          slide.composition.blocks.splice(index, 1);
+          recalculateSlideRevealSteps(slide);
+        }
+      })
+  );
+
+  server.registerTool(
+    "set_slide_scene",
+    {
+      title: "スライドのcomponent sceneを設定",
+      description:
+        "一枚を登録済みWeb Componentsのsceneへ切り替えます。layer、stack、gridを親にしてリッチな部品をネストできます。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        enabled: z.boolean(),
+        background: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+        clip_content: z.boolean().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, enabled, background, clip_content }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_scene_updated",
+        changedId: slide_id,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          if (!enabled) {
+            slide.composition = null;
+            recalculateSlideRevealSteps(slide);
+            return;
+          }
+          if (slide.composition?.mode !== "scene") {
+            slide.composition = {
+              mode: "scene",
+              runtime_version: "uf-runtime@1",
+              background: background ?? slide.composition?.background ?? "#11100e",
+              clip_content:
+                clip_content ?? slide.composition?.clip_content ?? true,
+              nodes: []
+            };
+          }
+          if (background !== undefined) {
+            slide.composition.background = background;
+          }
+          if (clip_content !== undefined) {
+            slide.composition.clip_content = clip_content;
+          }
+          recalculateSlideRevealSteps(slide);
+        }
+      })
+  );
+
+  server.registerTool(
+    "upsert_slide_layout_component",
+    {
+      title: "sceneのlayout componentを作成・更新",
+      description:
+        "layer、stack、gridを一件だけ追加または置換します。子componentはparent_idでこのlayoutへ入れます。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        component: slideSceneLayoutNodeSchema
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, component }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_component_upserted",
+        changedId: `${slide_id}:${component.id}`,
+        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+      })
+  );
+
+  server.registerTool(
+    "upsert_slide_text_component",
+    {
+      title: "sceneの文章componentを作成・更新",
+      description:
+        "hero、markdown、quoteを一件だけ追加または置換します。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        component: slideSceneTextNodeSchema
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, component }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_component_upserted",
+        changedId: `${slide_id}:${component.id}`,
+        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+      })
+  );
+
+  server.registerTool(
+    "upsert_slide_info_component",
+    {
+      title: "sceneの情報componentを作成・更新",
+      description:
+        "card、metric、calloutを一件だけ追加または置換します。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        component: slideSceneInfoNodeSchema
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, component }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_component_upserted",
+        changedId: `${slide_id}:${component.id}`,
+        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+      })
+  );
+
+  server.registerTool(
+    "upsert_slide_data_component",
+    {
+      title: "sceneのデータcomponentを作成・更新",
+      description:
+        "bar chartまたはtimelineを一件だけ追加または置換します。itemごとに表示stepを指定できます。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        component: slideSceneDataNodeSchema
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, component }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_component_upserted",
+        changedId: `${slide_id}:${component.id}`,
+        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+      })
+  );
+
+  server.registerTool(
+    "upsert_slide_media_component",
+    {
+      title: "sceneの画像・装飾componentを作成・更新",
+      description:
+        "project画像またはshapeを一件だけ追加または置換します。外部URLは受け付けません。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        component: slideSceneMediaNodeSchema
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, component }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_component_upserted",
+        changedId: `${slide_id}:${component.id}`,
+        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+      })
+  );
+
+  server.registerTool(
+    "delete_slide_component",
+    {
+      title: "scene componentを削除",
+      description:
+        "指定componentと、そのcomponentを親にする子孫を一件の操作で削除します。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, component_id }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_component_deleted",
+        changedId: `${slide_id}:${component_id}`,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          if (slide.composition?.mode !== "scene") {
+            throw new ProjectToolError(
+              "INVALID_COMPOSITION_MODE",
+              "This slide does not use a component scene."
+            );
+          }
+          if (!slide.composition.nodes.some((node) => node.id === component_id)) {
+            throw new ProjectToolError(
+              "COMPONENT_NOT_FOUND",
+              "The slide component does not exist."
+            );
+          }
+          const removing = new Set([component_id]);
+          let changed = true;
+          while (changed) {
+            changed = false;
+            for (const node of slide.composition.nodes) {
+              if (node.parent_id !== null && removing.has(node.parent_id) && !removing.has(node.id)) {
+                removing.add(node.id);
+                changed = true;
+              }
+            }
+          }
+          slide.composition.nodes = slide.composition.nodes.filter(
+            (node) => !removing.has(node.id)
           );
+          recalculateSlideRevealSteps(slide);
         }
       })
   );
@@ -688,12 +1003,7 @@ export function registerProjectMutationTools(
           } else {
             slide.reveal_blocks[index] = { at, markdown };
           }
-          slide.reveal_steps = Math.max(
-            ...slide.reveal_blocks.map((block) => block.at),
-            ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
-            ...(slide.composition?.blocks.map((block) => block.at) ?? []),
-            0
-          );
+          recalculateSlideRevealSteps(slide);
           slide.reveal_blocks.sort((a, b) => a.at - b.at);
         }
       })
@@ -767,12 +1077,7 @@ export function registerProjectMutationTools(
             else slide.narration.segments[index] = segment;
           }
           slide.narration.segments.sort((a, b) => a.at - b.at);
-          slide.reveal_steps = Math.max(
-            ...slide.reveal_blocks.map((block) => block.at),
-            ...slide.narration.segments.map((segment) => segment.at),
-            ...(slide.composition?.blocks.map((block) => block.at) ?? []),
-            0
-          );
+          recalculateSlideRevealSteps(slide);
         }
       })
   );

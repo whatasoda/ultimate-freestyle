@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { renderPresentationHtml } from "../src/presentation/render";
-import { projectRecordSchema } from "../src/projects/schema";
+import {
+  projectRecordSchema,
+  slideCompositionSchema
+} from "../src/projects/schema";
 
 describe("presentation artifact renderer", () => {
   it("renders a self-contained interactive deck and escapes project content", () => {
@@ -281,5 +284,231 @@ describe("presentation artifact renderer", () => {
       }
     });
     expect(parsed.success).toBe(false);
+  });
+
+  it("renders nested registered Web Components with rich data visuals", () => {
+    const assetId = "50000000-0000-4000-8000-000000000005";
+    const project = projectRecordSchema.parse({
+      project_id: "63ab1ec4-20a0-4cf6-a1a0-f74ced56778a",
+      version: 5,
+      created_at: "2026-07-27T13:00:00.000Z",
+      updated_at: "2026-07-27T13:30:00.000Z",
+      document: {
+        schema_version: 1,
+        stage: "production",
+        title: "リッチな構成",
+        summary: "",
+        question: null,
+        hypothesis: null,
+        method: null,
+        findings: [],
+        limitations: [],
+        logs: [],
+        deck: {
+          short_title: "リッチな構成",
+          description: "",
+          author: "研究者",
+          year: 2026,
+          accent: "#ffcf32",
+          layout: "cinematic",
+          narration_defaults: null,
+          slides: [
+            {
+              id: "rich-result",
+              title: "結果",
+              duration_seconds: 60,
+              reveal_steps: 2,
+              tone: "dark",
+              content_markdown: "fallback",
+              reveal_blocks: [],
+              sidebar_markdown: null,
+              narration: null,
+              composition: {
+                mode: "scene",
+                runtime_version: "uf-runtime@1",
+                background: "#11100e",
+                clip_content: true,
+                nodes: [
+                  {
+                    id: "root",
+                    kind: "stack",
+                    parent_id: null,
+                    order: 0,
+                    at: 0,
+                    animation: "none",
+                    frame: null,
+                    direction: "column",
+                    gap_px: 22,
+                    align: "stretch",
+                    justify: "center",
+                    wrap: false
+                  },
+                  {
+                    id: "headline",
+                    kind: "hero",
+                    parent_id: "root",
+                    order: 0,
+                    at: 0,
+                    animation: "fade",
+                    frame: null,
+                    eyebrow: "RESULT <unsafe>",
+                    heading: "結果は、予想外。",
+                    subtitle: "構造を保ったまま表現する",
+                    align: "start"
+                  },
+                  {
+                    id: "content-grid",
+                    kind: "grid",
+                    parent_id: "root",
+                    order: 1,
+                    at: 0,
+                    animation: "none",
+                    frame: null,
+                    columns: 2,
+                    gap_px: 20,
+                    align: "stretch"
+                  },
+                  {
+                    id: "trial-count",
+                    kind: "metric",
+                    parent_id: "content-grid",
+                    order: 0,
+                    at: 1,
+                    animation: "zoom",
+                    frame: null,
+                    value: "12",
+                    unit: "回",
+                    caption: "試した回数",
+                    emphasis: "signal"
+                  },
+                  {
+                    id: "photo",
+                    kind: "image",
+                    parent_id: "content-grid",
+                    order: 1,
+                    at: 1,
+                    animation: "rise",
+                    frame: null,
+                    asset_id: assetId,
+                    alt_text: "観察写真",
+                    fit: "cover",
+                    caption: "固定された証拠"
+                  },
+                  {
+                    id: "comparison",
+                    kind: "bar_chart",
+                    parent_id: "root",
+                    order: 2,
+                    at: 1,
+                    animation: "rise",
+                    frame: null,
+                    max_value: 100,
+                    items: [
+                      { id: "before", at: 1, label: "変更前", value: 42, color: null },
+                      { id: "after", at: 2, label: "変更後", value: 91, color: "#ffcf32" }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    const html = renderPresentationHtml(project, {
+      assetUrls: { [assetId]: `/presentation-assets/revision/${assetId}` },
+      frameAncestors: "'self'",
+      editorFrame: true
+    });
+    expect(html).toContain('data-composition="scene"');
+    expect(html).toContain('data-runtime-version="uf-runtime@1"');
+    expect(html).toContain("<uf-stack");
+    expect(html).toContain("<uf-grid");
+    expect(html).toContain("<uf-hero");
+    expect(html).toContain("<uf-metric");
+    expect(html).toContain("<uf-bar-chart");
+    expect(html).toContain('data-reveal-at="2"');
+    expect(html).toContain("--bar-width: 91%");
+    expect(html).toContain(`/presentation-assets/revision/${assetId}`);
+    expect(html).toContain("RESULT &lt;unsafe&gt;");
+    expect(html).not.toContain("RESULT <unsafe>");
+    expect(html).toContain("frame-ancestors 'self'");
+    expect(html).toContain('data-editor-frame="true"');
+    expect(html).toContain("customElements.define");
+    expect(html).not.toContain("fallback");
+  });
+
+  it("rejects cyclic or invalid scene parent relationships", () => {
+    const base = {
+      mode: "scene" as const,
+      runtime_version: "uf-runtime@1" as const,
+      background: "#11100e",
+      clip_content: true
+    };
+    const cycle = slideCompositionSchema.safeParse({
+      ...base,
+      nodes: [
+        {
+          id: "first",
+          kind: "stack",
+          parent_id: "second",
+          order: 0,
+          at: 0,
+          animation: "none",
+          frame: null,
+          direction: "column",
+          gap_px: 0,
+          align: "stretch",
+          justify: "start",
+          wrap: false
+        },
+        {
+          id: "second",
+          kind: "stack",
+          parent_id: "first",
+          order: 1,
+          at: 0,
+          animation: "none",
+          frame: null,
+          direction: "column",
+          gap_px: 0,
+          align: "stretch",
+          justify: "start",
+          wrap: false
+        }
+      ]
+    });
+    expect(cycle.success).toBe(false);
+
+    const leafParent = slideCompositionSchema.safeParse({
+      ...base,
+      nodes: [
+        {
+          id: "metric",
+          kind: "metric",
+          parent_id: null,
+          order: 0,
+          at: 0,
+          animation: "none",
+          frame: null,
+          value: "1",
+          unit: null,
+          caption: "親にはできない",
+          emphasis: "normal"
+        },
+        {
+          id: "child",
+          kind: "markdown",
+          parent_id: "metric",
+          order: 0,
+          at: 0,
+          animation: "none",
+          frame: null,
+          markdown: "child"
+        }
+      ]
+    });
+    expect(leafParent.success).toBe(false);
   });
 });
