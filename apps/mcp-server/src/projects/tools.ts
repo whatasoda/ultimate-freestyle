@@ -7,12 +7,10 @@ import {
   createProject,
   getProject,
   listProjects,
-  ProjectRepositoryError,
-  updateProject
+  ProjectRepositoryError
 } from "./repository";
 import {
   createEmptyProject,
-  projectDocumentSchema,
   projectRecordSchema,
   projectSummarySchema
 } from "./schema";
@@ -25,16 +23,26 @@ const projectErrorCodeSchema = z.enum([
   "PROJECT_VERSION_CONFLICT",
   "PROJECT_LIMIT_REACHED",
   "PROJECT_TOO_LARGE",
+  "DECK_REQUIRED",
+  "SLIDE_NOT_FOUND",
+  "SLIDE_EXISTS",
+  "TEMPLATE_NOT_FOUND",
+  "TEMPLATE_IN_USE",
+  "LOG_ENTRY_EXISTS",
+  "INVALID_POSITION",
+  "INVALID_CHANGE",
   "INTERNAL_ERROR"
 ]);
 
-const projectErrorSchema = z.object({
+export const projectErrorSchema = z.object({
   code: projectErrorCodeSchema,
   message: z.string()
 });
 
-export type RequiredScope = "research:read" | "research:write";
-const MAX_PROJECT_DOCUMENT_BYTES = 512 * 1024;
+export type RequiredScope =
+  | "research:read"
+  | "research:write"
+  | "research:publish";
 
 export class ProjectToolError extends Error {
   constructor(
@@ -66,7 +74,7 @@ export function requireSubject(
   return parsed.data.subject_id;
 }
 
-function normalizeError(error: unknown): ProjectToolError {
+export function normalizeProjectToolError(error: unknown): ProjectToolError {
   if (error instanceof ProjectToolError) {
     return error;
   }
@@ -98,16 +106,6 @@ export function toolResult(
     structuredContent,
     isError
   };
-}
-
-function assertDocumentSize(document: unknown): void {
-  const byteLength = new TextEncoder().encode(JSON.stringify(document)).length;
-  if (byteLength > MAX_PROJECT_DOCUMENT_BYTES) {
-    throw new ProjectToolError(
-      "PROJECT_TOO_LARGE",
-      `The project document must not exceed ${MAX_PROJECT_DOCUMENT_BYTES} bytes.`
-    );
-  }
 }
 
 export function registerProjectTools(
@@ -146,12 +144,98 @@ export function registerProjectTools(
           error: null
         });
       } catch (error) {
-        const normalized = normalizeError(error);
+        const normalized = normalizeProjectToolError(error);
         return toolResult(
           {
             ok: false,
             request_id: requestId,
             projects: [],
+            error: { code: normalized.code, message: normalized.message }
+          },
+          true
+        );
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_project_outline",
+    {
+      title: "研究の概要と構成を取得",
+      description:
+        "編集前に使う軽量な読み取りです。本文全体ではなく、version、基本情報、templateとslideの識別子を返します。",
+      inputSchema: { project_id: z.string().uuid() },
+      outputSchema: {
+        ok: z.boolean(),
+        request_id: z.string().uuid(),
+        outline: z
+          .object({
+            project_id: z.string().uuid(),
+            version: z.number().int().positive(),
+            updated_at: z.string().datetime(),
+            title: z.string(),
+            stage: z.string(),
+            has_deck: z.boolean(),
+            template_ids: z.array(z.string()),
+            slides: z.array(
+              z.object({
+                id: z.string(),
+                title: z.string(),
+                position: z.number().int().nonnegative(),
+                template_id: z.string().nullable()
+              })
+            )
+          })
+          .nullable(),
+        error: projectErrorSchema.nullable()
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id }) => {
+      const requestId = crypto.randomUUID();
+      try {
+        const ownerUserId = requireSubject(getAuthProps, "research:read");
+        const project = await getProject(db, ownerUserId, project_id);
+        if (project === null) {
+          throw new ProjectToolError(
+            "PROJECT_NOT_FOUND",
+            "The project does not exist."
+          );
+        }
+        return toolResult({
+          ok: true,
+          request_id: requestId,
+          outline: {
+            project_id: project.project_id,
+            version: project.version,
+            updated_at: project.updated_at,
+            title: project.document.title,
+            stage: project.document.stage,
+            has_deck: project.document.deck !== null,
+            template_ids:
+              project.document.deck?.templates?.map((template) => template.id) ?? [],
+            slides:
+              project.document.deck?.slides.map((slide, position) => ({
+                id: slide.id,
+                title: slide.title,
+                position,
+                template_id: slide.template_id ?? null
+              })) ?? []
+          },
+          error: null
+        });
+      } catch (error) {
+        const normalized = normalizeProjectToolError(error);
+        return toolResult(
+          {
+            ok: false,
+            request_id: requestId,
+            outline: null,
             error: { code: normalized.code, message: normalized.message }
           },
           true
@@ -200,7 +284,7 @@ export function registerProjectTools(
           error: null
         });
       } catch (error) {
-        const normalized = normalizeError(error);
+        const normalized = normalizeProjectToolError(error);
         return toolResult(
           {
             ok: false,
@@ -256,7 +340,7 @@ export function registerProjectTools(
           error: null
         });
       } catch (error) {
-        const normalized = normalizeError(error);
+        const normalized = normalizeProjectToolError(error);
         return toolResult(
           {
             ok: false,
@@ -324,7 +408,7 @@ export function registerProjectTools(
           error: null
         });
       } catch (error) {
-        const normalized = normalizeError(error);
+        const normalized = normalizeProjectToolError(error);
         return toolResult(
           {
             ok: false,
@@ -339,69 +423,4 @@ export function registerProjectTools(
     }
   );
 
-  server.registerTool(
-    "update_project",
-    {
-      title: "研究プロジェクトを更新",
-      description:
-        "構造化された研究全体を置換します。get_projectで得たversionをexpected_versionへ指定し、競合時は再取得してください。",
-      inputSchema: {
-        project_id: z.string().uuid(),
-        expected_version: z.number().int().positive(),
-        document: projectDocumentSchema
-      },
-      outputSchema: {
-        ok: z.boolean(),
-        request_id: z.string().uuid(),
-        project: projectRecordSchema.nullable(),
-        current_version: z.number().int().positive().nullable(),
-        error: projectErrorSchema.nullable()
-      },
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, document }) => {
-      const requestId = crypto.randomUUID();
-      try {
-        const ownerUserId = requireSubject(getAuthProps, "research:write");
-        assertDocumentSize(document);
-        const project = await updateProject(db, {
-          ownerUserId,
-          projectId: project_id,
-          expectedVersion: expected_version,
-          document
-        });
-        await recordAuditEvent(db, {
-          userId: ownerUserId,
-          eventType: "project.updated",
-          outcome: "succeeded",
-          details: { project_id, version: project.version },
-          createdAt: new Date().toISOString()
-        });
-        return toolResult({
-          ok: true,
-          request_id: requestId,
-          project,
-          current_version: project.version,
-          error: null
-        });
-      } catch (error) {
-        const normalized = normalizeError(error);
-        return toolResult(
-          {
-            ok: false,
-            request_id: requestId,
-            project: null,
-            current_version: normalized.currentVersion,
-            error: { code: normalized.code, message: normalized.message }
-          },
-          true
-        );
-      }
-    }
-  );
 }

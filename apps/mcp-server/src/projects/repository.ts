@@ -8,7 +8,8 @@ import {
 export type ProjectRepositoryErrorCode =
   | "PROJECT_NOT_FOUND"
   | "PROJECT_VERSION_CONFLICT"
-  | "PROJECT_LIMIT_REACHED";
+  | "PROJECT_LIMIT_REACHED"
+  | "PROJECT_TOO_LARGE";
 
 export class ProjectRepositoryError extends Error {
   constructor(
@@ -31,6 +32,17 @@ type ProjectRow = {
 };
 
 const MAX_PROJECTS_PER_USER = 20;
+const MAX_PROJECT_DOCUMENT_BYTES = 512 * 1024;
+
+function assertProjectSize(document: ProjectDocument): void {
+  const byteLength = new TextEncoder().encode(JSON.stringify(document)).length;
+  if (byteLength > MAX_PROJECT_DOCUMENT_BYTES) {
+    throw new ProjectRepositoryError(
+      "PROJECT_TOO_LARGE",
+      `The project document must not exceed ${MAX_PROJECT_DOCUMENT_BYTES} bytes.`
+    );
+  }
+}
 
 function toProject(row: ProjectRow): ProjectRecord {
   return {
@@ -170,6 +182,7 @@ export async function updateProject(
     now?: Date;
   }
 ): Promise<ProjectRecord> {
+  assertProjectSize(options.document);
   const now = (options.now ?? new Date()).toISOString();
   const result = await db
     .prepare(
@@ -213,4 +226,41 @@ export async function updateProject(
     throw new Error("Updated project could not be read.");
   }
   return project;
+}
+
+export async function mutateProject(
+  db: D1Database,
+  options: {
+    ownerUserId: string;
+    projectId: string;
+    expectedVersion: number;
+    mutate: (document: ProjectDocument) => void;
+    now?: Date;
+  }
+): Promise<ProjectRecord> {
+  const current = await getProject(db, options.ownerUserId, options.projectId);
+  if (current === null) {
+    throw new ProjectRepositoryError(
+      "PROJECT_NOT_FOUND",
+      "The project does not exist."
+    );
+  }
+  if (current.version !== options.expectedVersion) {
+    throw new ProjectRepositoryError(
+      "PROJECT_VERSION_CONFLICT",
+      "The project was changed after it was read.",
+      current.version
+    );
+  }
+
+  const document = structuredClone(current.document);
+  options.mutate(document);
+  const validated = projectDocumentSchema.parse(document);
+  return updateProject(db, {
+    ownerUserId: options.ownerUserId,
+    projectId: options.projectId,
+    expectedVersion: options.expectedVersion,
+    document: validated,
+    now: options.now
+  });
 }

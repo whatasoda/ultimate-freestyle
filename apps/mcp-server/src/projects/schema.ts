@@ -10,6 +10,33 @@ export const projectStageSchema = z.enum([
   "review"
 ]);
 
+const templateIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/);
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+export const presentationTemplateSchema = z.object({
+  id: templateIdSchema,
+  name: z.string().min(1).max(80),
+  region_layout: z.enum([
+    "single",
+    "sidebar-right",
+    "sidebar-left",
+    "lower-third"
+  ]),
+  sidebar_width_percent: z.number().int().min(20).max(45),
+  background: hexColorSchema,
+  surface: hexColorSchema,
+  foreground: hexColorSchema,
+  muted: hexColorSchema,
+  accent: hexColorSchema,
+  corner_radius_px: z.number().int().min(0).max(48),
+  spacing_scale: z.number().min(0.75).max(1.5).multipleOf(0.05),
+  font_scale: z.number().min(0.75).max(1.3).multipleOf(0.05),
+  enter_animation: z.enum(["none", "fade", "rise", "zoom", "wipe"]),
+  reveal_animation: z.enum(["none", "fade", "rise", "zoom", "wipe"])
+});
+
+export type PresentationTemplate = z.infer<typeof presentationTemplateSchema>;
+
 export const narrationSegmentSchema = z.object({
   at: z.number().int().nonnegative().max(100),
   text: z.string().min(1).max(2_000),
@@ -84,6 +111,11 @@ export const projectSlideSchema = z
     duration_seconds: z.number().int().positive().max(1_200),
     reveal_steps: z.number().int().nonnegative().max(100),
     tone: z.enum(["dark", "light", "signal", "quiet"]),
+    template_id: templateIdSchema.nullable().optional(),
+    enter_animation: z
+      .enum(["none", "fade", "rise", "zoom", "wipe"])
+      .nullable()
+      .optional(),
     content_markdown: z.string().min(1).max(20_000),
     reveal_blocks: z
       .array(
@@ -173,8 +205,10 @@ export const projectDocumentSchema = z
       description: z.string().max(500),
       author: z.string().max(120),
       year: z.number().int().min(2021).max(2100),
-      accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+      accent: hexColorSchema,
       layout: z.enum(["cinematic", "biim", "minimal"]),
+      templates: z.array(presentationTemplateSchema).max(16).optional(),
+      default_template_id: templateIdSchema.nullable().optional(),
       narration_defaults: z
         .object({
           display: z.enum(["dialogue", "commentary", "inline"]),
@@ -188,12 +222,42 @@ export const projectDocumentSchema = z
       .nullable()
   })
   .superRefine((document, context) => {
+    const templateIds = new Set<string>();
+    for (const [index, template] of (
+      document.deck?.templates ?? []
+    ).entries()) {
+      if (templateIds.has(template.id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["deck", "templates", index, "id"],
+          message: "Presentation template IDs must be unique."
+        });
+      }
+      templateIds.add(template.id);
+    }
+    if (
+      document.deck?.default_template_id &&
+      !templateIds.has(document.deck.default_template_id)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["deck", "default_template_id"],
+        message: "The default presentation template must exist in templates."
+      });
+    }
     const profiles = new Set(
       document.deck?.voicevox?.profiles.map((profile) => profile.id) ?? []
     );
     for (const [slideIndex, slide] of (
       document.deck?.slides ?? []
     ).entries()) {
+      if (slide.template_id && !templateIds.has(slide.template_id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["deck", "slides", slideIndex, "template_id"],
+          message: "The referenced presentation template does not exist."
+        });
+      }
       for (const [segmentIndex, segment] of (
         slide.narration?.segments ?? []
       ).entries()) {

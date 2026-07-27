@@ -8,6 +8,7 @@ import {
   twitchGrantPropsSchema
 } from "./auth/types";
 import { registerProjectTools } from "./projects/tools";
+import { registerProjectMutationTools } from "./projects/mutation-tools";
 import { registerResearchGuides } from "./projects/guides";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
@@ -53,7 +54,7 @@ export function createServer(
     },
     {
       instructions:
-        "最自由研究の制作を支援するサーバーです。まずhealthを呼び、次にget_access_statusを確認してください。変更前はget_projectでversionを取得し、update_projectへexpected_versionを渡します。競合時は再取得してユーザーの変更を失わないでください。画像binaryの追加はWeb UIを案内し、MCPでは一覧と削除だけを扱います。"
+        "最自由研究の制作を支援するサーバーです。まずhealth、get_access_status、get_project_outlineを呼んでください。変更は目的に合う小粒度toolへexpected_versionを渡し、研究全体を送り直さないでください。競合時は該当範囲を再取得し、ユーザーの変更を失わないでください。画像binaryの追加と公開前確認はWeb UIを案内します。"
     }
   );
 
@@ -189,6 +190,7 @@ export function createServer(
   );
 
   registerProjectTools(server, config.DB, getAuthProps);
+  registerProjectMutationTools(server, config.DB, getAuthProps);
   registerAssetTools(server, config, getAuthProps);
   registerResearchGuides(server, config.DB, getAuthProps);
 

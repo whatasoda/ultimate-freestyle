@@ -38,6 +38,21 @@ describe("MCP contract", () => {
           })
         })
       );
+      expect(tools.map((tool) => tool.name)).toEqual(
+        expect.arrayContaining([
+          "get_project_outline",
+          "update_project_fields",
+          "configure_deck",
+          "upsert_presentation_template",
+          "create_slide",
+          "update_slide_fields",
+          "set_slide_reveal",
+          "set_slide_narration",
+          "move_slide",
+          "delete_slide"
+        ])
+      );
+      expect(tools.map((tool) => tool.name)).not.toContain("update_project");
       expect(tools).toContainEqual(
         expect.objectContaining({
           name: "delete_project_image",
@@ -225,34 +240,30 @@ describe("MCP contract", () => {
         project: { project_id: firstProject.project_id, version: 1 }
       });
 
-      const updatedDocument = {
-        ...firstProject.document,
-        stage: "design" as const,
-        question: "子どもの頃の記憶だけで、どこまで丸く作れるか？"
-      };
+      const updatedQuestion = "子どもの頃の記憶だけで、どこまで丸く作れるか？";
       const update = await client.callTool({
-        name: "update_project",
+        name: "update_project_fields",
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 1,
-          document: updatedDocument
+          stage: "design",
+          question: updatedQuestion
         }
       });
       expect(update.structuredContent).toMatchObject({
         ok: true,
         current_version: 2,
-        project: {
-          version: 2,
-          document: { stage: "design", question: updatedDocument.question }
-        }
+        project_id: firstProject.project_id,
+        version: 2,
+        changed: { kind: "fields_updated" }
       });
 
       const conflict = await client.callTool({
-        name: "update_project",
+        name: "update_project_fields",
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 1,
-          document: updatedDocument
+          summary: "競合して保存されない概要"
         }
       });
       expect(conflict.isError).toBe(true);
@@ -260,6 +271,20 @@ describe("MCP contract", () => {
         ok: false,
         current_version: 2,
         error: { code: "PROJECT_VERSION_CONFLICT" }
+      });
+
+      const outline = await client.callTool({
+        name: "get_project_outline",
+        arguments: { project_id: firstProject.project_id }
+      });
+      expect(outline.structuredContent).toMatchObject({
+        ok: true,
+        outline: {
+          project_id: firstProject.project_id,
+          version: 2,
+          has_deck: false,
+          slides: []
+        }
       });
 
       const list = await client.callTool({
@@ -340,7 +365,7 @@ describe("MCP contract", () => {
       expect(projectResource.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "application/json",
-          text: expect.stringContaining(updatedDocument.question)
+          text: expect.stringContaining(updatedQuestion)
         })
       );
 
@@ -359,6 +384,109 @@ describe("MCP contract", () => {
       expect(reviewPrompt.messages[0]?.content).toMatchObject({
         type: "text",
         text: expect.stringContaining(firstProject.project_id)
+      });
+
+      const configured = await client.callTool({
+        name: "configure_deck",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 2,
+          short_title: "泥団子",
+          layout: "biim"
+        }
+      });
+      expect(configured.structuredContent).toMatchObject({ ok: true, version: 3 });
+      const templated = await client.callTool({
+        name: "upsert_presentation_template",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 3,
+          template: {
+            id: "mud-biim",
+            name: "泥団子BIIM",
+            region_layout: "sidebar-right",
+            sidebar_width_percent: 32,
+            background: "#132035",
+            surface: "#08111f",
+            foreground: "#f8fafc",
+            muted: "#b8c6d9",
+            accent: "#f2c14e",
+            corner_radius_px: 8,
+            spacing_scale: 1,
+            font_scale: 1,
+            enter_animation: "fade",
+            reveal_animation: "rise"
+          }
+        }
+      });
+      expect(templated.structuredContent).toMatchObject({ ok: true, version: 4 });
+      const createdSlide = await client.callTool({
+        name: "create_slide",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 4,
+          slide_id: "question",
+          title: "研究の問い"
+        }
+      });
+      expect(createdSlide.structuredContent).toMatchObject({ ok: true, version: 5 });
+      const slideFields = await client.callTool({
+        name: "update_slide_fields",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 5,
+          slide_id: "question",
+          template_id: "mud-biim",
+          content_markdown: "# どこまで丸くできる？",
+          sidebar_markdown: "読み上げない作者コメント"
+        }
+      });
+      expect(slideFields.structuredContent).toMatchObject({ ok: true, version: 6 });
+      const reveal = await client.callTool({
+        name: "set_slide_reveal",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 6,
+          slide_id: "question",
+          at: 1,
+          markdown: "- 記憶だけで作る"
+        }
+      });
+      expect(reveal.structuredContent).toMatchObject({ ok: true, version: 7 });
+      const narration = await client.callTool({
+        name: "set_slide_narration",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 7,
+          slide_id: "question",
+          at: 0,
+          text: "まず研究の問いを説明します。",
+          display: "commentary"
+        }
+      });
+      expect(narration.structuredContent).toMatchObject({ ok: true, version: 8 });
+      const granularProject = await client.callTool({
+        name: "get_project",
+        arguments: { project_id: firstProject.project_id }
+      });
+      expect(granularProject.structuredContent).toMatchObject({
+        ok: true,
+        project: {
+          version: 8,
+          document: {
+            deck: {
+              templates: [{ id: "mud-biim" }],
+              slides: [
+                {
+                  id: "question",
+                  template_id: "mud-biim",
+                  reveal_steps: 1,
+                  narration: { segments: [{ at: 0 }] }
+                }
+              ]
+            }
+          }
+        }
       });
 
       const otherSubjectId = "twitch-other-project-owner";

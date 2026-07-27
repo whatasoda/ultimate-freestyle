@@ -28,6 +28,25 @@ describe("presentation artifact renderer", () => {
           year: 2026,
           accent: "#ffcf32",
           layout: "biim",
+          templates: [
+            {
+              id: "my-biim",
+              name: "自分のBIIM",
+              region_layout: "sidebar-right",
+              sidebar_width_percent: 34,
+              background: "#152238",
+              surface: "#08111f",
+              foreground: "#f8fafc",
+              muted: "#bac8dc",
+              accent: "#44ddaa",
+              corner_radius_px: 12,
+              spacing_scale: 1,
+              font_scale: 1,
+              enter_animation: "wipe",
+              reveal_animation: "zoom"
+            }
+          ],
+          default_template_id: "my-biim",
           narration_defaults: null,
           slides: [
             {
@@ -36,6 +55,7 @@ describe("presentation artifact renderer", () => {
               duration_seconds: 60,
               reveal_steps: 1,
               tone: "dark",
+              template_id: "my-biim",
               content_markdown: "# 結果\n<script>alert('content')</script>\n- 記録A",
               reveal_blocks: [
                 { at: 1, markdown: "追加で見せる証拠" }
@@ -66,6 +86,11 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("history.pushState");
     expect(html).toContain("speechSynthesis");
     expect(html).toContain('data-reveal="1"');
+    expect(html).toContain('data-slide-id="result"');
+    expect(html).toContain('data-template-id="my-biim"');
+    expect(html).toContain('data-region="sidebar"');
+    expect(html).toContain('data-reveal-at="1"');
+    expect(html).toContain('--template-sidebar-width: 34%');
     expect(html).toContain("classList.toggle('is-visible'");
     expect(html).toContain("&lt;script&gt;alert(&#039;content&#039;)&lt;/script&gt;");
     expect(html).toContain("\\u003c/script\\u003e\\u003cscript");

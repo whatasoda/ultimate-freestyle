@@ -70,20 +70,44 @@ export function renderPresentationHtml(project: ProjectRecord): string {
       narration: slide.narration
     }))
   };
-  const slideHtml = deck.slides
+  const templates = new Map(
+    (deck.templates ?? []).map((template) => [template.id, template])
+  );
+  const templateCss = [...templates.values()]
     .map(
-      (slide, index) => `<article class="slide tone-${slide.tone}" data-slide="${index}" hidden>
-  <div class="slide-main">
+      (template) => `.slide[data-template-id="${template.id}"] {
+      --template-background: ${template.background};
+      --template-surface: ${template.surface};
+      --template-foreground: ${template.foreground};
+      --template-muted: ${template.muted};
+      --template-accent: ${template.accent};
+      --template-radius: ${template.corner_radius_px}px;
+      --template-spacing: ${template.spacing_scale};
+      --template-font-scale: ${template.font_scale};
+      --template-sidebar-width: ${template.sidebar_width_percent}%;
+    }`
+    )
+    .join("\n");
+  const slideHtml = deck.slides
+    .map((slide, index) => {
+      const templateId = slide.template_id ?? deck.default_template_id ?? null;
+      const template = templateId === null ? null : templates.get(templateId);
+      const regionLayout = template?.region_layout ?? "sidebar-right";
+      const enterAnimation =
+        slide.enter_animation ?? template?.enter_animation ?? "fade";
+      const revealAnimation = template?.reveal_animation ?? "rise";
+      return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-tone="${slide.tone}" data-animation="${enterAnimation}" data-state="inactive" hidden>
+  <div class="slide-main" data-region="main">
     <p class="eyebrow">${String(index + 1).padStart(2, "0")} · ${escapeHtml(slide.title)}</p>
     <div class="slide-content">${renderTextBlocks(slide.content_markdown)}</div>
-    ${slide.reveal_blocks.map((block) => `<div class="reveal-block" data-reveal="${block.at}" aria-hidden="true">${renderTextBlocks(block.markdown)}</div>`).join("\n")}
+    ${slide.reveal_blocks.map((block) => `<div class="reveal-block" data-reveal="${block.at}" data-reveal-at="${block.at}" data-animation="${revealAnimation}" aria-hidden="true">${renderTextBlocks(block.markdown)}</div>`).join("\n")}
   </div>
-  <aside class="slide-sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
+  <aside class="slide-sidebar" data-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
     ${slide.sidebar_markdown === null ? "" : renderTextBlocks(slide.sidebar_markdown)}
   </aside>
-  <section class="narration" aria-live="polite"></section>
-</article>`
-    )
+  <section class="narration" data-region="narration" aria-live="polite"></section>
+</article>`;
+    })
     .join("\n");
 
   return `<!doctype html>
@@ -106,6 +130,17 @@ export function renderPresentationHtml(project: ProjectRecord): string {
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
     .stage { position: relative; width: min(100%, calc((100vh - 118px) * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; }
     .slide { position: absolute; inset: 0; display: grid; grid-template: 1fr auto / minmax(0, 1fr) minmax(0, 28%); background: radial-gradient(circle at 85% 15%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 38%), #111827; }
+    .slide[data-user-template="true"] { --accent: var(--template-accent); grid-template-columns: minmax(0, 1fr) var(--template-sidebar-width); border-radius: var(--template-radius); background: var(--template-background); color: var(--template-foreground); }
+    .slide[data-user-template="true"] .slide-main { padding: calc(7% * var(--template-spacing)) calc(7% * var(--template-spacing)) calc(4% * var(--template-spacing)); }
+    .slide[data-user-template="true"] .slide-sidebar { background: var(--template-surface); color: var(--template-muted); }
+    .slide[data-user-template="true"] .slide-content, .slide[data-user-template="true"] .slide-sidebar, .slide[data-user-template="true"] .narration { font-size: calc(1em * var(--template-font-scale)); }
+    .slide[data-region-layout="single"] { grid-template-columns: 1fr; }
+    .slide[data-region-layout="single"] .slide-sidebar { display: none; }
+    .slide[data-region-layout="sidebar-left"] { grid-template-columns: var(--template-sidebar-width, 28%) minmax(0, 1fr); }
+    .slide[data-region-layout="sidebar-left"] .slide-main { grid-column: 2; grid-row: 1; }
+    .slide[data-region-layout="sidebar-left"] .slide-sidebar { grid-column: 1; grid-row: 1; border-left: 0; border-right: 1px solid #ffffff25; }
+    .slide[data-region-layout="lower-third"] { grid-template: minmax(0, 1fr) auto auto / 1fr; }
+    .slide[data-region-layout="lower-third"] .slide-sidebar { grid-row: 2; padding: 2% 6%; border-top: 1px solid #ffffff25; border-left: 0; }
     .slide[hidden] { display: none; }
     .slide-main { padding: 7% 7% 4%; overflow: hidden; }
     .slide-sidebar { padding: 9% 8%; border-left: 1px solid #ffffff25; background: #05080dbb; overflow: hidden; }
@@ -117,8 +152,13 @@ export function renderPresentationHtml(project: ProjectRecord): string {
     .slide-content h2, .slide-content h3, .slide-content h4 { margin: 0 0 .5em; line-height: 1.12; font-size: clamp(24px, 4.8vw, 72px); }
     .slide-content p, .slide-content li { font-size: clamp(15px, 2.25vw, 34px); line-height: 1.5; }
     .slide-content ul { padding-left: 1.3em; }
-    .reveal-block { opacity: 0; translate: 0 18px; transition: opacity .4s ease, translate .4s ease; }
+    .reveal-block { opacity: 0; translate: 0 18px; transition: opacity .4s ease, translate .4s ease, scale .4s ease, clip-path .4s ease; }
     .reveal-block.is-visible { opacity: 1; translate: 0 0; }
+    .reveal-block[data-animation="none"] { transition: none; translate: none; }
+    .reveal-block[data-animation="zoom"] { scale: .92; translate: none; }
+    .reveal-block[data-animation="zoom"].is-visible { scale: 1; }
+    .reveal-block[data-animation="wipe"] { clip-path: inset(0 100% 0 0); translate: none; }
+    .reveal-block[data-animation="wipe"].is-visible { clip-path: inset(0); }
     .reveal-block p, .reveal-block li { font-size: clamp(14px, 1.8vw, 28px); line-height: 1.45; }
     .slide-sidebar h2, .slide-sidebar h3, .slide-sidebar h4 { color: var(--accent); }
     .slide-sidebar p, .slide-sidebar li { font-size: clamp(10px, 1.2vw, 18px); line-height: 1.55; }
@@ -130,6 +170,15 @@ export function renderPresentationHtml(project: ProjectRecord): string {
     [data-layout="minimal"] .slide-sidebar { background: #f1f5f9; color: #172033; border-color: #cbd5e1; }
     [data-layout="cinematic"] .slide-sidebar { display: none; }
     [data-layout="cinematic"] .slide { grid-template-columns: 1fr; }
+    ${templateCss}
+    @keyframes slide-fade { from { opacity: 0; } }
+    @keyframes slide-rise { from { opacity: 0; translate: 0 3%; } }
+    @keyframes slide-zoom { from { opacity: 0; scale: .96; } }
+    @keyframes slide-wipe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0); } }
+    .slide:not([hidden])[data-animation="fade"] { animation: slide-fade .35s ease both; }
+    .slide:not([hidden])[data-animation="rise"] { animation: slide-rise .4s ease both; }
+    .slide:not([hidden])[data-animation="zoom"] { animation: slide-zoom .4s ease both; }
+    .slide:not([hidden])[data-animation="wipe"] { animation: slide-wipe .45s ease both; }
     footer { justify-content: center; }
     .progress { flex: 1; max-width: 520px; height: 7px; overflow: hidden; border-radius: 99px; background: #263244; }
     .progress i, .voice-progress i { display: block; width: 0; height: 100%; background: var(--accent); transition: width .25s ease; }
@@ -140,6 +189,7 @@ export function renderPresentationHtml(project: ProjectRecord): string {
     label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
     input[type="range"] { width: 80px; accent-color: var(--accent); }
     @media (max-width: 680px) { .app { padding: 6px; } header .meta { display: none; } .voice-progress { width: 70px; } }
+    @media (prefers-reduced-motion: reduce) { .slide, .reveal-block { animation: none !important; transition: none !important; } }
   </style>
 </head>
 <body data-layout="${escapeHtml(deck.layout)}">
@@ -194,7 +244,7 @@ export function renderPresentationHtml(project: ProjectRecord): string {
       speechSynthesis.speak(utterance);
     };
     const render = () => {
-      stopVoice(); slides.forEach((item, index) => { item.hidden = index !== slide; });
+      stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
       slides[slide].querySelectorAll('[data-reveal]').forEach((item) => { const visible = Number(item.dataset.reveal) <= step; item.classList.toggle('is-visible', visible); item.setAttribute('aria-hidden', String(!visible)); });
       const segment = narration(); slides[slide].querySelector('.narration').textContent = segment?.text ?? '';
       counter.textContent = (slide + 1) + ' / ' + slides.length + ' · STEP ' + step;
