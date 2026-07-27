@@ -438,6 +438,9 @@ describe("Web dashboard", () => {
     );
     expect(publicPage.status).toBe(200);
     expect(publicPage.headers.get("cache-control")).toContain("max-age=60");
+    expect(publicPage.headers.get("content-security-policy")).toContain(
+      "frame-ancestors 'none'"
+    );
     expect(await publicPage.text()).toContain("Webで微調整した研究");
 
     const unsupportedUpload = await requestProvider(

@@ -196,7 +196,20 @@ export async function createPresentationPreview(
         .bind(projectId, ownerUserId, slug, revisionId, now)
     ]);
   } catch (error) {
-    await env.MEDIA_BUCKET.delete(objectKey);
+    try {
+      await env.MEDIA_BUCKET.delete(objectKey);
+    } catch (cleanupError) {
+      console.error(
+        JSON.stringify({
+          message: "Orphaned presentation object could not be removed",
+          object_key: objectKey,
+          error:
+            cleanupError instanceof Error
+              ? cleanupError.message
+              : String(cleanupError)
+        })
+      );
+    }
     throw error;
   }
 

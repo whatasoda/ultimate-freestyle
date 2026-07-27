@@ -317,7 +317,23 @@ function publicationErrorResponse(error: unknown): Response {
       status
     );
   }
-  throw error;
+  console.error(
+    JSON.stringify({
+      message: "Presentation publication request failed",
+      error: error instanceof Error ? error.message : String(error)
+    })
+  );
+  return jsonResponse(
+    {
+      ok: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "発表の処理を完了できませんでした。"
+      },
+      request_id: crypto.randomUUID()
+    },
+    500
+  );
 }
 
 async function handlePreviewCreate(
@@ -409,7 +425,11 @@ async function presentationResponse(
     headers: {
       "cache-control": cacheControl,
       "content-type": "text/html; charset=utf-8",
+      "content-security-policy":
+        "default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
       etag: object.httpEtag,
+      "permissions-policy":
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
       "x-content-type-options": "nosniff",
       "referrer-policy": "no-referrer"
     }
