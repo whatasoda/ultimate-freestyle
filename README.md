@@ -50,7 +50,9 @@ bun run test
 
 ## Remote MCPを開発する
 
-CodexとChatGPTを優先するRemote MCPがあります。`health`、`get_access_status`、研究の作成・一覧・取得・更新・評価材料取得、研究画像の一覧・削除、制作ガイドresource、3つの伴走prompt、Twitch OAuthによるフォロー期間・サブスク・運用overrideの資格判定を実装しています。`https://saijiyu-kenkyu.2764.moe/`では、同じTwitchアカウントでログインして自分の研究一覧・詳細と画像を管理できます。画像binaryの追加はMCP JSONへ埋め込まずWeb UIから行います。
+CodexとChatGPTを優先するRemote MCPがあります。`health`、`get_access_status`、研究の作成・一覧・取得・小粒度更新・評価材料取得、研究画像の一覧・削除、制作ガイドresource、3つの伴走prompt、Twitch OAuthによるフォロー期間・サブスク・運用overrideの資格判定を実装しています。`https://saijiyu-kenkyu.2764.moe/`では、同じTwitchアカウントでログインして自分の研究一覧・詳細と画像を管理できます。画像binaryの追加はMCP JSONへ埋め込まずWeb UIから行います。
+
+Cloudflare版の一枚編集画面では、公開版と同じ16:9 rendererを見ながら、7種類のvisual presetとfont preset、配色、密度、余白、animation、ADV／実況／映像字幕／追従全文／最小字幕、話者、VOICEVOX profileと7種類の調声値を確認・編集できます。文字は16:9枠を基準に自動調整され、収まりきらない箇所は品質確認欄へ対象付きで表示されます。componentの追加や親子構造変更は引き続きAIクライアントから行います。
 
 ```bash
 bun run dev:mcp

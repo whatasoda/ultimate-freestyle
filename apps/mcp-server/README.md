@@ -46,11 +46,13 @@ Twitchのclient ID／secretは既存のCloudflare Worker secretをそのまま�
 
 研究データは512 KiB以内の固定schemaでD1へ保存します。`create_project`はidempotency key、`update_project`は`expected_version`を必須とし、再試行による重複作成と同時編集による上書きを防ぎます。`list_project_images`と`delete_project_image`も所有者を強制し、画像binaryやbase64はMCPレスポンスへ含めません。全操作で他利用者のproject／asset IDを指定しても存在を開示しません。
 
-Web UIも同じD1の所有者IDで絞り込みます。Twitch確認後は、Twitch tokenやMCP tokenをCookieへ保存せず、D1に保存した24時間のWeb専用セッションを`HttpOnly`、`Secure`、`SameSite=Lax`の不透明Cookieで参照します。D1を使うことでログアウトを即時反映し、session cookieとCSRF cookieの両方が揃った場合だけ認証済みとして扱います。現在の画面機能は一覧、研究詳細、研究画像管理、研究の基本文言編集、一枚ごとの実表示・STEP確認・読み上げ文編集、固定previewの確認と公開です。大きな構造変更はMCP対応AIクライアントから行います。
+Web UIも同じD1の所有者IDで絞り込みます。Twitch確認後は、Twitch tokenやMCP tokenをCookieへ保存せず、D1に保存した24時間のWeb専用セッションを`HttpOnly`、`Secure`、`SameSite=Lax`の不透明Cookieで参照します。D1を使うことでログアウトを即時反映し、session cookieとCSRF cookieの両方が揃った場合だけ認証済みとして扱います。現在の画面機能は一覧、研究詳細、研究画像管理、研究の基本文言編集、一枚ごとの実表示・STEP確認、template・font・配色・animation編集、読み上げ枠・話者・VOICEVOX調声編集、構成詳細と見切れ診断、固定previewの確認と公開です。componentの追加・削除・親子構造変更はMCP対応AIクライアントから行います。
 
 研究画像はJPEG、PNG、静止WebPの10MiB以下だけを受け付けます。実データから形式と寸法を検査し、最大辺2560px、WebP quality 85、2MiB以下へ正規化した一枚だけをprivate R2へ保存します。原本、EXIF、SVG、GIF、アニメーションは保存しません。上限は100画像/project、300画像/user、150MiB/userで、D1 triggerでも同時書き込み時の超過を拒否します。
 
-構造化deckから自己完結HTMLを作るrendererも実装済みです。16:9枠、cinematic／BIIM／minimal、段階表示、字幕、ブラウザ読み上げ、音量保存、自動送り、進捗とURL復帰を含み、研究由来の文字列はHTMLと埋め込みJSONの両方でescapeします。発表成果物は画像snapshotとともにprivate R2の不変revisionへ保存し、所有者previewで確認した同じversionだけを`publish_project`からstable URLへ切り替えます。
+構造化deckから自己完結HTMLを作るrendererも実装済みです。16:9枠、cinematic／BIIM／minimal、7種類のvisual presetとfont preset、段階表示、ADV会話枠・実況字幕・映像字幕・追従全文・最小字幕、音声file優先再生とブラウザ読み上げfallback、音量保存、自動送り、進捗とURL復帰を含みます。文字と余白はbrowser全体ではなく16:9枠を基準に拡縮し、編集frameでは自動fit後も残る見切れを対象component付きで報告します。研究由来の文字列はHTMLと埋め込みJSONの両方でescapeします。発表成果物は画像snapshotとともにprivate R2の不変revisionへ保存し、所有者previewで確認した同じversionだけをWeb UIからstable URLへ切り替えます。
+
+発表templateは任意CSSではなく、安全なtokenを組み合わせます。visual presetは`studio`、`paper`、`editorial`、`neon`、`retro-game`、`soft-pop`、`scientific`、font presetは`system-sans`、`gothic`、`rounded`、`mincho`、`serif`、`monospace`、`display`です。本文と見出しを別々に指定でき、密度、文字weight、行間、字間、色、領域比、余白、角丸、motionも調整できます。既存projectは追加fieldなしで従来どおり読み取れます。
 
 ## 設定
 
