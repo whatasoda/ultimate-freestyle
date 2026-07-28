@@ -216,8 +216,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   if (slideFrame instanceof HTMLIFrameElement) {
-    slideFrame.addEventListener("load", () => {
-      setFrameLoading(false);
+    const syncFramePosition = () => {
       const step = stepOutput instanceof HTMLOutputElement
         ? Number(stepOutput.value.match(/STEP (\d+)/)?.[1] || 0)
         : 0;
@@ -226,6 +225,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         slide: Number(new URL(slideFrame.src).searchParams.get("slide") || 1),
         step
       }, location.origin);
+    };
+    slideFrame.addEventListener("load", () => {
+      setFrameLoading(false);
+      syncFramePosition();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");
@@ -250,13 +253,22 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           qualityList.append(row);
         }
       }
-      if (qualitySummary instanceof HTMLElement && overflows.length) {
-        qualitySummary.dataset.level = "warning";
-        qualitySummary.textContent = "実表示に" + overflows.length + "件の見切れがあります。";
+      if (qualitySummary instanceof HTMLElement) {
+        const baseCount = Number(qualitySummary.dataset.baseCount || 0);
+        const total = baseCount + overflows.length;
+        qualitySummary.dataset.level = total ? "warning" : "ok";
+        qualitySummary.textContent = overflows.length
+          ? total + "件の確認事項があります（うち見切れ" + overflows.length + "件）。"
+          : baseCount
+            ? baseCount + "件の確認事項があります。"
+            : "保存データ上の確認事項はありません。";
       }
     });
     try {
-      if (slideFrame.contentDocument?.readyState === "complete") setFrameLoading(false);
+      if (slideFrame.contentDocument?.readyState === "complete") {
+        setFrameLoading(false);
+        queueMicrotask(syncFramePosition);
+      }
     } catch {}
   }
 

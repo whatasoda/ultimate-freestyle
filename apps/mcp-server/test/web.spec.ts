@@ -416,6 +416,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("ずんだもん・ノーマル");
     expect(workspaceHtml).toContain("全設定を確認");
     expect(workspaceHtml).toContain("data-layout-status");
+    expect(workspaceHtml).toContain('data-base-count="');
 
     const frameUrl = `${workspaceUrl}/frame?slide=1&step=0`;
     const frame = await requestProvider(
@@ -448,6 +449,10 @@ describe("Web dashboard", () => {
     expect(dashboardScript.headers.get("content-type")).toContain(
       "text/javascript"
     );
+    const dashboardScriptText = await dashboardScript.text();
+    expect(() => new Function(dashboardScriptText)).not.toThrow();
+    expect(dashboardScriptText).toContain("queueMicrotask(syncFramePosition)");
+    expect(dashboardScriptText).toContain("qualitySummary.dataset.baseCount");
 
     const rejectedUpload = await requestProvider(
       provider,
