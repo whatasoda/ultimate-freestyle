@@ -50,7 +50,7 @@ Web UIも同じD1の所有者IDで絞り込みます。Twitch確認後は、Twit
 
 研究画像はJPEG、PNG、静止WebPの10MiB以下だけを受け付けます。実データから形式と寸法を検査し、最大辺2560px、WebP quality 85、2MiB以下へ正規化した一枚だけをprivate R2へ保存します。原本、EXIF、SVG、GIF、アニメーションは保存しません。上限は100画像/project、300画像/user、150MiB/userで、D1 triggerでも同時書き込み時の超過を拒否します。
 
-構造化deckから自己完結HTMLを作るrendererも実装済みです。16:9枠、cinematic／BIIM／minimal、7種類のvisual presetとfont preset、段階表示、ADV会話枠・実況字幕・映像字幕・追従全文・最小字幕、音声file優先再生とブラウザ読み上げfallback、音量保存、自動送り、進捗とURL復帰を含みます。文字と余白はbrowser全体ではなく16:9枠を基準に拡縮し、編集frameでは自動fit後も残る見切れを対象component付きで報告します。研究由来の文字列はHTMLと埋め込みJSONの両方でescapeします。発表成果物は画像snapshotとともにprivate R2の不変revisionへ保存し、所有者previewで確認した同じversionだけをWeb UIからstable URLへ切り替えます。
+構造化deckから自己完結HTMLを作るrendererも実装済みです。16:9枠、cinematic／BIIM／minimal、7種類のvisual presetとfont preset、段階表示、ADV会話枠・実況字幕・映像字幕・追従全文・最小字幕、音声file優先再生とブラウザ読み上げfallback、音量保存、自動送り、進捗とURL復帰を含みます。文字と余白はbrowser全体ではなく16:9枠を基準に拡縮し、編集frameでは自動fit後も残る見切れを対象component付きで報告します。研究由来の文字列はHTMLと埋め込みJSONの両方でescapeします。発表成果物は画像snapshotとともにprivate R2の不変revisionへ保存し、所有者previewで確認した研究versionとrenderer versionの両方が現在値と一致する場合だけWeb UIからstable URLへ切り替えます。
 
 発表templateは任意CSSではなく、安全なtokenを組み合わせます。visual presetは`studio`、`paper`、`editorial`、`neon`、`retro-game`、`soft-pop`、`scientific`、font presetは`system-sans`、`gothic`、`rounded`、`mincho`、`serif`、`monospace`、`display`です。本文と見出しを別々に指定でき、密度、文字weight、行間、字間、色、領域比、余白、角丸、motionも調整できます。既存projectは追加fieldなしで従来どおり読み取れます。
 

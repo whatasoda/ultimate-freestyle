@@ -1579,7 +1579,7 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 4</div>
             <div class="phase-main">
               <h3>プレビューと公開</h3>
-              <p>構造化データから安全なHTMLと固定画像を生成し、private R2の不変revisionとしてpreviewする。定型flow、自由配置canvas、登録Web Componentsのsceneを同じdeckで扱い、一枚編集workspaceで実rendererを確認した同一versionだけをstable URLへpublishする経路と自動検証まで完了。音声生成だけを後続の非同期jobとする。</p>
+              <p>構造化データから安全なHTMLと固定画像を生成し、private R2の不変revisionとしてpreviewする。定型flow、自由配置canvas、登録Web Componentsのsceneを同じdeckで扱い、一枚編集workspaceで実rendererを確認する。研究versionとrenderer versionの両方が現在値と一致するpreviewだけをstable URLへpublishでき、古いrendererで生成した成果物は要再生成として扱う。音声生成だけを後続の非同期jobとする。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>Cloudflareだけで発表URLを安全に生成・配信できる。</p></div>
           </article>
