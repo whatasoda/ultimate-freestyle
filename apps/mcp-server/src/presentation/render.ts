@@ -13,6 +13,13 @@ function escapeHtml(value: string): string {
     .replaceAll("'", "&#039;");
 }
 
+function renderInlineText(value: string): string {
+  return escapeHtml(value).replace(
+    /\*\*([^*\n]+)\*\*/g,
+    "<strong>$1</strong>"
+  );
+}
+
 function renderTextBlocks(markdown: string): string {
   const lines = markdown.split(/\r?\n/);
   const blocks: string[] = [];
@@ -27,7 +34,7 @@ function renderTextBlocks(markdown: string): string {
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith("- ")) {
-      list.push(escapeHtml(trimmed.slice(2)));
+      list.push(renderInlineText(trimmed.slice(2)));
       continue;
     }
     flushList();
@@ -35,9 +42,9 @@ function renderTextBlocks(markdown: string): string {
     const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
     if (heading) {
       const level = Math.min(heading[1].length + 1, 4);
-      blocks.push(`<h${level}>${escapeHtml(heading[2])}</h${level}>`);
+      blocks.push(`<h${level}>${renderInlineText(heading[2])}</h${level}>`);
     } else {
-      blocks.push(`<p>${escapeHtml(trimmed)}</p>`);
+      blocks.push(`<p>${renderInlineText(trimmed)}</p>`);
     }
   }
   flushList();
@@ -79,7 +86,10 @@ export function listPresentationAssetIds(project: ProjectRecord): string[] {
   ];
 }
 
-function styleCss(style: SlideBlock["style"] | SlideSceneNode["style"]): string {
+function styleCss(
+  style: SlideBlock["style"] | SlideSceneNode["style"],
+  applyVerticalAlignment = true
+): string {
   const verticalAlign =
     style?.vertical_align === "center"
       ? "center"
@@ -105,7 +115,7 @@ function styleCss(style: SlideBlock["style"] | SlideSceneNode["style"]): string 
       border-radius: ${style?.corner_radius_px ?? 0}px;
       padding: ${style?.padding_px ?? 0}px;
       --component-opacity: ${style?.opacity ?? 1};
-      text-align: ${textAlign}; justify-content: ${verticalAlign};
+      text-align: ${textAlign};${applyVerticalAlignment ? ` justify-content: ${verticalAlign};` : ""}
       font-size: calc(1em * ${style?.font_scale ?? 1});
       box-shadow: ${shadow};`;
 }
@@ -156,7 +166,7 @@ function sceneNodeCss(slideId: string, node: SlideSceneNode): string {
           })
           .join("\n")
       : "";
-  return `${selector} { ${frame} ${layout} ${styleCss(node.style)} }
+  return `${selector} { ${frame} ${layout} ${styleCss(node.style, node.kind !== "stack")} }
 ${itemCss}`;
 }
 
@@ -301,6 +311,15 @@ export function renderPresentationHtml(
         slide.enter_animation ?? template?.enter_animation ?? "fade";
       const revealAnimation = template?.reveal_animation ?? "rise";
       const composition = slide.composition;
+      const narrationDisplay = slide.narration?.display ?? "commentary";
+      const inlineNarration =
+        narrationDisplay === "inline"
+          ? slide.narration?.segments
+              .map(
+                (segment) => `<span class="narration-segment" data-narration-at="${segment.at}">${escapeHtml(segment.text)}</span>`
+              )
+              .join("") ?? ""
+          : "";
       const content = composition?.mode === "canvas"
         ? `<div class="slide-canvas" data-region="canvas">${composition.blocks.map((block) => renderCanvasBlock(block, options.assetUrls ?? {})).join("\n")}</div>`
         : composition?.mode === "scene"
@@ -315,7 +334,7 @@ export function renderPresentationHtml(
   </aside>`;
       return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-animation="${enterAnimation}" data-state="inactive" hidden>
   ${content}
-  <section class="narration" data-region="narration" aria-live="polite"></section>
+  <section class="narration" data-region="narration" data-display="${narrationDisplay}" aria-live="polite">${inlineNarration}</section>
 </article>`;
     })
     .join("\n");
@@ -426,8 +445,13 @@ export function renderPresentationHtml(
     .slide-sidebar { padding: 9% 8%; border-left: 1px solid #ffffff25; background: #05080dbb; overflow: hidden; }
     .slide-sidebar[hidden] { display: none; }
     .slide:has(.slide-sidebar[hidden]) { grid-template-columns: 1fr; }
-    .narration { grid-column: 1 / -1; min-height: 18%; padding: 2.2% 5%; border-top: 1px solid #ffffff2b; background: #05080de8; font-size: clamp(13px, 2vw, 28px); line-height: 1.55; }
+    .narration { grid-column: 1 / -1; min-height: 18%; padding: 2.2% 5%; border-top: 1px solid #ffffff2b; background: #05080de8; color: #f8fafc; font-size: clamp(13px, 2vw, 28px); line-height: 1.55; }
     .narration:empty { display: none; }
+    .narration[data-display="dialogue"] { min-height: 20%; margin: 0 4% 3%; border: 1px solid #ffffff38; border-radius: clamp(8px, 1.2vw, 18px); background: linear-gradient(135deg, #08111ff2, #101b2cf2); box-shadow: 0 12px 36px #0007, inset 0 1px #ffffff16; }
+    .narration[data-display="commentary"] { min-height: 14%; padding-block: 1.6%; border-top-color: color-mix(in srgb, var(--accent) 45%, transparent); text-align: center; font-weight: 800; text-shadow: 0 2px 10px #000; }
+    .narration[data-display="inline"] { display: grid; align-content: center; gap: .32em; min-height: 20%; padding-block: 1.35%; border-top-color: #cbd5e1; background: #f8fafcee; color: #172033; font-size: clamp(9px, 1.25vw, 18px); }
+    .narration-segment { opacity: .34; transition: opacity .25s ease, translate .25s ease; }
+    .narration-segment.is-current { opacity: 1; translate: .35em 0; font-weight: 800; }
     .eyebrow { margin: 0 0 4%; color: var(--accent); font-size: clamp(10px, 1vw, 16px); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
     .slide-content h2, .slide-content h3, .slide-content h4 { margin: 0 0 .5em; line-height: 1.12; font-size: clamp(24px, 4.8vw, 72px); }
     .slide-content p, .slide-content li { font-size: clamp(15px, 2.25vw, 34px); line-height: 1.5; }
@@ -442,11 +466,11 @@ export function renderPresentationHtml(
     .reveal-block p, .reveal-block li { font-size: clamp(14px, 1.8vw, 28px); line-height: 1.45; }
     .slide-sidebar h2, .slide-sidebar h3, .slide-sidebar h4 { color: var(--accent); }
     .slide-sidebar p, .slide-sidebar li { font-size: clamp(10px, 1.2vw, 18px); line-height: 1.55; }
-    .tone-light { background: #f6f1e8; color: #162033; }
-    .tone-quiet { background: #e9eef5; color: #162033; }
-    .tone-signal { background: var(--accent); color: #10131a; }
+    .slide[data-composition="flow"].tone-light { background: #f6f1e8; color: #162033; }
+    .slide[data-composition="flow"].tone-quiet { background: #e9eef5; color: #162033; }
+    .slide[data-composition="flow"].tone-signal { background: var(--accent); color: #10131a; }
     [data-layout="minimal"] .stage { background: white; }
-    [data-layout="minimal"] .slide { background: #fff; color: #172033; }
+    [data-layout="minimal"] .slide[data-composition="flow"] { background: #fff; color: #172033; }
     [data-layout="minimal"] .slide-sidebar { background: #f1f5f9; color: #172033; border-color: #cbd5e1; }
     [data-layout="cinematic"] .slide-sidebar { display: none; }
     [data-layout="cinematic"] .slide { grid-template-columns: 1fr; }
@@ -530,7 +554,14 @@ export function renderPresentationHtml(
     const render = () => {
       stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
       slides[slide].querySelectorAll('[data-reveal]').forEach((item) => { const visible = Number(item.dataset.reveal) <= step; item.classList.toggle('is-visible', visible); item.setAttribute('aria-hidden', String(!visible)); });
-      const segment = narration(); slides[slide].querySelector('.narration').textContent = segment?.text ?? '';
+      const segment = narration(); const narrationRegion = slides[slide].querySelector('.narration');
+      if (narrationRegion.dataset.display === 'inline') {
+        narrationRegion.querySelectorAll('[data-narration-at]').forEach((item) => {
+          const current = Number(item.dataset.narrationAt) === step;
+          item.classList.toggle('is-current', current);
+          if (current) item.setAttribute('aria-current', 'true'); else item.removeAttribute('aria-current');
+        });
+      } else narrationRegion.textContent = segment?.text ?? '';
       counter.textContent = (slide + 1) + ' / ' + slides.length + ' · STEP ' + step;
       progress.style.width = (currentUnit() / units * 100) + '%';
       expected.textContent = format(DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.durationSeconds, 0));

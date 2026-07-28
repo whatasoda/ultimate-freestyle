@@ -1,6 +1,6 @@
-name: Generate and publish VOICEVOX audio
+name: Generate VOICEVOX audio
 
-run-name: Generate and publish VOICEVOX audio for ${{ inputs.slug || github.ref_name }}
+run-name: Generate VOICEVOX audio for ${{ inputs.slug || github.ref_name }}
 
 on:
   workflow_dispatch:
@@ -31,11 +31,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: voicevox-audio
   cancel-in-progress: false
 
 env:
@@ -49,7 +47,7 @@ env:
   REGENERATE_ALL: ${{ inputs.regenerate_all || false }}
 
 jobs:
-  build:
+  generate:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -58,10 +56,6 @@ jobs:
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
-
-      - name: Setup GitHub Pages
-        id: pages
-        uses: actions/configure-pages@v5
 
       - name: Restore generated audio cache
         uses: actions/cache@v4
@@ -125,17 +119,6 @@ jobs:
         if: always()
         run: docker stop voicevox || true
 
-      - name: Select audio matching the current narration
-        id: audio
-        run: bun run voicevox:sync
-
-      - name: Build static site with generated audio
-        run: bun run build:pages
-        env:
-          PAGES_BASE_PATH: ${{ steps.pages.outputs.base_path }}
-          NEXT_PUBLIC_USE_GENERATED_AUDIO: ${{ steps.audio.outputs.count != '0' }}
-          NEXT_PUBLIC_GENERATED_AUDIO_ROOT: /researches
-
       - name: Record generation summary
         run: |
           {
@@ -145,8 +128,8 @@ jobs:
             echo "- Legacy deck fallback: $VOICEVOX_SPEAKER / $VOICEVOX_STYLE"
             echo "- Profile-based decks use their speaker UUID, style ID, and tuning settings."
             echo "- MP3 bitrate: ${VOICEVOX_MP3_BITRATE}kbps mono"
-            echo "- Published files: ${{ steps.audio.outputs.count }}"
-            echo "- Browser fallbacks: ${{ steps.audio.outputs.missing }}"
+            echo "- Output is retained as a review artifact for 7 days."
+            echo "- This workflow does not deploy the production Worker or GitHub Pages."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload generated MP3 for review
@@ -156,19 +139,3 @@ jobs:
           path: .voicevox-cache/researches/*/audio/*.mp3
           if-no-files-found: error
           retention-days: 7
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist/client
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4

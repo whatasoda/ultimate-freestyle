@@ -24,6 +24,7 @@ package.jsonのscriptは必ず `bun run <script>` で実行する。
 - MCP開発: `bun run dev:mcp`
 - MCP dry-run build: `bun run build:mcp`
 - MCPのみ検証: `bun run test:mcp`
+- MCP本番D1 migration: `bun run migrate:mcp`
 - MCP本番デプロイ: `bun run deploy:mcp`
 - MCP本番スモークテスト: `bun run smoke:mcp`
 - Worker binding型生成: `bun run types:mcp`

@@ -203,7 +203,17 @@ describe("Web dashboard", () => {
           content_markdown: "# 自分の研究",
           reveal_blocks: [],
           sidebar_markdown: null,
-          narration: null,
+          narration: {
+            display: "commentary",
+            speaker: null,
+            segments: [
+              {
+                at: 0,
+                text: "最初の読み上げ文",
+                audio_src: "/stale-audio.mp3"
+              }
+            ]
+          },
           composition: {
             mode: "canvas",
             background: "#102030",
@@ -337,6 +347,11 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("このスライドを保存");
     expect(workspaceHtml).toContain("自由配置 1 block");
     expect(workspaceHtml).toContain("data-slide-frame");
+    expect(workspaceHtml).toContain("data-frame-loading");
+    expect(workspaceHtml).toContain("プレビューを読み込み中…");
+    expect(workspaceHtml).toContain("data-narration-editor");
+    expect(workspaceHtml).toContain("読み上げ文を保存");
+    expect(workspaceHtml).toContain("最初の読み上げ文");
 
     const frameUrl = `${workspaceUrl}/frame?slide=1&step=0`;
     const frame = await requestProvider(
@@ -515,13 +530,41 @@ describe("Web dashboard", () => {
       error: { code: "PROJECT_VERSION_CONFLICT" }
     });
 
+    const narrationUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/narration",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 3,
+            segments: [{ at: 0, text: "Webで調整した読み上げ文" }]
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(narrationUpdate.status).toBe(200);
+    expect(await narrationUpdate.json()).toMatchObject({
+      ok: true,
+      slide_id: "intro",
+      version: 4
+    });
+
     const updatedWorkspace = await requestProvider(
       provider,
       new Request(workspaceUrl, { headers: { cookie: browserCookies } }),
       authEnv
     );
     expect(updatedWorkspace.status).toBe(200);
-    expect(await updatedWorkspace.text()).toContain("一枚ずつ確認できる結果");
+    const updatedWorkspaceHtml = await updatedWorkspace.text();
+    expect(updatedWorkspaceHtml).toContain("一枚ずつ確認できる結果");
+    expect(updatedWorkspaceHtml).toContain("Webで調整した読み上げ文");
 
     const previewCreate = await requestProvider(
       provider,
@@ -534,7 +577,7 @@ describe("Web dashboard", () => {
             "content-type": "application/json",
             "x-csrf-token": csrfToken ?? ""
           },
-          body: JSON.stringify({ expected_version: 3 })
+          body: JSON.stringify({ expected_version: 4 })
         }
       ),
       authEnv
@@ -544,7 +587,7 @@ describe("Web dashboard", () => {
       revision: { revision_id: string; project_version: number };
       preview_url: string;
     };
-    expect(previewResult.revision.project_version).toBe(3);
+    expect(previewResult.revision.project_version).toBe(4);
 
     const previewPage = await requestProvider(
       provider,
@@ -556,6 +599,8 @@ describe("Web dashboard", () => {
     expect(previewPage.status).toBe(200);
     const previewHtml = await previewPage.text();
     expect(previewHtml).toContain("Webで微調整した研究");
+    expect(previewHtml).toContain("Webで調整した読み上げ文");
+    expect(previewHtml).not.toContain("/stale-audio.mp3");
     const presentationAssetUrl = `/presentation-assets/${previewResult.revision.revision_id}/${presentationAssetId}`;
     expect(previewHtml).toContain(presentationAssetUrl);
 

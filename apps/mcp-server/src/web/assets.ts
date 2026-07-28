@@ -53,11 +53,35 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   const slideEditor = document.querySelector("[data-slide-editor]");
+  const narrationEditor = document.querySelector("[data-narration-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
+  const frameLoading = document.querySelector("[data-frame-loading]");
+  const setFrameLoading = (loading) => {
+    if (frameLoading instanceof HTMLElement) frameLoading.hidden = !loading;
+  };
+  if (slideFrame instanceof HTMLIFrameElement) {
+    slideFrame.addEventListener("load", () => setFrameLoading(false));
+    try {
+      if (slideFrame.contentDocument?.readyState === "complete") setFrameLoading(false);
+    } catch {}
+  }
+  const syncSlideVersion = (version) => {
+    const value = String(version);
+    if (slideEditor instanceof HTMLFormElement) slideEditor.dataset.version = value;
+    if (narrationEditor instanceof HTMLFormElement) narrationEditor.dataset.version = value;
+    for (const label of document.querySelectorAll("[data-workspace-version], [data-slide-version], [data-narration-version]")) {
+      if (label instanceof HTMLElement) label.textContent = "v" + value;
+    }
+  };
+  const refreshSlideFrame = (version) => {
+    if (!(slideFrame instanceof HTMLIFrameElement)) return;
+    const frameUrl = new URL(slideFrame.src);
+    frameUrl.searchParams.set("refresh", String(version));
+    setFrameLoading(true);
+    slideFrame.src = frameUrl.toString();
+  };
   if (slideEditor instanceof HTMLFormElement) {
     const feedback = slideEditor.querySelector("[data-slide-feedback]");
-    const versionLabel = slideEditor.querySelector("[data-slide-version]");
-    const workspaceVersion = document.querySelector("[data-workspace-version]");
     const submit = slideEditor.querySelector('button[type="submit"]');
     slideEditor.addEventListener("submit", async (event) => {
       event.preventDefault();
@@ -84,18 +108,54 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
-        slideEditor.dataset.version = String(result.version);
-        if (versionLabel instanceof HTMLElement) versionLabel.textContent = "v" + result.version;
-        if (workspaceVersion instanceof HTMLElement) workspaceVersion.textContent = "v" + result.version;
+        syncSlideVersion(result.version);
         feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
-        if (slideFrame instanceof HTMLIFrameElement) {
-          const frameUrl = new URL(slideFrame.src);
-          frameUrl.searchParams.set("refresh", String(result.version));
-          slideFrame.src = frameUrl.toString();
-        }
+        refreshSlideFrame(result.version);
       } catch (error) {
         feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
+        feedback.classList.add("warning");
+      } finally {
+        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+      }
+    });
+  }
+
+  if (narrationEditor instanceof HTMLFormElement) {
+    const feedback = narrationEditor.querySelector("[data-narration-feedback]");
+    const submit = narrationEditor.querySelector('button[type="submit"]');
+    narrationEditor.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!(feedback instanceof HTMLElement)) return;
+      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      feedback.textContent = "読み上げ文を保存しています…";
+      feedback.classList.remove("success", "warning");
+      const segments = [...narrationEditor.querySelectorAll("[data-narration-text]")]
+        .filter((input) => input instanceof HTMLTextAreaElement)
+        .map((input) => ({
+          at: Number(input.dataset.narrationAt),
+          text: input.value
+        }));
+      try {
+        const response = await fetch(narrationEditor.action, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": narrationEditor.dataset.csrf || ""
+          },
+          body: JSON.stringify({
+            expected_version: Number(narrationEditor.dataset.version),
+            segments
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || "読み上げ文を保存できませんでした。");
+        syncSlideVersion(result.version);
+        feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
+        feedback.classList.add("success");
+        refreshSlideFrame(result.version);
+      } catch (error) {
+        feedback.textContent = error instanceof Error ? error.message : "読み上げ文を保存できませんでした。";
         feedback.classList.add("warning");
       } finally {
         if (submit instanceof HTMLButtonElement) submit.disabled = false;
@@ -117,6 +177,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       stepOutput.value = "STEP " + currentStep + " / " + maxStep;
       const frameUrl = new URL(slideFrame.src);
       frameUrl.searchParams.set("step", String(currentStep));
+      setFrameLoading(true);
       slideFrame.src = frameUrl.toString();
       for (const button of stepButtons) {
         if (!(button instanceof HTMLButtonElement)) continue;

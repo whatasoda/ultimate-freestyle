@@ -139,3 +139,13 @@ Web UI堅牢化、研究詳細、画像upload、VOICEVOX複数話者・調声、
 - Worker v0.8.0、Version ID `0579d200-04de-494c-97eb-b070de2905ed`。
 - 反映後にhealth v0.8.0を2回確認し、本番smokeでOAuth必須、Web dashboard、authorization endpointを確認済み。
 - 認証済みの実データを使ったworkspaceの目視確認は残る。自動contractではowner／non-owner、CSRF、version競合、iframe CSP、scene rendererを確認済み。
+
+---
+
+## 2026-07-28 追記: main push本番デプロイ
+
+- ADR 0005でGitHub ActionsをCloudflare本番CI/CDの正本とした。
+- main pushと手動実行で、Worker contract検証、未適用D1 migration、Worker deploy、本番smokeを直列実行する。
+- production concurrencyはキャンセルせず直列化し、migration適用中やdeploy中の中断を避ける。
+- 旧GitHub Pagesのmain push workflowを削除した。VOICEVOX workflowは手動／`voice-*` tagによる試聴artifact生成だけを残し、PagesもCloudflare本番も更新しない。
+- GitHub Actionsにはvariable `CLOUDFLARE_ACCOUNT_ID` と、対象account／zoneに限定したsecret `CLOUDFLARE_API_TOKEN` が必要。Twitch secretはCloudflare側だけに保持する。

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { renderPresentationHtml } from "../src/presentation/render";
+import { slideWorkspacePage } from "../src/web/pages";
 import {
   projectRecordSchema,
   slideCompositionSchema
@@ -59,7 +60,7 @@ describe("presentation artifact renderer", () => {
               reveal_steps: 1,
               tone: "dark",
               template_id: "my-biim",
-              content_markdown: "# 結果\n<script>alert('content')</script>\n- 記録A",
+              content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A",
               reveal_blocks: [
                 { at: 1, markdown: "追加で見せる証拠" }
               ],
@@ -96,6 +97,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('--template-sidebar-width: 34%');
     expect(html).toContain("classList.toggle('is-visible'");
     expect(html).toContain("&lt;script&gt;alert(&#039;content&#039;)&lt;/script&gt;");
+    expect(html).toContain("<p><strong>重要</strong></p>");
     expect(html).toContain("\\u003c/script\\u003e\\u003cscript");
     expect(html).not.toContain("<script>alert('content')</script>");
     expect(html).not.toContain("<script>alert('voice')</script>");
@@ -162,7 +164,14 @@ describe("presentation artifact renderer", () => {
               content_markdown: "legacy fallback",
               reveal_blocks: [],
               sidebar_markdown: null,
-              narration: null,
+              narration: {
+                display: "inline",
+                speaker: null,
+                segments: [
+                  { at: 0, text: "最初の説明", audio_src: null },
+                  { at: 1, text: "次の説明", audio_src: null }
+                ]
+              },
               composition: {
                 mode: "canvas",
                 background: "#102030",
@@ -286,7 +295,7 @@ describe("presentation artifact renderer", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("renders nested registered Web Components with rich data visuals", () => {
+  it("renders nested registered Web Components with rich data visuals", async () => {
     const assetId = "50000000-0000-4000-8000-000000000005";
     const project = projectRecordSchema.parse({
       project_id: "63ab1ec4-20a0-4cf6-a1a0-f74ced56778a",
@@ -322,7 +331,14 @@ describe("presentation artifact renderer", () => {
               content_markdown: "fallback",
               reveal_blocks: [],
               sidebar_markdown: null,
-              narration: null,
+              narration: {
+                display: "inline",
+                speaker: null,
+                segments: [
+                  { at: 0, text: "最初の説明", audio_src: null },
+                  { at: 1, text: "次の説明", audio_src: null }
+                ]
+              },
               composition: {
                 mode: "scene",
                 runtime_version: "uf-runtime@1",
@@ -422,7 +438,14 @@ describe("presentation artifact renderer", () => {
       editorFrame: true
     });
     expect(html).toContain('data-composition="scene"');
+    expect(html).toContain('.slide[data-composition="flow"].tone-light');
+    expect(html).toContain('[data-layout="minimal"] .slide[data-composition="flow"]');
+    expect(html).not.toContain('[data-layout="minimal"] .slide { background: #fff;');
+    expect(html).toContain('background: #05080de8; color: #f8fafc;');
     expect(html).toContain('data-runtime-version="uf-runtime@1"');
+    expect(html).toContain('data-display="inline"');
+    expect(html).toContain('data-narration-at="1">次の説明</span>');
+    expect(html).toContain("item.classList.toggle('is-current', current)");
     expect(html).toContain("<uf-stack");
     expect(html).toContain("<uf-grid");
     expect(html).toContain("<uf-hero");
@@ -430,6 +453,11 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("<uf-bar-chart");
     expect(html).toContain('data-reveal-at="2"');
     expect(html).toContain("--bar-width: 91%");
+    const rootRule = html.match(
+      /\[data-node-id="root"\] \{([^}]*)\}/
+    )?.[1];
+    expect(rootRule).toContain("justify-content: center");
+    expect(rootRule?.match(/justify-content/g)).toHaveLength(1);
     expect(html).toContain(`/presentation-assets/revision/${assetId}`);
     expect(html).toContain("RESULT &lt;unsafe&gt;");
     expect(html).not.toContain("RESULT <unsafe>");
@@ -437,6 +465,21 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-editor-frame="true"');
     expect(html).toContain("customElements.define");
     expect(html).not.toContain("fallback");
+
+    const workspaceHtml = await slideWorkspacePage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project,
+      slideId: "rich-result"
+    }).text();
+    expect(workspaceHtml).toContain('class="component-outline-row"');
+    expect(workspaceHtml).toContain('class="component-step">STEP 1');
+    expect(workspaceHtml).toContain('class="narration-outline"');
+    expect(workspaceHtml).toContain(">全文表示</span>");
+    expect(workspaceHtml.indexOf(">root<")).toBeLessThan(
+      workspaceHtml.indexOf(">headline<")
+    );
+    expect(workspaceHtml).not.toContain("parent: root");
   });
 
   it("rejects cyclic or invalid scene parent relationships", () => {

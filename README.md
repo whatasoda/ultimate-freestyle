@@ -6,7 +6,7 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-現在は `saijiyu-kenkyu.2764.moe` を入口とするCloudflare構成へ移行中です。Remote MCP v0.5.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走promptまで実装済みです。同じWorkerのWeb UIでは自分の研究一覧・詳細と、正規化された研究画像を管理できます。発表UIはまだリポジトリ直下にあり、Cloudflareでの公開が成立した時点でGitHub Pages固有の設定・workflow・互換テストを削除します。
+本番の入口は `saijiyu-kenkyu.2764.moe` です。Remote MCP v0.8.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走prompt、安全な発表rendererを提供します。同じWorkerのWeb UIでは、自分の研究を一枚ずつ確認・編集し、画像、固定preview、公開版を管理できます。mainへのpushは検証後にD1 migrationとWorkerをCloudflareへ自動デプロイします。GitHub Pagesは公開経路に含めません。
 
 ## できること
 
@@ -60,43 +60,18 @@ bun run build:mcp
 
 `bun run test:mcp` は、設定から生成したWorker型、型検査、Workers runtime上のMCP contract、Cloudflare deployのdry-run buildをブラウザなしで確認します。詳しくは [MCP server README](apps/mcp-server/README.md) を参照してください。
 
-## 移行前の発表UIをGitHub Pagesへ公開する
+## Cloudflare本番へデプロイする
 
-以下はリポジトリ直下に残る発表UIの現行手順です。新構成の標準公開先ではなく、Cloudflareへの置換が終わるまでの開発用として残しています。GitHub Actionsで静的HTMLを生成する場合は、リポジトリの `Settings` → `Pages` → `Build and deployment` で、`Source` を `GitHub Actions` に設定してください。
+mainへのpush、またはActions画面からの手動実行で `Deploy Remote MCP to Cloudflare` が動きます。依存導入、`bun run test:mcp`、未適用D1 migration、Worker deploy、本番smokeのいずれかが失敗するとworkflowも失敗します。
 
-公開経路は音声生成の有無で分かれます。
+初回だけ、GitHub repositoryの `Settings` → `Secrets and variables` → `Actions` に次を登録します。
 
-| 操作 | VOICEVOX生成 | Pagesへの反映 |
-|---|---|---|
-| `main` へpush | しない | 現在の原稿と一致する既存MP3だけを使い、残りはブラウザ読み上げで公開 |
-| `Deploy to GitHub Pages` を手動実行 | しない | `main` pushと同じ |
-| `Generate and publish VOICEVOX audio` を手動実行 | 変更segmentだけ | MP3生成後にそのまま公開 |
-| `voice-*` タグをpush | 変更segmentだけ | タグ時点の内容をMP3生成後に公開 |
+- Actions variable `CLOUDFLARE_ACCOUNT_ID`
+- Actions secret `CLOUDFLARE_API_TOKEN`（`Edit Cloudflare Workers` template + `D1 Edit`、対象account／zoneだけに限定）
 
-したがって、原稿を編集して `main` へpushしただけでVOICEVOXの実行時間は消費しません。音声付きの公開確認をしたい時だけ、生成・公開workflowを明示的に実行します。
+通常pushではVOICEVOXを起動しません。`Generate VOICEVOX audio` は手動または `voice-*` tagだけで起動し、7日間の試聴artifactを作ります。本番音声は将来のCloudflare Container経路へ接続します。詳細は [MCP server README](apps/mcp-server/README.md) と [ADR 0005](docs/decisions/0005-main-push-cloudflare-deployment.md) を参照してください。
 
-同梱のワークフローは、GitHub Pagesが返す実際の公開パスをビルドへ渡します。このため、利用者側でURLをソースコードへ書く必要はありません。
-
-| 公開方法 | URL例 | ビルド時の基準パス |
-|---|---|---|
-| 通常のプロジェクトPages | `https://owner.github.io/repository/` | `/repository` |
-| カスタムドメイン | `https://research.example.com/` | 空 |
-
-カスタムドメインはリポジトリのPages設定とDNS側で設定します。Actionsから公開する場合、判定用の `CNAME` ファイルは使わず、GitHub Pagesの設定を正本にします。
-
-ローカルで静的出力だけを確認する場合：
-
-```bash
-# カスタムドメインと同じルート配置
-bun run build:pages
-
-# 通常のプロジェクトPagesと同じサブパス配置
-PAGES_BASE_PATH=/ultimate-freestyle bun run build:pages
-```
-
-成果物は `dist/client/` に生成されます。`bun run test` ではルート配置とサブパス配置を両方ビルドし、研究ページとCSS・JavaScriptのパスを確認します。
-
-GitHub Pages版は完全な静的サイトです。公開後にサーバー処理を追加することはできませんが、現在のスライド進行、URL履歴、音声再生、`localStorage` による音量保存はすべてブラウザ内で動くため、そのまま利用できます。
+リポジトリ直下の旧発表アプリは、移行期間中のローカル比較用として残しています。Cloudflare本番の公開発表は、Worker内の安全なrendererとR2上の固定revisionを正本にします。
 
 ## 対話しながら研究を作る
 
@@ -320,11 +295,11 @@ bun run dev:voicevox
 
 manifest v2のfingerprintには原稿、speaker UUID、style ID、全調声値、ENGINE／core／話者version、話者catalog、ユーザー辞書、MP3設定を含めます。ローカル生成は`unverified-local`として扱い、将来のCloudflare Container本番cacheとは混ぜません。
 
-### 移行前のGitHub Actionsで試験公開する
+### GitHub ActionsでVOICEVOXを試聴する
 
-ローカルへVOICEVOXを導入せず、GitHub Actions上の公式CPU DockerイメージでMP3を生成し、そのままGitHub Pagesへ試験公開できます。通常のpushでは音声生成せず、次のどちらかで明示的に起動します。
+ローカルへVOICEVOXを導入せず、GitHub Actions上の公式CPU DockerイメージでMP3を生成し、7日間のartifactとして試聴できます。通常のpushでは音声生成せず、次のどちらかで明示的に起動します。
 
-- Actions画面の `Generate and publish VOICEVOX audio` → `Run workflow` から、研究slug・話者・スタイルを指定する
+- Actions画面の `Generate VOICEVOX audio` → `Run workflow` から、研究slug・話者・スタイルを指定する
 - `voice-*` 形式のタグをpushし、登録済みの全研究を既定の「ずんだもん／ノーマル」で生成する
 
 ```bash
@@ -334,13 +309,13 @@ git push origin voice-2026-08-01
 
 各segmentの原稿、話者、話速、ENGINEバージョン等からfingerprintを作り、前回と一致するMP3はActionsキャッシュから再利用します。キャッシュがない場合、設定を変更した場合、または `regenerate_all` を選んだ場合は再生成します。
 
-生成後は同じworkflow runからPagesへデプロイされます。これは公開中のサイトを更新する操作なので、URLを知る人から閲覧可能になります。MP3はworkflow runの `Artifacts` にも7日間保存され、試聴に利用できます。
+生成したMP3はworkflow runの `Artifacts` に7日間保存されます。このworkflowはCloudflare本番もGitHub Pagesも更新しません。
 
-ローカル確認用・Actions生成用・本番用を問わず、VOICEVOXのMP3はリポジトリへコミットしません。`public/researches/*/audio/*.mp3` も `.gitignore` の対象です。本番の音声はActionsキャッシュからPages成果物へ配置し、キャッシュが失効した場合は原稿と設定から再生成します。Git LFSも使いません。
+ローカル確認用・Actions生成用・本番用を問わず、VOICEVOXのMP3はリポジトリへコミットしません。`public/researches/*/audio/*.mp3` も `.gitignore` の対象です。本番の音声は将来Cloudflare Containerで生成してR2へ保存し、fingerprintが一致する限り再利用します。Git LFSも使いません。
 
 音声は意図やイントネーションを人が確認してから公開する必要があるため、Actionからmainへの自動コミットは行いません。また、Release公開とタグpushの両方をトリガーにすると同じ版で二重実行しやすいため、専用タグだけを自動トリガーにしています。
 
-`main` pushのPages workflowはVOICEVOX ENGINEを起動しません。利用可能なActionsキャッシュから、現在の原稿ハッシュと一致するMP3だけを配置してビルドし、音声がないsegmentはブラウザ読み上げへ戻します。したがって、原稿だけ変更したpushで古い読み上げが流れることはありません。
+`main` pushのCloudflareデプロイworkflowはVOICEVOX ENGINEを起動しません。したがって、Workerや原稿だけを変更したpushで音声生成時間を消費しません。
 
 ずんだもん等の特徴的な声を使う前に、音声合成ソフト・話者・キャラクターそれぞれの最新の利用規約とクレジット条件を確認してください。
 

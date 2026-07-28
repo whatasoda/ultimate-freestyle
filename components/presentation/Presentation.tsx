@@ -31,9 +31,7 @@ const LAYOUT_OPTIONS: Array<{ value: PresentationLayout; label: string }> = [
 
 function resolvePublicAssetUrl(source: string) {
   if (/^(?:[a-z][a-z\d+.-]*:|\/\/)/i.test(source)) return source;
-  const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
-  const path = source.startsWith("/") ? source : `/${source}`;
-  return `${basePath}${path}`;
+  return source.startsWith("/") ? source : `/${source}`;
 }
 
 type PresentationPosition = {

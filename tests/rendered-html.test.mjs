@@ -66,14 +66,14 @@ test("keeps Claude and project assumptions in the repository", async () => {
   assert.match(rubric, /根拠不足は `NE`/);
 });
 
-test("keeps VOICEVOX MP3 generation opt-in and incremental", async () => {
+test("keeps production deploy automated and VOICEVOX generation opt-in", async () => {
   const [workflow, deployWorkflow, generator, sync, gitignore] = await Promise.all([
     readFile(
       new URL("../.github/workflows/generate-voicevox.yml", import.meta.url),
       "utf8"
     ),
     readFile(
-      new URL("../.github/workflows/deploy-pages.yml", import.meta.url),
+      new URL("../.github/workflows/deploy-mcp.yml", import.meta.url),
       "utf8"
     ),
     readFile(
@@ -91,11 +91,19 @@ test("keeps VOICEVOX MP3 generation opt-in and incremental", async () => {
   assert.match(workflow, /"voice-\*"/);
   assert.doesNotMatch(workflow, /branches:/);
   assert.match(workflow, /actions\/cache@v4/);
-  assert.match(workflow, /actions\/deploy-pages@v4/);
   assert.match(workflow, /retention-days: 7/);
+  assert.doesNotMatch(workflow, /deploy-pages/);
+  assert.doesNotMatch(workflow, /deploy:mcp/);
+  assert.match(deployWorkflow, /branches:\s*\n\s*- main/);
+  assert.match(deployWorkflow, /vars\.CLOUDFLARE_ACCOUNT_ID/);
+  assert.match(deployWorkflow, /secrets\.CLOUDFLARE_API_TOKEN/);
+  assert.match(deployWorkflow, /bun run test:mcp/);
+  assert.match(deployWorkflow, /bun run migrate:mcp/);
+  assert.match(deployWorkflow, /bun run deploy:mcp/);
+  assert.match(deployWorkflow, /bun run smoke:mcp/);
   assert.doesNotMatch(deployWorkflow, /voicevox_engine/);
   assert.doesNotMatch(deployWorkflow, /voicevox:generate/);
-  assert.match(deployWorkflow, /voicevox:sync/);
+  assert.doesNotMatch(deployWorkflow, /deploy-pages/);
   assert.match(generator, /args\.includes\("--all"\)/);
   assert.match(generator, /libmp3lame/);
   assert.match(generator, /\.voicevox-manifest\.json/);

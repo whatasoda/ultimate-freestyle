@@ -1477,7 +1477,7 @@ docs/                  # 設計・運用手順</pre>
           <h2>30 MAUなら月5〜10ドルを基準にする</h2>
           <p>
             制作者30 MAU、閲覧200 DAU、1人あたり月4回の音声生成を初期モデルとする。
-            閲覧はCloudflare配信で完結し、GitHub PagesとGitHub Actionsは構成に含めない。
+            閲覧はCloudflare配信で完結し、GitHub Pagesは構成に含めない。GitHub Actionsはmain push時の検証・D1 migration・Worker deploy・本番smokeだけを担い、ホスティングや通常push時の音声生成には使わない。
           </p>
         </div>
 
@@ -1523,7 +1523,7 @@ docs/                  # 設計・運用手順</pre>
           <h2>認証を先に証明し、制作機能を後から載せる</h2>
           <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
           <p class="callout">
-            <strong>2026-07-27現在：</strong>Phase 0は完了。Phase 1のWorker v0.8.0を
+            <strong>2026-07-28現在：</strong>Phase 0は完了。Phase 1のWorker v0.8.0を
             <code>https://saijiyu-kenkyu.2764.moe/mcp</code>へデプロイし、
             自動contract test、本番スモークテスト、Codexからのtool／resource呼び出しを確認済み。
             Phase 2はOAuth用KV、state用KV、D1 migration、二段OAuth、PKCE、CSRF、
@@ -1533,6 +1533,7 @@ docs/                  # 設計・運用手順</pre>
             Phase 4は安全なHTML renderer、宣言的な利用者template、標準<code>data-*</code> hook、不変preview、確認後publish、private R2配信まで実装・自動検証済み。定型flow、絶対配置canvasに加え、<code>layer</code>／<code>stack</code>／<code>grid</code>へ登録済み<code>uf-*</code> Web Componentsを入れ子にするsceneを追加した。文章、情報card、数値、callout、棒グラフ、timeline、画像、図形を分類別の小粒度toolで一件ずつ編集する。任意HTML／CSS／script／外部URLは受け付けず、参照画像はpreview revision専用R2 objectへ固定して元画像の変更や削除から公開版を分離する。
             Web UIはトップページ、Twitchログイン、D1上の24時間Web専用セッション、CSRF付きログアウト、所有者限定の研究一覧・詳細、基本文言編集、競合防止、preview／publish導線まで実装済み。さらに各スライドをfilmstrip、公開版と同じrendererの16:9 iframe、基本文言editor、component outline、読み上げ原稿で確認する一枚編集workspaceを追加した。
             private R2 bucketとImages binding、Web UIの画像追加・閲覧・削除は実装済み。入力10 MiB、40 MP、一辺10,000 px、保存2 MiB・最大辺2,560 px、100画像/project・300画像/user・150 MiB/userを上限とし、原本を残さずWebPへ正規化する。VOICEVOXは全talk styleを対象に、UUID + style IDの複数profile、segment別profile、7種の調声値、生成manifest v2、使用話者の自動クレジットまでschemaとローカル生成へ実装済み。Container job接続は後続とする。
+            main pushではGitHub Actionsが自動contract testを通した後、後方互換な未適用D1 migration、Worker deploy、本番smokeを直列実行する。GitHub Pagesの自動deployは廃止し、VOICEVOX Actionは手動／専用tagの試聴artifact生成に限定した。
             Codexでは<code>health</code>と<code>get_access_status</code>の実呼び出しまで確認済み。ChatGPT実クライアント確認を残し、Queue、Containerは未着手。
           </p>
         </div>
@@ -1624,6 +1625,7 @@ docs/                  # 設計・運用手順</pre>
               <tr><td>互換性方針</td><td>現リポジトリを直接再構成</td><td>現行形式の利用者がいないため、旧Pages構成との並行運用や移行層を作らない。</td></tr>
               <tr><td>公開ドメイン</td><td><code>saijiyu-kenkyu.2764.moe</code></td><td>MCP・OAuth・公開発表・成果物をpathで分け、ひとつのCloudflare Custom Domainへ集約する。</td></tr>
               <tr><td>公開基盤</td><td>Workers Static Assets + public R2</td><td>GitHub Pagesを使わず、認証から配信までCloudflareを正本にする。</td></tr>
+              <tr><td>本番CI/CD</td><td>GitHub Actions on <code>main</code></td><td>検証、D1 migration、Worker deploy、本番smokeを直列化し、mainと本番の対応を固定する。</td></tr>
               <tr><td>公開形式</td><td>R2上のversion付き固定成果物</td><td>上書きせず、切替・ロールバック・キャッシュ整合性を保つ。</td></tr>
               <tr><td>音声runtime</td><td>Cloudflare Container <code>standard-2</code></td><td>公式VOICEVOX CPU imageを使い、実測後にstandard-3と比較する。</td></tr>
               <tr><td>音声生成方式</td><td>Queueによる差分一括生成</td><td>MCPを待たせず、Container起動とmodel loadをsegment間で共有する。</td></tr>
@@ -1654,6 +1656,8 @@ docs/                  # 設計・運用手順</pre>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/protocol/authorization/">Cloudflare: MCP Authorization</a></li>
           <li><a href="https://developers.cloudflare.com/agents/model-context-protocol/guides/securing-mcp-server/">Cloudflare: Securing MCP servers</a></li>
           <li><a href="https://developers.cloudflare.com/workers/static-assets/">Cloudflare: Workers Static Assets</a></li>
+          <li><a href="https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/">Cloudflare: GitHub Actions</a></li>
+          <li><a href="https://developers.cloudflare.com/d1/reference/migrations/">Cloudflare: D1 Migrations</a></li>
           <li><a href="https://developers.cloudflare.com/r2/buckets/public-buckets/">Cloudflare: R2 Public Buckets</a></li>
           <li><a href="https://developers.cloudflare.com/r2/pricing/">Cloudflare: R2 Pricing</a></li>
           <li><a href="https://developers.cloudflare.com/containers/">Cloudflare: Containers</a></li>

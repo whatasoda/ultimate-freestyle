@@ -84,6 +84,30 @@ const slideFieldsRequestSchema = z.object({
   sidebar_markdown: z.string().max(10_000)
 });
 
+const slideNarrationRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  segments: z
+    .array(
+      z.object({
+        at: z.number().int().nonnegative().max(100),
+        text: z.string().trim().min(1).max(2_000)
+      })
+    )
+    .max(101)
+    .superRefine((segments, context) => {
+      const seen = new Set<number>();
+      for (const segment of segments) {
+        if (seen.has(segment.at)) {
+          context.addIssue({
+            code: "custom",
+            message: "Narration steps must be unique."
+          });
+        }
+        seen.add(segment.at);
+      }
+    })
+});
+
 async function recordWebAudit(
   db: D1Database,
   event: Parameters<typeof recordAuditEvent>[1]
@@ -475,6 +499,142 @@ async function handleSlideFieldsUpdate(
                 : code === "PROJECT_NOT_FOUND"
                   ? "研究が見つかりません。"
                   : "スライドを保存できませんでした。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      status
+    );
+  }
+}
+
+async function handleSlideNarrationUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = slideNarrationRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: "INVALID_NARRATION",
+          message: "読み上げ文を確認してください。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.narration === null) {
+          const error = new Error("The slide does not have narration.");
+          Object.assign(error, { code: "NARRATION_NOT_FOUND" });
+          throw error;
+        }
+        const updates = new Map(
+          parsed.data.segments.map((segment) => [segment.at, segment.text])
+        );
+        const currentSteps = slide.narration.segments.map((segment) => segment.at);
+        if (
+          updates.size !== currentSteps.length ||
+          currentSteps.some((step) => !updates.has(step))
+        ) {
+          const error = new Error("Narration structure changed.");
+          Object.assign(error, { code: "NARRATION_STRUCTURE_CHANGED" });
+          throw error;
+        }
+        slide.narration.segments = slide.narration.segments.map((segment) => {
+          const text = updates.get(segment.at)!;
+          return {
+            ...segment,
+            text,
+            audio_src: text === segment.text ? segment.audio_src : null
+          };
+        });
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_narration_updated",
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        slide_id: slideId,
+        version: project.version
+      },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    const code =
+      error instanceof Error && "code" in error
+        ? String((error as { code: unknown }).code)
+        : "INTERNAL_ERROR";
+    const currentVersion =
+      error instanceof Error && "currentVersion" in error
+        ? ((error as { currentVersion?: number }).currentVersion ?? null)
+        : null;
+    const status =
+      code === "PROJECT_NOT_FOUND" ||
+      code === "SLIDE_NOT_FOUND" ||
+      code === "NARRATION_NOT_FOUND"
+        ? 404
+        : code === "PROJECT_VERSION_CONFLICT" ||
+            code === "NARRATION_STRUCTURE_CHANGED"
+          ? 409
+          : 500;
+    return jsonResponse(
+      {
+        ok: false,
+        current_version: currentVersion,
+        error: {
+          code,
+          message:
+            code === "PROJECT_VERSION_CONFLICT" ||
+            code === "NARRATION_STRUCTURE_CHANGED"
+              ? "読み上げ構成が更新されました。画面を読み込み直してください。"
+              : code === "NARRATION_NOT_FOUND"
+                ? "このスライドには読み上げがありません。"
+                : code === "SLIDE_NOT_FOUND" || code === "PROJECT_NOT_FOUND"
+                  ? "スライドが見つかりません。"
+                  : "読み上げ文を保存できませんでした。"
         },
         request_id: crypto.randomUUID()
       },
@@ -903,6 +1063,20 @@ export async function handleWebRequest(
       env,
       slideFieldsMatch[1],
       slideFieldsMatch[2]
+    );
+  }
+  const slideNarrationMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/narration$`)
+  );
+  if (
+    slideNarrationMatch?.[1] !== undefined &&
+    slideNarrationMatch[2] !== undefined
+  ) {
+    return handleSlideNarrationUpdate(
+      request,
+      env,
+      slideNarrationMatch[1],
+      slideNarrationMatch[2]
     );
   }
   const projectPreviewMatch = path.match(

@@ -1,6 +1,10 @@
 import { escapeHtml } from "../auth/pages";
 import type { ProjectAsset } from "../assets/schema";
-import type { ProjectRecord, ProjectSummary } from "../projects/schema";
+import type {
+  ProjectRecord,
+  ProjectSummary,
+  SlideSceneNode
+} from "../projects/schema";
 import type { PublicationStatus } from "../publications/service";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
@@ -142,14 +146,27 @@ function shell(title: string, body: string): string {
       .filmstrip-link[data-active="true"] { border-color: #9d7bff; background: #8062df20; color: white; }
       .workspace-preview { min-width: 0; padding: .8rem; }
       .workspace-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #40516a; border-radius: .65rem; background: #05080d; box-shadow: 0 1.5rem 4rem #0006; }
-      .workspace-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+      .workspace-frame iframe { position: relative; z-index: 1; display: block; width: 100%; height: 100%; border: 0; }
+      .frame-loading { position: absolute; z-index: 2; inset: 0; display: grid; place-items: center; background: #05080de8; color: var(--muted); font-size: .85rem; letter-spacing: .03em; }
+      .frame-loading[hidden] { display: none; }
       .step-control { display: flex; align-items: center; justify-content: center; gap: .7rem; margin-top: .8rem; }
       .step-control button { min-height: 2.2rem; padding: .45rem .75rem; }
       .step-control output { min-width: 6rem; color: var(--muted); text-align: center; font: 700 .8rem/1 ui-monospace, monospace; }
       .component-outline { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
-      .component-outline li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .55rem; padding: .55rem; border: 1px solid var(--line); border-radius: .55rem; color: #bdc9d8; font-size: .8rem; }
+      .component-outline li { overflow: hidden; border: 1px solid var(--line); border-radius: .55rem; color: #bdc9d8; font-size: .8rem; }
+      .component-outline-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .55rem; }
+      .component-outline .component-outline { gap: .35rem; margin: 0 .45rem .45rem .85rem; padding-left: .65rem; border-left: 1px solid #52647c; }
+      .component-outline .component-outline li { background: #08111b66; }
       .component-outline code { color: #91ddff; }
       .component-outline small { display: block; color: var(--muted); overflow-wrap: anywhere; }
+      .component-step { padding: .2rem .38rem; border-radius: 999px; background: #8062df20; color: #c7b9ff; font: 750 .68rem/1 ui-monospace, monospace; white-space: nowrap; }
+      .narration-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+      .narration-head .stage { font-size: .68rem; }
+      .narration-outline { display: grid; gap: .55rem; margin: 0; padding: 0; list-style: none; }
+      .narration-outline li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .65rem; padding: .7rem; border: 1px solid var(--line); border-radius: .6rem; background: #08111b66; }
+      .narration-outline .component-step { align-self: start; margin-top: .18rem; }
+      .narration-outline p { margin: 0; color: #d3dce8; font-size: .83rem; line-height: 1.65; }
+      .narration-outline textarea { width: 100%; min-height: 5.5rem; padding: .65rem; border: 1px solid #40516a; border-radius: .5rem; background: #060d16; color: var(--ink); font: inherit; line-height: 1.65; resize: vertical; }
       .mode-note { margin: 0; padding: .75rem; border-left: 3px solid var(--accent); background: #0c1724; color: #bdc9d8; font-size: .84rem; line-height: 1.6; }
       form { margin: 0; }
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
@@ -199,6 +216,30 @@ function slideCompositionLabel(
     return `リッチ構成 ${slide.composition.nodes.length} component`;
   }
   return "定型flow";
+}
+
+function sceneComponentOutline(nodes: SlideSceneNode[]): string {
+  const children = new Map<string | null, SlideSceneNode[]>();
+  for (const node of nodes) {
+    const siblings = children.get(node.parent_id) ?? [];
+    siblings.push(node);
+    children.set(node.parent_id, siblings);
+  }
+  for (const siblings of children.values()) {
+    siblings.sort(
+      (left, right) => left.order - right.order || left.id.localeCompare(right.id)
+    );
+  }
+  const renderChildren = (parentId: string | null): string => {
+    const items = (children.get(parentId) ?? [])
+      .map((node) => {
+        const descendants = renderChildren(node.id);
+        return `<li><div class="component-outline-row"><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>${node.frame === null || node.frame === undefined ? "自動配置" : "自由配置"}</small></span><span class="component-step">STEP ${node.at}</span></div>${descendants}</li>`;
+      })
+      .join("");
+    return items.length > 0 ? `<ul class="component-outline">${items}</ul>` : "";
+  };
+  return renderChildren(null);
 }
 
 export function landingPage(): Response {
@@ -376,15 +417,11 @@ export function slideWorkspacePage(options: {
     .join("");
   const componentOutline =
     slide.composition?.mode === "scene"
-      ? `<ul class="component-outline">${slide.composition.nodes
-          .map(
-            (node) => `<li><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>parent: ${escapeHtml(node.parent_id ?? "root")} · step ${node.at}</small></span></li>`
-          )
-          .join("")}</ul>`
+      ? sceneComponentOutline(slide.composition.nodes)
       : slide.composition?.mode === "canvas"
         ? `<ul class="component-outline">${slide.composition.blocks
             .map(
-              (block) => `<li><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}% · step ${block.at}</small></span></li>`
+              (block) => `<li><div class="component-outline-row"><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}%</small></span><span class="component-step">STEP ${block.at}</span></div></li>`
             )
             .join("")}</ul>`
         : `<p class="mode-note">定型flowです。本文、段階表示、補足欄から構成されます。AIからsceneへ切り替えると、入れ子のリッチcomponentを利用できます。</p>`;
@@ -394,6 +431,19 @@ export function slideWorkspacePage(options: {
       : slide.composition?.mode === "canvas"
         ? "従来のflat canvasです。既存表示は維持されます。より複雑な構成はcomponent sceneへ移行できます。"
         : "本文と補足欄を使う定型flowです。";
+  const narrationDisplayLabel =
+    slide.narration?.display === "dialogue"
+      ? "ADV会話枠"
+      : slide.narration?.display === "inline"
+        ? "全文表示"
+        : "実況字幕";
+  const narrationOutline = slide.narration
+    ? `<form class="editor" data-narration-editor action="/api/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/narration" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><ol class="narration-outline">${slide.narration.segments
+        .map(
+          (segment) => `<li><span class="component-step">STEP ${segment.at}</span><textarea data-narration-text data-narration-at="${segment.at}" maxlength="2000" required aria-label="STEP ${segment.at} の読み上げ文">${escapeHtml(segment.text)}</textarea></li>`
+        )
+        .join("")}</ol><div class="actions"><button type="submit">読み上げ文を保存</button><span class="version" data-narration-version>v${options.project.version}</span></div><p class="feedback" data-narration-feedback aria-live="polite"></p></form>`
+    : `<p class="prose">読み上げはまだありません。</p>`;
   return new Response(
     shell(
       `${slide.title} — スライド編集`,
@@ -404,7 +454,7 @@ export function slideWorkspacePage(options: {
          <div class="slide-workspace">
            <nav class="filmstrip" aria-label="スライド一覧">${filmstrip}</nav>
            <section class="panel workspace-preview">
-             <div class="workspace-frame"><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame></iframe></div>
+             <div class="workspace-frame"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame></iframe></div>
              <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output>STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>
            </section>
            <aside class="inspector">
@@ -419,7 +469,7 @@ export function slideWorkspacePage(options: {
                </form>
              </section>
              <section class="panel"><h2>${escapeHtml(slideCompositionLabel(slide))}</h2><p class="mode-note">${escapeHtml(modeNote)}</p>${componentOutline}</section>
-             <section class="panel"><h2>読み上げ</h2><p class="prose">${escapeHtml(slide.narration?.segments.map((segment) => `STEP ${segment.at}: ${segment.text}`).join("\n\n") || "読み上げはまだありません。")}</p></section>
+             <section class="panel"><div class="narration-head"><h2>読み上げ</h2>${slide.narration ? `<span class="stage">${narrationDisplayLabel}</span>` : ""}</div>${narrationOutline}</section>
            </aside>
          </div>
        </main><script src="/assets/dashboard.js" defer></script>`
