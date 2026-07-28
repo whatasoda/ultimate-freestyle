@@ -47,7 +47,16 @@ describe("presentation artifact renderer", () => {
               spacing_scale: 1,
               font_scale: 1,
               enter_animation: "wipe",
-              reveal_animation: "zoom"
+              reveal_animation: "zoom",
+              visual_preset: "neon",
+              body_font: "rounded",
+              heading_font: "display",
+              density: "compact",
+              motion_style: "snappy",
+              body_weight: 500,
+              heading_weight: 900,
+              line_height: 1.4,
+              letter_spacing_em: 0.02
             }
           ],
           default_template_id: "my-biim",
@@ -68,11 +77,26 @@ describe("presentation artifact renderer", () => {
               narration: {
                 display: "commentary",
                 speaker: null,
+                appearance: {
+                  placement: "overlay-bottom",
+                  size: "large",
+                  text_align: "center",
+                  speaker_visible: true,
+                  progress_visible: true,
+                  text_scale: 1.1,
+                  max_lines: 3
+                },
                 segments: [
                   {
                     at: 0,
                     text: "読み上げにも </script><script>alert('voice')</script>",
-                    audio_src: null
+                    audio_src: "/audio/result-0.mp3",
+                    speaker: "ずんだもん",
+                    voice_tuning: {
+                      speedScale: 1.25,
+                      pitchScale: 0.05,
+                      volumeScale: 0.8
+                    }
                   }
                 ]
               }
@@ -95,6 +119,22 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-region="sidebar"');
     expect(html).toContain('data-reveal-at="1"');
     expect(html).toContain('--template-sidebar-width: 34%');
+    expect(html).toContain('data-visual-preset="neon"');
+    expect(html).toContain('data-body-font="rounded"');
+    expect(html).toContain('data-heading-font="display"');
+    expect(html).toContain('data-density="compact"');
+    expect(html).toContain('data-motion-style="snappy"');
+    expect(html).toContain('data-placement="overlay-bottom"');
+    expect(html).toContain('class="narration-speaker">ずんだもん</span>');
+    expect(html).toContain("const player = new Audio(segment.audio_src)");
+    expect(html).toContain("player.addEventListener('timeupdate'");
+    expect(html).toContain('"speedScale":1.25');
+    expect(html).toContain('"speaker":"ずんだもん"');
+    expect(html).toContain("segment?.speaker || DECK.slides[slide].narration?.speaker");
+    expect(html).toContain("ultimate-freestyle:render-diagnostics");
+    expect(html).toContain("ultimate-freestyle:set-position");
+    expect(html).toContain("container: presentation-stage / size");
+    expect(html).not.toMatch(/\d(?:\.\d+)?vw/);
     expect(html).toContain("classList.toggle('is-visible'");
     expect(html).toContain("&lt;script&gt;alert(&#039;content&#039;)&lt;/script&gt;");
     expect(html).toContain("<p><strong>重要</strong></p>");
@@ -439,9 +479,9 @@ describe("presentation artifact renderer", () => {
     });
     expect(html).toContain('data-composition="scene"');
     expect(html).toContain('.slide[data-composition="flow"].tone-light');
-    expect(html).toContain('[data-layout="minimal"] .slide[data-composition="flow"]');
+    expect(html).toContain('[data-layout="minimal"] .slide[data-user-template="false"][data-composition="flow"]');
     expect(html).not.toContain('[data-layout="minimal"] .slide { background: #fff;');
-    expect(html).toContain('background: #05080de8; color: #f8fafc;');
+    expect(html).toContain('--theme-surface: #05080dcc');
     expect(html).toContain('data-runtime-version="uf-runtime@1"');
     expect(html).toContain('data-display="inline"');
     expect(html).toContain('data-narration-at="1">次の説明</span>');
@@ -458,13 +498,20 @@ describe("presentation artifact renderer", () => {
     )?.[1];
     expect(rootRule).toContain("justify-content: center");
     expect(rootRule?.match(/justify-content/g)).toHaveLength(1);
+    expect(rootRule).toContain("--component-font-scale: 1");
+    expect(rootRule).not.toContain("font-size");
     expect(html).toContain(`/presentation-assets/revision/${assetId}`);
     expect(html).toContain("RESULT &lt;unsafe&gt;");
     expect(html).not.toContain("RESULT <unsafe>");
     expect(html).toContain("frame-ancestors 'self'");
     expect(html).toContain('data-editor-frame="true"');
     expect(html).toContain("customElements.define");
-    expect(html).not.toContain("fallback");
+    expect(html).toContain('class="narration-track"');
+    expect(html).toContain('data-fit-scroll="true"');
+    expect(html).toContain("item.scrollIntoView");
+    expect(html).toContain("target.dataset.overflow = String(overflowing)");
+    expect(html).toContain("@media (prefers-reduced-motion: reduce) { *, *::before, *::after");
+    expect(html).not.toContain(">fallback<");
 
     const workspaceHtml = await slideWorkspacePage({
       twitchLogin: "researcher",
@@ -474,12 +521,128 @@ describe("presentation artifact renderer", () => {
     }).text();
     expect(workspaceHtml).toContain('class="component-outline-row"');
     expect(workspaceHtml).toContain('class="component-step">STEP 1');
-    expect(workspaceHtml).toContain('class="narration-outline"');
-    expect(workspaceHtml).toContain(">全文表示</span>");
+    expect(workspaceHtml).toContain("data-segment-editor");
+    expect(workspaceHtml).toContain(">全文追従</span>");
     expect(workspaceHtml.indexOf(">root<")).toBeLessThan(
       workspaceHtml.indexOf(">headline<")
     );
     expect(workspaceHtml).not.toContain("parent: root");
+  });
+
+  it("maps every safe visual and font preset and renders bounded narration variants", () => {
+    const visuals = [
+      "studio",
+      "paper",
+      "editorial",
+      "neon",
+      "retro-game",
+      "soft-pop",
+      "scientific"
+    ] as const;
+    const fonts = [
+      "system-sans",
+      "gothic",
+      "rounded",
+      "mincho",
+      "serif",
+      "monospace",
+      "display"
+    ] as const;
+    const project = projectRecordSchema.parse({
+      project_id: "63ab1ec4-20a0-4cf6-a1a0-f74ced56778a",
+      version: 6,
+      created_at: "2026-07-28T12:00:00.000Z",
+      updated_at: "2026-07-28T12:30:00.000Z",
+      document: {
+        schema_version: 1,
+        stage: "production",
+        title: "表示preset",
+        summary: "",
+        question: null,
+        hypothesis: null,
+        method: null,
+        findings: [],
+        limitations: [],
+        logs: [],
+        deck: {
+          short_title: "表示preset",
+          description: "",
+          author: "研究者",
+          year: 2026,
+          accent: "#44ddaa",
+          layout: "minimal",
+          narration_defaults: {
+            display: "subtitle",
+            speaker: "四国めたん",
+            credit: null,
+            appearance: {
+              placement: "bottom",
+              speaker_visible: true,
+              max_lines: 2
+            }
+          },
+          templates: visuals.map((visual, index) => ({
+            id: `preset-${index}`,
+            name: visual,
+            region_layout: "single",
+            sidebar_width_percent: 28,
+            background: "#182234",
+            surface: "#0b1220",
+            foreground: "#f8fafc",
+            muted: "#a9b5c7",
+            accent: "#44ddaa",
+            corner_radius_px: 8,
+            spacing_scale: 1,
+            font_scale: 1,
+            enter_animation: index === 0 ? "slide-left" : "fade",
+            reveal_animation: index === 1 ? "blur" : "pop",
+            visual_preset: visual,
+            body_font: fonts[index],
+            heading_font: fonts[fonts.length - index - 1],
+            density: index % 2 === 0 ? "spacious" : "compact",
+            motion_style: index % 2 === 0 ? "dramatic" : "calm"
+          })),
+          default_template_id: null,
+          slides: visuals.map((visual, index) => ({
+            id: `slide-${index}`,
+            title: visual,
+            duration_seconds: 30,
+            reveal_steps: 0,
+            tone: "dark",
+            template_id: `preset-${index}`,
+            enter_animation: null,
+            composition: null,
+            content_markdown: `# ${visual}\n日本語の本文`,
+            reveal_blocks: [],
+            sidebar_markdown: null,
+            narration: {
+              display: index === 0 ? "subtitle" : index === 1 ? "minimal" : "dialogue",
+              speaker: index === 0 ? "四国めたん" : null,
+              appearance: index === 1 ? { size: "compact", text_align: "center" } : {},
+              segments: [{ at: 0, text: `${visual}の説明`, audio_src: null }]
+            }
+          }))
+        }
+      }
+    });
+
+    const html = renderPresentationHtml(project, { editorFrame: true });
+    for (const visual of visuals) {
+      expect(html).toContain(`data-visual-preset="${visual}"`);
+      expect(html).toContain(`[data-visual-preset="${visual}"]`);
+    }
+    for (const font of fonts) {
+      expect(html).toContain(`data-body-font="${font}"`);
+      expect(html).toContain(`[data-body-font="${font}"]`);
+      expect(html).toContain(`[data-heading-font="${font}"]`);
+    }
+    expect(html).toContain('data-display="subtitle"');
+    expect(html).toContain('data-display="minimal"');
+    expect(html).toContain('class="narration-speaker">四国めたん</span>');
+    expect(html).toContain('.narration[data-display="subtitle"]');
+    expect(html).toContain('.narration[data-display="minimal"]');
+    expect(html).toContain('data-animation="slide-left"');
+    expect(html).toContain('@keyframes slide-blur');
   });
 
   it("rejects cyclic or invalid scene parent relationships", () => {
