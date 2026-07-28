@@ -882,6 +882,7 @@ export function renderPresentationHtml(
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
     document.fonts?.ready.then(scheduleFit);
+    setTimeout(scheduleFit, 300);
     setInterval(() => { elapsed.textContent = format((Date.now() - startedAt) / 1000); }, 250); restore();
   })();</script>
 </body>
