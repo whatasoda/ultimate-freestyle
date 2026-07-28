@@ -828,8 +828,8 @@ export function renderPresentationHtml(
         target.style.setProperty('--fit-scale', '1');
         let scale = 1;
         let overflow = collectOverflow(target);
-        while ((overflow.x > 1 || overflow.y > 1) && scale > .62 && target.dataset.fitScroll !== 'true') {
-          scale = Math.max(.62, Number((scale - .05).toFixed(2)));
+        while ((overflow.x > 1 || overflow.y > 1) && scale > .55 && target.dataset.fitScroll !== 'true') {
+          scale = Math.max(.55, Number((scale - .05).toFixed(2)));
           target.style.setProperty('--fit-scale', String(scale));
           overflow = collectOverflow(target);
         }
