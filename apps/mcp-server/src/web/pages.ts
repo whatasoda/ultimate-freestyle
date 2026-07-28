@@ -81,6 +81,8 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=2";
+
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
   pitchScale: "音高",
@@ -521,7 +523,7 @@ export function projectDetailPage(options: {
              <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>
            </aside>
          </div>
-       </main><script src="/assets/dashboard.js" defer></script>`
+       </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
     { headers: headers() }
   );
@@ -721,7 +723,7 @@ export function slideWorkspacePage(options: {
              <details class="inspector-section" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-base-count="${qualityItems.length}" data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
            </aside>
          </div>
-       </main><script src="/assets/dashboard.js" defer></script>`
+       </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
     { headers: headers() }
   );

@@ -378,7 +378,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=2"');
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
     expect(detailHtml).toContain("自由配置 1 block");
