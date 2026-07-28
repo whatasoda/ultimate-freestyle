@@ -12,8 +12,8 @@
     "test": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vitest run",
     "test:render": "vitest run --config vitest.render.config.ts",
     "typecheck": "tsc --noEmit",
-    "types": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types src/worker-configuration.d.ts --config wrangler.jsonc --include-runtime=false",
-    "types:check": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types src/worker-configuration.d.ts --config wrangler.jsonc --include-runtime=false --check",
+    "types": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types src/worker-configuration.d.ts --config wrangler.jsonc --env-file .dev.vars.example --include-runtime=false",
+    "types:check": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types src/worker-configuration.d.ts --config wrangler.jsonc --env-file .dev.vars.example --include-runtime=false --check",
     "check": "bun run types:check && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
