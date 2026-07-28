@@ -401,7 +401,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
 export function dashboardScriptResponse(): Response {
   return new Response(DASHBOARD_SCRIPT, {
     headers: {
-      "cache-control": "public, max-age=60, must-revalidate",
+      "cache-control": "no-cache, must-revalidate",
       "content-type": "text/javascript; charset=utf-8",
       "x-content-type-options": "nosniff"
     }

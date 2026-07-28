@@ -449,6 +449,9 @@ describe("Web dashboard", () => {
     expect(dashboardScript.headers.get("content-type")).toContain(
       "text/javascript"
     );
+    expect(dashboardScript.headers.get("cache-control")).toBe(
+      "no-cache, must-revalidate"
+    );
     const dashboardScriptText = await dashboardScript.text();
     expect(() => new Function(dashboardScriptText)).not.toThrow();
     expect(dashboardScriptText).toContain("queueMicrotask(syncFramePosition)");
