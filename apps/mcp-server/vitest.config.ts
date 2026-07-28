@@ -14,7 +14,11 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       miniflare: {
-        bindings: { TEST_MIGRATIONS: migrations }
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          TWITCH_CLIENT_ID: "contract-test-client-id",
+          TWITCH_CLIENT_SECRET: "contract-test-client-secret"
+        }
       },
       wrangler: { configPath: "./wrangler.jsonc" }
     })
