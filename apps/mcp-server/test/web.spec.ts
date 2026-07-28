@@ -382,6 +382,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain('src="/assets/dashboard.js?v=2"');
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
+    expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("自由配置 1 block");
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
