@@ -41,6 +41,27 @@ rootにcolumn方向のstackを置き、その子にhero、row方向のstackを�
 
 一度に研究全体やscene全体を送り直さず、成功時に返るversionを次の\`expected_version\`へ渡して一件ずつ更新する。`;
 
+const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガイド
+
+## template
+
+- 最初は \`create_presentation_template\` でvisual presetから一件作る。
+- visual presetは \`studio\`、\`paper\`、\`editorial\`、\`neon\`、\`retro-game\`、\`soft-pop\`、\`scientific\`。
+- font presetは \`system-sans\`、\`gothic\`、\`rounded\`、\`mincho\`、\`serif\`、\`monospace\`、\`display\`。任意font名やURLは入力しない。
+- 密度は \`spacious\`、\`comfortable\`、\`compact\`、動きの傾向は \`calm\`、\`snappy\`、\`dramatic\`。
+- 色、配置、font、密度、animationの調整は \`update_presentation_template_fields\` で変更項目だけを送る。互換用の全量upsertを通常の編集には使わない。
+
+## 読み上げ表示
+
+- 発表全体の既定値は \`configure_deck_narration\`、一枚の表示方式と枠は \`configure_slide_narration\` で設定する。
+- displayはADV枠の \`dialogue\`、実況風の \`commentary\`、全文追従の \`inline\`、映像字幕の \`subtitle\`、最小表示の \`minimal\`。
+- 枠は配置、寸法、文字揃え、話者表示、進捗表示、文字倍率、最大行数だけを安全なtokenで調整する。
+- 読み上げ本文は \`set_slide_narration\`、segmentの話者・VOICEVOX profile・調声値は \`update_slide_narration_voice\` で別々に更新する。
+- profileの基準調声値だけを変える場合は \`update_voicevox_profile_tuning\` を使う。本文や音声設定が変わると、古い生成音声は無効になる。
+- 任意の音声URLは入力できない。音声fileの参照は管理された生成処理だけが設定する。
+
+各toolの成功時に返るversionを、次のtoolの\`expected_version\`へ渡す。`;
+
 function projectResourceBody(
   getAuthProps: () => Record<string, unknown> | undefined,
   requiredScope: "research:read"
@@ -94,6 +115,26 @@ export function registerResearchGuides(
           uri: uri.href,
           mimeType: "text/markdown",
           text: PRESENTATION_COMPONENT_GUIDE
+        }
+      ]
+    })
+  );
+
+  server.registerResource(
+    "presentation-style-guide",
+    "research://guide/presentation-style",
+    {
+      title: "発表デザイン・読み上げ設定ガイド",
+      description:
+        "安全な見た目preset、font、読み上げ枠、VOICEVOX調声を小粒度toolで編集するガイドです。",
+      mimeType: "text/markdown"
+    },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: PRESENTATION_STYLE_GUIDE
         }
       ]
     })
@@ -246,7 +287,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。research://guide/presentation-componentsを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererを確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。research://guide/presentation-componentsとresearch://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
           }
         }
       ]

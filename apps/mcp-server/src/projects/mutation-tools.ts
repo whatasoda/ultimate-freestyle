@@ -5,6 +5,11 @@ import { recordAuditEvent } from "../auth/repository";
 import { mutateProject } from "./repository";
 import {
   compositionRevealPositions,
+  densitySchema,
+  fontPresetSchema,
+  motionStyleSchema,
+  narrationAppearanceSchema,
+  narrationDisplaySchema,
   narrationSegmentSchema,
   presentationTemplateSchema,
   projectSlideSchema,
@@ -16,7 +21,9 @@ import {
   slideSceneLayoutNodeSchema,
   slideSceneMediaNodeSchema,
   slideSceneTextNodeSchema,
+  visualPresetSchema,
   voicevoxProfileSchema,
+  type PresentationTemplate,
   type ProjectDocument,
   type ProjectRecord,
   type SlideSceneNode
@@ -45,6 +52,176 @@ const mutationOutput = {
     .nullable(),
   current_version: z.number().int().positive().nullable(),
   error: projectErrorSchema.nullable()
+};
+
+const templateMutableInput = {
+  name: presentationTemplateSchema.shape.name.optional(),
+  region_layout: presentationTemplateSchema.shape.region_layout.optional(),
+  sidebar_width_percent:
+    presentationTemplateSchema.shape.sidebar_width_percent.optional(),
+  background: presentationTemplateSchema.shape.background.optional(),
+  surface: presentationTemplateSchema.shape.surface.optional(),
+  foreground: presentationTemplateSchema.shape.foreground.optional(),
+  muted: presentationTemplateSchema.shape.muted.optional(),
+  accent: presentationTemplateSchema.shape.accent.optional(),
+  corner_radius_px:
+    presentationTemplateSchema.shape.corner_radius_px.optional(),
+  spacing_scale: presentationTemplateSchema.shape.spacing_scale.optional(),
+  font_scale: presentationTemplateSchema.shape.font_scale.optional(),
+  enter_animation:
+    presentationTemplateSchema.shape.enter_animation.optional(),
+  reveal_animation:
+    presentationTemplateSchema.shape.reveal_animation.optional(),
+  visual_preset: visualPresetSchema.optional(),
+  body_font: fontPresetSchema.optional(),
+  heading_font: fontPresetSchema.optional(),
+  density: densitySchema.optional(),
+  motion_style: motionStyleSchema.optional(),
+  body_weight: presentationTemplateSchema.shape.body_weight,
+  heading_weight: presentationTemplateSchema.shape.heading_weight,
+  line_height: presentationTemplateSchema.shape.line_height,
+  letter_spacing_em: presentationTemplateSchema.shape.letter_spacing_em
+};
+
+type VisualPreset = z.infer<typeof visualPresetSchema>;
+
+const TEMPLATE_PRESET_DEFAULTS: Record<
+  VisualPreset,
+  Omit<PresentationTemplate, "id" | "name">
+> = {
+  studio: {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 30,
+    background: "#111827",
+    surface: "#1f2937",
+    foreground: "#f8fafc",
+    muted: "#cbd5e1",
+    accent: "#9d7bff",
+    corner_radius_px: 18,
+    spacing_scale: 1,
+    font_scale: 1,
+    enter_animation: "fade",
+    reveal_animation: "rise",
+    visual_preset: "studio",
+    body_font: "system-sans",
+    heading_font: "gothic",
+    density: "comfortable",
+    motion_style: "calm"
+  },
+  paper: {
+    region_layout: "single",
+    sidebar_width_percent: 28,
+    background: "#f4efe3",
+    surface: "#e8dfcf",
+    foreground: "#241f1a",
+    muted: "#625b50",
+    accent: "#a34b35",
+    corner_radius_px: 8,
+    spacing_scale: 1.05,
+    font_scale: 1,
+    enter_animation: "fade",
+    reveal_animation: "rise",
+    visual_preset: "paper",
+    body_font: "mincho",
+    heading_font: "serif",
+    density: "spacious",
+    motion_style: "calm"
+  },
+  editorial: {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 34,
+    background: "#f7f7f2",
+    surface: "#151515",
+    foreground: "#161616",
+    muted: "#f2f2ed",
+    accent: "#d33f2f",
+    corner_radius_px: 0,
+    spacing_scale: 1,
+    font_scale: 1,
+    enter_animation: "slide-left",
+    reveal_animation: "wipe",
+    visual_preset: "editorial",
+    body_font: "gothic",
+    heading_font: "display",
+    density: "compact",
+    motion_style: "snappy"
+  },
+  neon: {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 30,
+    background: "#080a18",
+    surface: "#11152c",
+    foreground: "#f4f7ff",
+    muted: "#a9b3d8",
+    accent: "#36f1cd",
+    corner_radius_px: 20,
+    spacing_scale: 1,
+    font_scale: 1,
+    enter_animation: "blur",
+    reveal_animation: "pop",
+    visual_preset: "neon",
+    body_font: "gothic",
+    heading_font: "display",
+    density: "comfortable",
+    motion_style: "dramatic"
+  },
+  "retro-game": {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 32,
+    background: "#151515",
+    surface: "#252525",
+    foreground: "#fff7d6",
+    muted: "#b8d86f",
+    accent: "#ffcf4a",
+    corner_radius_px: 0,
+    spacing_scale: 0.95,
+    font_scale: 0.95,
+    enter_animation: "slide-right",
+    reveal_animation: "pop",
+    visual_preset: "retro-game",
+    body_font: "monospace",
+    heading_font: "monospace",
+    density: "compact",
+    motion_style: "snappy"
+  },
+  "soft-pop": {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 28,
+    background: "#fff5fa",
+    surface: "#f5e5ff",
+    foreground: "#3d294d",
+    muted: "#725e80",
+    accent: "#f05d9b",
+    corner_radius_px: 28,
+    spacing_scale: 1.1,
+    font_scale: 1,
+    enter_animation: "zoom",
+    reveal_animation: "pop",
+    visual_preset: "soft-pop",
+    body_font: "rounded",
+    heading_font: "rounded",
+    density: "spacious",
+    motion_style: "calm"
+  },
+  scientific: {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 30,
+    background: "#f4f8fb",
+    surface: "#e5eef4",
+    foreground: "#142330",
+    muted: "#536979",
+    accent: "#087e8b",
+    corner_radius_px: 10,
+    spacing_scale: 1,
+    font_scale: 0.95,
+    enter_animation: "fade",
+    reveal_animation: "wipe",
+    visual_preset: "scientific",
+    body_font: "system-sans",
+    heading_font: "gothic",
+    density: "compact",
+    motion_style: "calm"
+  }
 };
 
 type MutationContext = {
@@ -135,6 +312,30 @@ function findSlide(document: ProjectDocument, slideId: string) {
     throw new ProjectToolError("SLIDE_NOT_FOUND", "The slide does not exist.");
   }
   return slide;
+}
+
+function findTemplate(document: ProjectDocument, templateId: string) {
+  const template = requireDeck(document).templates?.find(
+    (item) => item.id === templateId
+  );
+  if (template === undefined) {
+    throw new ProjectToolError(
+      "TEMPLATE_NOT_FOUND",
+      "The presentation template does not exist."
+    );
+  }
+  return template;
+}
+
+function invalidateProfileAudio(
+  document: ProjectDocument,
+  profileId: string
+): void {
+  for (const slide of requireDeck(document).slides) {
+    for (const segment of slide.narration?.segments ?? []) {
+      if (segment.voice_profile_id === profileId) segment.audio_src = null;
+    }
+  }
 }
 
 function recalculateSlideRevealSteps(
@@ -369,6 +570,159 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
+    "configure_deck_narration",
+    {
+      title: "発表全体の読み上げ表示を設定",
+      description:
+        "読み上げ枠の既定表示、話者、credit、外観だけを部分更新します。enabled=falseで既定設定を解除します。",
+      inputSchema: {
+        ...projectIdInput,
+        enabled: z.boolean().optional(),
+        display: narrationDisplaySchema.optional(),
+        speaker: z.string().max(80).nullable().optional(),
+        credit: z.string().max(500).nullable().optional(),
+        appearance: narrationAppearanceSchema.nullable().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, enabled, ...fields }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "deck_narration_configured",
+        mutate: (document) => {
+          const deck = requireDeck(document);
+          if (
+            enabled === undefined &&
+            Object.values(fields).every((value) => value === undefined)
+          ) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "At least one narration default must be supplied."
+            );
+          }
+          if (enabled === false) {
+            deck.narration_defaults = null;
+            return;
+          }
+          deck.narration_defaults ??= {
+            display: fields.display ?? "dialogue",
+            speaker: fields.speaker ?? null,
+            credit: fields.credit ?? null
+          };
+          if (fields.display !== undefined) {
+            deck.narration_defaults.display = fields.display;
+          }
+          if (fields.speaker !== undefined) {
+            deck.narration_defaults.speaker = fields.speaker;
+          }
+          if (fields.credit !== undefined) {
+            deck.narration_defaults.credit = fields.credit;
+          }
+          if (fields.appearance === null) {
+            delete deck.narration_defaults.appearance;
+          } else if (fields.appearance !== undefined) {
+            deck.narration_defaults.appearance = {
+              ...(deck.narration_defaults.appearance ?? {}),
+              ...fields.appearance
+            };
+          }
+        }
+      })
+  );
+
+  server.registerTool(
+    "create_presentation_template",
+    {
+      title: "presetから発表テンプレートを作成",
+      description:
+        "安全なvisual presetからtemplateを一件作ります。作成後は部分更新toolで必要な項目だけ調整します。",
+      inputSchema: {
+        ...projectIdInput,
+        template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        name: z.string().min(1).max(80),
+        visual_preset: visualPresetSchema,
+        make_default: z.boolean().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, template_id, name, visual_preset, make_default }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "template_created",
+        changedId: template_id,
+        mutate: (document) => {
+          const deck = requireDeck(document);
+          deck.templates ??= [];
+          if (deck.templates.some((template) => template.id === template_id)) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "A presentation template with this ID already exists."
+            );
+          }
+          deck.templates.push(
+            presentationTemplateSchema.parse({
+              id: template_id,
+              name,
+              ...TEMPLATE_PRESET_DEFAULTS[visual_preset]
+            })
+          );
+          if (make_default === true) deck.default_template_id = template_id;
+        }
+      })
+  );
+
+  server.registerTool(
+    "update_presentation_template_fields",
+    {
+      title: "発表テンプレートを部分更新",
+      description:
+        "指定templateの色、配置、font、密度、動きなど、指定した項目だけを更新します。",
+      inputSchema: {
+        ...projectIdInput,
+        template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        ...templateMutableInput
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, template_id, ...fields }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "template_fields_updated",
+        changedId: template_id,
+        mutate: (document) => {
+          if (Object.values(fields).every((value) => value === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "At least one template field must be supplied."
+            );
+          }
+          Object.assign(findTemplate(document, template_id), fields);
+        }
+      })
+  );
+
+  server.registerTool(
     "upsert_presentation_template",
     {
       title: "発表テンプレートを作成・更新",
@@ -440,10 +794,58 @@ export function registerProjectMutationTools(
             (item) => item.id === profile.id
           );
           if (index === -1) deck.voicevox.profiles.push(profile);
-          else deck.voicevox.profiles[index] = profile;
+          else {
+            deck.voicevox.profiles[index] = profile;
+            invalidateProfileAudio(document, profile.id);
+          }
           if (make_default === true || deck.voicevox.profiles.length === 1) {
             deck.voicevox.default_profile_id = profile.id;
           }
+        }
+      })
+  );
+
+  server.registerTool(
+    "update_voicevox_profile_tuning",
+    {
+      title: "VOICEVOX profileの調声値を部分更新",
+      description:
+        "指定profileの調声値だけを更新します。tuning=nullでprofile固有の調声を解除します。関連する生成済み音声は無効化されます。",
+      inputSchema: {
+        ...projectIdInput,
+        profile_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        tuning: narrationSegmentSchema.shape.voice_tuning.unwrap()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, profile_id, tuning }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "voicevox_profile_tuning_updated",
+        changedId: profile_id,
+        mutate: (document) => {
+          const settings = requireDeck(document).voicevox;
+          const profile = settings?.profiles.find(
+            (item) => item.id === profile_id
+          );
+          if (profile === undefined) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "The VOICEVOX profile does not exist."
+            );
+          }
+          profile.tuning =
+            tuning === null
+              ? null
+              : { ...(profile.tuning ?? {}), ...tuning };
+          invalidateProfileAudio(document, profile_id);
         }
       })
   );
@@ -1010,6 +1412,135 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
+    "configure_slide_narration",
+    {
+      title: "一枚の読み上げ表示を設定",
+      description:
+        "読み上げ本文を再送せず、表示方式、共通話者、枠の外観だけを部分更新します。appearance=nullでslide固有の外観を解除します。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        display: narrationDisplaySchema.optional(),
+        speaker: z.string().max(80).nullable().optional(),
+        appearance: narrationAppearanceSchema.nullable().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, ...fields }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_narration_configured",
+        changedId: slide_id,
+        mutate: (document) => {
+          if (Object.values(fields).every((value) => value === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "At least one slide narration setting must be supplied."
+            );
+          }
+          const deck = requireDeck(document);
+          const slide = findSlide(document, slide_id);
+          slide.narration ??= {
+            display:
+              fields.display ??
+              deck.narration_defaults?.display ??
+              "dialogue",
+            speaker:
+              fields.speaker === undefined
+                ? (deck.narration_defaults?.speaker ?? null)
+                : fields.speaker,
+            segments: []
+          };
+          if (fields.display !== undefined) {
+            slide.narration.display = fields.display;
+          }
+          if (fields.speaker !== undefined) {
+            slide.narration.speaker = fields.speaker;
+          }
+          if (fields.appearance === null) {
+            delete slide.narration.appearance;
+          } else if (fields.appearance !== undefined) {
+            slide.narration.appearance = {
+              ...(slide.narration.appearance ?? {}),
+              ...fields.appearance
+            };
+          }
+        }
+      })
+  );
+
+  server.registerTool(
+    "update_slide_narration_voice",
+    {
+      title: "読み上げsegmentの音声設定を部分更新",
+      description:
+        "本文を再送せず、指定stepの話者表示、VOICEVOX profile、調声値だけを更新します。音声設定を変えると生成済み音声は無効化されます。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        at: z.number().int().nonnegative().max(100),
+        speaker: narrationSegmentSchema.shape.speaker.optional(),
+        voice_profile_id:
+          narrationSegmentSchema.shape.voice_profile_id.optional(),
+        voice_tuning: narrationSegmentSchema.shape.voice_tuning.optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, at, ...fields }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_narration_voice_updated",
+        changedId: `${slide_id}:${at}`,
+        mutate: (document) => {
+          if (Object.values(fields).every((value) => value === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "At least one segment voice setting must be supplied."
+            );
+          }
+          const segment = findSlide(document, slide_id).narration?.segments.find(
+            (item) => item.at === at
+          );
+          if (segment === undefined) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "The narration segment does not exist."
+            );
+          }
+          if (fields.speaker !== undefined) segment.speaker = fields.speaker;
+          if (fields.voice_profile_id !== undefined) {
+            segment.voice_profile_id = fields.voice_profile_id;
+            segment.audio_src = null;
+          }
+          if (fields.voice_tuning !== undefined) {
+            segment.voice_tuning =
+              fields.voice_tuning === null
+                ? null
+                : {
+                    ...(segment.voice_tuning ?? {}),
+                    ...fields.voice_tuning
+                  };
+            segment.audio_src = null;
+          }
+        }
+      })
+  );
+
+  server.registerTool(
     "set_slide_narration",
     {
       title: "読み上げを一件編集",
@@ -1020,9 +1551,8 @@ export function registerProjectMutationTools(
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         at: z.number().int().nonnegative().max(100),
         text: z.string().min(1).max(2_000).nullable(),
-        display: z.enum(["dialogue", "commentary", "inline"]).optional(),
+        display: narrationDisplaySchema.optional(),
         speaker: z.string().max(80).nullable().optional(),
-        audio_src: z.string().max(500).nullable().optional(),
         voice_profile_id:
           narrationSegmentSchema.shape.voice_profile_id.optional(),
         voice_tuning: narrationSegmentSchema.shape.voice_tuning.optional()
@@ -1061,9 +1591,11 @@ export function registerProjectMutationTools(
               at,
               text,
               audio_src:
-                voice.audio_src === undefined
+                previous?.text === text &&
+                voice.voice_profile_id === undefined &&
+                voice.voice_tuning === undefined
                   ? (previous?.audio_src ?? null)
-                  : voice.audio_src,
+                  : null,
               voice_profile_id:
                 voice.voice_profile_id === undefined
                   ? previous?.voice_profile_id

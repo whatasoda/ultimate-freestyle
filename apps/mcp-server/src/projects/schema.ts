@@ -14,7 +14,63 @@ const templateIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/);
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const blockIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/);
 const percentSchema = z.number().min(0).max(100).multipleOf(0.01);
-const animationSchema = z.enum(["none", "fade", "rise", "zoom", "wipe"]);
+export const animationSchema = z.enum([
+  "none",
+  "fade",
+  "rise",
+  "zoom",
+  "wipe",
+  "slide-left",
+  "slide-right",
+  "pop",
+  "blur"
+]);
+
+export const visualPresetSchema = z.enum([
+  "studio",
+  "paper",
+  "editorial",
+  "neon",
+  "retro-game",
+  "soft-pop",
+  "scientific"
+]);
+
+export const fontPresetSchema = z.enum([
+  "system-sans",
+  "gothic",
+  "rounded",
+  "mincho",
+  "serif",
+  "monospace",
+  "display"
+]);
+
+export const densitySchema = z.enum([
+  "spacious",
+  "comfortable",
+  "compact"
+]);
+
+export const motionStyleSchema = z.enum(["calm", "snappy", "dramatic"]);
+
+export const narrationDisplaySchema = z.enum([
+  "dialogue",
+  "commentary",
+  "inline",
+  "subtitle",
+  "minimal"
+]);
+
+export const narrationAppearanceSchema = z.object({
+  placement: z.enum(["bottom", "overlay-bottom", "sidebar"]).optional(),
+  size: z.enum(["compact", "normal", "large"]).optional(),
+  text_align: z.enum(["start", "center"]).optional(),
+  speaker_visible: z.boolean().optional(),
+  progress_visible: z.boolean().optional(),
+  text_scale: z.number().min(0.75).max(1.5).multipleOf(0.05).optional(),
+  max_lines: z.number().int().min(2).max(8).optional()
+});
 
 const slideBlockFrameSchema = z.object({
   x: percentSchema,
@@ -412,7 +468,21 @@ export const presentationTemplateSchema = z.object({
   spacing_scale: z.number().min(0.75).max(1.5).multipleOf(0.05),
   font_scale: z.number().min(0.75).max(1.3).multipleOf(0.05),
   enter_animation: animationSchema,
-  reveal_animation: animationSchema
+  reveal_animation: animationSchema,
+  visual_preset: visualPresetSchema.optional(),
+  body_font: fontPresetSchema.optional(),
+  heading_font: fontPresetSchema.optional(),
+  density: densitySchema.optional(),
+  motion_style: motionStyleSchema.optional(),
+  body_weight: z.number().int().min(300).max(900).multipleOf(100).optional(),
+  heading_weight: z.number().int().min(300).max(900).multipleOf(100).optional(),
+  line_height: z.number().min(1).max(2).multipleOf(0.05).optional(),
+  letter_spacing_em: z
+    .number()
+    .min(-0.08)
+    .max(0.2)
+    .multipleOf(0.01)
+    .optional()
 });
 
 export type PresentationTemplate = z.infer<typeof presentationTemplateSchema>;
@@ -421,6 +491,7 @@ export const narrationSegmentSchema = z.object({
   at: z.number().int().nonnegative().max(100),
   text: z.string().min(1).max(2_000),
   audio_src: z.string().max(500).nullable(),
+  speaker: z.string().max(80).nullable().optional(),
   voice_profile_id: z
     .string()
     .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
@@ -506,8 +577,9 @@ export const projectSlideSchema = z
     sidebar_markdown: z.string().max(10_000).nullable(),
     narration: z
       .object({
-        display: z.enum(["dialogue", "commentary", "inline"]),
+        display: narrationDisplaySchema,
         speaker: z.string().max(80).nullable(),
+        appearance: narrationAppearanceSchema.optional(),
         segments: z.array(narrationSegmentSchema).max(101)
       })
       .nullable()
@@ -600,9 +672,10 @@ export const projectDocumentSchema = z
       default_template_id: templateIdSchema.nullable().optional(),
       narration_defaults: z
         .object({
-          display: z.enum(["dialogue", "commentary", "inline"]),
+          display: narrationDisplaySchema,
           speaker: z.string().max(80).nullable(),
-          credit: z.string().max(500).nullable()
+          credit: z.string().max(500).nullable(),
+          appearance: narrationAppearanceSchema.optional()
         })
         .nullable(),
       voicevox: voicevoxSettingsSchema.nullable().optional(),

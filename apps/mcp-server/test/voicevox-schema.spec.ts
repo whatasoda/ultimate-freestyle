@@ -103,4 +103,83 @@ describe("VOICEVOX project schema", () => {
       );
     }
   });
+
+  it("accepts optional presentation presets and narration appearance without migrating version 1", () => {
+    const project = voiceProject();
+    project.deck!.templates = [
+      {
+        id: "retro",
+        name: "レトロ",
+        region_layout: "sidebar-right",
+        sidebar_width_percent: 32,
+        background: "#151515",
+        surface: "#252525",
+        foreground: "#fff7d6",
+        muted: "#b8d86f",
+        accent: "#ffcf4a",
+        corner_radius_px: 0,
+        spacing_scale: 0.95,
+        font_scale: 0.95,
+        enter_animation: "slide-right",
+        reveal_animation: "pop",
+        visual_preset: "retro-game",
+        body_font: "monospace",
+        heading_font: "display",
+        density: "compact",
+        motion_style: "snappy",
+        body_weight: 500,
+        heading_weight: 800,
+        line_height: 1.4,
+        letter_spacing_em: 0.02
+      }
+    ];
+    project.deck!.narration_defaults!.display = "subtitle";
+    project.deck!.narration_defaults!.appearance = {
+      placement: "overlay-bottom",
+      size: "compact",
+      text_align: "center",
+      speaker_visible: false,
+      progress_visible: true,
+      text_scale: 0.9,
+      max_lines: 3
+    };
+    const narration = project.deck!.slides[0]!.narration!;
+    narration.display = "minimal";
+    narration.appearance = { placement: "bottom", max_lines: 2 };
+    narration.segments[0]!.speaker = "ずんだもん";
+
+    const parsed = projectDocumentSchema.safeParse(project);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.schema_version).toBe(1);
+  });
+
+  it("rejects arbitrary presentation tokens and unsafe typography bounds", () => {
+    const project = voiceProject();
+    project.deck!.templates = [
+      {
+        id: "unsafe",
+        name: "unsafe",
+        region_layout: "single",
+        sidebar_width_percent: 28,
+        background: "#ffffff",
+        surface: "#eeeeee",
+        foreground: "#111111",
+        muted: "#555555",
+        accent: "#0055aa",
+        corner_radius_px: 8,
+        spacing_scale: 1,
+        font_scale: 1,
+        enter_animation: "fade",
+        reveal_animation: "rise",
+        body_font: "url(https://example.com/font.woff2)" as "gothic",
+        line_height: 2.05
+      }
+    ];
+    project.deck!.slides[0]!.narration!.appearance = {
+      text_scale: 1.55,
+      max_lines: 9
+    };
+
+    expect(projectDocumentSchema.safeParse(project).success).toBe(false);
+  });
 });

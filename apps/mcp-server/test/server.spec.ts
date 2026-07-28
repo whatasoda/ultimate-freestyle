@@ -43,6 +43,7 @@ describe("MCP contract", () => {
           "get_project_outline",
           "get_project_slide",
           "upsert_voicevox_profile",
+          "update_voicevox_profile_tuning",
           "set_slide_canvas",
           "upsert_slide_block",
           "delete_slide_block",
@@ -55,11 +56,16 @@ describe("MCP contract", () => {
           "delete_slide_component",
           "update_project_fields",
           "configure_deck",
+          "configure_deck_narration",
+          "create_presentation_template",
+          "update_presentation_template_fields",
           "upsert_presentation_template",
           "create_slide",
           "update_slide_fields",
           "set_slide_reveal",
           "set_slide_narration",
+          "configure_slide_narration",
+          "update_slide_narration_voice",
           "move_slide",
           "delete_slide"
         ])
@@ -69,6 +75,12 @@ describe("MCP contract", () => {
         ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
       );
       expect(largestInputSchema).toBeLessThan(12_000);
+      const narrationTool = tools.find(
+        (tool) => tool.name === "set_slide_narration"
+      );
+      expect(
+        (narrationTool?.inputSchema as { properties?: object }).properties
+      ).not.toHaveProperty("audio_src");
       expect(tools).toContainEqual(
         expect.objectContaining({
           name: "delete_project_image",
@@ -122,6 +134,11 @@ describe("MCP contract", () => {
           uri: "research://guide/presentation-components"
         })
       );
+      expect(resources).toContainEqual(
+        expect.objectContaining({
+          uri: "research://guide/presentation-style"
+        })
+      );
 
       const result = await client.readResource({
         uri: "research://guide/overview"
@@ -141,6 +158,15 @@ describe("MCP contract", () => {
         expect.objectContaining({
           mimeType: "text/markdown",
           text: expect.stringContaining("upsert_slide_layout_component")
+        })
+      );
+      const styleGuide = await client.readResource({
+        uri: "research://guide/presentation-style"
+      });
+      expect(styleGuide.contents).toContainEqual(
+        expect.objectContaining({
+          mimeType: "text/markdown",
+          text: expect.stringContaining("update_slide_narration_voice")
         })
       );
     } finally {
@@ -707,6 +733,255 @@ describe("MCP contract", () => {
       expect(JSON.stringify(crossOwnerRead)).not.toContain(
         "記憶と泥団子の研究"
       );
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("updates presentation appearance and voice settings with granular versioned tools", async () => {
+    const subjectId = "presentation-settings-owner";
+    const now = "2026-07-28T12:00:00.000Z";
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO users (
+         id, twitch_user_id, twitch_login, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?)`
+    )
+      .bind(subjectId, subjectId, subjectId, now, now)
+      .run();
+
+    const authProps = {
+      subject_id: subjectId,
+      mcp_scopes: ["research:read", "research:write"],
+      identity: { user_id: subjectId, login: subjectId },
+      eligibility: {
+        eligible: true,
+        reason: "subscriber",
+        checked_at: now,
+        expires_at: "2026-07-28T12:30:00.000Z",
+        followed_at: null,
+        follow_days: null,
+        subscribed: true,
+        override: null
+      },
+      twitch_tokens: {
+        access_token: "not-returned",
+        refresh_token: "not-returned",
+        expires_at: "2026-07-28T13:00:00.000Z",
+        scopes: []
+      }
+    };
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const server = createServer(eligibilityConfig, () => authProps);
+    const client = new Client({ name: "settings-test", version: "0.1.0" });
+
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const created = await client.callTool({
+        name: "create_project",
+        arguments: {
+          title: "見た目と声の研究",
+          idempotency_key: "presentation-settings-contract-001"
+        }
+      });
+      const project = projectRecordSchema.parse(
+        (created.structuredContent as { project?: unknown } | undefined)
+          ?.project
+      );
+      const projectId = project.project_id;
+
+      await client.callTool({
+        name: "configure_deck",
+        arguments: { project_id: projectId, expected_version: 1 }
+      });
+      const template = await client.callTool({
+        name: "create_presentation_template",
+        arguments: {
+          project_id: projectId,
+          expected_version: 2,
+          template_id: "research-paper",
+          name: "研究ノート",
+          visual_preset: "paper",
+          make_default: true
+        }
+      });
+      expect(template.structuredContent).toMatchObject({ ok: true, version: 3 });
+
+      const conflict = await client.callTool({
+        name: "update_presentation_template_fields",
+        arguments: {
+          project_id: projectId,
+          expected_version: 2,
+          template_id: "research-paper",
+          heading_font: "mincho"
+        }
+      });
+      expect(conflict.isError).toBe(true);
+      expect(conflict.structuredContent).toMatchObject({
+        ok: false,
+        current_version: 3,
+        error: { code: "PROJECT_VERSION_CONFLICT" }
+      });
+
+      await client.callTool({
+        name: "update_presentation_template_fields",
+        arguments: {
+          project_id: projectId,
+          expected_version: 3,
+          template_id: "research-paper",
+          heading_font: "mincho",
+          body_weight: 500,
+          line_height: 1.5,
+          motion_style: "calm"
+        }
+      });
+      await client.callTool({
+        name: "configure_deck_narration",
+        arguments: {
+          project_id: projectId,
+          expected_version: 4,
+          display: "subtitle",
+          speaker: "案内役",
+          appearance: {
+            placement: "overlay-bottom",
+            size: "compact",
+            progress_visible: true,
+            max_lines: 3
+          }
+        }
+      });
+      await client.callTool({
+        name: "upsert_voicevox_profile",
+        arguments: {
+          project_id: projectId,
+          expected_version: 5,
+          catalog_revision: "voicevox-test",
+          profile: {
+            id: "guide-voice",
+            label: "案内役",
+            speaker_uuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
+            speaker_name: "ずんだもん",
+            style_id: 3,
+            style_name: "ノーマル",
+            tuning: null
+          },
+          make_default: true
+        }
+      });
+      await client.callTool({
+        name: "update_voicevox_profile_tuning",
+        arguments: {
+          project_id: projectId,
+          expected_version: 6,
+          profile_id: "guide-voice",
+          tuning: { speedScale: 1.1, intonationScale: 1.2 }
+        }
+      });
+      await client.callTool({
+        name: "create_slide",
+        arguments: {
+          project_id: projectId,
+          expected_version: 7,
+          slide_id: "intro",
+          title: "はじめに"
+        }
+      });
+      await client.callTool({
+        name: "set_slide_narration",
+        arguments: {
+          project_id: projectId,
+          expected_version: 8,
+          slide_id: "intro",
+          at: 0,
+          text: "研究を始めます。"
+        }
+      });
+      await client.callTool({
+        name: "configure_slide_narration",
+        arguments: {
+          project_id: projectId,
+          expected_version: 9,
+          slide_id: "intro",
+          display: "minimal",
+          appearance: {
+            placement: "bottom",
+            speaker_visible: true,
+            text_scale: 1.1
+          }
+        }
+      });
+      const segmentVoice = await client.callTool({
+        name: "update_slide_narration_voice",
+        arguments: {
+          project_id: projectId,
+          expected_version: 10,
+          slide_id: "intro",
+          at: 0,
+          speaker: "ずんだもん",
+          voice_profile_id: "guide-voice",
+          voice_tuning: { pitchScale: -0.02 }
+        }
+      });
+      expect(segmentVoice.structuredContent).toMatchObject({
+        ok: true,
+        version: 11
+      });
+
+      const result = await client.callTool({
+        name: "get_project",
+        arguments: { project_id: projectId }
+      });
+      expect(result.structuredContent).toMatchObject({
+        ok: true,
+        project: {
+          version: 11,
+          document: {
+            deck: {
+              default_template_id: "research-paper",
+              narration_defaults: {
+                display: "subtitle",
+                appearance: { placement: "overlay-bottom", max_lines: 3 }
+              },
+              templates: [
+                {
+                  id: "research-paper",
+                  visual_preset: "paper",
+                  heading_font: "mincho",
+                  body_weight: 500
+                }
+              ],
+              voicevox: {
+                profiles: [
+                  {
+                    id: "guide-voice",
+                    tuning: { speedScale: 1.1, intonationScale: 1.2 }
+                  }
+                ]
+              },
+              slides: [
+                {
+                  id: "intro",
+                  narration: {
+                    display: "minimal",
+                    appearance: { placement: "bottom", text_scale: 1.1 },
+                    segments: [
+                      {
+                        at: 0,
+                        speaker: "ずんだもん",
+                        voice_profile_id: "guide-voice",
+                        voice_tuning: { pitchScale: -0.02 },
+                        audio_src: null
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      });
     } finally {
       await client.close();
       await server.close();
