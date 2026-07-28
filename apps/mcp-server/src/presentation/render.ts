@@ -4,7 +4,7 @@ import type {
   SlideSceneNode
 } from "../projects/schema";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@2";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@3";
 
 function escapeHtml(value: string): string {
   return value
@@ -347,6 +347,26 @@ export function renderPresentationHtml(
   const defaultProfile = deck.voicevox
     ? profiles.get(deck.voicevox.default_profile_id)
     : undefined;
+  const aspectRatio = deck.aspect_ratio ?? "16:9";
+  const loadingScreen = {
+    enabled: true,
+    style: "pulse" as const,
+    message: "発表の準備をしています",
+    show_progress: true,
+    minimum_duration_ms: 500,
+    ...(deck.loading_screen ?? {})
+  };
+  const preloadImages = [...new Set(Object.values(options.assetUrls ?? {}))];
+  const preloadAudio = [
+    ...new Set(
+      deck.slides.flatMap(
+        (slide) =>
+          slide.narration?.segments.flatMap((segment) =>
+            segment.audio_src === null ? [] : [segment.audio_src]
+          ) ?? []
+      )
+    )
+  ];
 
   const runtimeDeck = {
     projectId: project.project_id,
@@ -354,7 +374,10 @@ export function renderPresentationHtml(
     title: project.document.title,
     shortTitle: deck.short_title,
     layout: deck.layout,
+    aspectRatio,
     accent: deck.accent,
+    loadingScreen,
+    preload: { images: preloadImages, audio: preloadAudio },
     slides: deck.slides.map((slide) => {
       const segments = slide.narration?.segments.map((segment) => {
         const profile =
@@ -408,6 +431,8 @@ export function renderPresentationHtml(
       --template-foreground: ${template.foreground};
       --template-muted: ${template.muted};
       --template-accent: ${template.accent};
+      --template-accent-secondary: ${template.accent_secondary ?? template.accent};
+      --template-border: ${template.border ?? template.muted};
       --template-radius: ${stageLength(template.corner_radius_px)};
       --template-spacing: ${template.spacing_scale};
       --template-font-scale: ${template.font_scale};
@@ -481,7 +506,7 @@ export function renderPresentationHtml(
   <aside class="slide-sidebar" data-region="sidebar" data-fit-content data-fit-id="flow:sidebar" data-fit-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
     ${slide.sidebar_markdown === null ? "" : renderTextBlocks(slide.sidebar_markdown)}
   </aside>`;
-      return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${appearance.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em" hidden>
+      return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${appearance.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em" hidden>
   ${content}
   <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" style="--narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines}" aria-live="polite">
     <span class="narration-speaker"${narrationSpeaker === "" ? " hidden" : ""}>${escapeHtml(narrationSpeaker)}</span>
@@ -501,7 +526,7 @@ export function renderPresentationHtml(
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${options.frameAncestors ?? "'none'"}">
   <title>${escapeHtml(project.document.title)}</title>
   <style nonce="saijiyu-static">
-    :root { color-scheme: dark; --accent: ${escapeHtml(deck.accent)}; font-family: Inter, "Noto Sans JP", system-ui, sans-serif; }
+    :root { color-scheme: dark; --accent: ${escapeHtml(deck.accent)}; --stage-ratio: 16 / 9; --stage-width: 16; --stage-height: 9; font-family: Inter, "Noto Sans JP", system-ui, sans-serif; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; overflow: hidden; background: #090d14; color: #f8fafc; }
     button, input { font: inherit; }
@@ -514,11 +539,12 @@ export function renderPresentationHtml(
     header strong { color: #fff; }
     header .time { margin-left: auto; font-variant-numeric: tabular-nums; }
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
-    .stage { position: relative; width: min(100%, calc((100vh - 118px) * 16 / 9)); aspect-ratio: 16 / 9; overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; }
+    body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
+    .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
     .slide::before, .slide::after { content: ""; position: absolute; z-index: 0; pointer-events: none; }
     .slide > * { position: relative; z-index: 1; }
-    .slide[data-user-template="true"] { --accent: var(--template-accent); --theme-background: var(--template-background); --theme-surface: var(--template-surface); --theme-foreground: var(--template-foreground); --theme-muted: var(--template-muted); --slide-base: var(--theme-background); grid-template-columns: minmax(0, 1fr) var(--template-sidebar-width); border-radius: var(--template-radius); }
+    .slide[data-user-template="true"] { --accent: var(--template-accent); --accent-secondary: var(--template-accent-secondary); --theme-background: var(--template-background); --theme-surface: var(--template-surface); --theme-foreground: var(--template-foreground); --theme-muted: var(--template-muted); --theme-border: var(--template-border); --slide-base: var(--theme-background); grid-template-columns: minmax(0, 1fr) var(--template-sidebar-width); border-radius: var(--template-radius); }
     .slide[data-user-template="true"] .slide-main { padding: calc(7% * var(--template-spacing)) calc(7% * var(--template-spacing)) calc(4% * var(--template-spacing)); }
     .slide[data-user-template="true"] .slide-sidebar { background: var(--theme-surface); color: var(--theme-muted); }
     .slide[data-density="spacious"] { --density-scale: 1.18; }
@@ -566,6 +592,26 @@ export function renderPresentationHtml(
     .slide[data-region-layout="sidebar-left"] .slide-sidebar { grid-column: 1; grid-row: 1; border-left: 0; border-right: 1px solid #ffffff25; }
     .slide[data-region-layout="lower-third"] { grid-template: minmax(0, 1fr) auto auto / 1fr; }
     .slide[data-region-layout="lower-third"] .slide-sidebar { grid-row: 2; padding: 2% 6%; border-top: 1px solid #ffffff25; border-left: 0; }
+    .slide[data-region-layout="split"] { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .slide[data-region-layout="split"] .slide-sidebar { padding: calc(7% * var(--density-scale)); }
+    .slide[data-region-layout="top-band"] { grid-template: auto minmax(0, 1fr) auto / 1fr; }
+    .slide[data-region-layout="top-band"] .slide-sidebar { grid-row: 1; padding: 2.5% 6%; border: 0; border-bottom: max(1px, .07cqw) solid var(--theme-border); }
+    .slide[data-region-layout="top-band"] .slide-main { grid-row: 2; }
+    .slide[data-region-layout="focus"] { grid-template-columns: 1fr; }
+    .slide[data-region-layout="focus"] .slide-sidebar { display: none; }
+    .slide[data-region-layout="focus"] .slide-main { width: min(82%, 72rem); place-self: center; }
+    .slide[data-slide-role="cover"][data-composition="flow"] .eyebrow { color: var(--accent); }
+    .slide[data-slide-role="cover"][data-composition="flow"] .slide-content h2:first-child { font-size: calc(7.4cqw * var(--template-font-scale) * var(--fit-scale)); line-height: .96; letter-spacing: -.055em; text-wrap: balance; }
+    .slide[data-slide-role="cover"][data-cover-layout="center"] .slide-main { display: grid; align-content: center; justify-items: center; text-align: center; }
+    .slide[data-slide-role="cover"][data-cover-layout="center"] .slide-content { max-width: 82%; }
+    .slide[data-slide-role="cover"][data-cover-layout="split"] .slide-main { width: 62%; display: grid; align-content: end; padding-bottom: 8%; }
+    .slide[data-slide-role="cover"][data-cover-layout="split"]::after { right: 0; top: 0; width: 34%; height: 100%; background: linear-gradient(155deg, var(--accent), var(--accent-secondary, var(--accent))); }
+    .slide[data-slide-role="cover"][data-cover-layout="poster"] .slide-main { display: grid; align-content: end; padding: 7%; background: linear-gradient(0deg, #000c, transparent 62%); }
+    .slide[data-slide-role="cover"][data-cover-layout="poster"] .slide-content h2:first-child { max-width: 12ch; font-size: calc(9cqw * var(--template-font-scale) * var(--fit-scale)); text-transform: uppercase; }
+    .slide[data-slide-role="cover"][data-cover-layout="minimal"] .slide-main { display: grid; align-content: center; padding-inline: 14%; }
+    .slide[data-slide-role="cover"][data-cover-layout="minimal"] .slide-content h2:first-child { font-size: calc(5.7cqw * var(--template-font-scale) * var(--fit-scale)); font-weight: 600; letter-spacing: -.035em; }
+    .slide[data-slide-role="cover"][data-cover-layout="statement"] .slide-main { display: grid; align-content: center; padding: 6%; }
+    .slide[data-slide-role="cover"][data-cover-layout="statement"] .slide-content h2:first-child { max-width: 18ch; font-size: calc(8.2cqw * var(--template-font-scale) * var(--fit-scale)); color: var(--accent); }
     .slide[data-composition="canvas"], .slide[data-composition="scene"] { --slide-base: var(--canvas-background); grid-template: minmax(0, 1fr) auto / 1fr; overflow: var(--canvas-overflow); }
     .slide-canvas { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; overflow: var(--canvas-overflow); }
     .slide-scene { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; padding: calc(6% * var(--density-scale)); overflow: var(--canvas-overflow); }
@@ -690,6 +736,25 @@ export function renderPresentationHtml(
     [data-layout="minimal"] .slide[data-user-template="false"] .slide-sidebar { background: var(--theme-surface); color: var(--theme-foreground); border-color: var(--theme-border); }
     [data-layout="cinematic"] .slide-sidebar { display: none; }
     [data-layout="cinematic"] .slide { grid-template-columns: 1fr; }
+    .prelude { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; overflow: hidden; background: #080d15; color: #f8fafc; }
+    .prelude[hidden] { display: none; }
+    .prelude-inner { position: relative; z-index: 1; display: grid; width: min(78%, 48rem); justify-items: center; gap: 1.4cqh; text-align: center; }
+    .prelude-kicker { margin: 0; color: var(--accent); font: 850 1.1cqw/1.2 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; }
+    .prelude h1 { max-width: 16ch; margin: 0; font-family: var(--font-heading, system-ui, sans-serif); font-size: 5.8cqw; line-height: .98; letter-spacing: -.05em; text-wrap: balance; overflow-wrap: anywhere; }
+    .prelude-message { margin: 0; color: #b9c6d6; font-size: 1.35cqw; }
+    .prelude-meter { width: min(100%, 32rem); height: .55cqh; overflow: hidden; border-radius: 99px; background: #ffffff18; }
+    .prelude-meter i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, var(--accent), #65ccff); transition: width .2s ease; }
+    .prelude-status { min-height: 1.5em; margin: 0; color: #8fa0b5; font: 700 1cqw/1.4 ui-monospace, monospace; }
+    .prelude-start { min-width: 10em; padding: .8em 1.4em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: var(--accent); font-weight: 850; }
+    .prelude-start:disabled { cursor: wait; opacity: .45; }
+    .prelude[data-style="pulse"]::before { content: ""; position: absolute; width: 28cqw; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 36%, transparent), transparent 68%); animation: prelude-pulse 1.7s ease-in-out infinite alternate; }
+    .prelude[data-style="orbit"]::before, .prelude[data-style="orbit"]::after { content: ""; position: absolute; width: 32cqw; aspect-ratio: 1; border: .12cqw solid #ffffff22; border-radius: 50%; animation: prelude-orbit 7s linear infinite; }
+    .prelude[data-style="orbit"]::after { width: 21cqw; border-color: color-mix(in srgb, var(--accent) 55%, transparent); animation-direction: reverse; animation-duration: 4s; }
+    .prelude[data-style="research-log"] { place-items: end start; background: linear-gradient(90deg, #ffffff09 1px, transparent 1px), #f3efe6; background-size: 4cqw 100%; color: #172033; }
+    .prelude[data-style="research-log"] .prelude-inner { margin: 8%; justify-items: start; text-align: start; }
+    .prelude[data-style="research-log"] .prelude-message, .prelude[data-style="research-log"] .prelude-status { color: #536071; }
+    @keyframes prelude-pulse { from { opacity: .55; scale: .82; } to { opacity: 1; scale: 1.12; } }
+    @keyframes prelude-orbit { to { rotate: 1turn; } }
     ${templateCss}
     ${compositionCss}
     @keyframes slide-fade { from { opacity: 0; } }
@@ -721,10 +786,22 @@ export function renderPresentationHtml(
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; } }
   </style>
 </head>
-<body data-layout="${escapeHtml(deck.layout)}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
+<body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time"><span id="elapsed">00:00</span> / <span id="expected">00:00</span></span></header>
-    <div class="stage-wrap"><div class="stage" aria-label="${escapeHtml(project.document.title)}">${slideHtml}</div></div>
+    <div class="stage-wrap"><div class="stage" aria-label="${escapeHtml(project.document.title)}">
+      <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
+        <div class="prelude-inner">
+          <p class="prelude-kicker">PAGE 0 · PREPARING</p>
+          <h1>${escapeHtml(project.document.title)}</h1>
+          <p class="prelude-message">${escapeHtml(loadingScreen.message)}</p>
+          <div class="prelude-meter"${loadingScreen.show_progress ? "" : " hidden"} aria-hidden="true"><i data-prelude-progress></i></div>
+          <p class="prelude-status" data-prelude-status aria-live="polite">コンテンツを確認しています…</p>
+          <button class="prelude-start" type="button" data-prelude-start disabled>発表を始める</button>
+        </div>
+      </section>
+      ${slideHtml}
+    </div></div>
     <footer>
       <span id="counter">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div>
       <div class="voice-progress" title="読み上げ進捗"><i id="voice-progress"></i></div>
@@ -750,10 +827,14 @@ export function renderPresentationHtml(
     const volume = document.querySelector('#volume');
     const speechButton = document.querySelector('#speech');
     const autoButton = document.querySelector('#auto');
+    const prelude = document.querySelector('[data-prelude]');
+    const preludeStart = document.querySelector('[data-prelude-start]');
+    const preludeProgress = document.querySelector('[data-prelude-progress]');
+    const preludeStatus = document.querySelector('[data-prelude-status]');
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let slide = 0, step = 0, speech = true, auto = false, startedAt = Date.now(), voiceTimer, activeAudio, fitFrame;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), voiceTimer, activeAudio, fitFrame;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -774,6 +855,7 @@ export function renderPresentationHtml(
     };
     const finishVoice = () => { clearInterval(voiceTimer); setVoiceProgress(100); if (auto) setTimeout(advance, 350); };
     const advance = () => {
+      if (!started) return false;
       const current = DECK.slides[slide];
       if (step < current.revealSteps) step += 1;
       else if (slide < slides.length - 1) { slide += 1; step = 0; }
@@ -797,7 +879,7 @@ export function renderPresentationHtml(
     };
     const speak = () => {
       stopVoice(); const segment = narration();
-      if (!speech || !segment) return;
+      if (!started || !speech || !segment) return;
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
       const tuning = segment.effectiveTuning || {};
@@ -872,6 +954,20 @@ export function renderPresentationHtml(
       if (push) syncUrl(); else history.replaceState(null, '', '?slide=' + (slide + 1) + '&step=' + step);
       render();
     };
+    const showPrelude = (push) => {
+      if (!DECK.loadingScreen.enabled || editorFrame) return false;
+      started = false;
+      stopVoice();
+      prelude.hidden = false;
+      slides.forEach((item) => { item.hidden = true; item.dataset.state = 'inactive'; });
+      counter.textContent = '0 / ' + slides.length;
+      progress.style.width = '0%';
+      elapsed.textContent = '00:00';
+      expected.textContent = '00:00';
+      if (push) history.pushState(null, '', '?slide=0');
+      else history.replaceState(null, '', '?slide=0');
+      return true;
+    };
     const render = () => {
       stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
       slides[slide].querySelectorAll('[data-reveal]').forEach((item) => { const visible = Number(item.dataset.reveal) <= step; item.classList.toggle('is-visible', visible); item.setAttribute('aria-hidden', String(!visible)); });
@@ -895,9 +991,53 @@ export function renderPresentationHtml(
       expected.textContent = format(DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.durationSeconds, 0));
       scheduleFit(); speak();
     };
-    const restore = () => { const query = new URLSearchParams(location.search); slide = Math.min(Math.max(Number(query.get('slide') ?? 1) - 1, 0), slides.length - 1); step = Math.min(Math.max(Number(query.get('step') ?? 0), 0), DECK.slides[slide].revealSteps); render(); };
-    document.querySelector('#next').addEventListener('click', advance);
-    document.querySelector('#prev').addEventListener('click', () => { if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
+    const restore = () => {
+      const query = new URLSearchParams(location.search);
+      if ((query.get('slide') === null || query.get('slide') === '0') && showPrelude(false)) return;
+      started = true;
+      prelude.hidden = true;
+      slide = Math.min(Math.max(Number(query.get('slide') ?? 1) - 1, 0), slides.length - 1);
+      step = Math.min(Math.max(Number(query.get('step') ?? 0), 0), DECK.slides[slide].revealSteps);
+      render();
+    };
+    const markPreloadProgress = (completed, total) => {
+      const percent = total === 0 ? 100 : completed / total * 100;
+      if (preludeProgress) preludeProgress.style.width = percent + '%';
+      if (preludeStatus) preludeStatus.textContent = completed < total ? completed + ' / ' + total + ' 件を準備中' : '準備できました';
+    };
+    const preloadResource = (url, kind) => new Promise((resolve) => {
+      const media = kind === 'image' ? new Image() : new Audio();
+      const finish = () => resolve(url);
+      media.addEventListener(kind === 'image' ? 'load' : 'loadedmetadata', finish, { once: true });
+      media.addEventListener('error', finish, { once: true });
+      if (kind === 'audio') media.preload = 'metadata';
+      media.src = url;
+      if (kind === 'audio') media.load();
+    });
+    const preparePrelude = async () => {
+      const resources = [
+        ...DECK.preload.images.map((url) => [url, 'image']),
+        ...DECK.preload.audio.map((url) => [url, 'audio']),
+        ['fonts', 'font']
+      ];
+      let completed = 0;
+      markPreloadProgress(completed, resources.length);
+      const startedLoadingAt = performance.now();
+      const tasks = resources.map(([url, kind]) => {
+        const task = kind === 'font' ? (document.fonts?.ready ?? Promise.resolve()) : preloadResource(url, kind);
+        return Promise.resolve(task).finally(() => { completed += 1; markPreloadProgress(completed, resources.length); });
+      });
+      await Promise.race([
+        Promise.allSettled(tasks),
+        new Promise((resolve) => setTimeout(resolve, 10_000))
+      ]);
+      const remaining = Math.max(0, Number(DECK.loadingScreen.minimum_duration_ms) - (performance.now() - startedLoadingAt));
+      if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      if (preludeStatus) preludeStatus.textContent = completed < resources.length ? '一部を読み込みながら開始できます' : '準備できました';
+      if (preludeStart) preludeStart.disabled = false;
+    };
+    document.querySelector('#next').addEventListener('click', () => { if (started) advance(); });
+    document.querySelector('#prev').addEventListener('click', () => { if (!started) return; if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
     speechButton.addEventListener('click', () => { speech = !speech; speechButton.setAttribute('aria-pressed', String(speech)); render(); });
     autoButton.addEventListener('click', () => { auto = !auto; autoButton.setAttribute('aria-pressed', String(auto)); });
     volume.addEventListener('input', () => { if (activeAudio) { const tuning = narration()?.effectiveTuning || {}; activeAudio.volume = clamp(Number(volume.value) * Number(tuning.volumeScale || 1), 0, 1); } try { localStorage.setItem(volumeKey, volume.value); } catch {} });
@@ -908,7 +1048,18 @@ export function renderPresentationHtml(
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
     document.fonts?.ready.then(scheduleFit);
     setTimeout(scheduleFit, 300);
-    setInterval(() => { elapsed.textContent = format((Date.now() - startedAt) / 1000); }, 250); restore();
+    preludeStart?.addEventListener('click', () => {
+      started = true;
+      prelude.hidden = true;
+      startedAt = Date.now();
+      history.pushState(null, '', '?slide=1&step=0');
+      slide = 0;
+      step = 0;
+      render();
+    });
+    setInterval(() => { if (started) elapsed.textContent = format((Date.now() - startedAt) / 1000); }, 250);
+    preparePrelude();
+    restore();
   })();</script>
 </body>
 </html>`;

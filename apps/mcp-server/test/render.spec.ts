@@ -35,6 +35,14 @@ describe("presentation artifact renderer", () => {
           year: 2026,
           accent: "#ffcf32",
           layout: "biim",
+          aspect_ratio: "4:3",
+          loading_screen: {
+            enabled: true,
+            style: "orbit",
+            message: "素材を準備しています",
+            show_progress: true,
+            minimum_duration_ms: 700
+          },
           templates: [
             {
               id: "my-biim",
@@ -46,6 +54,8 @@ describe("presentation artifact renderer", () => {
               foreground: "#f8fafc",
               muted: "#bac8dc",
               accent: "#44ddaa",
+              accent_secondary: "#65ccff",
+              border: "#334155",
               corner_radius_px: 12,
               spacing_scale: 1,
               font_scale: 1,
@@ -72,6 +82,8 @@ describe("presentation artifact renderer", () => {
               reveal_steps: 1,
               tone: "dark",
               template_id: "my-biim",
+              role: "cover",
+              cover_layout: "poster",
               content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A",
               reveal_blocks: [
                 { at: 1, markdown: "追加で見せる証拠" }
@@ -109,7 +121,12 @@ describe("presentation artifact renderer", () => {
       }
     });
 
-    const html = renderPresentationHtml(project);
+    const html = renderPresentationHtml(project, {
+      assetUrls: {
+        "40000000-0000-4000-8000-000000000004":
+          "/presentation-assets/revision/image"
+      }
+    });
     expect(html).toContain('<meta http-equiv="Content-Security-Policy"');
     expect(html).toContain('class="stage"');
     expect(html).toContain('id="voice-progress"');
@@ -119,6 +136,17 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@3");
+    expect(html).toContain('data-aspect-ratio="4:3"');
+    expect(html).toContain('data-style="orbit"');
+    expect(html).toContain('data-slide-role="cover"');
+    expect(html).toContain('data-cover-layout="poster"');
+    expect(html).toContain('--template-accent-secondary: #65ccff');
+    expect(html).toContain('--template-border: #334155');
+    expect(html).toContain('"/presentation-assets/revision/image"');
+    expect(html).toContain('"/audio/result-0.mp3"');
+    expect(html).toContain("Promise.allSettled(tasks)");
+    expect(html).toContain("history.pushState(null, '', '?slide=1&step=0')");
     expect(html).toContain('data-template-id="my-biim"');
     expect(html).toContain('data-region="sidebar"');
     expect(html).toContain('data-reveal-at="1"');

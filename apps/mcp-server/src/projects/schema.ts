@@ -54,6 +54,33 @@ export const densitySchema = z.enum([
 
 export const motionStyleSchema = z.enum(["calm", "snappy", "dramatic"]);
 
+export const presentationAspectRatioSchema = z.enum(["16:9", "4:3"]);
+
+export const loadingScreenStyleSchema = z.enum([
+  "minimal",
+  "pulse",
+  "orbit",
+  "research-log"
+]);
+
+export const loadingScreenSchema = z.object({
+  enabled: z.boolean(),
+  style: loadingScreenStyleSchema,
+  message: z.string().max(160),
+  show_progress: z.boolean(),
+  minimum_duration_ms: z.number().int().min(0).max(5_000)
+});
+
+export const slideRoleSchema = z.enum(["content", "cover"]);
+
+export const coverLayoutSchema = z.enum([
+  "center",
+  "split",
+  "poster",
+  "minimal",
+  "statement"
+]);
+
 export const narrationDisplaySchema = z.enum([
   "dialogue",
   "commentary",
@@ -456,7 +483,10 @@ export const presentationTemplateSchema = z.object({
     "single",
     "sidebar-right",
     "sidebar-left",
-    "lower-third"
+    "lower-third",
+    "split",
+    "top-band",
+    "focus"
   ]),
   sidebar_width_percent: z.number().int().min(20).max(45),
   background: hexColorSchema,
@@ -464,6 +494,8 @@ export const presentationTemplateSchema = z.object({
   foreground: hexColorSchema,
   muted: hexColorSchema,
   accent: hexColorSchema,
+  accent_secondary: hexColorSchema.optional(),
+  border: hexColorSchema.optional(),
   corner_radius_px: z.number().int().min(0).max(48),
   spacing_scale: z.number().min(0.75).max(1.5).multipleOf(0.05),
   font_scale: z.number().min(0.75).max(1.3).multipleOf(0.05),
@@ -564,6 +596,8 @@ export const projectSlideSchema = z
     tone: z.enum(["dark", "light", "signal", "quiet"]),
     template_id: templateIdSchema.nullable().optional(),
     enter_animation: animationSchema.nullable().optional(),
+    role: slideRoleSchema.optional(),
+    cover_layout: coverLayoutSchema.optional(),
     composition: slideCompositionSchema.nullable().optional(),
     content_markdown: z.string().min(1).max(20_000),
     reveal_blocks: z
@@ -668,6 +702,8 @@ export const projectDocumentSchema = z
       year: z.number().int().min(2021).max(2100),
       accent: hexColorSchema,
       layout: z.enum(["cinematic", "biim", "minimal"]),
+      aspect_ratio: presentationAspectRatioSchema.optional(),
+      loading_screen: loadingScreenSchema.optional(),
       templates: z.array(presentationTemplateSchema).max(16).optional(),
       default_template_id: templateIdSchema.nullable().optional(),
       narration_defaults: z

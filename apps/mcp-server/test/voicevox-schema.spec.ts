@@ -106,6 +106,14 @@ describe("VOICEVOX project schema", () => {
 
   it("accepts optional presentation presets and narration appearance without migrating version 1", () => {
     const project = voiceProject();
+    project.deck!.aspect_ratio = "4:3";
+    project.deck!.loading_screen = {
+      enabled: true,
+      style: "research-log",
+      message: "準備しています",
+      show_progress: true,
+      minimum_duration_ms: 500
+    };
     project.deck!.templates = [
       {
         id: "retro",
@@ -117,6 +125,8 @@ describe("VOICEVOX project schema", () => {
         foreground: "#fff7d6",
         muted: "#b8d86f",
         accent: "#ffcf4a",
+        accent_secondary: "#65ccff",
+        border: "#334155",
         corner_radius_px: 0,
         spacing_scale: 0.95,
         font_scale: 0.95,
@@ -144,17 +154,31 @@ describe("VOICEVOX project schema", () => {
       max_lines: 3
     };
     const narration = project.deck!.slides[0]!.narration!;
+    project.deck!.slides[0]!.role = "cover";
+    project.deck!.slides[0]!.cover_layout = "split";
     narration.display = "minimal";
     narration.appearance = { placement: "bottom", max_lines: 2 };
     narration.segments[0]!.speaker = "ずんだもん";
 
     const parsed = projectDocumentSchema.safeParse(project);
     expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data.schema_version).toBe(1);
+    if (parsed.success) {
+      expect(parsed.data.schema_version).toBe(1);
+      expect(parsed.data.deck?.aspect_ratio).toBe("4:3");
+      expect(parsed.data.deck?.slides[0]?.cover_layout).toBe("split");
+    }
   });
 
   it("rejects arbitrary presentation tokens and unsafe typography bounds", () => {
     const project = voiceProject();
+    project.deck!.aspect_ratio = "21:9" as "16:9";
+    project.deck!.loading_screen = {
+      enabled: true,
+      style: "pulse",
+      message: "準備中",
+      show_progress: true,
+      minimum_duration_ms: 5_100
+    };
     project.deck!.templates = [
       {
         id: "unsafe",

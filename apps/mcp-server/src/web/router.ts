@@ -24,11 +24,15 @@ import { renderPresentationHtml } from "../presentation/render";
 import { getProject, listProjects, mutateProject } from "../projects/repository";
 import {
   animationSchema,
+  coverLayoutSchema,
+  loadingScreenSchema,
   narrationAppearanceSchema,
   narrationDisplaySchema,
   narrationSegmentSchema,
   presentationTemplateSchema,
-  projectStageSchema
+  presentationAspectRatioSchema,
+  projectStageSchema,
+  slideRoleSchema
 } from "../projects/schema";
 import {
   createPresentationPreview,
@@ -78,6 +82,12 @@ const previewRequestSchema = z.object({
   expected_version: z.number().int().positive()
 });
 
+const deckSettingsRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  aspect_ratio: presentationAspectRatioSchema,
+  loading_screen: loadingScreenSchema
+});
+
 const publishRequestSchema = z.object({
   revision_id: z.string().uuid()
 });
@@ -89,6 +99,8 @@ const slideFieldsRequestSchema = z.object({
   tone: z.enum(["dark", "light", "signal", "quiet"]).optional(),
   template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
   enter_animation: animationSchema.nullable().optional(),
+  role: slideRoleSchema.optional(),
+  cover_layout: coverLayoutSchema.optional(),
   content_markdown: z.string().min(1).max(20_000).optional(),
   sidebar_markdown: z.string().max(10_000).optional()
 }).refine(
@@ -430,6 +442,79 @@ async function handleProjectFieldsUpdate(
         request_id: crypto.randomUUID()
       },
       status
+    );
+  }
+}
+
+async function handleDeckSettingsUpdate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = deckSettingsRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: "INVALID_PRESENTATION_SETTINGS",
+          message: "発表画面の設定を確認してください。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        if (document.deck === null) {
+          const error = new Error("The presentation deck does not exist.");
+          Object.assign(error, { code: "DECK_REQUIRED" });
+          throw error;
+        }
+        document.deck.aspect_ratio = parsed.data.aspect_ratio;
+        document.deck.loading_screen = parsed.data.loading_screen;
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.presentation_stage_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(
+      error,
+      "発表画面の設定を保存できませんでした。"
     );
   }
 }
@@ -1392,6 +1477,12 @@ export async function handleWebRequest(
   );
   if (projectFieldsMatch?.[1] !== undefined) {
     return handleProjectFieldsUpdate(request, env, projectFieldsMatch[1]);
+  }
+  const deckSettingsMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/presentation/settings$`, "i")
+  );
+  if (deckSettingsMatch?.[1] !== undefined) {
+    return handleDeckSettingsUpdate(request, env, deckSettingsMatch[1]);
   }
   const slideFieldsMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})$`)

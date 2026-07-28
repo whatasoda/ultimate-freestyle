@@ -81,7 +81,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=2";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=3";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -222,7 +222,7 @@ function shell(title: string, body: string): string {
       .filmstrip-link strong { overflow-wrap: anywhere; font-size: .86rem; line-height: 1.35; }
       .filmstrip-link[data-active="true"] { border-color: #9d7bff; background: #8062df20; color: white; }
       .workspace-preview { min-width: 0; padding: .8rem; }
-      .workspace-frame { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #40516a; border-radius: .65rem; background: #05080d; box-shadow: 0 1.5rem 4rem #0006; }
+      .workspace-frame { position: relative; width: 100%; aspect-ratio: var(--workspace-aspect, 16 / 9); overflow: hidden; border: 1px solid #40516a; border-radius: .65rem; background: #05080d; box-shadow: 0 1.5rem 4rem #0006; }
       .workspace-frame iframe { position: relative; z-index: 1; display: block; width: 100%; height: 100%; border: 0; }
       .frame-loading { position: absolute; z-index: 2; inset: 0; display: grid; place-items: center; background: #05080de8; color: var(--muted); font-size: .85rem; letter-spacing: .03em; }
       .frame-loading[hidden] { display: none; }
@@ -256,6 +256,12 @@ function shell(title: string, body: string): string {
       .editor fieldset { display: grid; gap: .7rem; min-width: 0; margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: .7rem; }
       .editor legend { padding: 0 .35rem; color: #dce6f3; font-size: .82rem; font-weight: 800; }
       .editor input[type="color"] { min-height: 2.7rem; padding: .3rem; }
+      .ratio-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+      .ratio-option { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .65rem; padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; background: #0b1420; cursor: pointer; }
+      .ratio-option:has(input:checked) { border-color: #9d7bff; box-shadow: 0 0 0 1px #9d7bff; }
+      .ratio-preview { display: block; width: 3.3rem; border: 1px solid #6f8096; background: #1d2b3d; }
+      .ratio-preview.wide { aspect-ratio: 16 / 9; }
+      .ratio-preview.standard { width: 2.8rem; aspect-ratio: 4 / 3; }
       .editor input[type="checkbox"] { width: auto; accent-color: var(--accent); }
       .check-label { display: flex !important; grid-template-columns: auto 1fr; align-items: center; }
       .setting-table { display: grid; grid-template-columns: minmax(6rem, auto) minmax(0, 1fr); gap: .35rem .75rem; margin: 0; font-size: .78rem; }
@@ -438,10 +444,19 @@ export function projectDetailPage(options: {
         .join("")
     : `<p class="prose">まだ研究ログがありません。</p>`;
   const slides = document.deck?.slides ?? [];
+  const deck = document.deck;
+  const loadingScreen = {
+    enabled: true,
+    style: "pulse",
+    message: "発表の準備をしています",
+    show_progress: true,
+    minimum_duration_ms: 500,
+    ...(deck?.loading_screen ?? {})
+  };
   const slideRows = slides.length
     ? slides
         .map(
-          (slide, index) => `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${escapeHtml(slideCompositionLabel(slide))}</small></strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></a>`
+          (slide, index) => `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${slide.role === "cover" ? "表紙 · " : ""}${escapeHtml(slideCompositionLabel(slide))}</small></strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></a>`
         )
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
@@ -477,6 +492,24 @@ export function projectDetailPage(options: {
     </div>
     <p class="feedback${preview !== null && !previewCurrent ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
+  const presentationSettingsPanel = deck === null
+    ? ""
+    : `<section class="panel"><h2>発表画面と0ページ目</h2>
+       <form class="editor" data-deck-editor data-versioned-form action="/api/projects/${escapeHtml(options.project.project_id)}/presentation/settings" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+         <fieldset><legend>スライド比率</legend><div class="ratio-options">
+           <label class="ratio-option"><input type="radio" name="aspect_ratio" value="16:9"${(deck.aspect_ratio ?? "16:9") === "16:9" ? " checked" : ""}><span class="ratio-preview wide"></span><span><strong>ワイド 16:9</strong><small>PC・配信向け</small></span></label>
+           <label class="ratio-option"><input type="radio" name="aspect_ratio" value="4:3"${deck.aspect_ratio === "4:3" ? " checked" : ""}><span class="ratio-preview standard"></span><span><strong>標準 4:3</strong><small>資料・旧型画面向け</small></span></label>
+         </div></fieldset>
+         <fieldset><legend>0ページ目</legend>
+           <label class="check-label"><input type="checkbox" name="loading_enabled"${loadingScreen.enabled ? " checked" : ""}>表紙の前に準備画面を表示</label>
+           <div class="editor-grid"><label>見た目<select name="loading_style">${[["minimal", "ミニマル"], ["pulse", "光のパルス"], ["orbit", "軌道"], ["research-log", "研究ノート"]].map(([value, label]) => `<option value="${value}"${loadingScreen.style === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>最低表示時間（ms）<input name="loading_minimum_duration_ms" type="number" min="0" max="5000" step="100" value="${loadingScreen.minimum_duration_ms}"></label></div>
+           <label>案内文<input name="loading_message" maxlength="160" value="${escapeHtml(loadingScreen.message)}"></label>
+           <label class="check-label"><input type="checkbox" name="loading_show_progress"${loadingScreen.show_progress ? " checked" : ""}>プリロード件数を表示</label>
+           <p class="inherit-note">画像・生成音声・利用可能なフォントを準備し、失敗やタイムアウトがあっても発表は開始できます。</p>
+         </fieldset>
+         <div class="actions"><button type="submit">発表画面を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
+       </form>
+     </section>`;
 
   return new Response(
     shell(
@@ -503,6 +536,7 @@ export function projectDetailPage(options: {
                  <p class="feedback" data-editor-feedback aria-live="polite"></p>
                </form>
              </section>
+             ${presentationSettingsPanel}
              ${textPanel("研究の問い", document.question)}
              ${textPanel("仮説", document.hypothesis)}
              ${textPanel("方法", document.method)}
@@ -553,7 +587,7 @@ export function slideWorkspacePage(options: {
   const slidePath = `${projectPath}/slides/${escapeHtml(slide.id)}`;
   const filmstrip = deck.slides
     .map(
-      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}</strong></a>`
+      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}${item.role === "cover" ? '<small class="stage">表紙</small>' : ""}</strong></a>`
     )
     .join("");
   const componentOutline =
@@ -628,8 +662,8 @@ export function slideWorkspacePage(options: {
         <p class="inherit-note">このtemplateを使う全スライドへ反映されます。</p>
         <label>template名<input name="name" maxlength="80" required value="${escapeHtml(activeTemplate.name)}"></label>
         <div class="editor-grid"><label>visual<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}"${visualPreset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>情報密度<select name="density">${Object.entries(DENSITY_LABELS).map(([value, label]) => `<option value="${value}"${density === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div>
-        <fieldset><legend>領域</legend><div class="editor-grid"><label>配置<select name="region_layout">${[["single", "単一"], ["sidebar-right", "右補足"], ["sidebar-left", "左補足"], ["lower-third", "下段補足"]].map(([value, label]) => `<option value="${value}"${activeTemplate.region_layout === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>補足幅（%）<input name="sidebar_width_percent" type="number" min="20" max="45" value="${activeTemplate.sidebar_width_percent}" required></label></div><div class="editor-grid"><label>角の丸み<input name="corner_radius_px" type="number" min="0" max="48" value="${activeTemplate.corner_radius_px}" required></label><label>余白倍率<input name="spacing_scale" type="number" min="0.75" max="1.5" step="0.05" value="${activeTemplate.spacing_scale}" required></label></div></fieldset>
-        <fieldset><legend>色</legend><div class="editor-grid">${[["background", "背景"], ["surface", "補足面"], ["foreground", "本文"], ["muted", "補助文字"], ["accent", "アクセント"]].map(([name, label]) => `<label>${label}<input name="${name}" type="color" value="${escapeHtml(String(activeTemplate[name as keyof typeof activeTemplate]))}"></label>`).join("")}</div></fieldset>
+        <fieldset><legend>領域</legend><div class="editor-grid"><label>配置<select name="region_layout">${[["single", "単一"], ["sidebar-right", "右補足"], ["sidebar-left", "左補足"], ["lower-third", "下段補足"], ["split", "左右均等"], ["top-band", "上段補足"], ["focus", "中央集中"]].map(([value, label]) => `<option value="${value}"${activeTemplate.region_layout === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>補足幅（%）<input name="sidebar_width_percent" type="number" min="20" max="45" value="${activeTemplate.sidebar_width_percent}" required></label></div><div class="editor-grid"><label>角の丸み<input name="corner_radius_px" type="number" min="0" max="48" value="${activeTemplate.corner_radius_px}" required></label><label>余白倍率<input name="spacing_scale" type="number" min="0.75" max="1.5" step="0.05" value="${activeTemplate.spacing_scale}" required></label></div></fieldset>
+        <fieldset><legend>色</legend><div class="editor-grid">${[["background", "背景", activeTemplate.background], ["surface", "補足面", activeTemplate.surface], ["foreground", "本文", activeTemplate.foreground], ["muted", "補助文字", activeTemplate.muted], ["accent", "アクセント", activeTemplate.accent], ["accent_secondary", "第2アクセント", activeTemplate.accent_secondary ?? activeTemplate.accent], ["border", "境界線", activeTemplate.border ?? activeTemplate.muted]].map(([name, label, value]) => `<label>${label}<input name="${name}" type="color" value="${escapeHtml(String(value))}"></label>`).join("")}</div></fieldset>
         <fieldset><legend>文字</legend><div class="editor-grid"><label>本文font<select name="body_font">${Object.entries(FONT_LABELS).map(([value, label]) => `<option value="${value}"${bodyFont === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>見出しfont<select name="heading_font">${Object.entries(FONT_LABELS).map(([value, label]) => `<option value="${value}"${headingFont === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>本文weight<input name="body_weight" type="number" min="300" max="900" step="100" value="${activeTemplate.body_weight ?? 400}"></label><label>見出しweight<input name="heading_weight" type="number" min="300" max="900" step="100" value="${activeTemplate.heading_weight ?? 800}"></label><label>文字倍率<input name="font_scale" type="number" min="0.75" max="1.3" step="0.05" value="${activeTemplate.font_scale}"></label><label>行間<input name="line_height" type="number" min="1" max="2" step="0.05" value="${activeTemplate.line_height ?? 1.5}"></label><label>字間（em）<input name="letter_spacing_em" type="number" min="-0.08" max="0.2" step="0.01" value="${activeTemplate.letter_spacing_em ?? 0}"></label></div></fieldset>
         <fieldset><legend>動き</legend><div class="editor-grid"><label>motion<select name="motion_style">${Object.entries(MOTION_LABELS).map(([value, label]) => `<option value="${value}"${motion === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation">${Object.entries(ANIMATION_LABELS).map(([value, label]) => `<option value="${value}"${activeTemplate.enter_animation === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>段階animation<select name="reveal_animation">${Object.entries(ANIMATION_LABELS).map(([value, label]) => `<option value="${value}"${activeTemplate.reveal_animation === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div></fieldset>
         <div class="actions"><button type="submit">templateを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
@@ -705,7 +739,7 @@ export function slideWorkspacePage(options: {
          <div class="slide-workspace">
            <nav class="filmstrip" aria-label="スライド一覧">${filmstrip}</nav>
            <section class="panel workspace-preview">
-             <div class="workspace-frame"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame></iframe></div>
+             <div class="workspace-frame" style="--workspace-aspect:${(deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame data-aspect-ratio="${deck.aspect_ratio ?? "16:9"}"></iframe></div>
              <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output aria-live="polite">STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>
              <p class="quality-status" data-layout-status role="status" aria-live="polite">実表示の文字収まりを確認しています…</p>
            </section>
@@ -721,7 +755,7 @@ export function slideWorkspacePage(options: {
                </form>
              </div></details>
              <details class="inspector-section"><summary>デザイン</summary><div class="inspector-body">
-               <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
+               <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>用途<select name="role"><option value="content"${slide.role !== "cover" ? " selected" : ""}>通常スライド</option><option value="cover"${slide.role === "cover" ? " selected" : ""}>表紙</option></select></label><label>表紙レイアウト<select name="cover_layout">${[["center", "中央タイトル"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言を強調"]].map(([value, label]) => `<option value="${value}"${(slide.cover_layout ?? "center") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div><div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
                ${templateEditor}
              </div></details>
              <details class="inspector-section"><summary>読み上げ</summary><div class="inspector-body">

@@ -166,7 +166,7 @@ describe("MCP contract", () => {
       expect(styleGuide.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "text/markdown",
-          text: expect.stringContaining("update_slide_narration_voice")
+          text: expect.stringContaining("configure_presentation_stage")
         })
       );
     } finally {
@@ -929,6 +929,46 @@ describe("MCP contract", () => {
         version: 11
       });
 
+      await client.callTool({
+        name: "configure_presentation_stage",
+        arguments: {
+          project_id: projectId,
+          expected_version: 11,
+          aspect_ratio: "4:3",
+          loading_screen: {
+            style: "research-log",
+            message: "資料を準備しています",
+            minimum_duration_ms: 800
+          }
+        }
+      });
+      await client.callTool({
+        name: "update_slide_fields",
+        arguments: {
+          project_id: projectId,
+          expected_version: 12,
+          slide_id: "intro",
+          role: "cover",
+          cover_layout: "statement",
+          enter_animation: "blur"
+        }
+      });
+      const expandedTemplate = await client.callTool({
+        name: "update_presentation_template_fields",
+        arguments: {
+          project_id: projectId,
+          expected_version: 13,
+          template_id: "research-paper",
+          region_layout: "split",
+          accent_secondary: "#65ccff",
+          border: "#334155"
+        }
+      });
+      expect(expandedTemplate.structuredContent).toMatchObject({
+        ok: true,
+        version: 14
+      });
+
       const result = await client.callTool({
         name: "get_project",
         arguments: { project_id: projectId }
@@ -936,7 +976,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         project: {
-          version: 11,
+          version: 14,
           document: {
             deck: {
               default_template_id: "research-paper",
@@ -949,7 +989,10 @@ describe("MCP contract", () => {
                   id: "research-paper",
                   visual_preset: "paper",
                   heading_font: "mincho",
-                  body_weight: 500
+                  body_weight: 500,
+                  region_layout: "split",
+                  accent_secondary: "#65ccff",
+                  border: "#334155"
                 }
               ],
               voicevox: {
@@ -963,6 +1006,9 @@ describe("MCP contract", () => {
               slides: [
                 {
                   id: "intro",
+                  role: "cover",
+                  cover_layout: "statement",
+                  enter_animation: "blur",
                   narration: {
                     display: "minimal",
                     appearance: { placement: "bottom", text_scale: 1.1 },
@@ -977,7 +1023,15 @@ describe("MCP contract", () => {
                     ]
                   }
                 }
-              ]
+              ],
+              aspect_ratio: "4:3",
+              loading_screen: {
+                enabled: true,
+                style: "research-log",
+                message: "資料を準備しています",
+                show_progress: true,
+                minimum_duration_ms: 800
+              }
             }
           }
         }

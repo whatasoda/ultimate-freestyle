@@ -66,6 +66,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     for (const label of document.querySelectorAll("[data-workspace-version], [data-version-label]")) {
       if (label instanceof HTMLElement) label.textContent = "v" + value;
     }
+    const previewButton = document.querySelector("[data-create-preview]");
+    if (previewButton instanceof HTMLButtonElement) previewButton.dataset.version = value;
   };
   const refreshSlideFrame = (version) => {
     if (!(slideFrame instanceof HTMLIFrameElement)) return;
@@ -91,7 +93,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (form.matches("[data-appearance-editor]")) Object.assign(body, {
       tone: String(data.get("tone") || ""),
       template_id: String(data.get("template_id") || "") || null,
-      enter_animation: String(data.get("enter_animation") || "") || null
+      enter_animation: String(data.get("enter_animation") || "") || null,
+      role: String(data.get("role") || "content"),
+      cover_layout: String(data.get("cover_layout") || "center")
+    });
+    if (form.matches("[data-deck-editor]")) Object.assign(body, {
+      aspect_ratio: String(data.get("aspect_ratio") || "16:9"),
+      loading_screen: {
+        enabled: data.has("loading_enabled"),
+        style: String(data.get("loading_style") || "pulse"),
+        message: String(data.get("loading_message") || ""),
+        show_progress: data.has("loading_show_progress"),
+        minimum_duration_ms: numberValue(data, "loading_minimum_duration_ms")
+      }
     });
     if (form.matches("[data-template-editor]")) Object.assign(body, {
       name: String(data.get("name") || ""),
@@ -102,6 +116,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       foreground: String(data.get("foreground") || ""),
       muted: String(data.get("muted") || ""),
       accent: String(data.get("accent") || ""),
+      accent_secondary: String(data.get("accent_secondary") || ""),
+      border: String(data.get("border") || ""),
       corner_radius_px: numberValue(data, "corner_radius_px"),
       spacing_scale: numberValue(data, "spacing_scale"),
       font_scale: numberValue(data, "font_scale"),
@@ -241,7 +257,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = overflows.length
           ? overflows.length + "か所で文字が収まりません。品質確認から対象を確認してください。"
-          : "このSTEPの文字は16:9の枠内に収まっています。";
+          : "このSTEPの文字は" + (slideFrame.dataset.aspectRatio || "16:9") + "の枠内に収まっています。";
         layoutStatus.dataset.level = overflows.length ? "warning" : "ok";
       }
       if (qualityList instanceof HTMLElement) {

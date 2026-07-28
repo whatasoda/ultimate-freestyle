@@ -379,8 +379,12 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=2"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=3"');
     expect(detailHtml).toContain("基本情報を編集");
+    expect(detailHtml).toContain("発表画面と0ページ目");
+    expect(detailHtml).toContain("data-deck-editor");
+    expect(detailHtml).toContain("ワイド 16:9");
+    expect(detailHtml).toContain("標準 4:3");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
     expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("自由配置 1 block");
@@ -401,6 +405,10 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("内容を保存");
     expect(workspaceHtml).toContain("自由配置 1 block");
     expect(workspaceHtml).toContain("data-slide-frame");
+    expect(workspaceHtml).toContain('data-aspect-ratio="16:9"');
+    expect(workspaceHtml).toContain("表紙レイアウト");
+    expect(workspaceHtml).toContain("左右均等");
+    expect(workspaceHtml).toContain("第2アクセント");
     expect(workspaceHtml).toContain("data-frame-loading");
     expect(workspaceHtml).toContain("プレビューを読み込み中…");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
@@ -941,6 +949,47 @@ describe("Web dashboard", () => {
     expect(customizedWorkspaceHtml).toContain("ADV会話枠");
     expect(customizedWorkspaceHtml).toContain("調声もWebから確認できる読み上げ文");
     expect(customizedWorkspaceHtml).toContain("ブラウザ音声で代替");
+
+    const deckSettingsUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/presentation/settings",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 7,
+            aspect_ratio: "4:3",
+            loading_screen: {
+              enabled: true,
+              style: "research-log",
+              message: "実験道具を準備しています",
+              show_progress: false,
+              minimum_duration_ms: 900
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(deckSettingsUpdate.status).toBe(200);
+    expect(await deckSettingsUpdate.json()).toMatchObject({
+      ok: true,
+      version: 8
+    });
+
+    const fourThreeWorkspace = await requestProvider(
+      provider,
+      new Request(workspaceUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const fourThreeWorkspaceHtml = await fourThreeWorkspace.text();
+    expect(fourThreeWorkspaceHtml).toContain('data-aspect-ratio="4:3"');
+    expect(fourThreeWorkspaceHtml).toContain("--workspace-aspect:4 / 3");
 
     const unsupportedUpload = await requestProvider(
       provider,

@@ -4,18 +4,23 @@ import { z } from "zod";
 import { recordAuditEvent } from "../auth/repository";
 import { mutateProject } from "./repository";
 import {
+  animationSchema,
   compositionRevealPositions,
+  coverLayoutSchema,
   densitySchema,
   fontPresetSchema,
+  loadingScreenSchema,
   motionStyleSchema,
   narrationAppearanceSchema,
   narrationDisplaySchema,
   narrationSegmentSchema,
   presentationTemplateSchema,
+  presentationAspectRatioSchema,
   projectSlideSchema,
   projectStageSchema,
   researchLogEntrySchema,
   slideBlockSchema,
+  slideRoleSchema,
   slideSceneDataNodeSchema,
   slideSceneInfoNodeSchema,
   slideSceneLayoutNodeSchema,
@@ -64,6 +69,9 @@ const templateMutableInput = {
   foreground: presentationTemplateSchema.shape.foreground.optional(),
   muted: presentationTemplateSchema.shape.muted.optional(),
   accent: presentationTemplateSchema.shape.accent.optional(),
+  accent_secondary:
+    presentationTemplateSchema.shape.accent_secondary.optional(),
+  border: presentationTemplateSchema.shape.border.optional(),
   corner_radius_px:
     presentationTemplateSchema.shape.corner_radius_px.optional(),
   spacing_scale: presentationTemplateSchema.shape.spacing_scale.optional(),
@@ -559,12 +567,68 @@ export function registerProjectMutationTools(
             year: new Date().getUTCFullYear(),
             accent: "#9d7bff",
             layout: "minimal",
+            aspect_ratio: "16:9",
+            loading_screen: {
+              enabled: true,
+              style: "pulse",
+              message: "発表の準備をしています",
+              show_progress: true,
+              minimum_duration_ms: 500
+            },
             narration_defaults: null,
             templates: [],
             default_template_id: null,
             slides: []
           };
           Object.assign(document.deck, fields);
+        }
+      })
+  );
+
+  server.registerTool(
+    "configure_presentation_stage",
+    {
+      title: "発表画面と0ページ目を設定",
+      description:
+        "スライド本文を再送せず、16:9／4:3の比率と、画像・音声・fontを事前読込する0ページ目だけを部分更新します。",
+      inputSchema: {
+        ...projectIdInput,
+        aspect_ratio: presentationAspectRatioSchema.optional(),
+        loading_screen: loadingScreenSchema.partial().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, aspect_ratio, loading_screen }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "presentation_stage_configured",
+        mutate: (document) => {
+          const deck = requireDeck(document);
+          if (aspect_ratio === undefined && loading_screen === undefined) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "At least one presentation stage field must be supplied."
+            );
+          }
+          if (aspect_ratio !== undefined) deck.aspect_ratio = aspect_ratio;
+          if (loading_screen !== undefined) {
+            deck.loading_screen = {
+              enabled: true,
+              style: "pulse",
+              message: "発表の準備をしています",
+              show_progress: true,
+              minimum_duration_ms: 500,
+              ...(deck.loading_screen ?? {}),
+              ...loading_screen
+            };
+          }
         }
       })
   );
@@ -892,6 +956,8 @@ export function registerProjectMutationTools(
             tone: "dark",
             template_id: deck.default_template_id ?? null,
             enter_animation: null,
+            role: "content",
+            cover_layout: "center",
             content_markdown: title,
             reveal_blocks: [],
             sidebar_markdown: null,
@@ -919,10 +985,9 @@ export function registerProjectMutationTools(
           .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
           .nullable()
           .optional(),
-        enter_animation: z
-          .enum(["none", "fade", "rise", "zoom", "wipe"])
-          .nullable()
-          .optional(),
+        enter_animation: animationSchema.nullable().optional(),
+        role: slideRoleSchema.optional(),
+        cover_layout: coverLayoutSchema.optional(),
         content_markdown: z.string().min(1).max(20_000).optional(),
         sidebar_markdown: z.string().max(10_000).nullable().optional()
       },

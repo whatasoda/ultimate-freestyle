@@ -50,6 +50,14 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - font presetは \`system-sans\`、\`gothic\`、\`rounded\`、\`mincho\`、\`serif\`、\`monospace\`、\`display\`。任意font名やURLは入力しない。
 - 密度は \`spacious\`、\`comfortable\`、\`compact\`、動きの傾向は \`calm\`、\`snappy\`、\`dramatic\`。
 - 色、配置、font、密度、animationの調整は \`update_presentation_template_fields\` で変更項目だけを送る。互換用の全量upsertを通常の編集には使わない。
+- 領域配置は単一、左右補足、下段補足に加え、左右均等の \`split\`、上段補足の \`top-band\`、中央集中の \`focus\`を選べる。
+- 基本5色に加えて \`accent_secondary\` と \`border\` を指定できる。値は6桁hexだけを使い、任意CSSやgradientは入力しない。
+
+## 発表枠・表紙・0ページ目
+
+- \`configure_presentation_stage\` で発表全体の \`16:9\`／\`4:3\`と、開始前の0ページ目だけを部分更新する。
+- 0ページ目は画像、生成音声、利用可能なfontをpreloadし、開始クリック後に経過時間と初回読み上げを始める。slide数と進捗には含めない。
+- 表紙相当の一枚は \`update_slide_fields\` で \`role: "cover"\` とし、\`center\`、\`split\`、\`poster\`、\`minimal\`、\`statement\`から \`cover_layout\` を選ぶ。sceneやcanvasがある場合は、その自由構成を優先する。
 
 ## 読み上げ表示
 
