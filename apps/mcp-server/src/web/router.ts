@@ -22,7 +22,14 @@ import {
 import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
 import { renderPresentationHtml } from "../presentation/render";
 import { getProject, listProjects, mutateProject } from "../projects/repository";
-import { projectStageSchema } from "../projects/schema";
+import {
+  animationSchema,
+  narrationAppearanceSchema,
+  narrationDisplaySchema,
+  narrationSegmentSchema,
+  presentationTemplateSchema,
+  projectStageSchema
+} from "../projects/schema";
 import {
   createPresentationPreview,
   getPublicationStatus,
@@ -77,12 +84,36 @@ const publishRequestSchema = z.object({
 
 const slideFieldsRequestSchema = z.object({
   expected_version: z.number().int().positive(),
-  title: z.string().min(1).max(120),
-  duration_seconds: z.number().int().positive().max(1_200),
-  tone: z.enum(["dark", "light", "signal", "quiet"]),
-  content_markdown: z.string().min(1).max(20_000),
-  sidebar_markdown: z.string().max(10_000)
+  title: z.string().min(1).max(120).optional(),
+  duration_seconds: z.number().int().positive().max(1_200).optional(),
+  tone: z.enum(["dark", "light", "signal", "quiet"]).optional(),
+  template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
+  enter_animation: animationSchema.nullable().optional(),
+  content_markdown: z.string().min(1).max(20_000).optional(),
+  sidebar_markdown: z.string().max(10_000).optional()
+}).refine(
+  (request) =>
+    Object.entries(request).some(
+      ([key, value]) => key !== "expected_version" && value !== undefined
+    ),
+  { message: "At least one slide field is required." }
+);
+
+const templateFieldsRequestSchema = presentationTemplateSchema
+  .omit({ id: true })
+  .extend({ expected_version: z.number().int().positive() });
+
+const narrationSettingsRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  display: narrationDisplaySchema,
+  speaker: z.string().max(80).nullable(),
+  appearance: narrationAppearanceSchema
 });
+
+const narrationSegmentRequestSchema = narrationSegmentSchema
+  .pick({ text: true, speaker: true, voice_profile_id: true, voice_tuning: true })
+  .required({ speaker: true, voice_profile_id: true, voice_tuning: true })
+  .extend({ expected_version: z.number().int().positive() });
 
 const slideNarrationRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -449,9 +480,21 @@ async function handleSlideFieldsUpdate(
           Object.assign(error, { code: "SLIDE_NOT_FOUND" });
           throw error;
         }
-        Object.assign(slide, fields, {
-          sidebar_markdown: sidebar_markdown.trim() || null
-        });
+        if (
+          fields.template_id !== undefined &&
+          fields.template_id !== null &&
+          !document.deck?.templates?.some(
+            (template) => template.id === fields.template_id
+          )
+        ) {
+          const error = new Error("The presentation template does not exist.");
+          Object.assign(error, { code: "TEMPLATE_NOT_FOUND" });
+          throw error;
+        }
+        Object.assign(slide, fields);
+        if (sidebar_markdown !== undefined) {
+          slide.sidebar_markdown = sidebar_markdown.trim() || null;
+        }
       }
     });
     await recordWebAudit(env.DB, {
@@ -480,7 +523,9 @@ async function handleSlideFieldsUpdate(
         ? ((error as { currentVersion?: number }).currentVersion ?? null)
         : null;
     const status =
-      code === "PROJECT_NOT_FOUND" || code === "SLIDE_NOT_FOUND"
+      code === "PROJECT_NOT_FOUND" ||
+      code === "SLIDE_NOT_FOUND" ||
+      code === "TEMPLATE_NOT_FOUND"
         ? 404
         : code === "PROJECT_VERSION_CONFLICT"
           ? 409
@@ -496,6 +541,8 @@ async function handleSlideFieldsUpdate(
               ? "別の場所で更新されました。画面を読み込み直してください。"
               : code === "SLIDE_NOT_FOUND"
                 ? "スライドが見つかりません。"
+                : code === "TEMPLATE_NOT_FOUND"
+                  ? "選択したtemplateが見つかりません。"
                 : code === "PROJECT_NOT_FOUND"
                   ? "研究が見つかりません。"
                   : "スライドを保存できませんでした。"
@@ -504,6 +551,298 @@ async function handleSlideFieldsUpdate(
       },
       status
     );
+  }
+}
+
+function projectMutationErrorResponse(
+  error: unknown,
+  fallbackMessage: string
+): Response {
+  const code =
+    error instanceof Error && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "INTERNAL_ERROR";
+  const currentVersion =
+    error instanceof Error && "currentVersion" in error
+      ? ((error as { currentVersion?: number }).currentVersion ?? null)
+      : null;
+  const messages: Record<string, string> = {
+    PROJECT_NOT_FOUND: "研究が見つかりません。",
+    SLIDE_NOT_FOUND: "スライドが見つかりません。",
+    TEMPLATE_NOT_FOUND: "templateが見つかりません。",
+    NARRATION_NOT_FOUND: "このスライドには読み上げがありません。",
+    NARRATION_SEGMENT_NOT_FOUND: "読み上げ区間が見つかりません。",
+    VOICE_PROFILE_NOT_FOUND: "VOICEVOX profileが見つかりません。",
+    PROJECT_VERSION_CONFLICT: "別の場所で更新されました。画面を読み込み直してください。"
+  };
+  const status =
+    code === "PROJECT_NOT_FOUND" ||
+    code === "SLIDE_NOT_FOUND" ||
+    code === "TEMPLATE_NOT_FOUND" ||
+    code === "NARRATION_NOT_FOUND" ||
+    code === "NARRATION_SEGMENT_NOT_FOUND" ||
+    code === "VOICE_PROFILE_NOT_FOUND"
+      ? 404
+      : code === "PROJECT_VERSION_CONFLICT"
+        ? 409
+        : 500;
+  return jsonResponse(
+    {
+      ok: false,
+      current_version: currentVersion,
+      error: { code, message: messages[code] ?? fallbackMessage },
+      request_id: crypto.randomUUID()
+    },
+    status
+  );
+}
+
+async function handleTemplateFieldsUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  templateId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = templateFieldsRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_TEMPLATE", message: "templateの入力内容を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const { expected_version, ...fields } = parsed.data;
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: expected_version,
+      mutate: (document) => {
+        const template = document.deck?.templates?.find(
+          (item) => item.id === templateId
+        );
+        if (template === undefined) {
+          const error = new Error("The presentation template does not exist.");
+          Object.assign(error, { code: "TEMPLATE_NOT_FOUND" });
+          throw error;
+        }
+        Object.assign(template, fields);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.presentation_template_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, template_id: templateId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      template_id: templateId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "templateを保存できませんでした。");
+  }
+}
+
+async function handleNarrationSettingsUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = narrationSettingsRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_NARRATION_SETTINGS", message: "読み上げ枠の設定を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        slide.narration = {
+          display: parsed.data.display,
+          speaker: parsed.data.speaker,
+          appearance: parsed.data.appearance,
+          segments: slide.narration?.segments ?? []
+        };
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_narration_settings_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "読み上げ枠を保存できませんでした。");
+  }
+}
+
+async function handleNarrationSegmentUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string,
+  at: number
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = narrationSegmentRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_NARRATION_SEGMENT", message: "読み上げ区間の設定を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.narration === null) {
+          const error = new Error("The slide does not have narration.");
+          Object.assign(error, { code: "NARRATION_NOT_FOUND" });
+          throw error;
+        }
+        const segment = slide.narration.segments.find((item) => item.at === at);
+        if (segment === undefined) {
+          const error = new Error("The narration segment does not exist.");
+          Object.assign(error, { code: "NARRATION_SEGMENT_NOT_FOUND" });
+          throw error;
+        }
+        if (
+          parsed.data.voice_profile_id !== null &&
+          !document.deck?.voicevox?.profiles.some(
+            (profile) => profile.id === parsed.data.voice_profile_id
+          )
+        ) {
+          const error = new Error("The VOICEVOX profile does not exist.");
+          Object.assign(error, { code: "VOICE_PROFILE_NOT_FOUND" });
+          throw error;
+        }
+        const invalidatesAudio =
+          segment.text !== parsed.data.text ||
+          (segment.voice_profile_id ?? null) !== parsed.data.voice_profile_id ||
+          JSON.stringify(segment.voice_tuning ?? null) !==
+            JSON.stringify(parsed.data.voice_tuning);
+        Object.assign(segment, {
+          text: parsed.data.text,
+          speaker: parsed.data.speaker,
+          voice_profile_id: parsed.data.voice_profile_id,
+          voice_tuning: parsed.data.voice_tuning,
+          audio_src: invalidatesAudio ? null : segment.audio_src
+        });
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_narration_segment_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, at, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      at,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "読み上げ区間を保存できませんでした。");
   }
 }
 
@@ -1063,6 +1402,50 @@ export async function handleWebRequest(
       env,
       slideFieldsMatch[1],
       slideFieldsMatch[2]
+    );
+  }
+  const templateFieldsMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/templates/([a-z0-9][a-z0-9-]{0,63})$`)
+  );
+  if (
+    templateFieldsMatch?.[1] !== undefined &&
+    templateFieldsMatch[2] !== undefined
+  ) {
+    return handleTemplateFieldsUpdate(
+      request,
+      env,
+      templateFieldsMatch[1],
+      templateFieldsMatch[2]
+    );
+  }
+  const narrationSettingsMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/narration/settings$`)
+  );
+  if (
+    narrationSettingsMatch?.[1] !== undefined &&
+    narrationSettingsMatch[2] !== undefined
+  ) {
+    return handleNarrationSettingsUpdate(
+      request,
+      env,
+      narrationSettingsMatch[1],
+      narrationSettingsMatch[2]
+    );
+  }
+  const narrationSegmentMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/narration/segments/(\\d{1,3})$`)
+  );
+  if (
+    narrationSegmentMatch?.[1] !== undefined &&
+    narrationSegmentMatch[2] !== undefined &&
+    narrationSegmentMatch[3] !== undefined
+  ) {
+    return handleNarrationSegmentUpdate(
+      request,
+      env,
+      narrationSegmentMatch[1],
+      narrationSegmentMatch[2],
+      Number(narrationSegmentMatch[3])
     );
   }
   const slideNarrationMatch = path.match(

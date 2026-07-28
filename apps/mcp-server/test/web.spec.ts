@@ -189,8 +189,49 @@ describe("Web dashboard", () => {
       accent: "#9d7bff",
       layout: "minimal",
       narration_defaults: null,
-      templates: [],
-      default_template_id: null,
+      templates: [
+        {
+          id: "lab",
+          name: "実験ノート",
+          region_layout: "sidebar-right",
+          sidebar_width_percent: 30,
+          background: "#111827",
+          surface: "#172033",
+          foreground: "#f8fafc",
+          muted: "#a9b5c7",
+          accent: "#9d7bff",
+          corner_radius_px: 12,
+          spacing_scale: 1,
+          font_scale: 1,
+          enter_animation: "fade",
+          reveal_animation: "rise",
+          visual_preset: "scientific",
+          body_font: "gothic",
+          heading_font: "display",
+          density: "comfortable",
+          motion_style: "calm",
+          body_weight: 400,
+          heading_weight: 800,
+          line_height: 1.5,
+          letter_spacing_em: 0
+        }
+      ],
+      default_template_id: "lab",
+      voicevox: {
+        catalog_revision: "test-catalog",
+        default_profile_id: "zundamon",
+        profiles: [
+          {
+            id: "zundamon",
+            label: "ずんだもん・ノーマル",
+            speaker_uuid: "40000000-0000-4000-8000-000000000004",
+            speaker_name: "ずんだもん",
+            style_id: 3,
+            style_name: "ノーマル",
+            tuning: { speedScale: 1.1 }
+          }
+        ]
+      },
       slides: [
         {
           id: "intro",
@@ -198,7 +239,7 @@ describe("Web dashboard", () => {
           duration_seconds: 30,
           reveal_steps: 0,
           tone: "dark",
-          template_id: null,
+          template_id: "lab",
           enter_animation: "fade",
           content_markdown: "# 自分の研究",
           reveal_blocks: [],
@@ -206,11 +247,22 @@ describe("Web dashboard", () => {
           narration: {
             display: "commentary",
             speaker: null,
+            appearance: {
+              placement: "overlay-bottom",
+              size: "normal",
+              speaker_visible: true,
+              progress_visible: true,
+              text_scale: 1,
+              max_lines: 3
+            },
             segments: [
               {
                 at: 0,
                 text: "最初の読み上げ文",
-                audio_src: "/stale-audio.mp3"
+                audio_src: "/stale-audio.mp3",
+                speaker: "ずんだもん",
+                voice_profile_id: "zundamon",
+                voice_tuning: { pitchScale: 0.02 }
               }
             ]
           },
@@ -344,14 +396,26 @@ describe("Web dashboard", () => {
     const workspaceHtml = await workspace.text();
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("Slide workspace");
-    expect(workspaceHtml).toContain("このスライドを保存");
+    expect(workspaceHtml).toContain("内容を保存");
     expect(workspaceHtml).toContain("自由配置 1 block");
     expect(workspaceHtml).toContain("data-slide-frame");
     expect(workspaceHtml).toContain("data-frame-loading");
     expect(workspaceHtml).toContain("プレビューを読み込み中…");
-    expect(workspaceHtml).toContain("data-narration-editor");
-    expect(workspaceHtml).toContain("読み上げ文を保存");
+    expect(workspaceHtml).toContain("data-narration-settings-editor");
+    expect(workspaceHtml).toContain("この区間を保存");
     expect(workspaceHtml).toContain("最初の読み上げ文");
+    expect(workspaceHtml).toContain('aria-current="page"');
+    expect(workspaceHtml).toContain("現在有効な設定");
+    expect(workspaceHtml).toContain("実験ノート");
+    expect(workspaceHtml).toContain("サイエンス");
+    expect(workspaceHtml).toContain("強調見出し");
+    expect(workspaceHtml).toContain("data-template-editor");
+    expect(workspaceHtml).toContain("data-narration-settings-editor");
+    expect(workspaceHtml).toContain("data-segment-editor");
+    expect(workspaceHtml).toContain("VOICEVOX音声あり");
+    expect(workspaceHtml).toContain("ずんだもん・ノーマル");
+    expect(workspaceHtml).toContain("全設定を確認");
+    expect(workspaceHtml).toContain("data-layout-status");
 
     const frameUrl = `${workspaceUrl}/frame?slide=1&step=0`;
     const frame = await requestProvider(
@@ -660,6 +724,161 @@ describe("Web dashboard", () => {
     expect(new Uint8Array(await publishedAsset.arrayBuffer())).toEqual(
       new Uint8Array([82, 73, 70, 70])
     );
+
+    const templateUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/templates/lab",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 4,
+            name: "読みやすい実験ノート",
+            region_layout: "sidebar-left",
+            sidebar_width_percent: 34,
+            background: "#102030",
+            surface: "#182838",
+            foreground: "#f8fafc",
+            muted: "#b8c5d4",
+            accent: "#62d6ff",
+            corner_radius_px: 16,
+            spacing_scale: 1.05,
+            font_scale: 0.95,
+            enter_animation: "slide-left",
+            reveal_animation: "pop",
+            visual_preset: "editorial",
+            body_font: "mincho",
+            heading_font: "gothic",
+            density: "spacious",
+            motion_style: "snappy",
+            body_weight: 500,
+            heading_weight: 900,
+            line_height: 1.6,
+            letter_spacing_em: 0.02
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(templateUpdate.status).toBe(200);
+    expect(await templateUpdate.json()).toMatchObject({
+      ok: true,
+      template_id: "lab",
+      version: 5
+    });
+
+    const narrationSettingsUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/narration/settings",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 5,
+            display: "dialogue",
+            speaker: "案内役",
+            appearance: {
+              placement: "overlay-bottom",
+              size: "large",
+              text_align: "start",
+              speaker_visible: true,
+              progress_visible: false,
+              text_scale: 1.1,
+              max_lines: 4
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(narrationSettingsUpdate.status).toBe(200);
+    expect(await narrationSettingsUpdate.json()).toMatchObject({
+      ok: true,
+      slide_id: "intro",
+      version: 6
+    });
+
+    const invalidProfileUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/narration/segments/0",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 6,
+            text: "保存されない文",
+            speaker: null,
+            voice_profile_id: "missing-profile",
+            voice_tuning: null
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(invalidProfileUpdate.status).toBe(404);
+    expect(await invalidProfileUpdate.json()).toMatchObject({
+      error: { code: "VOICE_PROFILE_NOT_FOUND" }
+    });
+
+    const narrationSegmentUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/narration/segments/0",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 6,
+            text: "調声もWebから確認できる読み上げ文",
+            speaker: "ずんだもん",
+            voice_profile_id: "zundamon",
+            voice_tuning: {
+              speedScale: 1.2,
+              pitchScale: 0.03,
+              intonationScale: 1.1
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(narrationSegmentUpdate.status).toBe(200);
+    expect(await narrationSegmentUpdate.json()).toMatchObject({
+      ok: true,
+      at: 0,
+      version: 7
+    });
+
+    const customizedWorkspace = await requestProvider(
+      provider,
+      new Request(workspaceUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const customizedWorkspaceHtml = await customizedWorkspace.text();
+    expect(customizedWorkspaceHtml).toContain("読みやすい実験ノート");
+    expect(customizedWorkspaceHtml).toContain("エディトリアル");
+    expect(customizedWorkspaceHtml).toContain("ADV会話枠");
+    expect(customizedWorkspaceHtml).toContain("調声もWebから確認できる読み上げ文");
+    expect(customizedWorkspaceHtml).toContain("ブラウザ音声で代替");
 
     const unsupportedUpload = await requestProvider(
       provider,

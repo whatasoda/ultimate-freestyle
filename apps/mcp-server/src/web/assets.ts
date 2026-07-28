@@ -53,23 +53,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   const slideEditor = document.querySelector("[data-slide-editor]");
-  const narrationEditor = document.querySelector("[data-narration-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
   const setFrameLoading = (loading) => {
     if (frameLoading instanceof HTMLElement) frameLoading.hidden = !loading;
   };
-  if (slideFrame instanceof HTMLIFrameElement) {
-    slideFrame.addEventListener("load", () => setFrameLoading(false));
-    try {
-      if (slideFrame.contentDocument?.readyState === "complete") setFrameLoading(false);
-    } catch {}
-  }
   const syncSlideVersion = (version) => {
     const value = String(version);
-    if (slideEditor instanceof HTMLFormElement) slideEditor.dataset.version = value;
-    if (narrationEditor instanceof HTMLFormElement) narrationEditor.dataset.version = value;
-    for (const label of document.querySelectorAll("[data-workspace-version], [data-slide-version], [data-narration-version]")) {
+    for (const form of document.querySelectorAll("[data-versioned-form]")) {
+      if (form instanceof HTMLFormElement) form.dataset.version = value;
+    }
+    for (const label of document.querySelectorAll("[data-workspace-version], [data-version-label]")) {
       if (label instanceof HTMLElement) label.textContent = "v" + value;
     }
   };
@@ -80,82 +74,106 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     setFrameLoading(true);
     slideFrame.src = frameUrl.toString();
   };
-  if (slideEditor instanceof HTMLFormElement) {
-    const feedback = slideEditor.querySelector("[data-slide-feedback]");
-    const submit = slideEditor.querySelector('button[type="submit"]');
-    slideEditor.addEventListener("submit", async (event) => {
+  const numberValue = (data, name) => Number(data.get(name));
+  const optionalNumberValue = (data, name) => {
+    const value = String(data.get(name) ?? "").trim();
+    return value === "" ? undefined : Number(value);
+  };
+  const serializeVersionedForm = (form) => {
+    const data = new FormData(form);
+    const body = { expected_version: Number(form.dataset.version) };
+    if (form.matches("[data-slide-editor]")) Object.assign(body, {
+      title: String(data.get("title") || ""),
+      duration_seconds: numberValue(data, "duration_seconds"),
+      content_markdown: String(data.get("content_markdown") || ""),
+      sidebar_markdown: String(data.get("sidebar_markdown") || "")
+    });
+    if (form.matches("[data-appearance-editor]")) Object.assign(body, {
+      tone: String(data.get("tone") || ""),
+      template_id: String(data.get("template_id") || "") || null,
+      enter_animation: String(data.get("enter_animation") || "") || null
+    });
+    if (form.matches("[data-template-editor]")) Object.assign(body, {
+      name: String(data.get("name") || ""),
+      region_layout: String(data.get("region_layout") || ""),
+      sidebar_width_percent: numberValue(data, "sidebar_width_percent"),
+      background: String(data.get("background") || ""),
+      surface: String(data.get("surface") || ""),
+      foreground: String(data.get("foreground") || ""),
+      muted: String(data.get("muted") || ""),
+      accent: String(data.get("accent") || ""),
+      corner_radius_px: numberValue(data, "corner_radius_px"),
+      spacing_scale: numberValue(data, "spacing_scale"),
+      font_scale: numberValue(data, "font_scale"),
+      enter_animation: String(data.get("enter_animation") || ""),
+      reveal_animation: String(data.get("reveal_animation") || ""),
+      visual_preset: String(data.get("visual_preset") || ""),
+      body_font: String(data.get("body_font") || ""),
+      heading_font: String(data.get("heading_font") || ""),
+      density: String(data.get("density") || ""),
+      motion_style: String(data.get("motion_style") || ""),
+      body_weight: numberValue(data, "body_weight"),
+      heading_weight: numberValue(data, "heading_weight"),
+      line_height: numberValue(data, "line_height"),
+      letter_spacing_em: numberValue(data, "letter_spacing_em")
+    });
+    if (form.matches("[data-narration-settings-editor]")) Object.assign(body, {
+      display: String(data.get("display") || ""),
+      speaker: String(data.get("speaker") || "").trim() || null,
+      appearance: {
+        placement: String(data.get("placement") || ""),
+        size: String(data.get("size") || ""),
+        text_align: String(data.get("text_align") || ""),
+        speaker_visible: data.has("speaker_visible"),
+        progress_visible: data.has("progress_visible"),
+        text_scale: numberValue(data, "text_scale"),
+        max_lines: numberValue(data, "max_lines")
+      }
+    });
+    if (form.matches("[data-segment-editor]")) {
+      const tuning = {};
+      for (const key of ["speedScale", "pitchScale", "intonationScale", "volumeScale", "pauseLengthScale", "prePhonemeLength", "postPhonemeLength"]) {
+        const value = optionalNumberValue(data, "tuning_" + key);
+        if (value !== undefined) tuning[key] = value;
+      }
+      Object.assign(body, {
+        text: String(data.get("text") || ""),
+        speaker: String(data.get("speaker") || "").trim() || null,
+        voice_profile_id: String(data.get("voice_profile_id") || "") || null,
+        voice_tuning: Object.keys(tuning).length ? tuning : null
+      });
+    }
+    return body;
+  };
+  for (const form of document.querySelectorAll("[data-versioned-form]")) {
+    if (!(form instanceof HTMLFormElement)) continue;
+    form.addEventListener("input", () => { form.dataset.dirty = "true"; });
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      const feedback = form.querySelector("[data-form-feedback]");
+      const submit = form.querySelector('button[type="submit"]');
       if (!(feedback instanceof HTMLElement)) return;
       if (submit instanceof HTMLButtonElement) submit.disabled = true;
-      feedback.textContent = "このスライドを保存しています…";
+      feedback.textContent = "変更を保存しています…";
       feedback.classList.remove("success", "warning");
-      const data = new FormData(slideEditor);
       try {
-        const response = await fetch(slideEditor.action, {
+        const response = await fetch(form.action, {
           method: "PATCH",
           headers: {
             "content-type": "application/json",
-            "x-csrf-token": slideEditor.dataset.csrf || ""
+            "x-csrf-token": form.dataset.csrf || ""
           },
-          body: JSON.stringify({
-            expected_version: Number(slideEditor.dataset.version),
-            title: String(data.get("title") || ""),
-            duration_seconds: Number(data.get("duration_seconds")),
-            tone: String(data.get("tone") || ""),
-            content_markdown: String(data.get("content_markdown") || ""),
-            sidebar_markdown: String(data.get("sidebar_markdown") || "")
-          })
+          body: JSON.stringify(serializeVersionedForm(form))
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
         syncSlideVersion(result.version);
+        form.dataset.dirty = "false";
         feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
         refreshSlideFrame(result.version);
       } catch (error) {
         feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
-        feedback.classList.add("warning");
-      } finally {
-        if (submit instanceof HTMLButtonElement) submit.disabled = false;
-      }
-    });
-  }
-
-  if (narrationEditor instanceof HTMLFormElement) {
-    const feedback = narrationEditor.querySelector("[data-narration-feedback]");
-    const submit = narrationEditor.querySelector('button[type="submit"]');
-    narrationEditor.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!(feedback instanceof HTMLElement)) return;
-      if (submit instanceof HTMLButtonElement) submit.disabled = true;
-      feedback.textContent = "読み上げ文を保存しています…";
-      feedback.classList.remove("success", "warning");
-      const segments = [...narrationEditor.querySelectorAll("[data-narration-text]")]
-        .filter((input) => input instanceof HTMLTextAreaElement)
-        .map((input) => ({
-          at: Number(input.dataset.narrationAt),
-          text: input.value
-        }));
-      try {
-        const response = await fetch(narrationEditor.action, {
-          method: "PATCH",
-          headers: {
-            "content-type": "application/json",
-            "x-csrf-token": narrationEditor.dataset.csrf || ""
-          },
-          body: JSON.stringify({
-            expected_version: Number(narrationEditor.dataset.version),
-            segments
-          })
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "読み上げ文を保存できませんでした。");
-        syncSlideVersion(result.version);
-        feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
-        feedback.classList.add("success");
-        refreshSlideFrame(result.version);
-      } catch (error) {
-        feedback.textContent = error instanceof Error ? error.message : "読み上げ文を保存できませんでした。";
         feedback.classList.add("warning");
       } finally {
         if (submit instanceof HTMLButtonElement) submit.disabled = false;
@@ -175,10 +193,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const updateStep = (nextStep) => {
       currentStep = Math.min(Math.max(nextStep, 0), maxStep);
       stepOutput.value = "STEP " + currentStep + " / " + maxStep;
-      const frameUrl = new URL(slideFrame.src);
-      frameUrl.searchParams.set("step", String(currentStep));
-      setFrameLoading(true);
-      slideFrame.src = frameUrl.toString();
+      slideFrame.contentWindow?.postMessage({
+        type: "ultimate-freestyle:set-position",
+        slide: Number(new URL(slideFrame.src).searchParams.get("slide") || 1),
+        step: currentStep
+      }, location.origin);
       for (const button of stepButtons) {
         if (!(button instanceof HTMLButtonElement)) continue;
         button.disabled =
@@ -194,6 +213,51 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
     }
     updateStep(0);
+  }
+
+  if (slideFrame instanceof HTMLIFrameElement) {
+    slideFrame.addEventListener("load", () => {
+      setFrameLoading(false);
+      const step = stepOutput instanceof HTMLOutputElement
+        ? Number(stepOutput.value.match(/STEP (\d+)/)?.[1] || 0)
+        : 0;
+      slideFrame.contentWindow?.postMessage({
+        type: "ultimate-freestyle:set-position",
+        slide: Number(new URL(slideFrame.src).searchParams.get("slide") || 1),
+        step
+      }, location.origin);
+    });
+    const layoutStatus = document.querySelector("[data-layout-status]");
+    const qualitySummary = document.querySelector("[data-quality-summary]");
+    const qualityList = document.querySelector("[data-quality-list]");
+    addEventListener("message", (event) => {
+      if (event.origin !== location.origin || event.source !== slideFrame.contentWindow) return;
+      const data = event.data;
+      if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || !Array.isArray(data.overflows)) return;
+      const overflows = data.overflows.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.overflow_x) && Number.isFinite(item.overflow_y));
+      if (layoutStatus instanceof HTMLElement) {
+        layoutStatus.textContent = overflows.length
+          ? overflows.length + "か所で文字が収まりません。品質確認から対象を確認してください。"
+          : "このSTEPの文字は16:9の枠内に収まっています。";
+        layoutStatus.dataset.level = overflows.length ? "warning" : "ok";
+      }
+      if (qualityList instanceof HTMLElement) {
+        qualityList.querySelectorAll("[data-layout-warning]").forEach((item) => item.remove());
+        for (const item of overflows) {
+          const row = document.createElement("li");
+          row.dataset.layoutWarning = "true";
+          row.textContent = item.region + "「" + item.id + "」が横" + Math.ceil(item.overflow_x) + "px・縦" + Math.ceil(item.overflow_y) + "px超過しています。";
+          qualityList.append(row);
+        }
+      }
+      if (qualitySummary instanceof HTMLElement && overflows.length) {
+        qualitySummary.dataset.level = "warning";
+        qualitySummary.textContent = "実表示に" + overflows.length + "件の見切れがあります。";
+      }
+    });
+    try {
+      if (slideFrame.contentDocument?.readyState === "complete") setFrameLoading(false);
+    } catch {}
   }
 
   const previewButton = document.querySelector("[data-create-preview]");

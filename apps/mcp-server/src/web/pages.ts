@@ -5,6 +5,12 @@ import type {
   ProjectSummary,
   SlideSceneNode
 } from "../projects/schema";
+import {
+  DEFAULT_VOICEVOX_TUNING,
+  VOICEVOX_TUNING_LIMITS,
+  mergeVoicevoxTuning,
+  type VoicevoxTuning
+} from "@ultimate-freestyle/research-schema/voice";
 import type { PublicationStatus } from "../publications/service";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
@@ -14,6 +20,75 @@ const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   story: "構成",
   production: "制作",
   review: "見直し"
+};
+
+const TONE_LABELS = {
+  dark: "ダーク",
+  light: "ライト",
+  signal: "アクセント",
+  quiet: "静かな明色"
+} as const;
+
+const ANIMATION_LABELS = {
+  none: "なし",
+  fade: "フェード",
+  rise: "下から浮上",
+  zoom: "ズーム",
+  wipe: "ワイプ",
+  "slide-left": "左へスライド",
+  "slide-right": "右へスライド",
+  pop: "ポップ",
+  blur: "ぼかし解除"
+} as const;
+
+const VISUAL_LABELS = {
+  studio: "スタジオ",
+  paper: "紙面",
+  editorial: "エディトリアル",
+  neon: "ネオン",
+  "retro-game": "レトロゲーム",
+  "soft-pop": "ソフトポップ",
+  scientific: "サイエンス"
+} as const;
+
+const FONT_LABELS = {
+  "system-sans": "端末標準ゴシック",
+  gothic: "モダンゴシック",
+  rounded: "丸ゴシック",
+  mincho: "明朝",
+  serif: "クラシックセリフ",
+  monospace: "等幅",
+  display: "強調見出し"
+} as const;
+
+const DENSITY_LABELS = {
+  spacious: "ゆったり",
+  comfortable: "標準",
+  compact: "コンパクト"
+} as const;
+
+const MOTION_LABELS = {
+  calm: "穏やか",
+  snappy: "小気味よい",
+  dramatic: "ドラマチック"
+} as const;
+
+const NARRATION_DISPLAY_LABELS = {
+  dialogue: "ADV会話枠",
+  commentary: "実況字幕",
+  inline: "全文追従",
+  subtitle: "映像字幕",
+  minimal: "最小表示"
+} as const;
+
+const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
+  speedScale: "話速",
+  pitchScale: "音高",
+  intonationScale: "抑揚",
+  volumeScale: "音量",
+  pauseLengthScale: "句読点の間",
+  prePhonemeLength: "読み始め前の無音",
+  postPhonemeLength: "読み終わり後の無音"
 };
 
 function headers(setCookies: string[] = []): Headers {
@@ -168,9 +243,41 @@ function shell(title: string, body: string): string {
       .narration-outline p { margin: 0; color: #d3dce8; font-size: .83rem; line-height: 1.65; }
       .narration-outline textarea { width: 100%; min-height: 5.5rem; padding: .65rem; border: 1px solid #40516a; border-radius: .5rem; background: #060d16; color: var(--ink); font: inherit; line-height: 1.65; resize: vertical; }
       .mode-note { margin: 0; padding: .75rem; border-left: 3px solid var(--accent); background: #0c1724; color: #bdc9d8; font-size: .84rem; line-height: 1.6; }
+      .setting-summary { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0 0 1rem; }
+      .setting-chip { display: inline-flex; gap: .35rem; align-items: center; padding: .38rem .58rem; border: 1px solid #52647c; border-radius: 999px; background: #0c1724; color: #d6dfeb; font-size: .75rem; }
+      .setting-chip small { color: var(--muted); }
+      .inspector-section { overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--panel); }
+      .inspector-section > summary { display: flex; align-items: center; justify-content: space-between; gap: .7rem; padding: 1rem 1.15rem; cursor: pointer; font-weight: 820; }
+      .inspector-section > summary::marker { color: var(--accent); }
+      .inspector-section[open] > summary { border-bottom: 1px solid var(--line); }
+      .inspector-body { display: grid; gap: .9rem; padding: 1rem; }
+      .editor fieldset { display: grid; gap: .7rem; min-width: 0; margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: .7rem; }
+      .editor legend { padding: 0 .35rem; color: #dce6f3; font-size: .82rem; font-weight: 800; }
+      .editor input[type="color"] { min-height: 2.7rem; padding: .3rem; }
+      .editor input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+      .check-label { display: flex !important; grid-template-columns: auto 1fr; align-items: center; }
+      .setting-table { display: grid; grid-template-columns: minmax(6rem, auto) minmax(0, 1fr); gap: .35rem .75rem; margin: 0; font-size: .78rem; }
+      .setting-table dt { color: var(--muted); overflow-wrap: anywhere; }
+      .setting-table dd { margin: 0; color: #dce6f3; overflow-wrap: anywhere; }
+      .component-detail { border-top: 1px solid var(--line); }
+      .component-detail > summary { padding: .55rem; cursor: pointer; color: #dce6f3; }
+      .component-detail .setting-table { padding: 0 .65rem .7rem; }
+      .voice-segment { display: grid; gap: .75rem; padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; background: #08111b66; }
+      .voice-segment-head { display: flex; justify-content: space-between; gap: .65rem; align-items: center; }
+      .audio-state { color: #ffd681; font-size: .75rem; }
+      .audio-state.ready { color: #74e6b2; }
+      .tuning-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+      .tuning-grid label { font-size: .78rem; }
+      .inherit-note { color: var(--muted); font-size: .74rem; line-height: 1.55; }
+      .quality-status { display: flex; align-items: center; gap: .6rem; margin: 0; padding: .75rem; border: 1px solid #35506a; border-radius: .7rem; background: #0a1b29; color: #bfe6f7; font-size: .84rem; line-height: 1.55; }
+      .quality-status[data-level="warning"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
+      .quality-list { display: grid; gap: .45rem; margin: 0; padding-left: 1.2rem; color: #bdc9d8; font-size: .8rem; line-height: 1.55; }
+      .swatches { display: flex; gap: .35rem; }
+      .swatch { width: 1.2rem; height: 1.2rem; border: 1px solid #ffffff55; border-radius: .3rem; background: var(--swatch); }
+      [data-dirty="true"] button[type="submit"]::after { content: " · 未保存"; }
       form { margin: 0; }
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
-      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } }
+      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
     </style>
@@ -218,6 +325,27 @@ function slideCompositionLabel(
   return "定型flow";
 }
 
+function settingValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "未設定（継承）";
+  if (typeof value === "boolean") return value ? "有効" : "無効";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+function settingTable(entries: Array<[string, unknown]>): string {
+  return `<dl class="setting-table">${entries
+    .map(
+      ([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(settingValue(value))}</dd>`
+    )
+    .join("")}</dl>`;
+}
+
+function componentSettings(node: SlideSceneNode): string {
+  return settingTable(
+    Object.entries(node).map(([key, value]) => [key, value])
+  );
+}
+
 function sceneComponentOutline(nodes: SlideSceneNode[]): string {
   const children = new Map<string | null, SlideSceneNode[]>();
   for (const node of nodes) {
@@ -234,7 +362,7 @@ function sceneComponentOutline(nodes: SlideSceneNode[]): string {
     const items = (children.get(parentId) ?? [])
       .map((node) => {
         const descendants = renderChildren(node.id);
-        return `<li><div class="component-outline-row"><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>${node.frame === null || node.frame === undefined ? "自動配置" : "自由配置"}</small></span><span class="component-step">STEP ${node.at}</span></div>${descendants}</li>`;
+        return `<li><div class="component-outline-row"><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>${node.frame === null || node.frame === undefined ? "自動配置" : "自由配置"}</small></span><span class="component-step">STEP ${node.at}</span></div><details class="component-detail"><summary>全設定を確認</summary>${componentSettings(node)}</details>${descendants}</li>`;
       })
       .join("");
     return items.length > 0 ? `<ul class="component-outline">${items}</ul>` : "";
@@ -410,9 +538,11 @@ export function slideWorkspacePage(options: {
   if (deck === null || slideIndex === -1) return projectNotFoundPage();
   const slide = deck.slides[slideIndex];
   if (slide === undefined) return projectNotFoundPage();
+  const projectPath = `/api/projects/${escapeHtml(options.project.project_id)}`;
+  const slidePath = `${projectPath}/slides/${escapeHtml(slide.id)}`;
   const filmstrip = deck.slides
     .map(
-      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}</strong></a>`
+      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}</strong></a>`
     )
     .join("");
   const componentOutline =
@@ -421,7 +551,7 @@ export function slideWorkspacePage(options: {
       : slide.composition?.mode === "canvas"
         ? `<ul class="component-outline">${slide.composition.blocks
             .map(
-              (block) => `<li><div class="component-outline-row"><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}%</small></span><span class="component-step">STEP ${block.at}</span></div></li>`
+              (block) => `<li><div class="component-outline-row"><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}%</small></span><span class="component-step">STEP ${block.at}</span></div><details class="component-detail"><summary>全設定を確認</summary>${settingTable(Object.entries(block))}</details></li>`
             )
             .join("")}</ul>`
         : `<p class="mode-note">定型flowです。本文、段階表示、補足欄から構成されます。AIからsceneへ切り替えると、入れ子のリッチcomponentを利用できます。</p>`;
@@ -431,19 +561,128 @@ export function slideWorkspacePage(options: {
       : slide.composition?.mode === "canvas"
         ? "従来のflat canvasです。既存表示は維持されます。より複雑な構成はcomponent sceneへ移行できます。"
         : "本文と補足欄を使う定型flowです。";
-  const narrationDisplayLabel =
-    slide.narration?.display === "dialogue"
-      ? "ADV会話枠"
-      : slide.narration?.display === "inline"
-        ? "全文表示"
-        : "実況字幕";
-  const narrationOutline = slide.narration
-    ? `<form class="editor" data-narration-editor action="/api/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/narration" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><ol class="narration-outline">${slide.narration.segments
-        .map(
-          (segment) => `<li><span class="component-step">STEP ${segment.at}</span><textarea data-narration-text data-narration-at="${segment.at}" maxlength="2000" required aria-label="STEP ${segment.at} の読み上げ文">${escapeHtml(segment.text)}</textarea></li>`
-        )
-        .join("")}</ol><div class="actions"><button type="submit">読み上げ文を保存</button><span class="version" data-narration-version>v${options.project.version}</span></div><p class="feedback" data-narration-feedback aria-live="polite"></p></form>`
-    : `<p class="prose">読み上げはまだありません。</p>`;
+  const effectiveTemplateId = slide.template_id ?? deck.default_template_id ?? null;
+  const activeTemplate = (deck.templates ?? []).find(
+    (template) => template.id === effectiveTemplateId
+  );
+  const visualPreset = activeTemplate?.visual_preset ?? "studio";
+  const bodyFont = activeTemplate?.body_font ?? "system-sans";
+  const headingFont = activeTemplate?.heading_font ?? "system-sans";
+  const density = activeTemplate?.density ?? "comfortable";
+  const motion = activeTemplate?.motion_style ?? "calm";
+  const effectiveEnter = slide.enter_animation ?? activeTemplate?.enter_animation ?? "fade";
+  const narrationDisplay =
+    slide.narration?.display ?? deck.narration_defaults?.display ?? "commentary";
+  const narrationAppearance = {
+    placement: "bottom",
+    size: "normal",
+    text_align: (["commentary", "subtitle", "minimal"] as string[]).includes(
+      narrationDisplay
+    )
+      ? "center"
+      : "start",
+    speaker_visible: true,
+    progress_visible: true,
+    text_scale: 1,
+    max_lines:
+      narrationDisplay === "dialogue"
+        ? 4
+        : narrationDisplay === "commentary"
+          ? 3
+          : narrationDisplay === "inline"
+            ? 8
+            : 2,
+    ...(deck.narration_defaults?.appearance ?? {}),
+    ...(slide.narration?.appearance ?? {})
+  };
+  const effectiveSpeaker =
+    slide.narration?.speaker ?? deck.narration_defaults?.speaker ?? null;
+  const profiles = deck.voicevox?.profiles ?? [];
+  const defaultProfile = profiles.find(
+    (profile) => profile.id === deck.voicevox?.default_profile_id
+  );
+  const templateOptions = [
+    `<option value=""${slide.template_id === null || slide.template_id === undefined ? " selected" : ""}>deck既定を使う</option>`,
+    ...(deck.templates ?? []).map(
+      (template) => `<option value="${escapeHtml(template.id)}"${slide.template_id === template.id ? " selected" : ""}>${escapeHtml(template.name)}</option>`
+    )
+  ].join("");
+  const animationOptions = Object.entries(ANIMATION_LABELS)
+    .map(
+      ([value, label]) => `<option value="${value}"${slide.enter_animation === value ? " selected" : ""}>${escapeHtml(label)}</option>`
+    )
+    .join("");
+  const templateEditor = activeTemplate
+    ? `<form class="editor" data-template-editor data-versioned-form action="${projectPath}/templates/${escapeHtml(activeTemplate.id)}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+        <p class="inherit-note">このtemplateを使う全スライドへ反映されます。</p>
+        <label>template名<input name="name" maxlength="80" required value="${escapeHtml(activeTemplate.name)}"></label>
+        <div class="editor-grid"><label>visual<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}"${visualPreset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>情報密度<select name="density">${Object.entries(DENSITY_LABELS).map(([value, label]) => `<option value="${value}"${density === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div>
+        <fieldset><legend>領域</legend><div class="editor-grid"><label>配置<select name="region_layout">${[["single", "単一"], ["sidebar-right", "右補足"], ["sidebar-left", "左補足"], ["lower-third", "下段補足"]].map(([value, label]) => `<option value="${value}"${activeTemplate.region_layout === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>補足幅（%）<input name="sidebar_width_percent" type="number" min="20" max="45" value="${activeTemplate.sidebar_width_percent}" required></label></div><div class="editor-grid"><label>角の丸み<input name="corner_radius_px" type="number" min="0" max="48" value="${activeTemplate.corner_radius_px}" required></label><label>余白倍率<input name="spacing_scale" type="number" min="0.75" max="1.5" step="0.05" value="${activeTemplate.spacing_scale}" required></label></div></fieldset>
+        <fieldset><legend>色</legend><div class="editor-grid">${[["background", "背景"], ["surface", "補足面"], ["foreground", "本文"], ["muted", "補助文字"], ["accent", "アクセント"]].map(([name, label]) => `<label>${label}<input name="${name}" type="color" value="${escapeHtml(String(activeTemplate[name as keyof typeof activeTemplate]))}"></label>`).join("")}</div></fieldset>
+        <fieldset><legend>文字</legend><div class="editor-grid"><label>本文font<select name="body_font">${Object.entries(FONT_LABELS).map(([value, label]) => `<option value="${value}"${bodyFont === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>見出しfont<select name="heading_font">${Object.entries(FONT_LABELS).map(([value, label]) => `<option value="${value}"${headingFont === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>本文weight<input name="body_weight" type="number" min="300" max="900" step="100" value="${activeTemplate.body_weight ?? 400}"></label><label>見出しweight<input name="heading_weight" type="number" min="300" max="900" step="100" value="${activeTemplate.heading_weight ?? 800}"></label><label>文字倍率<input name="font_scale" type="number" min="0.75" max="1.3" step="0.05" value="${activeTemplate.font_scale}"></label><label>行間<input name="line_height" type="number" min="1" max="2" step="0.05" value="${activeTemplate.line_height ?? 1.5}"></label><label>字間（em）<input name="letter_spacing_em" type="number" min="-0.08" max="0.2" step="0.01" value="${activeTemplate.letter_spacing_em ?? 0}"></label></div></fieldset>
+        <fieldset><legend>動き</legend><div class="editor-grid"><label>motion<select name="motion_style">${Object.entries(MOTION_LABELS).map(([value, label]) => `<option value="${value}"${motion === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation">${Object.entries(ANIMATION_LABELS).map(([value, label]) => `<option value="${value}"${activeTemplate.enter_animation === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>段階animation<select name="reveal_animation">${Object.entries(ANIMATION_LABELS).map(([value, label]) => `<option value="${value}"${activeTemplate.reveal_animation === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div></fieldset>
+        <div class="actions"><button type="submit">templateを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
+      </form>`
+    : `<p class="mode-note">組み込みstyleを使用中です。templateを選ぶと色、font、密度、余白、動きを編集できます。</p>`;
+  const voiceSegments = slide.narration?.segments.length
+    ? slide.narration.segments
+        .map((segment) => {
+          const profile =
+            (segment.voice_profile_id
+              ? profiles.find((item) => item.id === segment.voice_profile_id)
+              : undefined) ?? defaultProfile;
+          const effectiveTuning = mergeVoicevoxTuning(
+            profile?.tuning ?? undefined,
+            segment.voice_tuning ?? undefined
+          );
+          const profileOptions = [
+            `<option value=""${segment.voice_profile_id === null || segment.voice_profile_id === undefined ? " selected" : ""}>deck既定${defaultProfile ? `（${escapeHtml(defaultProfile.label)}）` : ""}</option>`,
+            ...profiles.map(
+              (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
+            )
+          ].join("");
+          return `<form class="voice-segment editor" data-segment-editor data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+            <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
+            <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
+            <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOX profile<select name="voice_profile_id">${profileOptions}</select></label></div>
+            <p class="inherit-note">実効profile: ${escapeHtml(profile ? `${profile.label} / ${profile.speaker_name} ${profile.style_name}` : "未設定（Web Speech）")}。空欄の調声値はprofileまたはVOICEVOX標準値を継承します。</p>
+            <fieldset><legend>調声（空欄で継承）</legend><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" value="${segment.voice_tuning?.[key] ?? ""}" placeholder="実効 ${effectiveTuning[key]}"></label>`).join("")}</div></fieldset>
+            <div class="actions"><button type="submit">この区間を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
+          </form>`;
+        })
+        .join("")
+    : `<p class="prose">読み上げ区間はまだありません。構成の追加はAIクライアントから行えます。</p>`;
+  const missingAlt =
+    slide.composition?.mode === "canvas"
+      ? slide.composition.blocks.filter(
+          (block) => block.kind === "image" && block.alt_text.trim() === ""
+        ).length
+      : slide.composition?.mode === "scene"
+        ? slide.composition.nodes.filter(
+            (node) => node.kind === "image" && node.alt_text.trim() === ""
+          ).length
+        : 0;
+  const missingAudio =
+    slide.narration?.segments.filter((segment) => segment.audio_src === null).length ?? 0;
+  const qualityItems = [
+    ...(missingAlt > 0 ? [`説明のない画像が${missingAlt}件あります。`] : []),
+    ...(missingAudio > 0
+      ? [`${missingAudio}区間はVOICEVOX音声が未生成で、ブラウザ音声を使います。`]
+      : []),
+    ...(slide.composition?.clip_content
+      ? ["枠外を隠す設定です。実表示の見切れ診断を確認してください。"]
+      : [])
+  ];
+  const effectiveSummary = `<div class="setting-summary" aria-label="現在有効な設定">
+    <span class="setting-chip"><small>layout</small>${escapeHtml(deck.layout)}</span>
+    <span class="setting-chip"><small>template</small>${escapeHtml(activeTemplate?.name ?? "組み込み")}</span>
+    <span class="setting-chip"><small>visual</small>${VISUAL_LABELS[visualPreset]}</span>
+    <span class="setting-chip"><small>font</small>${FONT_LABELS[bodyFont]} / ${FONT_LABELS[headingFont]}</span>
+    <span class="setting-chip"><small>tone</small>${TONE_LABELS[slide.tone]}</span>
+    <span class="setting-chip"><small>animation</small>${ANIMATION_LABELS[effectiveEnter]}</span>
+    <span class="setting-chip"><small>読み上げ</small>${NARRATION_DISPLAY_LABELS[narrationDisplay]}</span>
+    <span class="setting-chip"><small>voice</small>${escapeHtml(defaultProfile?.label ?? "Web Speech")}</span>
+  </div>`;
   return new Response(
     shell(
       `${slide.title} — スライド編集`,
@@ -451,25 +690,35 @@ export function slideWorkspacePage(options: {
        <main class="workspace-main">
          <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
          <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span data-workspace-version>v${options.project.version}</span><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">大きく開く</a></div></div>
+         ${effectiveSummary}
          <div class="slide-workspace">
            <nav class="filmstrip" aria-label="スライド一覧">${filmstrip}</nav>
            <section class="panel workspace-preview">
              <div class="workspace-frame"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame></iframe></div>
-             <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output>STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>
+             <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output aria-live="polite">STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>
+             <p class="quality-status" data-layout-status role="status" aria-live="polite">実表示の文字収まりを確認しています…</p>
            </section>
            <aside class="inspector">
-             <section class="panel"><h2>スライド設定</h2>
-               <form class="editor" data-slide-editor action="/api/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}" data-version="${options.project.version}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
+             <details class="inspector-section" open><summary>内容</summary><div class="inspector-body">
+               <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
-                 <div class="editor-grid"><label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"></label><label>tone<select name="tone">${["dark", "light", "signal", "quiet"].map((tone) => `<option value="${tone}"${slide.tone === tone ? " selected" : ""}>${tone}</option>`).join("")}</select></label></div>
+                 <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"></label>
                  <label>定型本文／fallback<textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea></label>
                  <label>補足欄<textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea></label>
-                 <div class="actions"><button type="submit">このスライドを保存</button><span class="version" data-slide-version>v${options.project.version}</span></div>
-                 <p class="feedback" data-slide-feedback aria-live="polite"></p>
+                 <div class="actions"><button type="submit">内容を保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
+                 <p class="feedback" data-form-feedback aria-live="polite"></p>
                </form>
-             </section>
-             <section class="panel"><h2>${escapeHtml(slideCompositionLabel(slide))}</h2><p class="mode-note">${escapeHtml(modeNote)}</p>${componentOutline}</section>
-             <section class="panel"><div class="narration-head"><h2>読み上げ</h2>${slide.narration ? `<span class="stage">${narrationDisplayLabel}</span>` : ""}</div>${narrationOutline}</section>
+             </div></details>
+             <details class="inspector-section"><summary>デザイン</summary><div class="inspector-body">
+               <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
+               ${templateEditor}
+             </div></details>
+             <details class="inspector-section"><summary>読み上げ</summary><div class="inspector-body">
+               <form class="editor" data-narration-settings-editor data-versioned-form action="${slidePath}/narration/settings" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>表示形式<select name="display">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<option value="${value}"${narrationDisplay === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>スライド話者名<input name="speaker" maxlength="80" value="${escapeHtml(slide.narration?.speaker ?? "")}" placeholder="deck既定: ${escapeHtml(deck.narration_defaults?.speaker ?? "なし")}"></label></div><fieldset><legend>読み上げ枠</legend><div class="editor-grid"><label>配置<select name="placement">${[["bottom", "下部"], ["overlay-bottom", "下部に重ねる"], ["sidebar", "補足欄"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.placement === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>大きさ<select name="size">${[["compact", "小"], ["normal", "標準"], ["large", "大"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.size === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>文字揃え<select name="text_align"><option value="start"${narrationAppearance.text_align === "start" ? " selected" : ""}>左</option><option value="center"${narrationAppearance.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>文字倍率<input name="text_scale" type="number" min="0.75" max="1.5" step="0.05" value="${narrationAppearance.text_scale}"></label><label>最大行数<input name="max_lines" type="number" min="2" max="8" value="${narrationAppearance.max_lines}"></label></div><label class="check-label"><input name="speaker_visible" type="checkbox"${narrationAppearance.speaker_visible ? " checked" : ""}>話者名を表示</label><label class="check-label"><input name="progress_visible" type="checkbox"${narrationAppearance.progress_visible ? " checked" : ""}>読み上げ進捗を表示</label></fieldset><p class="inherit-note">話者の実効値: ${escapeHtml(effectiveSpeaker ?? "なし")}。この欄で保存するとslide設定として上書きします。</p><div class="actions"><button type="submit">読み上げ枠を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
+               ${voiceSegments}
+             </div></details>
+             <details class="inspector-section"><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${componentOutline}</div></details>
+             <details class="inspector-section" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
            </aside>
          </div>
        </main><script src="/assets/dashboard.js" defer></script>`
