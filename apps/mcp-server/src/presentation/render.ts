@@ -572,7 +572,7 @@ export function renderPresentationHtml(
     .reveal-block.scene-node.is-visible { opacity: var(--component-opacity); }
     uf-layer, uf-stack, uf-grid, uf-hero, uf-markdown, uf-image, uf-shape, uf-card, uf-metric, uf-quote, uf-callout, uf-bar-chart, uf-timeline, uf-bar-row, uf-timeline-item { box-sizing: border-box; }
     uf-stack > .scene-node, uf-grid > .scene-node { min-height: 0; }
-    uf-hero { gap: 1.5cqh; justify-content: center; }
+    uf-hero { gap: calc(1.5cqh * var(--fit-scale)); justify-content: center; }
     uf-hero[data-align="center"] { align-items: center; text-align: center; }
     uf-hero[data-align="end"] { align-items: flex-end; text-align: end; }
     :is(uf-hero,uf-markdown,uf-card,uf-metric,uf-quote,uf-callout,uf-bar-chart,uf-timeline)[data-fit-content] { --fit-scale: 1; }
@@ -581,7 +581,7 @@ export function renderPresentationHtml(
     .component-subtitle { max-width: 48rem; margin: 0; color: color-mix(in srgb, currentColor 68%, transparent); font-size: calc(1.8cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
     uf-markdown h2, uf-markdown h3, uf-card h2, uf-card h3 { margin: 0 0 .45em; font-family: var(--font-heading); font-size: calc(3.7cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); font-weight: var(--heading-weight); line-height: 1.05; overflow-wrap: anywhere; }
     uf-markdown p, uf-markdown li, uf-card p, uf-card li, uf-callout p { margin-top: 0; font-size: calc(1.55cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
-    uf-card, uf-callout { gap: .55em; padding: calc(2.1cqw * var(--density-scale)); border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.8cqw; background: var(--theme-surface); backdrop-filter: blur(18px); }
+    uf-card, uf-callout { gap: calc(.55em * var(--fit-scale)); padding: calc(2.1cqw * var(--density-scale) * var(--fit-scale)); border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.8cqw; background: var(--theme-surface); backdrop-filter: blur(18px); }
     uf-card[data-variant="accent"] { border-color: color-mix(in srgb, var(--accent) 70%, transparent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
     uf-card[data-variant="glass"] { background: #ffffff14; box-shadow: 0 18px 55px #0005; }
     uf-metric { justify-content: center; gap: .5em; padding: calc(1.8cqw * var(--density-scale)); }

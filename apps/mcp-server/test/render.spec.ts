@@ -514,6 +514,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("overflow.x > 1 || overflow.y > 1");
     expect(html).toContain("scale > .55");
     expect(html).toContain("setTimeout(scheduleFit, 300)");
+    expect(html).toContain("1.5cqh * var(--fit-scale)");
+    expect(html).toContain("var(--density-scale) * var(--fit-scale)");
     expect(html).toContain("@media (prefers-reduced-motion: reduce) { *, *::before, *::after");
     expect(html).not.toContain(">fallback<");
 
