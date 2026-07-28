@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { renderPresentationHtml } from "../src/presentation/render";
+import {
+  PRESENTATION_RENDERER_VERSION,
+  renderPresentationHtml
+} from "../src/presentation/render";
 import { slideWorkspacePage } from "../src/web/pages";
 import {
   projectRecordSchema,
@@ -115,6 +118,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("speechSynthesis");
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
+    expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
     expect(html).toContain('data-template-id="my-biim"');
     expect(html).toContain('data-region="sidebar"');
     expect(html).toContain('data-reveal-at="1"');

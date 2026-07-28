@@ -454,19 +454,28 @@ export function projectDetailPage(options: {
     : `<p class="prose">まだ画像がありません。</p>`;
   const preview = options.publication.latest_preview;
   const published = options.publication.published;
-  const previewCurrent = preview?.project_version === options.project.version;
+  const previewDraftCurrent = preview?.project_version === options.project.version;
+  const previewRendererCurrent =
+    preview?.renderer_version === options.publication.current_renderer_version;
+  const previewCurrent = previewDraftCurrent && previewRendererCurrent;
+  const previewStaleMessage = !previewDraftCurrent
+    ? "下書きが変わったため、新しいプレビューの確認が必要です。"
+    : !previewRendererCurrent
+      ? "表示エンジンが更新されたため、新しいプレビューの確認が必要です。"
+      : "公開中の版は、下書きを編集しても自動では変わりません。";
   const publicationPanel = `<section class="panel publish-state" data-publication>
     <h2>プレビューと公開</h2>
     <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
-    <div class="status-row"><span>最新プレビュー</span><strong>${preview === null ? "未作成" : `v${preview.project_version}`}</strong></div>
-    <div class="status-row"><span>公開中</span><strong>${published === null ? "未公開" : `v${published.project_version}`}</strong></div>
+    <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
+    <div class="status-row"><span>最新プレビュー</span><strong data-preview-status>${preview === null ? "未作成" : `v${preview.project_version} · ${escapeHtml(preview.renderer_version)}${previewCurrent ? "" : " · 要再生成"}`}</strong></div>
+    <div class="status-row"><span>公開中</span><strong data-published-status>${published === null ? "未公開" : `v${published.project_version} · ${escapeHtml(published.renderer_version)}`}</strong></div>
     ${preview !== null ? `<a class="button ghost" href="/preview/${escapeHtml(preview.revision_id)}" target="_blank" rel="noopener">最新プレビューを開く</a>` : ""}
     ${published !== null && options.publication.slug !== null ? `<a class="button ghost" href="/p/${escapeHtml(options.publication.slug)}" target="_blank" rel="noopener">公開ページを開く</a>` : ""}
     <div class="actions">
       <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 ? " disabled" : ""}>現在の下書きをプレビュー</button>
       <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}"${previewCurrent ? "" : " disabled"}>確認した版を公開</button>
     </div>
-    <p class="feedback${preview !== null && !previewCurrent ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : preview !== null && !previewCurrent ? "下書きが変わったため、新しいプレビューの確認が必要です。" : "公開中の版は、下書きを編集しても自動では変わりません。"}</p>
+    <p class="feedback${preview !== null && !previewCurrent ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
 
   return new Response(

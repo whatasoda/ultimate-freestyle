@@ -4,6 +4,8 @@ import type {
   SlideSceneNode
 } from "../projects/schema";
 
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@2";
+
 function escapeHtml(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -719,7 +721,7 @@ export function renderPresentationHtml(
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; } }
   </style>
 </head>
-<body data-layout="${escapeHtml(deck.layout)}" data-editor-frame="${String(options.editorFrame ?? false)}">
+<body data-layout="${escapeHtml(deck.layout)}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time"><span id="elapsed">00:00</span> / <span id="expected">00:00</span></span></header>
     <div class="stage-wrap"><div class="stage" aria-label="${escapeHtml(project.document.title)}">${slideHtml}</div></div>

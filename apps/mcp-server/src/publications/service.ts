@@ -2,6 +2,7 @@ import { getProjectAsset } from "../assets/repository";
 import type { StoredProjectAsset } from "../assets/schema";
 import {
   listPresentationAssetIds,
+  PRESENTATION_RENDERER_VERSION,
   renderPresentationHtml
 } from "../presentation/render";
 import { getProject } from "../projects/repository";
@@ -33,6 +34,7 @@ export type PresentationRevision = {
   revision_id: string;
   project_id: string;
   project_version: number;
+  renderer_version: string;
   object_key: string;
   content_hash: string;
   byte_size: number;
@@ -42,6 +44,7 @@ export type PresentationRevision = {
 export type PublicationStatus = {
   project_id: string;
   draft_version: number;
+  current_renderer_version: string;
   slug: string | null;
   latest_preview: PresentationRevision | null;
   published: PresentationRevision | null;
@@ -51,6 +54,7 @@ type RevisionRow = {
   id: string;
   project_id: string;
   project_version: number;
+  renderer_version: string;
   object_key: string;
   content_hash: string;
   byte_size: number;
@@ -62,6 +66,7 @@ function toRevision(row: RevisionRow): PresentationRevision {
     revision_id: row.id,
     project_id: row.project_id,
     project_version: row.project_version,
+    renderer_version: row.renderer_version,
     object_key: row.object_key,
     content_hash: row.content_hash,
     byte_size: row.byte_size,
@@ -197,7 +202,7 @@ export async function getPublicationStatus(
   for (const revisionId of new Set(revisionIds)) {
     const row = await db
       .prepare(
-        `SELECT id, project_id, project_version, object_key, content_hash,
+        `SELECT id, project_id, project_version, renderer_version, object_key, content_hash,
                 byte_size, created_at
          FROM presentation_revisions
          WHERE id = ? AND owner_user_id = ?`
@@ -209,6 +214,7 @@ export async function getPublicationStatus(
   return {
     project_id: projectId,
     draft_version: project.version,
+    current_renderer_version: PRESENTATION_RENDERER_VERSION,
     slug: state?.slug ?? null,
     latest_preview:
       state?.latest_preview_revision_id === null ||
@@ -286,6 +292,7 @@ export async function createPresentationPreview(
       customMetadata: {
         projectId,
         projectVersion: String(project.version),
+        rendererVersion: PRESENTATION_RENDERER_VERSION,
         contentHash
       }
     });
@@ -295,15 +302,16 @@ export async function createPresentationPreview(
       env.DB
         .prepare(
           `INSERT INTO presentation_revisions (
-             id, project_id, owner_user_id, project_version, object_key,
-             content_hash, byte_size, created_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+             id, project_id, owner_user_id, project_version, renderer_version,
+             object_key, content_hash, byte_size, created_at
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           revisionId,
           projectId,
           ownerUserId,
           project.version,
+          PRESENTATION_RENDERER_VERSION,
           objectKey,
           contentHash,
           bytes.byteLength,
@@ -346,6 +354,7 @@ export async function createPresentationPreview(
         revision_id: revisionId,
         project_id: projectId,
         project_version: project.version,
+        renderer_version: PRESENTATION_RENDERER_VERSION,
         object_key: objectKey,
         content_hash: contentHash,
         byte_size: bytes.byteLength,
@@ -371,7 +380,7 @@ export async function publishPresentationPreview(
   }
   const revision = await db
     .prepare(
-      `SELECT id, project_id, project_version, object_key, content_hash,
+      `SELECT id, project_id, project_version, renderer_version, object_key, content_hash,
               byte_size, created_at
        FROM presentation_revisions
        WHERE id = ? AND project_id = ? AND owner_user_id = ?`
@@ -388,6 +397,12 @@ export async function publishPresentationPreview(
     throw new PublicationError(
       "PREVIEW_STALE",
       `プレビューは v${revision.project_version}、現在の下書きは v${status.draft_version} です。新しいプレビューを確認してください。`
+    );
+  }
+  if (revision.renderer_version !== PRESENTATION_RENDERER_VERSION) {
+    throw new PublicationError(
+      "PREVIEW_STALE",
+      `プレビューは ${revision.renderer_version}、現在は ${PRESENTATION_RENDERER_VERSION} です。新しいプレビューを確認してください。`
     );
   }
   const now = new Date().toISOString();

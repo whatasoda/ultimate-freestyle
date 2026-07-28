@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { createOAuthProvider } from "../src/auth/oauth";
 import { createProjectAsset } from "../src/assets/repository";
+import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { createEmptyProject } from "../src/projects/schema";
 import type { Fetcher } from "../src/auth/twitch";
 
@@ -656,10 +657,17 @@ describe("Web dashboard", () => {
     );
     expect(previewCreate.status).toBe(201);
     const previewResult = (await previewCreate.json()) as {
-      revision: { revision_id: string; project_version: number };
+      revision: {
+        revision_id: string;
+        project_version: number;
+        renderer_version: string;
+      };
       preview_url: string;
     };
     expect(previewResult.revision.project_version).toBe(4);
+    expect(previewResult.revision.renderer_version).toBe(
+      PRESENTATION_RENDERER_VERSION
+    );
 
     const previewPage = await requestProvider(
       provider,
@@ -692,6 +700,51 @@ describe("Web dashboard", () => {
     expect(privateAsset.status).toBe(200);
     expect(privateAsset.headers.get("cache-control")).toBe("private, no-store");
     await env.MEDIA_BUCKET.delete(presentationSourceKey);
+
+    await env.DB.prepare(
+      "UPDATE presentation_revisions SET renderer_version = 'uf-renderer@1' WHERE id = ?"
+    ).bind(previewResult.revision.revision_id).run();
+    const staleRendererDetail = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const staleRendererHtml = await staleRendererDetail.text();
+    expect(staleRendererHtml).toContain("uf-renderer@1 · 要再生成");
+    expect(staleRendererHtml).toContain(
+      "表示エンジンが更新されたため、新しいプレビューの確認が必要です。"
+    );
+    const staleRendererPublish = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/publish",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            revision_id: previewResult.revision.revision_id
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(staleRendererPublish.status).toBe(409);
+    expect(await staleRendererPublish.json()).toMatchObject({
+      error: { code: "PREVIEW_STALE" }
+    });
+    await env.DB.prepare(
+      "UPDATE presentation_revisions SET renderer_version = ? WHERE id = ?"
+    ).bind(
+      PRESENTATION_RENDERER_VERSION,
+      previewResult.revision.revision_id
+    ).run();
 
     const publish = await requestProvider(
       provider,

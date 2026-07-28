@@ -275,6 +275,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const previewButton = document.querySelector("[data-create-preview]");
   const publishButton = document.querySelector("[data-publish-preview]");
   const publishFeedback = document.querySelector("[data-publish-feedback]");
+  const previewStatus = document.querySelector("[data-preview-status]");
+  const publishedStatus = document.querySelector("[data-published-status]");
   if (previewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     previewButton.addEventListener("click", async () => {
       previewButton.disabled = true;
@@ -297,6 +299,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.revision = result.revision.revision_id;
           publishButton.disabled = false;
+        }
+        if (previewStatus instanceof HTMLElement) {
+          previewStatus.textContent = "v" + result.revision.project_version + " · " + result.revision.renderer_version;
         }
         if (previewWindow) previewWindow.location.href = result.preview_url;
         else window.open(result.preview_url, "_blank", "noopener");
@@ -329,6 +334,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!response.ok) throw new Error(result.error?.message || "公開できませんでした。");
         publishFeedback.textContent = "公開しました: " + result.public_url;
         publishFeedback.classList.add("success");
+        if (publishedStatus instanceof HTMLElement && result.publication?.published) {
+          publishedStatus.textContent = "v" + result.publication.published.project_version + " · " + result.publication.published.renderer_version;
+        }
         publishButton.disabled = false;
       } catch (error) {
         publishFeedback.textContent = error instanceof Error ? error.message : "公開できませんでした。";
