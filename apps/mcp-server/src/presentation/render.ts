@@ -816,8 +816,8 @@ export function renderPresentationHtml(
     const collectOverflow = (target) => {
       const ignoreVertical = target.dataset.fitScroll === 'true';
       return {
-        x: target.scrollWidth > target.clientWidth + 1,
-        y: !ignoreVertical && target.scrollHeight > target.clientHeight + 1
+        x: Math.max(0, target.scrollWidth - target.clientWidth),
+        y: ignoreVertical ? 0 : Math.max(0, target.scrollHeight - target.clientHeight)
       };
     };
     const fitAndReport = () => {
@@ -828,12 +828,12 @@ export function renderPresentationHtml(
         target.style.setProperty('--fit-scale', '1');
         let scale = 1;
         let overflow = collectOverflow(target);
-        while ((overflow.x || overflow.y) && scale > .62 && target.dataset.fitScroll !== 'true') {
+        while ((overflow.x > 1 || overflow.y > 1) && scale > .62 && target.dataset.fitScroll !== 'true') {
           scale = Math.max(.62, Number((scale - .05).toFixed(2)));
           target.style.setProperty('--fit-scale', String(scale));
           overflow = collectOverflow(target);
         }
-        const overflowing = overflow.x || overflow.y;
+        const overflowing = overflow.x > 1 || overflow.y > 1;
         target.dataset.overflow = String(overflowing);
         target.dataset.fitScale = String(scale);
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: overflow.x, overflow_y: overflow.y, fit_scale: scale });

@@ -510,6 +510,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-fit-scroll="true"');
     expect(html).toContain("item.scrollIntoView");
     expect(html).toContain("target.dataset.overflow = String(overflowing)");
+    expect(html).toContain("Math.max(0, target.scrollWidth - target.clientWidth)");
+    expect(html).toContain("overflow.x > 1 || overflow.y > 1");
     expect(html).toContain("@media (prefers-reduced-motion: reduce) { *, *::before, *::after");
     expect(html).not.toContain(">fallback<");
 
