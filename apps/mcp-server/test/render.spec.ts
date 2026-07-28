@@ -511,6 +511,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("item.scrollIntoView");
     expect(html).toContain("target.dataset.overflow = String(overflowing)");
     expect(html).toContain("Math.max(0, target.scrollWidth - target.clientWidth)");
+    expect(html).toContain("const collectClippedOverflow = (target)");
+    expect(html).toContain("boundary.getBoundingClientRect()");
     expect(html).toContain("overflow.x > 1 || overflow.y > 1");
     expect(html).toContain("scale > .45");
     expect(html).toContain("setTimeout(scheduleFit, 300)");

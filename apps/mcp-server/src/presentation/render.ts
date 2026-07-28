@@ -820,6 +820,28 @@ export function renderPresentationHtml(
         y: ignoreVertical ? 0 : Math.max(0, target.scrollHeight - target.clientHeight)
       };
     };
+    const collectClippedOverflow = (target) => {
+      const clips = (value) => ['auto', 'clip', 'hidden', 'scroll'].includes(value);
+      let boundary = target;
+      while (boundary.parentElement) {
+        const style = getComputedStyle(boundary);
+        if (clips(style.overflowX) || clips(style.overflowY)) break;
+        boundary = boundary.parentElement;
+      }
+      const boundaryRect = boundary.getBoundingClientRect();
+      const contentRects = [...target.querySelectorAll('*')]
+        .map((item) => item.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0);
+      if (contentRects.length === 0) contentRects.push(target.getBoundingClientRect());
+      const left = Math.min(...contentRects.map((rect) => rect.left));
+      const right = Math.max(...contentRects.map((rect) => rect.right));
+      const top = Math.min(...contentRects.map((rect) => rect.top));
+      const bottom = Math.max(...contentRects.map((rect) => rect.bottom));
+      return {
+        x: Math.max(0, boundaryRect.left - left, right - boundaryRect.right),
+        y: target.dataset.fitScroll === 'true' ? 0 : Math.max(0, boundaryRect.top - top, bottom - boundaryRect.bottom)
+      };
+    };
     const fitAndReport = () => {
       const currentSlide = slides[slide];
       const diagnostics = [];
@@ -833,10 +855,11 @@ export function renderPresentationHtml(
           target.style.setProperty('--fit-scale', String(scale));
           overflow = collectOverflow(target);
         }
-        const overflowing = overflow.x > 1 || overflow.y > 1;
+        const clippedOverflow = collectClippedOverflow(target);
+        const overflowing = clippedOverflow.x > 1 || clippedOverflow.y > 1;
         target.dataset.overflow = String(overflowing);
         target.dataset.fitScale = String(scale);
-        if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: overflow.x, overflow_y: overflow.y, fit_scale: scale });
+        if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
       });
       if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, overflows: diagnostics }, location.origin);
     };
