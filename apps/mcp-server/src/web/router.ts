@@ -22,6 +22,7 @@ import {
 import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
 import { renderPresentationHtml } from "../presentation/render";
 import { getProject, listProjects, mutateProject } from "../projects/repository";
+import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import {
   animationSchema,
   coverLayoutSchema,
@@ -32,7 +33,8 @@ import {
   presentationTemplateSchema,
   presentationAspectRatioSchema,
   projectStageSchema,
-  slideRoleSchema
+  slideRoleSchema,
+  visualPresetSchema
 } from "../projects/schema";
 import {
   createPresentationPreview,
@@ -114,6 +116,14 @@ const slideFieldsRequestSchema = z.object({
 const templateFieldsRequestSchema = presentationTemplateSchema
   .omit({ id: true })
   .extend({ expected_version: z.number().int().positive() });
+
+const templateCreateRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+  name: z.string().min(1).max(80),
+  visual_preset: visualPresetSchema,
+  make_default: z.boolean()
+});
 
 const narrationSettingsRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -655,6 +665,8 @@ function projectMutationErrorResponse(
     PROJECT_NOT_FOUND: "研究が見つかりません。",
     SLIDE_NOT_FOUND: "スライドが見つかりません。",
     TEMPLATE_NOT_FOUND: "templateが見つかりません。",
+    TEMPLATE_EXISTS: "同じIDのtemplateがすでにあります。",
+    DECK_REQUIRED: "発表スライドを先に作成してください。",
     NARRATION_NOT_FOUND: "このスライドには読み上げがありません。",
     NARRATION_SEGMENT_NOT_FOUND: "読み上げ区間が見つかりません。",
     VOICE_PROFILE_NOT_FOUND: "VOICEVOX profileが見つかりません。",
@@ -668,7 +680,9 @@ function projectMutationErrorResponse(
     code === "NARRATION_SEGMENT_NOT_FOUND" ||
     code === "VOICE_PROFILE_NOT_FOUND"
       ? 404
-      : code === "PROJECT_VERSION_CONFLICT"
+      : code === "PROJECT_VERSION_CONFLICT" ||
+          code === "TEMPLATE_EXISTS" ||
+          code === "DECK_REQUIRED"
         ? 409
         : 500;
   return jsonResponse(
@@ -751,6 +765,102 @@ async function handleTemplateFieldsUpdate(
     });
   } catch (error) {
     return projectMutationErrorResponse(error, "templateを保存できませんでした。");
+  }
+}
+
+async function handleTemplateCreate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = templateCreateRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: "INVALID_TEMPLATE",
+          message: "template名、ID、presetを確認してください。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const deck = document.deck;
+        if (deck === null) {
+          const error = new Error("The presentation deck does not exist.");
+          Object.assign(error, { code: "DECK_REQUIRED" });
+          throw error;
+        }
+        deck.templates ??= [];
+        if (deck.templates.some((template) => template.id === parsed.data.template_id)) {
+          const error = new Error("The presentation template already exists.");
+          Object.assign(error, { code: "TEMPLATE_EXISTS" });
+          throw error;
+        }
+        deck.templates.push(
+          presentationTemplateSchema.parse({
+            id: parsed.data.template_id,
+            name: parsed.data.name,
+            ...TEMPLATE_PRESET_DEFAULTS[parsed.data.visual_preset]
+          })
+        );
+        if (parsed.data.make_default) {
+          deck.default_template_id = parsed.data.template_id;
+        }
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.presentation_template_created",
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        template_id: parsed.data.template_id,
+        version: project.version
+      },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse(
+      {
+        ok: true,
+        project_id: projectId,
+        template_id: parsed.data.template_id,
+        version: project.version,
+        updated_at: project.updated_at,
+        error: null,
+        request_id: crypto.randomUUID()
+      },
+      201
+    );
+  } catch (error) {
+    return projectMutationErrorResponse(
+      error,
+      "templateを作成できませんでした。"
+    );
   }
 }
 
@@ -1508,6 +1618,12 @@ export async function handleWebRequest(
       templateFieldsMatch[1],
       templateFieldsMatch[2]
     );
+  }
+  const templateCreateMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/templates$`, "i")
+  );
+  if (templateCreateMatch?.[1] !== undefined) {
+    return handleTemplateCreate(request, env, templateCreateMatch[1]);
   }
   const narrationSettingsMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/narration/settings$`)

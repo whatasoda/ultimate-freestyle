@@ -133,6 +133,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       line_height: numberValue(data, "line_height"),
       letter_spacing_em: numberValue(data, "letter_spacing_em")
     });
+    if (form.matches("[data-template-create]")) Object.assign(body, {
+      template_id: String(data.get("template_id") || ""),
+      name: String(data.get("name") || ""),
+      visual_preset: String(data.get("visual_preset") || "studio"),
+      make_default: data.has("make_default")
+    });
     if (form.matches("[data-narration-settings-editor]")) Object.assign(body, {
       display: String(data.get("display") || ""),
       speaker: String(data.get("speaker") || "").trim() || null,
@@ -174,7 +180,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       feedback.classList.remove("success", "warning");
       try {
         const response = await fetch(form.action, {
-          method: "PATCH",
+          method: form.dataset.method || "PATCH",
           headers: {
             "content-type": "application/json",
             "x-csrf-token": form.dataset.csrf || ""
@@ -185,6 +191,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
         syncSlideVersion(result.version);
         form.dataset.dirty = "false";
+        if (form.matches("[data-template-create]")) {
+          location.reload();
+          return;
+        }
         feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
         refreshSlideFrame(result.version);

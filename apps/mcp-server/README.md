@@ -46,7 +46,7 @@ Twitchのclient ID／secretは既存のCloudflare Worker secretをそのまま�
 
 研究データは512 KiB以内の固定schemaでD1へ保存します。`create_project`はidempotency key、`update_project`は`expected_version`を必須とし、再試行による重複作成と同時編集による上書きを防ぎます。`list_project_images`と`delete_project_image`も所有者を強制し、画像binaryやbase64はMCPレスポンスへ含めません。全操作で他利用者のproject／asset IDを指定しても存在を開示しません。
 
-Web UIも同じD1の所有者IDで絞り込みます。Twitch確認後は、Twitch tokenやMCP tokenをCookieへ保存せず、D1に保存した24時間のWeb専用セッションを`HttpOnly`、`Secure`、`SameSite=Lax`の不透明Cookieで参照します。D1を使うことでログアウトを即時反映し、session cookieとCSRF cookieの両方が揃った場合だけ認証済みとして扱います。現在の画面機能は一覧、研究詳細、研究画像管理、研究の基本文言編集、一枚ごとの実表示・STEP確認、template・font・配色・animation編集、読み上げ枠・話者・VOICEVOX調声編集、構成詳細と見切れ診断、固定previewの確認と公開です。componentの追加・削除・親子構造変更はMCP対応AIクライアントから行います。
+Web UIも同じD1の所有者IDで絞り込みます。Twitch確認後は、Twitch tokenやMCP tokenをCookieへ保存せず、D1に保存した24時間のWeb専用セッションを`HttpOnly`、`Secure`、`SameSite=Lax`の不透明Cookieで参照します。D1を使うことでログアウトを即時反映し、session cookieとCSRF cookieの両方が揃った場合だけ認証済みとして扱います。現在の画面機能は一覧、研究詳細、研究画像管理、研究の基本文言編集、発表比率・0ページ目編集、一枚ごとの実表示・STEP確認、presetからのtemplate作成、template・font・配色・領域・animation編集、表紙設定、読み上げ枠・話者・VOICEVOX調声編集、構成詳細と見切れ診断、固定previewの確認と公開です。componentの追加・削除・親子構造変更はMCP対応AIクライアントから行います。
 
 研究画像はJPEG、PNG、静止WebPの10MiB以下だけを受け付けます。実データから形式と寸法を検査し、最大辺2560px、WebP quality 85、2MiB以下へ正規化した一枚だけをprivate R2へ保存します。原本、EXIF、SVG、GIF、アニメーションは保存しません。上限は100画像/project、300画像/user、150MiB/userで、D1 triggerでも同時書き込み時の超過を拒否します。
 

@@ -91,9 +91,9 @@ const templateMutableInput = {
   letter_spacing_em: presentationTemplateSchema.shape.letter_spacing_em
 };
 
-type VisualPreset = z.infer<typeof visualPresetSchema>;
+export type VisualPreset = z.infer<typeof visualPresetSchema>;
 
-const TEMPLATE_PRESET_DEFAULTS: Record<
+export const TEMPLATE_PRESET_DEFAULTS: Record<
   VisualPreset,
   Omit<PresentationTemplate, "id" | "name">
 > = {

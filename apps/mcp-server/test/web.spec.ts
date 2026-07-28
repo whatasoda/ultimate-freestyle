@@ -420,6 +420,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("サイエンス");
     expect(workspaceHtml).toContain("強調見出し");
     expect(workspaceHtml).toContain("data-template-editor");
+    expect(workspaceHtml).toContain("data-template-create");
+    expect(workspaceHtml).toContain("編集できるtemplateを追加");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain("VOICEVOX音声あり");
@@ -990,6 +992,35 @@ describe("Web dashboard", () => {
     const fourThreeWorkspaceHtml = await fourThreeWorkspace.text();
     expect(fourThreeWorkspaceHtml).toContain('data-aspect-ratio="4:3"');
     expect(fourThreeWorkspaceHtml).toContain("--workspace-aspect:4 / 3");
+
+    const templateCreate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/templates",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 8,
+            template_id: "web-neon",
+            name: "Webで作るネオン",
+            visual_preset: "neon",
+            make_default: false
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(templateCreate.status).toBe(201);
+    expect(await templateCreate.json()).toMatchObject({
+      ok: true,
+      template_id: "web-neon",
+      version: 9
+    });
 
     const unsupportedUpload = await requestProvider(
       provider,
