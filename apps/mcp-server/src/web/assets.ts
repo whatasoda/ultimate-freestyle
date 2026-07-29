@@ -343,6 +343,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   let draftAppearanceTimer;
   let draftNarrationTimer;
   let draftSceneTimer;
+  let setWorkspaceStep = () => {};
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(slideEditor);
@@ -555,6 +556,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   };
   narrationSettingsEditor?.addEventListener("input", scheduleNarrationDraft);
   for (const form of document.querySelectorAll("[data-segment-preview]")) form.addEventListener("input", scheduleNarrationDraft);
+  const newSegmentStep = document.querySelector("[data-narration-segment-create] select[name=at]");
+  if (newSegmentStep instanceof HTMLSelectElement) {
+    newSegmentStep.addEventListener("change", () => setWorkspaceStep(Number(newSegmentStep.value)));
+  }
   const setFrameLoading = (loading) => {
     if (frameLoading instanceof HTMLElement) frameLoading.hidden = !loading;
   };
@@ -1232,6 +1237,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             : currentStep === maxStep;
       }
     };
+    setWorkspaceStep = updateStep;
     for (const button of stepButtons) {
       if (!(button instanceof HTMLButtonElement)) continue;
       button.addEventListener("click", () => {
