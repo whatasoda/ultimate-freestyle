@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { createOAuthProvider } from "../src/auth/oauth";
 import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
+import { DASHBOARD_SCRIPT } from "../src/web/assets";
 import { createEmptyProject } from "../src/projects/schema";
 import type { Fetcher } from "../src/auth/twitch";
 import {
@@ -403,7 +404,9 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=28"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=29"');
+    expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
+    expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");

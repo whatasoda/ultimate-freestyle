@@ -1046,6 +1046,24 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       publishFeedback.textContent = "現在の下書きから固定プレビューを生成しています…";
       publishFeedback.classList.remove("warning", "success");
       const previewWindow = window.open("", "_blank");
+      if (previewWindow) {
+        previewWindow.document.documentElement.lang = "ja";
+        previewWindow.document.title = "プレビューを準備中 — 最自由研究";
+        const waiting = previewWindow.document.createElement("main");
+        waiting.setAttribute("aria-live", "polite");
+        waiting.textContent = "固定プレビューを準備しています…";
+        Object.assign(previewWindow.document.body.style, {
+          margin: "0",
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "#090f18",
+          color: "#eef3fa",
+          fontFamily: 'Inter, "Noto Sans JP", system-ui, sans-serif',
+          fontSize: "clamp(1rem, 3vw, 1.4rem)"
+        });
+        previewWindow.document.body.append(waiting);
+      }
       try {
         const response = await fetch(previewButton.dataset.createPreview || "", {
           method: "POST",
@@ -1057,7 +1075,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "プレビューを作成できませんでした。"));
-        publishFeedback.textContent = "プレビューを作成しました。表示を確認してから公開してください。";
+        publishFeedback.textContent = "プレビューを作成しました。文字の見切れ、読み上げ、自動送り、最後の終了画面まで確認してください。";
         publishFeedback.classList.add("success");
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.revision = result.revision.revision_id;
