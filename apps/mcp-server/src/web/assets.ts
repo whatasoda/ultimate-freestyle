@@ -302,6 +302,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (voicePage instanceof HTMLElement) {
     const csrf = voicePage.dataset.csrf || "";
     const setupButton = voicePage.querySelector("[data-voice-setup]");
+    const profileSelect = voicePage.querySelector("[data-voice-profile]");
     const setupFeedback = voicePage.querySelector("[data-voice-setup-feedback]");
     const generateButton = voicePage.querySelector("[data-voice-generate]");
     const generateFeedback = voicePage.querySelector("[data-voice-generate-feedback]");
@@ -408,12 +409,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (setupButton instanceof HTMLButtonElement) {
       setupButton.addEventListener("click", async () => {
         setupButton.disabled = true;
-        if (setupFeedback instanceof HTMLElement) setupFeedback.textContent = "ずんだもん・ノーマルを設定しています…";
+        const selectedLabel = profileSelect instanceof HTMLSelectElement
+          ? profileSelect.selectedOptions[0]?.textContent || "選択した声"
+          : "選択した声";
+        if (setupFeedback instanceof HTMLElement) setupFeedback.textContent = selectedLabel + "を設定しています…";
         try {
           const response = await fetch(setupButton.dataset.voiceSetup || "", {
             method: "POST",
             headers: { "content-type": "application/json", "x-csrf-token": csrf },
-            body: JSON.stringify({ expected_version: Number(voicePage.dataset.version) })
+            body: JSON.stringify({
+              expected_version: Number(voicePage.dataset.version),
+              profile_id: profileSelect instanceof HTMLSelectElement ? profileSelect.value : "voicevox-style-3"
+            })
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error?.message || "声を設定できませんでした。");

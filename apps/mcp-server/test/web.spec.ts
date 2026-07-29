@@ -401,6 +401,21 @@ describe("Web dashboard", () => {
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
     );
 
+    const voicePage = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/voice",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const voicePageHtml = await voicePage.text();
+    expect(voicePage.status).toBe(200);
+    expect(voicePageHtml).toContain("40話者・118種類");
+    expect(voicePageHtml).toContain('value="voicevox-style-3" selected');
+    expect(voicePageHtml).toContain('label="四国めたん"');
+    expect(voicePageHtml).toContain("7種の調声値");
+
     const workspaceUrl =
       "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro";
     const workspace = await requestProvider(

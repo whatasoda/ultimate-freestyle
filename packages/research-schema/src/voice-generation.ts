@@ -20,9 +20,9 @@ export const VOICEVOX_MP3_CODEC = {
 } as const;
 
 export const ZUNDAMON_NORMAL_PROFILE = {
-  id: "zundamon-normal",
+  id: "voicevox-style-3",
   label: "ずんだもん・ノーマル",
-  speakerUuid: "388ca377-4b91-4ac4-99f2-26ec3f63a49c",
+  speakerUuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
   speakerName: "ずんだもん",
   styleId: 3,
   styleName: "ノーマル",

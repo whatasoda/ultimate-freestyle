@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./voice": "./src/voice.ts",
-    "./voice-generation": "./src/voice-generation.ts"
+    "./voice-generation": "./src/voice-generation.ts",
+    "./voicevox-catalog": "./src/voicevox-catalog.ts"
   }
 }

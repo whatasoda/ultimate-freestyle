@@ -55,7 +55,7 @@ import {
   hydrateProjectVoice,
   readOwnerVoiceArtifact,
   resolveVoiceArtifacts,
-  setupZundamonProfile,
+  setupVoicevoxProfile,
   VoiceGenerationError
 } from "../voicevox/service";
 import { z } from "zod";
@@ -108,7 +108,11 @@ const publishRequestSchema = z.object({
 });
 
 const voiceSetupRequestSchema = z.object({
-  expected_version: z.number().int().positive()
+  expected_version: z.number().int().positive(),
+  profile_id: z
+    .string()
+    .regex(/^voicevox-style-\d+$/)
+    .default("voicevox-style-3")
 });
 
 const voiceJobRequestSchema = voiceSetupRequestSchema.extend({
@@ -509,10 +513,11 @@ async function handleVoiceSetup(
     );
   }
   try {
-    const project = await setupZundamonProfile(env.DB, {
+    const project = await setupVoicevoxProfile(env.DB, {
       ownerUserId: session.userId,
       projectId,
-      expectedVersion: parsed.data.expected_version
+      expectedVersion: parsed.data.expected_version,
+      profileId: parsed.data.profile_id
     });
     await recordWebAudit(env.DB, {
       userId: session.userId,
@@ -2030,7 +2035,10 @@ export async function handleWebRequest(
     return handleVoiceJobCreate(request, env, voiceJobsMatch[1]);
   }
   const voiceSetupMatch = path.match(
-    new RegExp(`^/api/projects/${UUID_PATH}/voice/setup-zundamon$`, "i")
+    new RegExp(
+      `^/api/projects/${UUID_PATH}/voice/(?:profile|setup-zundamon)$`,
+      "i"
+    )
   );
   if (voiceSetupMatch?.[1] !== undefined) {
     return handleVoiceSetup(request, env, voiceSetupMatch[1]);

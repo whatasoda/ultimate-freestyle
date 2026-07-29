@@ -12,6 +12,7 @@ import {
   type VoicevoxTuning
 } from "@ultimate-freestyle/research-schema/voice";
 import type { PublicationStatus } from "../publications/service";
+import { VOICEVOX_CATALOG } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   discovery: "発見",
@@ -323,6 +324,8 @@ function shell(title: string, body: string): string {
       .voice-preset { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .85rem; align-items: center; padding: .9rem; border: 1px solid #52647c; border-radius: .8rem; background: linear-gradient(135deg, #102531, #111827); }
       .voice-character { display: grid; place-items: center; width: 3.2rem; height: 3.2rem; border: 2px solid #b6ef78; border-radius: 48% 52% 45% 55%; background: #6bbd45; color: #10230d; font-size: 1.4rem; box-shadow: inset 0 0 0 .35rem #d6f6a8; }
       .voice-preset strong, .voice-preset small { display: block; }
+      .voice-preset label { display: grid; gap: .35rem; min-width: 0; }
+      .voice-preset select { width: 100%; padding: .65rem; border: 1px solid #52647c; border-radius: .55rem; background: #08111b; color: var(--ink); font: inherit; }
       .voice-preset small { margin-top: .25rem; color: var(--muted); line-height: 1.5; }
       .voice-preset .stage { justify-self: end; }
       .voice-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
@@ -737,6 +740,23 @@ export function voiceFinishPage(options: {
     );
   const defaultProfileLabel =
     options.voice.default_profile?.label ?? "ずんだもん・ノーマル";
+  const profileGroups = new Map<string, typeof VOICEVOX_CATALOG[number][]>();
+  for (const profile of VOICEVOX_CATALOG) {
+    const entries = profileGroups.get(profile.speakerName) ?? [];
+    entries.push(profile);
+    profileGroups.set(profile.speakerName, entries);
+  }
+  const profileOptions = [...profileGroups.entries()]
+    .map(
+      ([speakerName, profiles]) =>
+        `<optgroup label="${escapeHtml(speakerName)}">${profiles
+          .map(
+            (profile) =>
+              `<option value="${escapeHtml(profile.id)}"${options.voice.default_profile?.id === profile.id || options.voice.default_profile?.label === profile.label || (!options.voice.configured && profile.styleId === 3) ? " selected" : ""}>${escapeHtml(profile.styleName)}</option>`
+          )
+          .join("")}</optgroup>`
+    )
+    .join("");
   const segmentList = options.voice.segments.length
     ? options.voice.segments
         .map((segment, index) => {
@@ -758,12 +778,12 @@ export function voiceFinishPage(options: {
       `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main class="voice-main" data-voice-page data-project-id="${projectId}" data-version="${options.voice.version}" data-csrf="${escapeHtml(options.csrfToken)}" data-summary-url="/api/projects/${projectId}/voice">
          <a class="back" href="/dashboard/projects/${projectId}">← 研究詳細へ戻る</a>
-         <section class="voice-hero"><div><p class="eyebrow">Voice finishing</p><h1>音声を仕上げる</h1><p class="lead">ずんだもんの声を設定し、不足している読み上げ音声を生成して、区間ごとに確認できます。</p></div><a class="button ghost" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ</a></section>
+         <section class="voice-hero"><div><p class="eyebrow">Voice finishing</p><h1>音声を仕上げる</h1><p class="lead">VOICEVOXの話者とスタイルを選び、不足している読み上げ音声を生成して、区間ごとに確認できます。</p></div><a class="button ghost" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ</a></section>
          <div class="voice-flow">
            <div class="voice-column">
-             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">1</span><div><h2>声を決める</h2><p>最初は聞き取りやすい「ずんだもん・ノーマル」がおすすめです。あとから区間ごとに変更できます。</p></div></div>
-               <div class="voice-preset"><span class="voice-character" aria-hidden="true">ず</span><span><strong>ずんだもん・ノーマル</strong><small>VOICEVOX · 発表全体の既定音声として設定します</small></span><span class="stage">おすすめ</span></div>
-               <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/setup-zundamon"${options.voice.configured ? " disabled" : ""}>${options.voice.configured ? `${escapeHtml(defaultProfileLabel)}を設定済み` : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? "発表の既定音声として利用できます。" : "設定すると未指定の読み上げ区間へ自動的に適用されます。"}</p>
+             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">1</span><div><h2>声を決める</h2><p>40話者・118種類のトークスタイルから発表全体の既定音声を選べます。最初は「ずんだもん・ノーマル」がおすすめです。</p></div></div>
+               <div class="voice-preset"><span class="voice-character" aria-hidden="true">声</span><label><strong>既定の話者・スタイル</strong><select data-voice-profile>${profileOptions}</select><small>区間ごとのprofileと7種の調声値は、各スライドの読み上げ設定で変更できます。</small></label><span class="stage">${options.voice.configured ? "設定済み" : "おすすめ"}</span></div>
+               <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/profile"${jobActive ? " disabled" : ""}>${options.voice.configured ? "選択した声へ変更" : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? `現在の既定音声は「${escapeHtml(defaultProfileLabel)}」です。` : "設定するとprofile未指定の読み上げ区間へ自動的に適用されます。"}</p>
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">2</span><div><h2>不足分を生成する</h2><p>設定や原稿が変わった区間だけを生成します。生成済みの音声は再利用します。</p></div></div>
                <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成</span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>

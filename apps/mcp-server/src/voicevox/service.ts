@@ -5,6 +5,7 @@ import {
   ZUNDAMON_NORMAL_PROFILE,
   type VoiceGenerationInput
 } from "@ultimate-freestyle/research-schema/voice-generation";
+import { findVoicevoxCatalogProfile } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import { z } from "zod";
 
 import { getProject, mutateProject } from "../projects/repository";
@@ -116,6 +117,7 @@ export class VoiceGenerationError extends Error {
       | "PROJECT_NOT_FOUND"
       | "PROJECT_VERSION_CONFLICT"
       | "VOICE_NOT_CONFIGURED"
+      | "VOICE_PROFILE_NOT_FOUND"
       | "NO_NARRATION"
       | "VOICE_JOB_LIMIT"
       | "VOICE_CHARACTER_LIMIT"
@@ -244,16 +246,26 @@ async function buildVoicePlan(
   }));
 }
 
-export async function setupZundamonProfile(
+export async function setupVoicevoxProfile(
   db: D1Database,
   options: {
     ownerUserId: string;
     projectId: string;
     expectedVersion: number;
+    profileId: string;
   }
 ): Promise<ProjectRecord> {
+  const catalogProfile = findVoicevoxCatalogProfile(options.profileId);
+  if (catalogProfile === undefined) {
+    throw new VoiceGenerationError(
+      "VOICE_PROFILE_NOT_FOUND",
+      "選択したVOICEVOXの声が見つかりません。"
+    );
+  }
   return mutateProject(db, {
-    ...options,
+    ownerUserId: options.ownerUserId,
+    projectId: options.projectId,
+    expectedVersion: options.expectedVersion,
     mutate: (document) => {
       if (document.deck === null) {
         throw new VoiceGenerationError(
@@ -262,13 +274,16 @@ export async function setupZundamonProfile(
         );
       }
       const profile = {
-        id: ZUNDAMON_NORMAL_PROFILE.id,
-        label: ZUNDAMON_NORMAL_PROFILE.label,
-        speaker_uuid: ZUNDAMON_NORMAL_PROFILE.speakerUuid,
-        speaker_name: ZUNDAMON_NORMAL_PROFILE.speakerName,
-        style_id: ZUNDAMON_NORMAL_PROFILE.styleId,
-        style_name: ZUNDAMON_NORMAL_PROFILE.styleName,
-        tuning: { ...ZUNDAMON_NORMAL_PROFILE.tuning }
+        id: catalogProfile.id,
+        label: catalogProfile.label,
+        speaker_uuid: catalogProfile.speakerUuid,
+        speaker_name: catalogProfile.speakerName,
+        style_id: catalogProfile.styleId,
+        style_name: catalogProfile.styleName,
+        tuning:
+          catalogProfile.styleId === ZUNDAMON_NORMAL_PROFILE.styleId
+            ? { ...ZUNDAMON_NORMAL_PROFILE.tuning }
+            : null
       };
       const existing = document.deck.voicevox?.profiles ?? [];
       const profiles = existing.filter((item) => item.id !== profile.id);
@@ -285,6 +300,20 @@ export async function setupZundamonProfile(
       };
       document.deck.narration_defaults.speaker ??= profile.speaker_name;
     }
+  });
+}
+
+export async function setupZundamonProfile(
+  db: D1Database,
+  options: {
+    ownerUserId: string;
+    projectId: string;
+    expectedVersion: number;
+  }
+): Promise<ProjectRecord> {
+  return setupVoicevoxProfile(db, {
+    ...options,
+    profileId: ZUNDAMON_NORMAL_PROFILE.id
   });
 }
 
