@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@25";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@26";
 
 function escapeHtml(value: string): string {
   return value
@@ -1192,6 +1192,64 @@ export function renderPresentationHtml(
       }
       scheduleFit();
     };
+    const previewSceneComponent = (data) => {
+      const currentSlide = slides[slide];
+      const component = data.component;
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'scene' || data.slide_id !== DECK.slides[slide].id || !component || typeof component !== 'object') return;
+      const target = currentSlide.querySelector('[data-node-id="' + String(component.id) + '"]');
+      if (!(target instanceof HTMLElement) || target.dataset.component !== 'uf-' + String(component.kind).replaceAll('_', '-')) return;
+      const addText = (parent, tag, className, value) => {
+        if (value === null || value === undefined) return null;
+        const item = document.createElement(tag);
+        if (className) item.className = className;
+        item.textContent = String(value);
+        parent.append(item);
+        return item;
+      };
+      if (component.kind === 'hero') {
+        target.replaceChildren();
+        addText(target, 'p', 'component-eyebrow', component.eyebrow);
+        addText(target, 'h2', '', component.heading);
+        addText(target, 'p', 'component-subtitle', component.subtitle);
+      } else if (component.kind === 'markdown') {
+        renderDraftMarkdown(target, component.markdown || '');
+      } else if (component.kind === 'image') {
+        const media = target.querySelector('img');
+        if (media instanceof HTMLImageElement) media.alt = String(component.alt_text || '');
+        target.querySelector('small')?.remove();
+        addText(target, 'small', '', component.caption);
+      } else if (component.kind === 'shape') {
+        target.replaceChildren();
+        addText(target, 'span', '', component.label);
+      } else if (component.kind === 'card') {
+        target.replaceChildren();
+        addText(target, 'p', 'component-label', component.label);
+        const body = document.createElement('div');
+        target.append(body);
+        renderDraftMarkdown(body, component.markdown || '');
+      } else if (component.kind === 'metric') {
+        target.replaceChildren();
+        const line = document.createElement('p');
+        addText(line, 'strong', '', component.value);
+        addText(line, 'span', '', component.unit);
+        target.append(line);
+        addText(target, 'small', '', component.caption);
+      } else if (component.kind === 'quote') {
+        target.replaceChildren();
+        addText(target, 'blockquote', '', component.quote);
+        addText(target, 'cite', '', component.attribution);
+      } else if (component.kind === 'callout') {
+        target.replaceChildren();
+        addText(target, 'p', 'component-label', component.label);
+        addText(target, 'h3', '', component.heading);
+        if (component.markdown !== null && component.markdown !== undefined) {
+          const body = document.createElement('div');
+          target.append(body);
+          renderDraftMarkdown(body, component.markdown);
+        }
+      }
+      scheduleFit();
+    };
     const previewTypography = (data) => {
       const currentSlide = slides[slide];
       if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'flow' || data.slide_id !== DECK.slides[slide].id) return;
@@ -1475,6 +1533,7 @@ export function renderPresentationHtml(
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-scene-component') previewSceneComponent(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-template') previewTemplate(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-appearance') previewAppearance(event.data);

@@ -146,6 +146,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   let draftTemplateTimer;
   let draftAppearanceTimer;
   let draftNarrationTimer;
+  let draftSceneTimer;
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(slideEditor);
@@ -346,6 +347,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const value = String(data.get(name) ?? "").trim();
     return value === "" ? undefined : Number(value);
   };
+  const sceneComponentFromForm = (form) => {
+    let component = {};
+    try { component = JSON.parse(form.dataset.component || "{}"); } catch {}
+    for (const field of form.querySelectorAll("[data-component-field]")) {
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) continue;
+      component[field.name] = field.dataset.nullable === "true" && field.value.trim() === ""
+        ? null
+        : field.value;
+    }
+    return component;
+  };
   const serializeVersionedForm = (form) => {
     const data = new FormData(form);
     const body = { expected_version: Number(form.dataset.version) };
@@ -376,15 +388,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
     if (form.matches("[data-scene-component-editor]")) {
-      let component = {};
-      try { component = JSON.parse(form.dataset.component || "{}"); } catch {}
-      for (const field of form.querySelectorAll("[data-component-field]")) {
-        if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) continue;
-        component[field.name] = field.dataset.nullable === "true" && field.value.trim() === ""
-          ? null
-          : field.value;
-      }
-      Object.assign(body, { component });
+      Object.assign(body, { component: sceneComponentFromForm(form) });
     }
     if (form.matches("[data-deck-editor]")) Object.assign(body, {
       aspect_ratio: String(data.get("aspect_ratio") || "16:9"),
@@ -518,6 +522,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  const syncSceneComponentDrafts = () => {
+    if (!(slideFrame instanceof HTMLIFrameElement)) return;
+    for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
+      if (!(form instanceof HTMLFormElement)) continue;
+      slideFrame.contentWindow?.postMessage({
+        type: "ultimate-freestyle:preview-scene-component",
+        slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
+        component: sceneComponentFromForm(form)
+      }, location.origin);
+    }
+  };
+  for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
+    form.addEventListener("input", () => {
+      clearTimeout(draftSceneTimer);
+      draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
+      const layoutStatus = document.querySelector("[data-layout-status]");
+      if (layoutStatus instanceof HTMLElement) {
+        layoutStatus.textContent = "componentの文言をプレビューへ反映しています…";
+        layoutStatus.dataset.level = "";
+      }
+    });
+  }
+
   for (const field of document.querySelectorAll('textarea[maxlength], input[maxlength]:not([type]), input[type="text"][maxlength]')) {
     if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement)) continue;
     const counter = document.createElement("span");
@@ -631,6 +658,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncTemplateDraft();
       syncAppearanceDraft();
       syncNarrationDrafts();
+      syncSceneComponentDrafts();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");

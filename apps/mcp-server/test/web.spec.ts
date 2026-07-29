@@ -403,7 +403,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=25"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=26"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -587,6 +587,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("workspace-inspector");
     expect(dashboardScriptText).toContain("data-scene-component-editor");
     expect(dashboardScriptText).toContain("data-component-field");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
+    expect(dashboardScriptText).toContain("componentの文言をプレビューへ反映しています");
 
     const rejectedUpload = await requestProvider(
       provider,

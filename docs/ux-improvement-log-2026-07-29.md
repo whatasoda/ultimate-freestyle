@@ -342,3 +342,8 @@
 
 - リッチなcomponent sceneで、hero、markdown、画像、shape、card、metric、quote、calloutの文言を一件ずつ編集できるWeb APIとフォームを追加した。
 - component全体をschemaで再検証し、レイアウト構造や任意HTMLを公開せず、Web UIでは既存componentの文字項目だけを変更できる境界にした。
+
+## 改善ループ51
+
+- scene componentの未保存文言も中央iframeへ即時反映し、flow・sceneどちらでも保存前に実表示を確認できるようにした。
+- HTML文字列は受け取らず、component種別ごとの安全なDOM再構築と既存Markdown rendererだけでpreviewを更新する。
