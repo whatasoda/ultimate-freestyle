@@ -4,7 +4,7 @@ import type {
   SlideSceneNode
 } from "../projects/schema";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@4";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@5";
 
 function escapeHtml(value: string): string {
   return value
@@ -805,7 +805,7 @@ export function renderPresentationHtml(
 </head>
 <body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
-    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time"><span id="elapsed">00:00</span> / <span id="expected">00:00</span></span></header>
+    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 想定経過時間"><span id="elapsed">00:00</span> / <span id="expected">00:00</span></span></header>
     <div class="stage-wrap"><div class="stage" aria-label="${escapeHtml(project.document.title)}">
       <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
         <div class="prelude-inner">
@@ -856,6 +856,12 @@ export function renderPresentationHtml(
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
     const currentUnit = () => DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.revealSteps + 1, 0) + step + 1;
+    const expectedElapsed = () => {
+      const previous = DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.durationSeconds, 0);
+      const current = DECK.slides[slide];
+      const fraction = current.revealSteps === 0 ? 0 : step / current.revealSteps;
+      return previous + current.durationSeconds * fraction;
+    };
     const narration = () => DECK.slides[slide].narration?.segments.find((item) => item.at === step) ?? null;
     const syncUrl = () => history.pushState(null, '', '?slide=' + (slide + 1) + '&step=' + step);
     const setVoiceProgress = (percent) => {
@@ -1004,7 +1010,7 @@ export function renderPresentationHtml(
       }
       counter.textContent = (slide + 1) + ' / ' + slides.length + ' · STEP ' + step;
       progress.style.width = (currentUnit() / units * 100) + '%';
-      expected.textContent = format(DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.durationSeconds, 0));
+      expected.textContent = format(expectedElapsed());
       scheduleFit(); speak();
     };
     const restore = () => {

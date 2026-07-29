@@ -136,7 +136,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@4");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@5");
+    expect(html).toContain('title="実経過時間 / 想定経過時間"');
+    expect(html).toContain("const expectedElapsed = () =>");
+    expect(html).toContain("step / current.revealSteps");
     expect(html).toContain('data-aspect-ratio="4:3"');
     expect(html).toContain('data-style="orbit"');
     expect(html).toContain('data-slide-role="cover"');
