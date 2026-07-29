@@ -575,11 +575,11 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("data-template-delete");
     expect(workspaceHtml).toContain('name="make_default"');
     expect(workspaceHtml).toContain('data-visual-pick="neon"');
-    expect(workspaceHtml).toContain("配色presetを選ぶ");
+    expect(workspaceHtml).toContain("配色プリセットを選ぶ");
     expect(workspaceHtml).toContain("data-visual-palette=");
     expect(workspaceHtml).toContain('data-color-text="background"');
     expect(workspaceHtml).toContain('data-font-pick="mincho"');
-    expect(workspaceHtml).toContain("本文と見出しのfontをまとめて選ぶ");
+    expect(workspaceHtml).toContain("本文と見出しのフォントをまとめて選ぶ");
     expect(workspaceHtml).toContain('data-animation-pick="wipe"');
     expect(workspaceHtml).toContain("動きをもう一度見る");
     expect(workspaceHtml).toContain('data-tone-pick="signal"');
@@ -590,7 +590,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-region-pick="sidebar-right"');
     expect(workspaceHtml).toContain("本文と補足の領域配置を選ぶ");
     expect(workspaceHtml).toContain("data-template-create");
-    expect(workspaceHtml).toContain("編集できるtemplateを追加");
+    expect(workspaceHtml).toContain("編集できるテンプレートを追加");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain("VOICEVOX音声が未生成");
@@ -667,7 +667,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-typography");
     expect(dashboardScriptText).toContain("組版をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-template");
-    expect(dashboardScriptText).toContain("templateをプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("テンプレートをプレビューへ反映しています");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-appearance");
     expect(dashboardScriptText).toContain("スライド外観をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("const colorContrast =");
@@ -687,7 +687,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-scene-component-editor");
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
-    expect(dashboardScriptText).toContain("componentの文言をプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("表示パーツの文言をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("changingConfiguredVoice");
     expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
 

@@ -5,7 +5,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       PROJECT_VERSION_CONFLICT: "別の画面またはAIから先に更新されました。入力内容を退避してから画面を再読み込みしてください。",
       PROJECT_NOT_FOUND: "研究が見つかりません。研究一覧へ戻って選び直してください。",
       SLIDE_NOT_FOUND: "スライドが見つかりません。画面を再読み込みしてください。",
-      TEMPLATE_NOT_FOUND: "templateが見つかりません。画面を再読み込みしてください。",
+      TEMPLATE_NOT_FOUND: "テンプレートが見つかりません。画面を再読み込みしてください。",
       VOICE_PROFILE_NOT_FOUND: "選んだ声が見つかりません。声を選び直してください。",
       VOICE_JOB_NOT_FOUND: "音声生成の状況が見つかりません。音声仕上げ画面を再読み込みしてください。",
       ASSET_IN_USE: "この画像はスライドで使用中です。スライドから外してから削除してください。",
@@ -480,7 +480,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       draftTemplateTimer = setTimeout(syncTemplateDraft, 120);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
-        layoutStatus.textContent = "templateをプレビューへ反映しています…";
+        layoutStatus.textContent = "テンプレートをプレビューへ反映しています…";
         layoutStatus.dataset.level = "";
       }
     });
@@ -819,7 +819,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
-        layoutStatus.textContent = "componentの文言をプレビューへ反映しています…";
+        layoutStatus.textContent = "表示パーツの文言をプレビューへ反映しています…";
         layoutStatus.dataset.level = "";
       }
     });
@@ -1155,9 +1155,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) return;
       const dirty = document.querySelector('[data-dirty="true"]') !== null;
       const prefix = dirty ? "未保存の入力は破棄されます。\n" : "";
-      if (!confirm(prefix + "「" + (button.dataset.templateName || "このtemplate") + "」を削除しますか？使用中のスライドはdeck既定、既定自身なら組み込みstyleへ戻ります。")) return;
+      if (!confirm(prefix + "「" + (button.dataset.templateName || "このテンプレート") + "」を削除しますか？使用中のスライドは発表全体の既定、既定自身なら組み込みスタイルへ戻ります。")) return;
       setButtonBusy(button, true);
-      feedback.textContent = "templateを削除しています…";
+      feedback.textContent = "テンプレートを削除しています…";
       feedback.classList.remove("warning", "success");
       try {
         const response = await fetch(button.dataset.deleteUrl || "", {
@@ -1166,7 +1166,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           body: JSON.stringify({ expected_version: Number(form.dataset.version) })
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(apiErrorMessage(result, "templateを削除できませんでした。"));
+        if (!response.ok) throw new Error(apiErrorMessage(result, "テンプレートを削除できませんでした。"));
         for (const dirtyForm of document.querySelectorAll('[data-dirty="true"]')) {
           if (dirtyForm instanceof HTMLElement) dirtyForm.dataset.dirty = "false";
         }
@@ -1174,7 +1174,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.classList.add("success");
         location.href = result.next_url;
       } catch (error) {
-        feedback.textContent = caughtErrorMessage(error, "templateを削除できませんでした。");
+        feedback.textContent = caughtErrorMessage(error, "テンプレートを削除できませんでした。");
         feedback.classList.add("warning");
         setButtonBusy(button, false);
       }
