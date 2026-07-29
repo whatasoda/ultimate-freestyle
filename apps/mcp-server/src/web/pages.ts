@@ -110,7 +110,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=22";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=23";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1233,13 +1233,14 @@ export function slideWorkspacePage(options: {
               (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
             )
           ].join("");
-          return `<form class="voice-segment editor" data-segment-editor data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-csrf="${escapeHtml(options.csrfToken)}">
+          return `<form class="voice-segment editor" data-segment-editor data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-csrf="${escapeHtml(options.csrfToken)}">
             <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
             <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
             <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOX profile<select name="voice_profile_id">${profileOptions}</select></label></div>
             <p class="inherit-note">実効profile: ${escapeHtml(profile ? `${profile.label} / ${profile.speaker_name} ${profile.style_name}` : "未設定（Web Speech）")}。空欄の調声値はprofileまたはVOICEVOX標準値を継承します。</p>
             <fieldset><legend>調声（空欄で継承）</legend><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" value="${segment.voice_tuning?.[key] ?? ""}" placeholder="実効 ${effectiveTuning[key]}"></label>`).join("")}</div></fieldset>
-            <div class="actions"><button type="submit">この区間を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
+            <p class="inherit-note">ブラウザ仮試聴では速度・高さ・音量を近似します。抑揚、間、前後の無音はVOICEVOX生成後に確認してください。</p>
+            <div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false">ブラウザで仮試聴</button><button type="submit">この区間を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
           </form>`;
         })
         .join("")

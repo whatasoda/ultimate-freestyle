@@ -682,6 +682,55 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     event.returnValue = "";
   });
 
+  for (const button of document.querySelectorAll("[data-segment-speech-preview]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+        const feedback = button.closest("form")?.querySelector("[data-form-feedback]");
+        if (feedback instanceof HTMLElement) feedback.textContent = "このブラウザでは音声の仮試聴を利用できません。";
+        return;
+      }
+      if (button.getAttribute("aria-pressed") === "true") {
+        speechSynthesis.cancel();
+        button.setAttribute("aria-pressed", "false");
+        button.textContent = "ブラウザで仮試聴";
+        return;
+      }
+      speechSynthesis.cancel();
+      for (const other of document.querySelectorAll("[data-segment-speech-preview]")) {
+        if (other instanceof HTMLButtonElement) {
+          other.setAttribute("aria-pressed", "false");
+          other.textContent = "ブラウザで仮試聴";
+        }
+      }
+      const form = button.closest("[data-segment-editor]");
+      if (!(form instanceof HTMLFormElement)) return;
+      const data = new FormData(form);
+      let effective = {};
+      try { effective = JSON.parse(form.dataset.effectiveTuning || "{}"); } catch {}
+      const tuningValue = (name, fallback) => {
+        const value = String(data.get("tuning_" + name) ?? "").trim();
+        return value === "" || !Number.isFinite(Number(value)) ? Number(fallback) : Number(value);
+      };
+      const utterance = new SpeechSynthesisUtterance(String(data.get("text") || ""));
+      utterance.lang = "ja-JP";
+      utterance.rate = Math.min(2, Math.max(0.5, tuningValue("speedScale", effective.speedScale ?? 1)));
+      utterance.pitch = Math.min(2, Math.max(0.5, 1 + tuningValue("pitchScale", effective.pitchScale ?? 0) * 2));
+      utterance.volume = Math.min(1, Math.max(0, tuningValue("volumeScale", effective.volumeScale ?? 1)));
+      const japaneseVoice = speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("ja"));
+      if (japaneseVoice) utterance.voice = japaneseVoice;
+      const finish = () => {
+        button.setAttribute("aria-pressed", "false");
+        button.textContent = "ブラウザで仮試聴";
+      };
+      utterance.addEventListener("end", finish, { once: true });
+      utterance.addEventListener("error", finish, { once: true });
+      button.setAttribute("aria-pressed", "true");
+      button.textContent = "試聴を停止";
+      speechSynthesis.speak(utterance);
+    });
+  }
+
   const voicePage = document.querySelector("[data-voice-page]");
   if (voicePage instanceof HTMLElement) {
     const csrf = voicePage.dataset.csrf || "";
