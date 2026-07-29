@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@32";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@33";
 
 function escapeHtml(value: string): string {
   return value
@@ -811,6 +811,10 @@ export function renderPresentationHtml(
     .completion-card { width: min(34em, 78%); padding: 2.4em; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff33); border-radius: 1.2em; background: #101827f2; box-shadow: 0 1.5em 5em #000b; text-align: center; }
     .completion-card h2 { margin: 0 0 .35em; color: #fff; font-size: clamp(1.4rem, 3.2cqw, 2.7rem); }
     .completion-card p { margin: 0 0 1.4em; color: #b7c2d2; }
+    .completion-time { display: grid; gap: .25em; margin: 1em 0 1.4em; color: #dbe5f1; font-variant-numeric: tabular-nums; }
+    .completion-time strong { color: #fff; font-size: 1.25em; }
+    .completion-time small { color: #9fb0c3; }
+    .completion-time[data-state="over"] small { color: #ffc6a8; }
     .completion-actions { display: flex; justify-content: center; gap: .7em; }
     .completion-actions button { padding: .65em 1em; }
     .completion-actions .primary { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 32%, #172131); }
@@ -906,7 +910,8 @@ export function renderPresentationHtml(
       <section class="completion" data-completion role="dialog" aria-modal="true" aria-labelledby="completion-title" aria-live="polite" hidden>
         <div class="completion-card">
           <h2 id="completion-title">発表はここまでです</h2>
-          <p>${deck.slides.length}枚・想定${formattedTotalDuration}</p>
+          <p>${deck.slides.length}枚の発表を最後まで確認しました。</p>
+          <p class="completion-time" data-completion-time><strong>実 00:00 / 想定 ${formattedTotalDuration}</strong><small>結果を集計しています…</small></p>
           <div class="completion-actions"><button class="primary" type="button" data-restart>最初から見る</button><button type="button" data-dismiss-completion>最後のスライドに戻る</button></div>
         </div>
       </section>
@@ -967,6 +972,7 @@ export function renderPresentationHtml(
     const completion = document.querySelector('[data-completion]');
     const restartButton = document.querySelector('[data-restart]');
     const dismissCompletionButton = document.querySelector('[data-dismiss-completion]');
+    const completionTime = document.querySelector('[data-completion-time]');
     const shortcuts = document.querySelector('[data-shortcuts]');
     const dismissShortcutsButton = document.querySelector('[data-dismiss-shortcuts]');
     const volumeKey = 'ultimate-freestyle:narration-volume';
@@ -1059,6 +1065,18 @@ export function renderPresentationHtml(
       autoButton.textContent = '自動 OFF';
       if (nextButton instanceof HTMLButtonElement) nextButton.disabled = true;
       setTimerRunning(false);
+      if (completionTime instanceof HTMLElement) {
+        const actualSeconds = elapsedAccumulated / 1000;
+        const expectedSeconds = DECK.slides.reduce((sum, item) => sum + item.durationSeconds, 0);
+        const difference = actualSeconds - expectedSeconds;
+        const summary = completionTime.querySelector('strong');
+        const comparison = completionTime.querySelector('small');
+        if (summary instanceof HTMLElement) summary.textContent = '実 ' + format(actualSeconds) + ' / 想定 ' + format(expectedSeconds);
+        if (comparison instanceof HTMLElement) comparison.textContent = Math.abs(difference) < 1
+          ? '想定時間どおりです。'
+          : '想定より' + format(Math.abs(difference)) + (difference > 0 ? '長い結果です。' : '短い結果です。');
+        completionTime.dataset.state = difference > 0 ? 'over' : 'within';
+      }
       completion.hidden = false;
       if (restartButton instanceof HTMLButtonElement) restartButton.focus();
     };
