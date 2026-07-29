@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@43";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@44";
 
 function escapeHtml(value: string): string {
   return value
@@ -1299,8 +1299,49 @@ export function renderPresentationHtml(
       let list = null;
       let listTag = '';
       const flushList = () => { if (list) { target.append(list); list = null; } };
-      for (const source of String(markdown).split(String.fromCharCode(10))) {
+      const lines = String(markdown).split(String.fromCharCode(10));
+      const tableCells = (value) => value.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((cell) => cell.trim());
+      for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+        const source = lines[lineIndex] || '';
         const line = source.trim();
+        const nextLine = String(lines[lineIndex + 1] || '').trim();
+        const headerCells = tableCells(line);
+        const separatorCells = tableCells(nextLine);
+        if (line.includes('|') && nextLine.includes('|') && headerCells.length === separatorCells.length && separatorCells.every((cell) => /^:?-{3,}:?$/.test(cell))) {
+          flushList();
+          const alignments = separatorCells.map((cell) => cell.startsWith(':') && cell.endsWith(':') ? 'center' : cell.endsWith(':') ? 'right' : 'start');
+          const table = document.createElement('table');
+          const head = document.createElement('thead');
+          const headRow = document.createElement('tr');
+          headerCells.forEach((cell, index) => {
+            const header = document.createElement('th');
+            header.className = 'align-' + (alignments[index] || 'start');
+            appendDraftInline(header, cell);
+            headRow.append(header);
+          });
+          head.append(headRow);
+          table.append(head);
+          const body = document.createElement('tbody');
+          lineIndex += 2;
+          while (lineIndex < lines.length) {
+            const rowLine = String(lines[lineIndex] || '').trim();
+            if (!rowLine || !rowLine.includes('|')) break;
+            const values = tableCells(rowLine);
+            const row = document.createElement('tr');
+            headerCells.forEach((_, index) => {
+              const cell = document.createElement('td');
+              cell.className = 'align-' + (alignments[index] || 'start');
+              appendDraftInline(cell, values[index] || '');
+              row.append(cell);
+            });
+            body.append(row);
+            lineIndex += 1;
+          }
+          lineIndex -= 1;
+          table.append(body);
+          target.append(table);
+          continue;
+        }
         if (line.startsWith('- ')) {
           if (list && listTag !== 'ul') flushList();
           if (!list) { list = document.createElement('ul'); listTag = 'ul'; }
