@@ -358,6 +358,8 @@ function shell(title: string, body: string): string {
       .voice-preset select { width: 100%; padding: .65rem; border: 1px solid #52647c; border-radius: .55rem; background: #08111b; color: var(--ink); font: inherit; }
       .voice-preset small { margin-top: .25rem; color: var(--muted); line-height: 1.5; }
       .voice-preset .stage { justify-self: end; }
+      .voice-quick { display: flex; flex-wrap: wrap; gap: .45rem; }
+      .voice-quick button { min-height: 2.2rem; padding: .45rem .7rem; font-size: .78rem; }
       .voice-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
       .voice-stat { padding: .75rem; border: 1px solid var(--line); border-radius: .7rem; background: #08111b88; }
       .voice-stat span, .voice-stat strong { display: block; }
@@ -372,6 +374,9 @@ function shell(title: string, body: string): string {
       .job-progress { width: 100%; height: .65rem; accent-color: var(--accent); }
       .job-numbers { display: flex; flex-wrap: wrap; gap: .75rem; color: var(--muted); font-size: .78rem; }
       .voice-segment-list { display: grid; gap: .55rem; }
+      .voice-filter { display: flex; flex-wrap: wrap; gap: .45rem; }
+      .voice-filter button { min-height: 2.2rem; padding: .45rem .7rem; font-size: .78rem; }
+      .voice-filter button[aria-pressed="true"] { border-color: #9d7bff; background: #8062df30; color: white; }
       .voice-review { overflow: hidden; border: 1px solid var(--line); border-radius: .75rem; background: #08111b77; }
       .voice-review > summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .8rem; cursor: pointer; }
       .voice-review > summary::marker { color: var(--accent); }
@@ -826,13 +831,19 @@ export function voiceFinishPage(options: {
           .join("")}</optgroup>`
     )
     .join("");
+  const quickProfiles = [3, 2, 8]
+    .map((styleId) => VOICEVOX_CATALOG.find((profile) => profile.styleId === styleId))
+    .filter((profile): profile is typeof VOICEVOX_CATALOG[number] => profile !== undefined);
+  const attentionSegmentIndex = options.voice.segments.findIndex(
+    (segment) => segment.status !== "ready"
+  );
   const segmentList = options.voice.segments.length
     ? options.voice.segments
         .map((segment, index) => {
           const statusLabel =
             VOICE_SEGMENT_STATUS_LABELS[segment.status] ?? segment.status;
           const generated = segment.audio_url !== null;
-          return `<details class="voice-review"${index === 0 ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}">
+          return `<details class="voice-review"${index === (attentionSegmentIndex === -1 ? 0 : attentionSegmentIndex) ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}">
             <summary><span class="component-step">${String(index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
             <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}">この区間を編集</a></div></div>
           </details>`;
@@ -851,6 +862,7 @@ export function voiceFinishPage(options: {
          <div class="voice-flow">
            <div class="voice-column">
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">1</span><div><h2>声を決める</h2><p>40話者・118種類のトークスタイルから発表全体の既定音声を選べます。最初は「ずんだもん・ノーマル」がおすすめです。</p></div></div>
+               <div class="voice-quick" aria-label="おすすめの声">${quickProfiles.map((profile) => `<button class="ghost" type="button" data-voice-pick="${escapeHtml(profile.id)}">${escapeHtml(profile.label)}</button>`).join("")}</div>
                <div class="voice-preset"><span class="voice-character" aria-hidden="true">声</span><label><strong>既定の話者・スタイル</strong><select data-voice-profile>${profileOptions}</select><small>区間ごとのprofileと7種の調声値は、各スライドの読み上げ設定で変更できます。</small></label><span class="stage">${options.voice.configured ? "設定済み" : "おすすめ"}</span></div>
                <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/profile"${jobActive ? " disabled" : ""}>${options.voice.configured ? "選択した声へ変更" : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? `現在の既定音声は「${escapeHtml(defaultProfileLabel)}」です。` : "設定するとprofile未指定の読み上げ区間へ自動的に適用されます。"}</p>
              </section>
@@ -859,9 +871,9 @@ export function voiceFinishPage(options: {
                <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.total === 0 ? "読み上げ原稿がありません" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.total === 0 ? "各スライドへ読み上げ原稿を追加すると生成できます。" : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : "生成中もこの画面を閉じて構いません。"}</p>
                ${voiceJobCard(currentJob)}
              </section>
-             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
+             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-filter" aria-label="区間の絞り込み"><button class="ghost" type="button" data-voice-filter="all" aria-pressed="true">すべて ${summary.total}</button><button class="ghost" type="button" data-voice-filter="needs_generation" aria-pressed="false">要生成 ${summary.needs_generation}</button><button class="ghost" type="button" data-voice-filter="ready" aria-pressed="false">生成済み ${summary.ready}</button><button class="ghost" type="button" data-voice-filter="failed" aria-pressed="false">失敗 ${summary.failed}</button></div><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
            </div>
-           <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>生成済み件数が原稿数と一致しているか確認</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">VOICEVOXを設定した発表は、全区間の生成が完了するまで固定プレビューを作成できません。</p></aside>
+           <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>必要な区間だけVOICEVOXを生成</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">音声生成は任意です。未生成区間はブラウザ音声で代替してプレビューできます。</p></aside>
          </div>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),

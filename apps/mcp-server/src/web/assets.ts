@@ -499,6 +499,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
       });
     }
+    for (const button of voicePage.querySelectorAll("[data-voice-pick]")) {
+      if (!(button instanceof HTMLButtonElement) || !(profileSelect instanceof HTMLSelectElement)) continue;
+      button.addEventListener("click", () => {
+        profileSelect.value = button.dataset.voicePick || "voicevox-style-3";
+        const selected = profileSelect.selectedOptions[0]?.textContent || "選択した声";
+        if (setupFeedback instanceof HTMLElement) {
+          setupFeedback.textContent = selected + "を選択しました。保存すると発表全体へ適用されます。";
+          setupFeedback.classList.remove("success", "warning");
+        }
+        profileSelect.focus();
+      });
+    }
     if (generateButton instanceof HTMLButtonElement) {
       generateButton.addEventListener("click", async () => {
         generateButton.disabled = true;
@@ -573,6 +585,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         utterance.onend = stopPreview;
         utterance.onerror = stopPreview;
         speechSynthesis.speak(utterance);
+      });
+    }
+    const segmentFilters = [...voicePage.querySelectorAll("[data-voice-filter]")];
+    for (const filterButton of segmentFilters) {
+      if (!(filterButton instanceof HTMLButtonElement)) continue;
+      filterButton.addEventListener("click", () => {
+        const filter = filterButton.dataset.voiceFilter || "all";
+        for (const button of segmentFilters) {
+          if (button instanceof HTMLButtonElement) button.setAttribute("aria-pressed", String(button === filterButton));
+        }
+        for (const segment of voicePage.querySelectorAll("[data-voice-segment]")) {
+          if (!(segment instanceof HTMLElement)) continue;
+          const state = segment.dataset.state || "";
+          const matches = filter === "all" || state === filter ||
+            (filter === "needs_generation" && ["queued", "running", "generating"].includes(state));
+          segment.hidden = !matches;
+        }
       });
     }
     addEventListener("pagehide", stopPreview, { once: true });

@@ -419,6 +419,9 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain('value="voicevox-style-3" selected');
     expect(voicePageHtml).toContain('label="四国めたん"');
     expect(voicePageHtml).toContain("7種の調声値");
+    expect(voicePageHtml).toContain("おすすめの声");
+    expect(voicePageHtml).toContain('data-voice-filter="needs_generation"');
+    expect(voicePageHtml).toContain("音声生成は任意です");
 
     const workspaceUrl =
       "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro";
