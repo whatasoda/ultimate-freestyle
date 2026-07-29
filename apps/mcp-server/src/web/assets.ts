@@ -136,12 +136,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideEditor = document.querySelector("[data-slide-editor]");
   const typographyEditor = document.querySelector("[data-typography-editor]");
   const templateEditor = document.querySelector("[data-template-editor]");
+  const appearanceEditor = document.querySelector("[data-appearance-editor]");
   const narrationSettingsEditor = document.querySelector("[data-narration-settings-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
   let draftFrameTimer;
   let draftTypographyTimer;
   let draftTemplateTimer;
+  let draftAppearanceTimer;
   let draftNarrationTimer;
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
@@ -253,6 +255,34 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = "templateをプレビューへ反映しています…";
+        layoutStatus.dataset.level = "";
+      }
+    });
+  }
+  const syncAppearanceDraft = () => {
+    if (!(appearanceEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    const data = new FormData(appearanceEditor);
+    let templates = {};
+    try { templates = JSON.parse(appearanceEditor.dataset.previewTemplates || "{}"); } catch {}
+    const templateId = String(data.get("template_id") || "");
+    const template = templates[templateId] || templates[""] || {};
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:preview-appearance",
+      slide_id: appearanceEditor.dataset.slideId || "",
+      role: String(data.get("role") || "content"),
+      cover_layout: String(data.get("cover_layout") || "center"),
+      tone: String(data.get("tone") || "dark"),
+      enter_animation: String(data.get("enter_animation") || template.enter_animation || "fade"),
+      template
+    }, location.origin);
+  };
+  if (appearanceEditor instanceof HTMLFormElement) {
+    appearanceEditor.addEventListener("input", () => {
+      clearTimeout(draftAppearanceTimer);
+      draftAppearanceTimer = setTimeout(syncAppearanceDraft, 120);
+      const layoutStatus = document.querySelector("[data-layout-status]");
+      if (layoutStatus instanceof HTMLElement) {
+        layoutStatus.textContent = "スライド外観をプレビューへ反映しています…";
         layoutStatus.dataset.level = "";
       }
     });
@@ -574,6 +604,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncSlideDraft();
       syncTypographyDraft();
       syncTemplateDraft();
+      syncAppearanceDraft();
       syncNarrationDrafts();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");

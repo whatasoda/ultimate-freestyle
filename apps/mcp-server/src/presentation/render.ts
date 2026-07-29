@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@24";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@25";
 
 function escapeHtml(value: string): string {
   return value
@@ -1280,6 +1280,32 @@ export function renderPresentationHtml(
       region.dataset.active = String(data.display === 'inline' || Boolean(narration()));
       scheduleFit();
     };
+    const previewAppearance = (data) => {
+      const currentSlide = slides[slide];
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return;
+      const template = data.template;
+      if (!template || typeof template !== 'object') return;
+      currentSlide.dataset.slideRole = String(data.role || 'content');
+      currentSlide.dataset.coverLayout = String(data.cover_layout || 'center');
+      currentSlide.dataset.tone = String(data.tone || 'dark');
+      for (const className of [...currentSlide.classList]) {
+        if (className.startsWith('tone-')) currentSlide.classList.remove(className);
+      }
+      currentSlide.classList.add('tone-' + String(data.tone || 'dark'));
+      currentSlide.dataset.templateId = String(template.template_id || '');
+      currentSlide.dataset.userTemplate = String(Boolean(template.user_template));
+      currentSlide.dataset.regionLayout = String(template.region_layout || 'sidebar-right');
+      currentSlide.dataset.visualPreset = String(template.visual_preset || 'studio');
+      currentSlide.dataset.bodyFont = String(template.body_font || 'system-sans');
+      currentSlide.dataset.headingFont = String(template.heading_font || 'system-sans');
+      currentSlide.dataset.density = String(template.density || 'comfortable');
+      currentSlide.dataset.motionStyle = String(template.motion_style || 'calm');
+      currentSlide.dataset.animation = String(data.enter_animation || template.enter_animation || 'fade');
+      currentSlide.style.animation = 'none';
+      currentSlide.getBoundingClientRect();
+      currentSlide.style.removeProperty('animation');
+      scheduleFit();
+    };
     const previewNarrationSegment = (data) => {
       const currentSlide = slides[slide];
       if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return;
@@ -1451,6 +1477,7 @@ export function renderPresentationHtml(
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-template') previewTemplate(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-appearance') previewAppearance(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-narration-settings') previewNarrationSettings(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-narration-segment') previewNarrationSegment(event.data);
     });

@@ -401,7 +401,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=19"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=20"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -559,6 +559,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("組版をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-template");
     expect(dashboardScriptText).toContain("templateをプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-appearance");
+    expect(dashboardScriptText).toContain("スライド外観をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("const colorContrast =");
     expect(dashboardScriptText).toContain("4.5:1未満の組み合わせを見直してください");
     expect(dashboardScriptText).toContain("button.dataset.copySuccess");

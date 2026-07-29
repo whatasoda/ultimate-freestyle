@@ -110,7 +110,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=19";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=20";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1128,6 +1128,32 @@ export function slideWorkspacePage(options: {
       (template) => `<option value="${escapeHtml(template.id)}"${slide.template_id === template.id ? " selected" : ""}>${escapeHtml(template.name)}</option>`
     )
   ].join("");
+  const appearancePreviewFor = (requestedTemplateId: string | null) => {
+    const resolvedTemplateId =
+      requestedTemplateId === null ? deck.default_template_id ?? null : requestedTemplateId;
+    const template = (deck.templates ?? []).find(
+      (item) => item.id === resolvedTemplateId
+    );
+    return {
+      template_id: template?.id ?? `builtin-${deck.layout}`,
+      user_template: template !== undefined,
+      region_layout: template?.region_layout ?? "sidebar-right",
+      visual_preset:
+        template?.visual_preset ?? (deck.layout === "minimal" ? "paper" : "studio"),
+      body_font: template?.body_font ?? "system-sans",
+      heading_font: template?.heading_font ?? "system-sans",
+      density: template?.density ?? "comfortable",
+      motion_style: template?.motion_style ?? "calm",
+      enter_animation: template?.enter_animation ?? "fade"
+    };
+  };
+  const appearancePreviewTemplates = Object.fromEntries([
+    ["", appearancePreviewFor(null)],
+    ...(deck.templates ?? []).map((template) => [
+      template.id,
+      appearancePreviewFor(template.id)
+    ])
+  ]);
   const animationOptions = Object.entries(ANIMATION_LABELS)
     .map(
       ([value, label]) => `<option value="${value}"${slide.enter_animation === value ? " selected" : ""}>${escapeHtml(label)}</option>`
@@ -1264,7 +1290,7 @@ export function slideWorkspacePage(options: {
                </form>
              </div></details>
              <details class="inspector-section"><summary>デザイン</summary><div class="inspector-body">
-               <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>用途<select name="role"><option value="content"${slide.role !== "cover" ? " selected" : ""}>通常スライド</option><option value="cover"${slide.role === "cover" ? " selected" : ""}>表紙</option></select></label><label>表紙レイアウト<select name="cover_layout">${[["center", "中央タイトル"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言を強調"]].map(([value, label]) => `<option value="${value}"${(slide.cover_layout ?? "center") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div><div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
+               <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-preview-templates="${escapeHtml(JSON.stringify(appearancePreviewTemplates))}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>用途<select name="role"><option value="content"${slide.role !== "cover" ? " selected" : ""}>通常スライド</option><option value="cover"${slide.role === "cover" ? " selected" : ""}>表紙</option></select></label><label>表紙レイアウト<select name="cover_layout">${[["center", "中央タイトル"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言を強調"]].map(([value, label]) => `<option value="${value}"${(slide.cover_layout ?? "center") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div><div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
                ${typographyEditor}
                ${templateCreator}
                ${templateEditor}
