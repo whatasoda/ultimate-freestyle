@@ -31,7 +31,7 @@ bun run smoke:mcp
 
 `bun run smoke:mcp` は、本番のヘルスチェックとMCP初期化をブラウザなしで検証します。別環境を検証するときだけ、`MCP_BASE_URL` にoriginを指定してください。手動デプロイはリポジトリルートで、`bun run migrate:mcp`、`bun run deploy:mcp`、`bun run smoke:mcp` の順に実行します。
 
-2026-07-29時点でWorker v0.9.0、Custom Domain、DNS、TLS、OAuth用KV、state用KV、D1、private R2、Images binding、Queue、VOICEVOX Container、期限切れOAuth／Web sessionと音声outboxを処理するcronを構成しています。D1 migration `0001`〜`0008`が認証、研究、Web session、画像metadata、固定発表revision、音声生成jobと不変音声snapshotを管理します。
+2026-07-29時点でWorker v0.13.0、Custom Domain、DNS、TLS、OAuth用KV、state用KV、D1、private R2、Images binding、Queue、VOICEVOX Container、期限切れOAuth／Web sessionと音声outboxを処理するcronを構成しています。D1 migration `0001`〜`0008`が認証、研究、Web session、画像metadata、固定発表revision、音声生成jobと不変音声snapshotを管理します。
 
 ## 本番デプロイ
 

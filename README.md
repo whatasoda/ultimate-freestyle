@@ -6,12 +6,12 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-本番の入口は `saijiyu-kenkyu.2764.moe` です。Remote MCP v0.9.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走prompt、安全な発表renderer、VOICEVOX差分生成を提供します。同じWorkerのWeb UIでは、自分の研究を一枚ずつ確認・編集し、画像、音声、固定preview、公開版を管理できます。mainへのpushは検証後にD1 migrationとWorker・ContainerをCloudflareへ自動デプロイします。GitHub Pagesは公開経路に含めません。
+本番の入口は `saijiyu-kenkyu.2764.moe` です。Remote MCP v0.13.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走prompt、安全な発表renderer、VOICEVOX差分生成を提供します。同じWorkerのWeb UIでは、自分の研究を一枚ずつ確認・編集し、画像、音声、固定preview、公開版を管理できます。mainへのpushは検証後にD1 migrationとWorker・ContainerをCloudflareへ自動デプロイします。GitHub Pagesは公開経路に含めません。
 
 ## できること
 
 - クリック、Space、Enter、矢印キーでスライドと段階表示を進める
-- Googleスライドのワイド画面と同じ16:9の枠内に発表内容を収める
+- Googleスライド相当の16:9、または標準的な4:3の枠内に発表内容を収める
 - タイマー、進捗、音声、操作ボタンをスライド枠の外側に表示する
 - 同じ研究内容を演出型・BIIM型・資料型の3レイアウトで比較する
 - 研究ごとに独立したURLを持つ
@@ -27,6 +27,16 @@
 - CSSだけで画面遷移・段階表示・背景・グラフをアニメーションする
 
 ## 開始方法
+
+完成済みのホスト版を使う場合は、ローカル環境を作る必要はありません。
+
+1. `https://saijiyu-kenkyu.2764.moe/` でTwitchログインする
+2. Codex、ChatGPTなどRemote MCP対応AIの連携設定へ `https://saijiyu-kenkyu.2764.moe/mcp` を追加し、同じTwitchアカウントで認証する
+3. AIへ「最自由研究MCPを使って、新しい研究を対話しながら作りたい。まず興味のあることを聞いて」と伝える
+
+AIで作った下書きはWeb UIへすぐ反映されます。Web UIでは一枚ずつ実表示を見ながら、文言・組版・配色・表紙・読み上げ・VOICEVOXの声色を調整し、スライドの複製・並べ替え・削除、固定プレビュー、公開まで進められます。
+
+以下はリポジトリ自体を開発するときの手順です。
 
 依存関係を初回だけインストールします。
 
@@ -71,7 +81,7 @@ mainへのpush、またはActions画面からの手動実行で `Deploy Remote M
 - Actions variable `CLOUDFLARE_ACCOUNT_ID`
 - Actions secret `CLOUDFLARE_API_TOKEN`（`Edit Cloudflare Workers` template + `D1 Edit`、対象account／zoneだけに限定）
 
-通常pushではVOICEVOXを起動しません。`Generate VOICEVOX audio` は手動または `voice-*` tagだけで起動し、7日間の試聴artifactを作ります。本番音声は将来のCloudflare Container経路へ接続します。詳細は [MCP server README](apps/mcp-server/README.md) と [ADR 0005](docs/decisions/0005-main-push-cloudflare-deployment.md) を参照してください。
+通常pushではVOICEVOX生成jobを起動しません。`Generate VOICEVOX audio` は手動または `voice-*` tagだけで起動し、7日間のローカル形式の試聴artifactを作ります。本番では利用者がWeb UIから不足区間の生成を明示すると、QueueとCloudflare Containerで生成してprivate R2へ保存します。詳細は [MCP server README](apps/mcp-server/README.md) と [ADR 0005](docs/decisions/0005-main-push-cloudflare-deployment.md) を参照してください。
 
 リポジトリ直下の旧発表アプリは、移行期間中のローカル比較用として残しています。Cloudflare本番の公開発表は、Worker内の安全なrendererとR2上の固定revisionを正本にします。
 
@@ -295,7 +305,7 @@ bun run dev:voicevox
 
 通常の`bun run dev`はプレビューMP3を参照せず、ブラウザ読み上げを使います。生成音声を使う表示では、profileに含まれる話者から`VOICEVOX:キャラクター名`のクレジットを重複なく自動表示します。公開前には各話者・キャラクターの最新規約も確認してください。
 
-manifest v2のfingerprintには原稿、speaker UUID、style ID、全調声値、ENGINE／core／話者version、話者catalog、ユーザー辞書、MP3設定を含めます。ローカル生成は`unverified-local`として扱い、将来のCloudflare Container本番cacheとは混ぜません。
+manifest v2のfingerprintには原稿、speaker UUID、style ID、全調声値、ENGINE／core／話者version、話者catalog、ユーザー辞書、MP3設定を含めます。ローカル生成は`unverified-local`として扱い、Cloudflare Containerの本番cacheとは混ぜません。
 
 ### GitHub ActionsでVOICEVOXを試聴する
 
@@ -313,7 +323,7 @@ git push origin voice-2026-08-01
 
 生成したMP3はworkflow runの `Artifacts` に7日間保存されます。このworkflowはCloudflare本番もGitHub Pagesも更新しません。
 
-ローカル確認用・Actions生成用・本番用を問わず、VOICEVOXのMP3はリポジトリへコミットしません。`public/researches/*/audio/*.mp3` も `.gitignore` の対象です。本番の音声は将来Cloudflare Containerで生成してR2へ保存し、fingerprintが一致する限り再利用します。Git LFSも使いません。
+ローカル確認用・Actions生成用・本番用を問わず、VOICEVOXのMP3はリポジトリへコミットしません。`public/researches/*/audio/*.mp3` も `.gitignore` の対象です。本番の音声はCloudflare Containerで生成してR2へ保存し、fingerprintが一致する限り再利用します。Git LFSも使いません。
 
 音声は意図やイントネーションを人が確認してから公開する必要があるため、Actionからmainへの自動コミットは行いません。また、Release公開とタグpushの両方をトリガーにすると同じ版で二重実行しやすいため、専用タグだけを自動トリガーにしています。
 
