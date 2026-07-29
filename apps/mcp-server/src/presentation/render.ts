@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@34";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@35";
 
 function escapeHtml(value: string): string {
   return value
@@ -595,6 +595,13 @@ export function renderPresentationHtml(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="referrer" content="no-referrer">
+  <meta name="description" content="${escapeHtml(project.document.summary || `${project.document.title}の最自由研究発表`)}">
+  <meta name="theme-color" content="${escapeHtml(deck.accent)}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="最自由研究">
+  <meta property="og:title" content="${escapeHtml(project.document.title)}">
+  <meta property="og:description" content="${escapeHtml(project.document.summary || `${project.document.title}の最自由研究発表`)}">
+  <meta name="twitter:card" content="summary">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors ${options.frameAncestors ?? "'none'"}">
   <title>${escapeHtml(project.document.title)}</title>
   <style nonce="saijiyu-static">
