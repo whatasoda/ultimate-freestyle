@@ -4,7 +4,7 @@ import {
   PRESENTATION_RENDERER_VERSION,
   renderPresentationHtml
 } from "../src/presentation/render";
-import { slideWorkspacePage } from "../src/web/pages";
+import { projectDetailPage, slideWorkspacePage } from "../src/web/pages";
 import { resolveSlideTypography } from "../src/projects/typography";
 import {
   projectRecordSchema,
@@ -718,6 +718,40 @@ describe("presentation artifact renderer", () => {
       'data-save-next="/dashboard/projects/63ab1ec4-20a0-4cf6-a1a0-f74ced56778a/slides/conclusion"'
     );
     expect(sequentialWorkspaceHtml).toContain("次のスライド →");
+
+    const overLimitProject = projectRecordSchema.parse({
+      ...projectWithNextSlide,
+      document: {
+        ...projectWithNextSlide.document,
+        question: "素材によって温度変化はどう変わるか？",
+        method: "2種類を同じ条件で比較する。",
+        deck: {
+          ...projectWithNextSlide.document.deck!,
+          slides: projectWithNextSlide.document.deck!.slides.map((slide) => ({
+            ...slide,
+            duration_seconds: 700
+          }))
+        }
+      }
+    });
+    const overLimitHtml = await projectDetailPage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project: overLimitProject,
+      assets: [],
+      publication: {
+        project_id: overLimitProject.project_id,
+        draft_version: overLimitProject.version,
+        current_renderer_version: PRESENTATION_RENDERER_VERSION,
+        slug: null,
+        latest_preview: null,
+        published: null
+      }
+    }).text();
+    expect(overLimitHtml).toContain("23分20秒");
+    expect(overLimitHtml).toContain("20分以内を3分20秒超えています");
+    expect(overLimitHtml).toContain("発表を20分以内に収める");
+    expect(overLimitHtml).toContain('data-duration-valid="false" disabled');
   });
 
   it("maps every safe visual and font preset and renders bounded narration variants", () => {

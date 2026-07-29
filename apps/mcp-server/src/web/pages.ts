@@ -24,6 +24,12 @@ const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   review: "見直し"
 };
 
+const MAX_PRESENTATION_SECONDS = 20 * 60;
+
+function formatDuration(seconds: number): string {
+  return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, "0")}秒`;
+}
+
 const TONE_LABELS = {
   dark: "ダーク",
   light: "ライト",
@@ -110,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=27";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=28";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -719,6 +725,8 @@ export function projectDetailPage(options: {
     (total, slide) => total + slide.duration_seconds,
     0
   );
+  const durationWithinLimit =
+    totalDurationSeconds > 0 && totalDurationSeconds <= MAX_PRESENTATION_SECONDS;
   const coverSlideCount = slides.filter((slide) => slide.role === "cover").length;
   const narratedSlideCount = slides.filter(
     (slide) => (slide.narration?.segments.length ?? 0) > 0
@@ -778,6 +786,12 @@ export function projectDetailPage(options: {
           description: "接続中のAIクライアントへ依頼文を貼り付けて、構成づくりを始めます。",
           action: `<button type="button" data-copy-text="${escapeHtml(slidePrompt)}">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span>`
         }
+      : !durationWithinLimit
+        ? {
+            title: "発表を20分以内に収める",
+            description: `現在は${formatDuration(totalDurationSeconds)}です。スライドの構成または想定秒数を見直してください。`,
+            action: `<a class="button" href="${firstSlidePath}">スライドを見直す</a>`
+          }
       : !previewCurrent
         ? {
             title: "現在の見た目をプレビューする",
@@ -845,11 +859,13 @@ export function projectDetailPage(options: {
         : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithoutNarration.id)}`
     },
     {
-      complete: totalDurationSeconds > 0,
+      complete: durationWithinLimit,
       label: "想定発表時間",
-      detail: totalDurationSeconds > 0
-        ? `${Math.floor(totalDurationSeconds / 60)}分${String(totalDurationSeconds % 60).padStart(2, "0")}秒です。`
-        : "各スライドの想定秒数を確認してください。",
+      detail: totalDurationSeconds === 0
+        ? "各スライドの想定秒数を確認してください。"
+        : durationWithinLimit
+          ? `${formatDuration(totalDurationSeconds)}です。20分以内に収まっています。`
+          : `現在${formatDuration(totalDurationSeconds)}で、20分以内を${formatDuration(totalDurationSeconds - MAX_PRESENTATION_SECONDS)}超えています。`,
       href: firstSlidePath
     },
     {
@@ -871,9 +887,9 @@ export function projectDetailPage(options: {
     <a class="button ghost" data-public-link href="${published !== null && options.publication.slug !== null ? `/p/${escapeHtml(options.publication.slug)}` : "#"}" target="_blank" rel="noopener"${published === null || options.publication.slug === null ? " hidden" : ""}>公開ページを開く</a>
     <div class="actions">
       <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 ? " disabled" : ""}>現在の下書きをプレビュー</button>
-      <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}"${previewCurrent ? "" : " disabled"}>確認した版を公開</button>
+      <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}" data-duration-valid="${String(durationWithinLimit)}"${previewCurrent && durationWithinLimit ? "" : " disabled"}>確認した版を公開</button>
     </div>
-    <p class="feedback${voiceIncomplete || (preview !== null && !previewCurrent) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : voiceIncomplete ? `VOICEVOX音声は ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成済みです。未生成区間はブラウザ音声で代替してプレビューできます。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
+    <p class="feedback${!durationWithinLimit || voiceIncomplete || (preview !== null && !previewCurrent) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : !durationWithinLimit ? `想定発表時間が${formatDuration(totalDurationSeconds)}です。20分以内に短縮してから公開してください。プレビューは短縮前でも確認できます。` : voiceIncomplete ? `VOICEVOX音声は ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成済みです。未生成区間はブラウザ音声で代替してプレビューできます。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
   const voicePanel = `<section class="panel publish-state"><h2>読み上げ音声</h2>
     <div class="status-row"><span>読み上げ区間</span><strong>${narrationSegments.length}件</strong></div>

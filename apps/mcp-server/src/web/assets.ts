@@ -1061,7 +1061,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.classList.add("success");
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.revision = result.revision.revision_id;
-          publishButton.disabled = false;
+          publishButton.disabled = publishButton.dataset.durationValid !== "true";
         }
         if (previewStatus instanceof HTMLElement) {
           previewStatus.textContent = "v" + result.revision.project_version + " · " + result.revision.renderer_version;
