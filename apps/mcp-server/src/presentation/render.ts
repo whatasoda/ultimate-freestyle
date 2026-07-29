@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@13";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@14";
 
 function escapeHtml(value: string): string {
   return value
@@ -924,7 +924,7 @@ export function renderPresentationHtml(
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), voiceTimer, autoTimer, activeAudio, fitFrame;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -959,6 +959,7 @@ export function renderPresentationHtml(
       stage?.removeAttribute('data-voice-blocked');
     };
     const stopVoice = () => {
+      voiceRun += 1;
       if ('speechSynthesis' in window) speechSynthesis.cancel();
       clearInterval(voiceTimer);
       clearTimeout(autoTimer);
@@ -991,6 +992,7 @@ export function renderPresentationHtml(
     };
     const speakWithBrowser = (segment) => {
       if (!('speechSynthesis' in window)) { scheduleAutoAdvance(); return; }
+      const run = voiceRun;
       const tuning = segment.effectiveTuning || {};
       const utterance = new SpeechSynthesisUtterance(segment.text);
       utterance.lang = 'ja-JP';
@@ -1000,9 +1002,15 @@ export function renderPresentationHtml(
       const estimated = Math.max(1.5, segment.text.length / (7 * utterance.rate));
       const begin = performance.now();
       voiceTimer = setInterval(() => setVoiceProgress((performance.now() - begin) / 10 / estimated), 100);
-      utterance.onstart = hideVoiceUnlock;
-      utterance.onend = finishVoice;
-      utterance.onerror = (event) => { clearInterval(voiceTimer); setVoiceProgress(0); if (event.error === 'not-allowed') showVoiceUnlock(); };
+      utterance.onstart = () => { if (run === voiceRun) hideVoiceUnlock(); };
+      utterance.onend = () => { if (run === voiceRun) finishVoice(); };
+      utterance.onerror = (event) => {
+        if (run !== voiceRun) return;
+        clearInterval(voiceTimer);
+        setVoiceProgress(0);
+        if (event.error === 'not-allowed') showVoiceUnlock();
+        else scheduleAutoAdvance();
+      };
       speechSynthesis.speak(utterance);
     };
     const speak = () => {
