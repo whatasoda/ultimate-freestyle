@@ -404,7 +404,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=37"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=38"');
     expect(detailHtml).toContain("data-copy-public");
     expect(detailHtml).toContain('data-published-current="false"');
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
@@ -471,6 +471,11 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain('value="voicevox-style-3" selected');
     expect(voicePageHtml).toContain('label="四国めたん"');
     expect(voicePageHtml).toContain("7種の調声値");
+    expect(voicePageHtml).toContain("既定のトーンを細かく調整");
+    expect(voicePageHtml).toContain('data-voice-profile-tuning');
+    expect(voicePageHtml).toContain("/voice/profile/tuning");
+    expect(voicePageHtml).toContain('name="tuning_speedScale"');
+    expect(DASHBOARD_SCRIPT).toContain("既定のトーンを保存しています");
     expect(voicePageHtml).toContain("おすすめの声");
     expect(voicePageHtml).toContain('data-voice-configured="true"');
     expect(voicePageHtml).toContain("該当区間の再生成が必要になります");
@@ -1336,6 +1341,47 @@ describe("Web dashboard", () => {
     expect(typographyWorkspaceHtml).toContain("2段組み（長文） · 3段");
     expect(typographyWorkspaceHtml).toContain('data-typography-editor');
     expect(typographyWorkspaceHtml).toContain('name="body_scale"');
+
+    const profileTuningUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/voice/profile/tuning",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 10,
+            tuning: {
+              speedScale: 1.2,
+              pitchScale: 0.05,
+              intonationScale: 1.1,
+              volumeScale: 0.9,
+              pauseLengthScale: 1.15,
+              prePhonemeLength: 0.12,
+              postPhonemeLength: 0.18
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(profileTuningUpdate.status).toBe(200);
+    expect(await profileTuningUpdate.json()).toMatchObject({
+      ok: true,
+      version: 11,
+      voice_generation_required: true
+    });
+    const tunedDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    expect(JSON.parse(tunedDocument!.document_json).deck.voicevox.profiles[0].tuning).toMatchObject({
+      speedScale: 1.2,
+      pauseLengthScale: 1.15
+    });
 
     const unsupportedUpload = await requestProvider(
       provider,

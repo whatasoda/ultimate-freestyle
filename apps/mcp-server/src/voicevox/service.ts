@@ -6,6 +6,7 @@ import {
   type VoiceGenerationInput
 } from "@ultimate-freestyle/research-schema/voice-generation";
 import { findVoicevoxCatalogProfile } from "@ultimate-freestyle/research-schema/voicevox-catalog";
+import type { VoicevoxTuning } from "@ultimate-freestyle/research-schema/voice";
 import { z } from "zod";
 
 import { getProject, mutateProject } from "../projects/repository";
@@ -89,6 +90,7 @@ export type VoiceProjectStatus = {
     label: string;
     speaker_name: string;
     style_name: string;
+    tuning: Partial<VoicevoxTuning> | null;
   } | null;
   summary: {
     total: number;
@@ -432,7 +434,8 @@ export async function getVoiceProjectStatus(
           id: defaultProfile.id,
           label: defaultProfile.label,
           speaker_name: defaultProfile.speaker_name,
-          style_name: defaultProfile.style_name
+          style_name: defaultProfile.style_name,
+          tuning: defaultProfile.tuning ?? null
         }
       : null,
     summary: {

@@ -116,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=37";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=38";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1040,6 +1040,7 @@ export type VoiceFinishState = {
     label: string;
     speaker_name?: string;
     style_name?: string;
+    tuning?: Partial<VoicevoxTuning> | null;
   } | null;
   summary: {
     total: number;
@@ -1100,6 +1101,9 @@ export function voiceFinishPage(options: {
     );
   const defaultProfileLabel =
     options.voice.default_profile?.label ?? "ずんだもん・ノーマル";
+  const defaultProfileTuning = mergeVoicevoxTuning(
+    options.voice.default_profile?.tuning ?? undefined
+  );
   const profileGroups = new Map<string, typeof VOICEVOX_CATALOG[number][]>();
   for (const profile of VOICEVOX_CATALOG) {
     const entries = profileGroups.get(profile.speakerName) ?? [];
@@ -1142,7 +1146,7 @@ export function voiceFinishPage(options: {
     shell(
       `音声を仕上げる — ${options.project.document.title}`,
       `${accountHeader(options.twitchLogin, options.csrfToken)}
-       <main class="voice-main" data-voice-page data-project-id="${projectId}" data-version="${options.voice.version}" data-voice-configured="${String(options.voice.configured)}" data-csrf="${escapeHtml(options.csrfToken)}" data-summary-url="/api/projects/${projectId}/voice">
+       <main class="voice-main" data-voice-page data-project-id="${projectId}" data-version="${options.voice.version}" data-voice-configured="${String(options.voice.configured)}" data-voice-ready="${summary.ready}" data-csrf="${escapeHtml(options.csrfToken)}" data-summary-url="/api/projects/${projectId}/voice">
          <a class="back" href="/dashboard/projects/${projectId}">← 研究詳細へ戻る</a>
          <section class="voice-hero"><div><p class="eyebrow">Voice finishing</p><h1>音声を仕上げる</h1><p class="lead">VOICEVOXの話者とスタイルを選び、不足している読み上げ音声を生成して、区間ごとに確認できます。</p></div><a class="button ghost" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ</a></section>
          <div class="voice-flow">
@@ -1151,6 +1155,7 @@ export function voiceFinishPage(options: {
                <div class="voice-quick" aria-label="おすすめの声">${quickProfiles.map((profile) => `<button class="ghost" type="button" data-voice-pick="${escapeHtml(profile.id)}">${escapeHtml(profile.label)}</button>`).join("")}</div>
                <div class="voice-preset"><span class="voice-character" aria-hidden="true">声</span><label><strong>既定の話者・スタイル</strong><select data-voice-profile>${profileOptions}</select><small>区間ごとのprofileと7種の調声値は、各スライドの読み上げ設定で変更できます。</small></label><span class="stage">${options.voice.configured ? "設定済み" : "おすすめ"}</span></div>
                <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/profile"${jobActive ? " disabled" : ""}>${options.voice.configured ? "選択した声へ変更" : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? `現在の既定音声は「${escapeHtml(defaultProfileLabel)}」です。声を変えると該当区間の再生成が必要になります。` : "設定するとprofile未指定の読み上げ区間へ自動的に適用されます。"}</p>
+               ${options.voice.configured ? `<details class="component-detail"><summary>既定のトーンを細かく調整</summary><form class="editor" data-voice-profile-tuning action="/api/projects/${projectId}/voice/profile/tuning"><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" required value="${defaultProfileTuning[key]}"></label>`).join("")}</div><p class="inherit-note">profile未指定の区間へ共通で適用されます。保存すると、この声を使う生成済み音声は再生成が必要です。</p><div class="actions"><button type="submit"${jobActive ? " disabled" : ""}>既定のトーンを保存</button></div><p class="feedback" data-voice-profile-tuning-feedback aria-live="polite"></p></form></details>` : ""}
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">2</span><div><h2>不足分を生成する</h2><p>設定や原稿が変わった区間だけを生成します。生成済みの音声は再利用します。</p></div></div>
                <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成</span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>

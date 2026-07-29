@@ -894,6 +894,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const setupButton = voicePage.querySelector("[data-voice-setup]");
     const profileSelect = voicePage.querySelector("[data-voice-profile]");
     const setupFeedback = voicePage.querySelector("[data-voice-setup-feedback]");
+    const profileTuningForm = voicePage.querySelector("[data-voice-profile-tuning]");
     const generateButton = voicePage.querySelector("[data-voice-generate]");
     const generateFeedback = voicePage.querySelector("[data-voice-generate-feedback]");
     const jobCard = voicePage.querySelector("[data-voice-job]");
@@ -1027,6 +1028,42 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             setupFeedback.textContent = caughtErrorMessage(error, "声を設定できませんでした。");
             setupFeedback.classList.add("warning");
           }
+        }
+      });
+    }
+    if (profileTuningForm instanceof HTMLFormElement) {
+      const tuningFeedback = profileTuningForm.querySelector("[data-voice-profile-tuning-feedback]");
+      const tuningSubmit = profileTuningForm.querySelector('button[type="submit"]');
+      profileTuningForm.addEventListener("input", () => { profileTuningForm.dataset.dirty = "true"; });
+      profileTuningForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (!(tuningFeedback instanceof HTMLElement)) return;
+        const readyCount = Number(voicePage.dataset.voiceReady || 0);
+        if (readyCount > 0 && !confirm("既定のトーンを変更しますか？生成済みの" + readyCount + "区間は再生成が必要になります。")) return;
+        setButtonBusy(tuningSubmit, true);
+        tuningFeedback.textContent = "既定のトーンを保存しています…";
+        tuningFeedback.classList.remove("warning", "success");
+        const data = new FormData(profileTuningForm);
+        const tuning = {};
+        for (const key of ["speedScale", "pitchScale", "intonationScale", "volumeScale", "pauseLengthScale", "prePhonemeLength", "postPhonemeLength"]) {
+          tuning[key] = Number(data.get("tuning_" + key));
+        }
+        try {
+          const response = await fetch(profileTuningForm.action, {
+            method: "PATCH",
+            headers: { "content-type": "application/json", "x-csrf-token": csrf },
+            body: JSON.stringify({ expected_version: Number(voicePage.dataset.version), tuning })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(apiErrorMessage(result, "既定のトーンを保存できませんでした。"));
+          profileTuningForm.dataset.dirty = "false";
+          tuningFeedback.textContent = "保存しました。VOICEVOX音声の生成状態を更新します…";
+          tuningFeedback.classList.add("success");
+          setTimeout(() => location.reload(), 600);
+        } catch (error) {
+          tuningFeedback.textContent = caughtErrorMessage(error, "既定のトーンを保存できませんでした。");
+          tuningFeedback.classList.add("warning");
+          setButtonBusy(tuningSubmit, false);
         }
       });
     }

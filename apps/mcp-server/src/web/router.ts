@@ -123,6 +123,11 @@ const voiceSetupRequestSchema = z.object({
     .default("voicevox-style-3")
 });
 
+const voiceProfileTuningRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  tuning: narrationSegmentSchema.shape.voice_tuning.unwrap()
+});
+
 const voiceJobRequestSchema = voiceSetupRequestSchema.extend({
   idempotency_key: z.string().uuid()
 });
@@ -553,6 +558,83 @@ async function handleVoiceSetup(
     });
   } catch (error) {
     return voiceErrorResponse(error);
+  }
+}
+
+async function handleVoiceProfileTuning(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = voiceProfileTuningRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: "調声値の範囲を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const settings = document.deck?.voicevox;
+        const profile = settings?.profiles.find(
+          (item) => item.id === settings.default_profile_id
+        );
+        if (profile === undefined) {
+          const error = new Error("The default VOICEVOX profile does not exist.");
+          Object.assign(error, { code: "VOICE_PROFILE_NOT_FOUND" });
+          throw error;
+        }
+        profile.tuning = parsed.data.tuning;
+        for (const slide of document.deck?.slides ?? []) {
+          for (const segment of slide.narration?.segments ?? []) {
+            if (segment.voice_profile_id === null || segment.voice_profile_id === profile.id) {
+              segment.audio_src = null;
+            }
+          }
+        }
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "voicevox.profile_tuning_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, project_version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      version: project.version,
+      voice_generation_required: true,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "既定のトーンを保存できませんでした。");
   }
 }
 
@@ -2371,6 +2453,12 @@ export async function handleWebRequest(
   );
   if (voiceSetupMatch?.[1] !== undefined) {
     return handleVoiceSetup(request, env, voiceSetupMatch[1]);
+  }
+  const voiceProfileTuningMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/voice/profile/tuning$`, "i")
+  );
+  if (voiceProfileTuningMatch?.[1] !== undefined) {
+    return handleVoiceProfileTuning(request, env, voiceProfileTuningMatch[1]);
   }
   const voiceStatusMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/voice$`, "i")
