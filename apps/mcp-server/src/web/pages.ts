@@ -904,6 +904,7 @@ export function projectDetailPage(options: {
   const reviseSlidesPrompt = `「${document.title}」の発表構成を見直したいです。現在の全スライドを確認し、過不足と順番の改善案を先に示してください。合意した部分だけを個別に変更してください。`;
   const slideAiActions = `<details class="component-detail"><summary>AIでスライドを追加・構成変更</summary><div class="disclosure-body"><p class="inherit-note">接続中のAIクライアントへ依頼文を貼り付けます。AIは現在の構成をresourceから確認できます。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(addSlidePrompt)}">追加を頼む文をコピー</button><button class="ghost" type="button" data-copy-text="${escapeHtml(reviseSlidesPrompt)}">構成見直しを頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
   const evaluationPrompt = `「${document.title}」をresearch://guide/evaluationの8観点でレビューしてください。research://projects/${options.project.project_id}を根拠にし、情報不足は0点ではなくNEにしてください。強み、最大のリスク、最優先の改善を一つずつ示し、最後はその改善につながる質問を一問だけしてください。`;
+  const imageAiPrompt = `research://projects/${options.project.project_id}の研究画像一覧を確認し、説明と寸法を根拠に「${document.title}」の発表で有効な使い方を提案してください。まだスライドは変更せず、使う画像と配置の合意後に個別編集してください。`;
   const evaluationPanel = `<details class="panel panel-disclosure"><summary>AIで研究を8観点レビュー</summary><div class="disclosure-body"><p class="prose">問い、仮説、方法、証拠、考察、独自性、発表、制作整合性を0〜4で確認します。根拠がない項目はNEとして扱います。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(evaluationPrompt)}">評価を頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
   const assetCards = options.assets.length
     ? `<div class="asset-grid">${options.assets
@@ -1213,6 +1214,7 @@ export function projectDetailPage(options: {
                  <p class="feedback" data-feedback aria-live="polite"></p>
                </form>
                ${assetCards}
+               <div class="copy-box"><code>接続したAIは画像本体を引数へ含めず、asset IDと説明の一覧を取得できます。</code><div class="actions"><button class="ghost" type="button" data-copy-text="${escapeHtml(imageAiPrompt)}">画像の使い方をAIへ相談</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div>
              </section>
              <section class="panel"><h2>研究ログ</h2>${logs}${document.logs.length > recentLogs.length ? `<p class="meta">最新20件を表示 · 全${document.logs.length}件</p>` : ""}</section>
            </div>
