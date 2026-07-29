@@ -188,6 +188,9 @@ const templateCreateRequestSchema = z.object({
   source_template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
   make_default: z.boolean()
 });
+const templateDeleteRequestSchema = z.object({
+  expected_version: z.number().int().positive()
+});
 
 const narrationSettingsRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -1581,8 +1584,74 @@ async function handleTemplateFieldsUpdate(
   projectId: string,
   templateId: string
 ): Promise<Response> {
+  if (request.method === "DELETE") {
+    const session = await requireWebSessionAndCsrf(request, env);
+    if (session === null) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+          request_id: crypto.randomUUID()
+        },
+        403
+      );
+    }
+    const read = await readRequestJson(request);
+    if (!read.ok) return read.response;
+    const parsed = templateDeleteRequestSchema.safeParse(read.value);
+    if (!parsed.success) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: { code: "INVALID_TEMPLATE", message: "画面を読み込み直してください。" },
+          request_id: crypto.randomUUID()
+        },
+        422
+      );
+    }
+    try {
+      const project = await mutateProject(env.DB, {
+        ownerUserId: session.userId,
+        projectId,
+        expectedVersion: parsed.data.expected_version,
+        mutate: (document) => {
+          const deck = document.deck;
+          const templates = deck?.templates ?? [];
+          const index = templates.findIndex((template) => template.id === templateId);
+          if (deck === null || index === -1) {
+            const error = new Error("The presentation template does not exist.");
+            Object.assign(error, { code: "TEMPLATE_NOT_FOUND" });
+            throw error;
+          }
+          templates.splice(index, 1);
+          if (deck.default_template_id === templateId) deck.default_template_id = null;
+          for (const slide of deck.slides) {
+            if (slide.template_id === templateId) slide.template_id = null;
+          }
+        }
+      });
+      await recordWebAudit(env.DB, {
+        userId: session.userId,
+        eventType: "project.presentation_template_deleted",
+        outcome: "succeeded",
+        details: { project_id: projectId, template_id: templateId, version: project.version },
+        createdAt: new Date().toISOString()
+      });
+      return jsonResponse({
+        ok: true,
+        project_id: projectId,
+        template_id: templateId,
+        version: project.version,
+        next_url: `/dashboard/projects/${projectId}`,
+        error: null,
+        request_id: crypto.randomUUID()
+      });
+    } catch (error) {
+      return projectMutationErrorResponse(error, "templateを削除できませんでした。");
+    }
+  }
   if (request.method !== "PATCH") {
-    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+    return new Response(null, { status: 405, headers: { allow: "PATCH, DELETE" } });
   }
   const session = await requireWebSessionAndCsrf(request, env);
   if (session === null) {

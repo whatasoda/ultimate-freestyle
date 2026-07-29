@@ -409,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=58"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=59"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("全スライドの実表示を一括確認");
@@ -550,6 +550,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("サイエンス");
     expect(workspaceHtml).toContain("強調見出し");
     expect(workspaceHtml).toContain("data-template-editor");
+    expect(workspaceHtml).toContain("data-template-delete");
     expect(workspaceHtml).toContain('data-visual-pick="neon"');
     expect(workspaceHtml).toContain("配色presetを選ぶ");
     expect(workspaceHtml).toContain("data-visual-palette=");
@@ -1615,6 +1616,36 @@ describe("Web dashboard", () => {
     );
     expect(createNarrationSegment.status).toBe(200);
     expect(await createNarrationSegment.json()).toMatchObject({ version: 16, at: 0 });
+
+    const deleteTemplate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/templates/lab",
+        {
+          method: "DELETE",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 16 })
+        }
+      ),
+      authEnv
+    );
+    expect(deleteTemplate.status).toBe(200);
+    expect(await deleteTemplate.json()).toMatchObject({
+      ok: true,
+      template_id: "lab",
+      version: 17
+    });
+    const documentWithoutTemplate = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const deletedTemplateDeck = JSON.parse(documentWithoutTemplate!.document_json).deck;
+    expect(deletedTemplateDeck.default_template_id).toBeNull();
+    expect(deletedTemplateDeck.slides[0].template_id).toBeNull();
+    expect(deletedTemplateDeck.templates.some((template: { id: string }) => template.id === "lab")).toBe(false);
 
     const unsupportedUpload = await requestProvider(
       provider,

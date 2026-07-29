@@ -1123,6 +1123,40 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  for (const button of document.querySelectorAll("[data-template-delete]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", async () => {
+      const form = button.closest("form");
+      const feedback = form?.querySelector("[data-form-feedback]");
+      if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) return;
+      const dirty = document.querySelector('[data-dirty="true"]') !== null;
+      const prefix = dirty ? "未保存の入力は破棄されます。\n" : "";
+      if (!confirm(prefix + "「" + (button.dataset.templateName || "このtemplate") + "」を削除しますか？使用中のスライドはdeck既定、既定自身なら組み込みstyleへ戻ります。")) return;
+      setButtonBusy(button, true);
+      feedback.textContent = "templateを削除しています…";
+      feedback.classList.remove("warning", "success");
+      try {
+        const response = await fetch(button.dataset.deleteUrl || "", {
+          method: "DELETE",
+          headers: { "content-type": "application/json", "x-csrf-token": form.dataset.csrf || "" },
+          body: JSON.stringify({ expected_version: Number(form.dataset.version) })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "templateを削除できませんでした。"));
+        for (const dirtyForm of document.querySelectorAll('[data-dirty="true"]')) {
+          if (dirtyForm instanceof HTMLElement) dirtyForm.dataset.dirty = "false";
+        }
+        feedback.textContent = "削除しました。研究詳細へ戻ります…";
+        feedback.classList.add("success");
+        location.href = result.next_url;
+      } catch (error) {
+        feedback.textContent = caughtErrorMessage(error, "templateを削除できませんでした。");
+        feedback.classList.add("warning");
+        setButtonBusy(button, false);
+      }
+    });
+  }
+
   const inspectorStateKey = "ultimate-freestyle:workspace-inspector";
   let inspectorState = {};
   try { inspectorState = JSON.parse(localStorage.getItem(inspectorStateKey) || "{}"); } catch {}
