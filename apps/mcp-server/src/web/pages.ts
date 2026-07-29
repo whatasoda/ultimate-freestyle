@@ -349,6 +349,7 @@ function shell(title: string, body: string): string {
       .filmstrip-link { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .55rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; color: #bdc9d8; text-decoration: none; }
       .filmstrip-link span { color: var(--muted); font: 700 .76rem/1.3 ui-monospace, monospace; }
       .filmstrip-link strong { overflow-wrap: anywhere; font-size: .86rem; line-height: 1.35; }
+      .filmstrip-link .filmstrip-meta { display: block; margin-top: .3rem; color: var(--muted); font-size: .68rem; font-weight: 550; line-height: 1.45; }
       .filmstrip-link[data-active="true"] { border-color: #9d7bff; background: #8062df20; color: white; }
       .workspace-preview { min-width: 0; padding: .8rem; }
       .workspace-frame { position: relative; width: 100%; aspect-ratio: var(--workspace-aspect, 16 / 9); overflow: hidden; border: 1px solid #40516a; border-radius: .65rem; background: #05080d; box-shadow: 0 1.5rem 4rem #0006; }
@@ -1177,7 +1178,7 @@ export function slideWorkspacePage(options: {
   const slidePath = `${projectPath}/slides/${escapeHtml(slide.id)}`;
   const filmstrip = deck.slides
     .map(
-      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}${item.role === "cover" ? '<small class="stage">表紙</small>' : ""}</strong></a>`
+      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}${item.role === "cover" ? '<small class="stage">表紙</small>' : ""}<small class="filmstrip-meta">${item.duration_seconds}秒 · ${item.reveal_steps + 1}段階 · ${escapeHtml(slideCompositionLabel(item))}</small></strong></a>`
     )
     .join("");
   const componentOutline =

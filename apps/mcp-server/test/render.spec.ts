@@ -680,6 +680,8 @@ describe("presentation artifact renderer", () => {
       slideId: "rich-result"
     }).text();
     expect(workspaceHtml).toContain('class="component-outline-row"');
+    expect(workspaceHtml).toContain('class="filmstrip-meta"');
+    expect(workspaceHtml).toContain("60秒 · 3段階 · リッチ構成 6 component");
     expect(workspaceHtml).toContain("data-scene-component-editor");
     expect(workspaceHtml).toContain('data-save-state data-state="saved"');
     expect(workspaceHtml).toContain("このcomponentを保存");
