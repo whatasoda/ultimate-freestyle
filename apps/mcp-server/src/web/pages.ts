@@ -322,6 +322,7 @@ function shell(title: string, body: string): string {
       .preflight-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .65rem; align-items: start; padding: .65rem .7rem; border: 1px solid var(--line); border-radius: .65rem; background: #0a131f; color: #c7d3e1; font-size: .82rem; line-height: 1.55; }
       .preflight-item::before { content: "✓"; display: grid; place-items: center; width: 1.35rem; height: 1.35rem; border-radius: 50%; background: #174d3a; color: #91efc4; font-weight: 900; }
       .preflight-item[data-state="attention"]::before { content: "!"; background: #5a4618; color: #ffe29a; }
+      .preflight-item[data-state="recommendation"]::before { content: "i"; background: #183f5a; color: #a7ddff; }
       .preflight-item strong, .preflight-item small { display: block; }
       .preflight-item small { margin-top: .12rem; color: var(--muted); }
       .preflight-action { align-self: center; padding: .25rem .45rem; border-radius: .4rem; color: #b9ddff; font-weight: 750; text-decoration: none; white-space: nowrap; }
@@ -852,18 +853,21 @@ export function projectDetailPage(options: {
   const preflightItems = [
     {
       complete: researchReady,
+      recommended: false,
       label: "研究の問いと方法",
       detail: researchReady ? "発表の前提を確認できます。" : "基本情報で問いと方法を入力してください。",
       href: "#basic-information"
     },
     {
       complete: coverSlideCount > 0,
+      recommended: true,
       label: "表紙スライド",
       detail: coverSlideCount > 0 ? `${coverSlideCount}枚を表紙として設定済みです。` : "任意ですが、発表の題名と作者を伝えやすくなります。",
       href: firstSlidePath
     },
     {
       complete: slidesWithMissingAlt + assetsWithMissingAlt === 0,
+      recommended: true,
       label: "画像の説明",
       detail: slidesWithMissingAlt + assetsWithMissingAlt === 0
         ? "説明が必要な画像に未入力はありません。"
@@ -876,6 +880,7 @@ export function projectDetailPage(options: {
     },
     {
       complete: slides.length > 0 && narratedSlideCount === slides.length,
+      recommended: true,
       label: "表示・読み上げ文",
       detail: slides.length === 0
         ? "スライドを作ると確認できます。"
@@ -888,6 +893,7 @@ export function projectDetailPage(options: {
     },
     {
       complete: durationWithinLimit,
+      recommended: false,
       label: "想定発表時間",
       detail: totalDurationSeconds === 0
         ? "各スライドの想定秒数を確認してください。"
@@ -898,12 +904,15 @@ export function projectDetailPage(options: {
     },
     {
       complete: previewCurrent,
+      recommended: false,
       label: "固定プレビュー",
       detail: previewCurrent ? "現在の下書きと表示エンジンで作成済みです。" : "現在の下書きから作り、最後まで操作して確認してください。",
       href: "#publication"
     }
   ];
-  const preflightChecklist = `<details${previewCurrent ? "" : " open"}><summary>公開前チェック · ${preflightItems.filter((item) => item.complete).length}/${preflightItems.length}</summary><ul class="preflight-list">${preflightItems.map((item) => `<li class="preflight-item" data-state="${item.complete ? "complete" : "attention"}"><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></span>${item.complete ? "" : `<a class="preflight-action" href="${item.href}">修正へ →</a>`}</li>`).join("")}</ul></details>`;
+  const corePreflightItems = preflightItems.filter((item) => !item.recommended);
+  const recommendedPreflightItems = preflightItems.filter((item) => item.recommended);
+  const preflightChecklist = `<details${previewCurrent ? "" : " open"}><summary>公開前チェック · 基本 ${corePreflightItems.filter((item) => item.complete).length}/${corePreflightItems.length} · おすすめ ${recommendedPreflightItems.filter((item) => item.complete).length}/${recommendedPreflightItems.length}</summary><ul class="preflight-list">${preflightItems.map((item) => `<li class="preflight-item" data-state="${item.complete ? "complete" : item.recommended ? "recommendation" : "attention"}"><span><strong>${escapeHtml(item.label)}${item.recommended ? " · おすすめ" : ""}</strong><small>${escapeHtml(item.detail)}</small></span>${item.complete ? "" : `<a class="preflight-action" href="${item.href}">${item.recommended ? "確認へ" : "修正へ"} →</a>`}</li>`).join("")}</ul></details>`;
   const publicationPanel = `<section class="panel publish-state" id="publication" data-publication>
     <h2>プレビューと公開</h2>
     ${preflightChecklist}

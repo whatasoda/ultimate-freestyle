@@ -410,6 +410,9 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
     expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");
     expect(detailHtml).toContain("公開前チェック ·");
+    expect(detailHtml).toContain("基本 1/3 · おすすめ 2/3");
+    expect(detailHtml).toContain("表紙スライド · おすすめ");
+    expect(detailHtml).toContain('data-state="recommendation"');
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
     expect(detailHtml).toContain("画像の説明");
