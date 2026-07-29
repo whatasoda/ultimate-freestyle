@@ -983,6 +983,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
   }
+  for (const button of document.querySelectorAll("[data-loading-style-pick]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      const select = form?.elements.namedItem("loading_style");
+      if (!(form instanceof HTMLFormElement) || !(select instanceof HTMLSelectElement)) return;
+      select.value = button.dataset.loadingStylePick || select.value;
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
   for (const button of document.querySelectorAll("[data-animation-replay]")) {
     if (!(button instanceof HTMLButtonElement)) continue;
     button.addEventListener("click", () => {
@@ -1032,6 +1043,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         syncPicker(form, '[data-animation-pick][data-animation-target="enter_animation"]', "animationPick", field.value);
       } else if (field.name === "tone") {
         syncPicker(form, "[data-tone-pick]", "tonePick", field.value);
+      } else if (field.name === "loading_style") {
+        syncPicker(form, "[data-loading-style-pick]", "loadingStylePick", field.value);
       } else if (field.name === "body_font" || field.name === "heading_font") {
         const body = form.elements.namedItem("body_font");
         const heading = form.elements.namedItem("heading_font");

@@ -168,7 +168,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=60";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=61";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -467,6 +467,17 @@ function shell(title: string, body: string): string {
       .tone-pick[data-tone-pick="light"] { --tone-color: #f7f3ea; --tone-accent: #4f91e8; }
       .tone-pick[data-tone-pick="signal"] { --tone-color: #2d1f55; --tone-accent: #ffcf4a; }
       .tone-pick[data-tone-pick="quiet"] { --tone-color: #e8edf2; --tone-accent: #718096; }
+      .loading-style-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(6rem, 1fr)); gap: .45rem; }
+      .loading-style-pick { display: grid; gap: .35rem; min-height: 4.6rem; padding: .45rem; border: 1px solid var(--line); background: #0a111b; color: #cbd6e4; font-size: .68rem; }
+      .loading-style-pick[aria-pressed="true"] { border-color: #9d7bff; background: #8062df24; color: white; }
+      .loading-wire { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid #52647c; border-radius: .2rem; background: #080d15; }
+      .loading-wire::before, .loading-wire::after { content: ""; position: absolute; }
+      .loading-wire::before { left: 25%; right: 25%; top: 42%; height: 10%; border-radius: 99px; background: #91ddff; }
+      .loading-wire::after { left: 20%; right: 20%; bottom: 18%; height: 4%; border-radius: 99px; background: #52647c; }
+      .loading-style-pick[data-loading-style-pick="pulse"] .loading-wire::before { left: 36%; right: auto; top: 24%; width: 28%; height: auto; aspect-ratio: 1; background: radial-gradient(circle, #8062df, transparent 68%); }
+      .loading-style-pick[data-loading-style-pick="orbit"] .loading-wire::before { left: 31%; right: auto; top: 17%; width: 38%; height: auto; aspect-ratio: 1; border: 2px solid #4f91e8; background: transparent; }
+      .loading-style-pick[data-loading-style-pick="research-log"] .loading-wire { background: repeating-linear-gradient(90deg, #d9d2c5 0 1px, #f3efe6 1px 18%); }
+      .loading-style-pick[data-loading-style-pick="research-log"] .loading-wire::before { left: 8%; right: 24%; top: 28%; background: #273444; }
       .actions { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
       button:disabled { cursor: not-allowed; opacity: .55; }
       button[aria-busy="true"] { cursor: wait; }
@@ -1145,6 +1156,7 @@ export function projectDetailPage(options: {
          <fieldset><legend>0ページ目</legend>
            <label class="check-label"><input type="checkbox" name="loading_enabled"${loadingScreen.enabled ? " checked" : ""}>表紙の前に準備画面を表示</label>
            <div class="editor-grid"><label>見た目<select name="loading_style">${[["minimal", "ミニマル"], ["pulse", "光のパルス"], ["orbit", "軌道"], ["research-log", "研究ノート"]].map(([value, label]) => `<option value="${value}"${loadingScreen.style === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>最低表示時間（ms）<input name="loading_minimum_duration_ms" type="number" min="0" max="5000" step="100" value="${loadingScreen.minimum_duration_ms}"></label></div>
+           <div class="loading-style-picker" role="group" aria-label="0ページ目の見た目を選ぶ">${[["minimal", "ミニマル"], ["pulse", "光のパルス"], ["orbit", "軌道"], ["research-log", "研究ノート"]].map(([value, label]) => `<button class="loading-style-pick" type="button" data-loading-style-pick="${value}" aria-pressed="${String(loadingScreen.style === value)}"><span class="loading-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>
            <label>案内文<input name="loading_message" maxlength="160" value="${escapeHtml(loadingScreen.message)}"></label>
            <label class="check-label"><input type="checkbox" name="loading_show_progress"${loadingScreen.show_progress ? " checked" : ""}>プリロード件数を表示</label>
            <p class="inherit-note">画像・生成音声・利用可能なフォントを準備し、失敗やタイムアウトがあっても発表は開始できます。</p>

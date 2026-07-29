@@ -409,8 +409,9 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=60"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=61"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
+    expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("全スライドの実表示を一括確認");
     expect(detailHtml).toContain("data-quality-sweep");
