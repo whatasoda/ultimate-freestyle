@@ -1377,15 +1377,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   });
   syncSaveState();
 
-  const segmentTuningValue = (form, name) => {
+  const segmentInheritedTuning = (form) => {
     let effective = {};
     try { effective = JSON.parse(form.dataset.effectiveTuning || "{}"); } catch {}
     let profileTunings = {};
     try { profileTunings = JSON.parse(form.dataset.profileTunings || "{}"); } catch {}
     const profileSelect = form.elements.namedItem("voice_profile_id");
-    const inherited = profileSelect instanceof HTMLSelectElement
+    return profileSelect instanceof HTMLSelectElement
       ? profileTunings[profileSelect.value] || effective
       : effective;
+  };
+  const segmentTuningValue = (form, name) => {
+    const inherited = segmentInheritedTuning(form);
     const field = form.elements.namedItem("tuning_" + name);
     const value = field instanceof HTMLInputElement ? field.value.trim() : "";
     const fallback = inherited[name] ?? (name === "speedScale" ? 1 : 0);
@@ -1395,6 +1398,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const output = form.querySelector("[data-segment-duration]");
     const text = form.elements.namedItem("text");
     if (!(output instanceof HTMLElement) || !(text instanceof HTMLTextAreaElement)) return;
+    const inherited = segmentInheritedTuning(form);
+    for (const field of form.querySelectorAll('input[name^="tuning_"]')) {
+      if (!(field instanceof HTMLInputElement)) continue;
+      const key = field.name.slice("tuning_".length);
+      field.placeholder = "実効 " + (inherited[key] ?? "-");
+    }
     const stepDuration = Number(form.dataset.stepDuration || 0);
     const estimated = Math.max(1.5, text.value.length / (7 * segmentTuningValue(form, "speedScale")));
     const previewButton = form.querySelector("[data-segment-speech-preview]");
