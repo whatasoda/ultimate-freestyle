@@ -4,7 +4,11 @@ import {
   PRESENTATION_RENDERER_VERSION,
   renderPresentationHtml
 } from "../src/presentation/render";
-import { projectDetailPage, slideWorkspacePage } from "../src/web/pages";
+import {
+  projectDetailPage,
+  slideWorkspacePage,
+  voiceFinishPage
+} from "../src/web/pages";
 import { resolveSlideTypography } from "../src/projects/typography";
 import {
   projectRecordSchema,
@@ -783,6 +787,55 @@ describe("presentation artifact renderer", () => {
     expect(overLimitHtml).toContain('<dt>想定時間</dt><dd data-state="warning">23分20秒 · 20分超過</dd>');
     expect(overLimitHtml).toContain("発表を20分以内に収める");
     expect(overLimitHtml).toContain('data-duration-valid="false" data-published-current="false" disabled');
+
+    const voiceLimitHtml = await voiceFinishPage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project,
+      voice: {
+        ok: true,
+        project_id: project.project_id,
+        version: project.version,
+        configured: true,
+        default_profile: {
+          id: "voicevox-style-3",
+          label: "ずんだもん・ノーマル",
+          speaker_name: "ずんだもん",
+          style_name: "ノーマル"
+        },
+        summary: {
+          total: 16,
+          ready: 0,
+          needs_generation: 16,
+          failed: 0,
+          queued: 0
+        },
+        segments: Array.from({ length: 16 }, (_, index) => ({
+          slide_id: "rich-result",
+          slide_title: "結果",
+          at: index,
+          text: "あ".repeat(2_000),
+          speaker: "ずんだもん",
+          profile_label: "ずんだもん・ノーマル",
+          effective_tuning: {
+            speedScale: 1,
+            pitchScale: 0,
+            intonationScale: 1,
+            volumeScale: 1,
+            pauseLengthScale: 1,
+            prePhonemeLength: 0.1,
+            postPhonemeLength: 0.1
+          },
+          status: "needs_generation",
+          audio_url: null
+        })),
+        active_job: null,
+        latest_job: null
+      }
+    }).text();
+    expect(voiceLimitHtml).toContain("32,000字");
+    expect(voiceLimitHtml).toContain("生成対象が1回の上限30,000字を超えています");
+    expect(voiceLimitHtml).toContain('data-voice-generate="/api/projects/63ab1ec4-20a0-4cf6-a1a0-f74ced56778a/voice/jobs" disabled>原稿を短縮してください</button>');
   });
 
   it("maps every safe visual and font preset and renders bounded narration variants", () => {
