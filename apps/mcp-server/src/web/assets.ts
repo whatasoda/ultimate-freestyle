@@ -8,7 +8,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       TEMPLATE_NOT_FOUND: "templateが見つかりません。画面を再読み込みしてください。",
       VOICE_PROFILE_NOT_FOUND: "選んだ声が見つかりません。声を選び直してください。",
       VOICE_JOB_NOT_FOUND: "音声生成の状況が見つかりません。音声仕上げ画面を再読み込みしてください。",
-      ASSET_IN_USE: "この画像はスライドで使用中です。スライドから外してから削除してください。"
+      ASSET_IN_USE: "この画像はスライドで使用中です。スライドから外してから削除してください。",
+      ASSET_NOT_FOUND: "画像が見つかりません。画面を再読み込みしてください。"
     };
     const code = result?.error?.code;
     return (code && messages[code]) || result?.error?.message || fallback;
@@ -1111,6 +1112,48 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         location.reload();
       } catch (error) {
         feedback.textContent = caughtErrorMessage(error, "画像を保存できませんでした。");
+        feedback.classList.add("warning");
+        setButtonBusy(submit, false);
+      }
+    });
+  }
+
+  for (const form of document.querySelectorAll("[data-image-alt]")) {
+    if (!(form instanceof HTMLFormElement)) continue;
+    const input = form.querySelector('input[name="alt_text"]');
+    const submit = form.querySelector('button[type="submit"]');
+    const feedback = form.querySelector("[data-alt-feedback]");
+    form.addEventListener("input", () => { form.dataset.dirty = "true"; });
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!(input instanceof HTMLInputElement) || !(feedback instanceof HTMLElement)) return;
+      setButtonBusy(submit, true);
+      feedback.textContent = "説明を保存しています…";
+      feedback.classList.remove("warning", "success");
+      try {
+        const response = await fetch(form.action, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": form.dataset.csrf || ""
+          },
+          body: JSON.stringify({ alt_text: input.value })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "説明を保存できませんでした。"));
+        form.dataset.dirty = "false";
+        const asset = form.closest("[data-asset]");
+        const image = asset?.querySelector("img");
+        const deleteButton = asset?.querySelector("[data-image-delete]");
+        if (image instanceof HTMLImageElement) image.alt = result.asset.alt_text;
+        if (deleteButton instanceof HTMLButtonElement) {
+          deleteButton.dataset.imageLabel = result.asset.alt_text || result.asset.original_filename;
+        }
+        feedback.textContent = "説明を保存しました。";
+        feedback.classList.add("success");
+        setTimeout(() => location.reload(), 600);
+      } catch (error) {
+        feedback.textContent = caughtErrorMessage(error, "説明を保存できませんでした。");
         feedback.classList.add("warning");
         setButtonBusy(submit, false);
       }

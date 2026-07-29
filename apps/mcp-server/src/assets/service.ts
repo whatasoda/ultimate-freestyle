@@ -3,7 +3,8 @@ import {
   assertAssetCapacity,
   createProjectAsset,
   deleteProjectAsset,
-  getProjectAsset
+  getProjectAsset,
+  updateProjectAssetAltText
 } from "./repository";
 import {
   assertDeclaredImageType,
@@ -160,4 +161,18 @@ export async function removeProjectImage(
   }
   await env.MEDIA_BUCKET.delete(asset.object_key);
   return (await deleteProjectAsset(env.DB, ownerUserId, assetId)) !== null;
+}
+
+export async function updateProjectImageAltText(
+  env: Pick<Env, "DB">,
+  ownerUserId: string,
+  assetId: string,
+  altText: string
+): Promise<ProjectAsset | null> {
+  return await updateProjectAssetAltText(
+    env.DB,
+    ownerUserId,
+    assetId,
+    altText.trim()
+  );
 }

@@ -6,6 +6,7 @@ import {
   AssetServiceError,
   readProjectImage,
   removeProjectImage,
+  updateProjectImageAltText,
   uploadProjectImage
 } from "../assets/service";
 import { readAuthConfig } from "../auth/config";
@@ -94,6 +95,9 @@ const projectFieldsRequestSchema = z.object({
   method: z.string().max(20_000),
   findings: z.array(z.string().min(1).max(4_000)).max(100).optional(),
   limitations: z.array(z.string().min(1).max(4_000)).max(100).optional()
+});
+const imageAltRequestSchema = z.object({
+  alt_text: z.string().max(500)
 });
 
 const previewRequestSchema = z.object({
@@ -1877,8 +1881,8 @@ async function handleImageDelete(
   env: Env,
   assetId: string
 ): Promise<Response> {
-  if (request.method !== "DELETE") {
-    return new Response(null, { status: 405, headers: { allow: "DELETE" } });
+  if (request.method !== "DELETE" && request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH, DELETE" } });
   }
   const session = await requireWebSessionAndCsrf(request, env);
   if (session === null) {
@@ -1890,6 +1894,45 @@ async function handleImageDelete(
       },
       403
     );
+  }
+  if (request.method === "PATCH") {
+    const read = await readRequestJson(request);
+    if (!read.ok) return read.response;
+    const parsed = imageAltRequestSchema.safeParse(read.value);
+    if (!parsed.success) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: { code: "INVALID_FIELDS", message: "画像の説明は500字以内で入力してください。" },
+          request_id: crypto.randomUUID()
+        },
+        422
+      );
+    }
+    const asset = await updateProjectImageAltText(
+      env,
+      session.userId,
+      assetId,
+      parsed.data.alt_text
+    );
+    if (asset === null) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: { code: "ASSET_NOT_FOUND", message: "画像が見つかりません。" },
+          request_id: crypto.randomUUID()
+        },
+        404
+      );
+    }
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project_image.alt_text_updated",
+      outcome: "succeeded",
+      details: { asset_id: assetId, has_alt_text: asset.alt_text !== "" },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, asset, error: null, request_id: crypto.randomUUID() });
   }
   const deleted = await removeProjectImage(env, session.userId, assetId);
   await recordWebAudit(env.DB, {

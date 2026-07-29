@@ -401,7 +401,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=21"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=22"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -431,6 +431,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("保存時に最大2560pxのWebPへ圧縮");
     expect(detailHtml).toContain("data-delete-feedback");
     expect(detailHtml).toContain("data-image-label");
+    expect(detailHtml).toContain("data-image-alt");
+    expect(detailHtml).toContain("説明を保存");
     expect(detailHtml).toContain("自由配置 1 block");
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
@@ -569,6 +571,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("まだ画像がありません");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-narration-settings");
     expect(dashboardScriptText).toContain("読み上げ枠をプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("説明を保存しています");
 
     const rejectedUpload = await requestProvider(
       provider,
@@ -599,6 +602,27 @@ describe("Web dashboard", () => {
       /name="csrf_token" value="([^"]+)"/
     )?.[1];
     expect(csrfToken).toBeTruthy();
+    const altUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/images/30000000-0000-4000-8000-000000000003",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ alt_text: "Webで更新した画像説明" })
+        }
+      ),
+      authEnv
+    );
+    expect(altUpdate.status).toBe(200);
+    expect(await altUpdate.json()).toMatchObject({
+      ok: true,
+      asset: { alt_text: "Webで更新した画像説明" }
+    });
     const fieldUpdate = await requestProvider(
       provider,
       new Request(

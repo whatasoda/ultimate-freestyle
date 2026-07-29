@@ -192,6 +192,23 @@ export async function createProjectAsset(
   return asset;
 }
 
+export async function updateProjectAssetAltText(
+  db: D1Database,
+  ownerUserId: string,
+  assetId: string,
+  altText: string,
+  now = new Date()
+): Promise<ProjectAsset | null> {
+  const result = await db
+    .prepare(
+      "UPDATE project_assets SET alt_text = ?, updated_at = ? WHERE id = ? AND owner_user_id = ?"
+    )
+    .bind(altText.slice(0, 500), now.toISOString(), assetId, ownerUserId)
+    .run();
+  if (result.meta.changes !== 1) return null;
+  return await getProjectAsset(db, ownerUserId, assetId);
+}
+
 export async function deleteProjectAsset(
   db: D1Database,
   ownerUserId: string,
