@@ -337,3 +337,8 @@
 
 - スライド編集の内容、デザイン、読み上げ、構造、品質確認の開閉状態をlocalStorageへ保持するようにした。
 - 複数スライドを続けて調整するとき、次のスライドでも作業中の欄が開いた状態を保つ。
+
+## 改善ループ50
+
+- リッチなcomponent sceneで、hero、markdown、画像、shape、card、metric、quote、calloutの文言を一件ずつ編集できるWeb APIとフォームを追加した。
+- component全体をschemaで再検証し、レイアウト構造や任意HTMLを公開せず、Web UIでは既存componentの文字項目だけを変更できる境界にした。

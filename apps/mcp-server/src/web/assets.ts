@@ -375,6 +375,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         vertical_align: String(data.get("vertical_align") || "") || undefined
       }
     });
+    if (form.matches("[data-scene-component-editor]")) {
+      let component = {};
+      try { component = JSON.parse(form.dataset.component || "{}"); } catch {}
+      for (const field of form.querySelectorAll("[data-component-field]")) {
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) continue;
+        component[field.name] = field.dataset.nullable === "true" && field.value.trim() === ""
+          ? null
+          : field.value;
+      }
+      Object.assign(body, { component });
+    }
     if (form.matches("[data-deck-editor]")) Object.assign(body, {
       aspect_ratio: String(data.get("aspect_ratio") || "16:9"),
       loading_screen: {

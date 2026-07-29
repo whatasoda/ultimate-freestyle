@@ -655,6 +655,9 @@ describe("presentation artifact renderer", () => {
       slideId: "rich-result"
     }).text();
     expect(workspaceHtml).toContain('class="component-outline-row"');
+    expect(workspaceHtml).toContain("data-scene-component-editor");
+    expect(workspaceHtml).toContain("このcomponentを保存");
+    expect(workspaceHtml).toContain("/components/headline");
     expect(workspaceHtml).toContain('class="component-step">STEP 1');
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain(">全文追従</span>");

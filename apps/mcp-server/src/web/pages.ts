@@ -110,7 +110,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=24";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=25";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -512,6 +512,60 @@ function componentSettings(node: SlideSceneNode): string {
   return settingTable(
     Object.entries(node).map(([key, value]) => [key, value])
   );
+}
+
+type SceneTextField = {
+  name: string;
+  label: string;
+  value: string | null;
+  maxLength: number;
+  multiline?: boolean;
+  required?: boolean;
+  nullable?: boolean;
+};
+
+function sceneTextFields(node: SlideSceneNode): SceneTextField[] {
+  switch (node.kind) {
+    case "hero":
+      return [
+        { name: "eyebrow", label: "小見出し", value: node.eyebrow, maxLength: 120, nullable: true },
+        { name: "heading", label: "見出し", value: node.heading, maxLength: 500, required: true },
+        { name: "subtitle", label: "補足文", value: node.subtitle, maxLength: 2_000, multiline: true, nullable: true }
+      ];
+    case "markdown":
+      return [{ name: "markdown", label: "本文", value: node.markdown, maxLength: 20_000, multiline: true, required: true }];
+    case "image":
+      return [
+        { name: "alt_text", label: "画像の説明", value: node.alt_text, maxLength: 500 },
+        { name: "caption", label: "キャプション", value: node.caption, maxLength: 500, nullable: true }
+      ];
+    case "shape":
+      return [{ name: "label", label: "ラベル", value: node.label, maxLength: 500, nullable: true }];
+    case "card":
+      return [
+        { name: "label", label: "ラベル", value: node.label, maxLength: 120, nullable: true },
+        { name: "markdown", label: "本文", value: node.markdown, maxLength: 10_000, multiline: true, required: true }
+      ];
+    case "metric":
+      return [
+        { name: "value", label: "値", value: node.value, maxLength: 80, required: true },
+        { name: "unit", label: "単位", value: node.unit, maxLength: 40, nullable: true },
+        { name: "caption", label: "説明", value: node.caption, maxLength: 500 }
+      ];
+    case "quote":
+      return [
+        { name: "quote", label: "引用文", value: node.quote, maxLength: 4_000, multiline: true, required: true },
+        { name: "attribution", label: "出典・話者", value: node.attribution, maxLength: 500, nullable: true }
+      ];
+    case "callout":
+      return [
+        { name: "label", label: "ラベル", value: node.label, maxLength: 120, nullable: true },
+        { name: "heading", label: "見出し", value: node.heading, maxLength: 500, required: true },
+        { name: "markdown", label: "本文", value: node.markdown, maxLength: 4_000, multiline: true, nullable: true }
+      ];
+    default:
+      return [];
+  }
 }
 
 function sceneComponentOutline(nodes: SlideSceneNode[]): string {
@@ -1101,6 +1155,22 @@ export function slideWorkspacePage(options: {
       : slide.composition?.mode === "canvas"
         ? "従来のflat canvasです。既存表示は維持されます。より複雑な構成はcomponent sceneへ移行できます。"
         : "本文と補足欄を使う定型flowです。";
+  const sceneComponentEditors = slide.composition?.mode === "scene"
+    ? slide.composition.nodes
+        .map((node) => {
+          const fields = sceneTextFields(node);
+          if (fields.length === 0) return "";
+          const controls = fields.map((field) => {
+            const attributes = `name="${field.name}" data-component-field data-nullable="${String(field.nullable === true)}" maxlength="${field.maxLength}"${field.required ? " required" : ""}`;
+            return field.multiline
+              ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(field.value ?? "")}</textarea></label>`
+              : `<label>${field.label}<input ${attributes} value="${escapeHtml(field.value ?? "")}"></label>`;
+          }).join("");
+          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の文言</summary><form class="editor" data-scene-component-editor data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}<div class="actions"><button type="submit">このcomponentを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+        })
+        .filter(Boolean)
+        .join("")
+    : "";
   const effectiveTemplateId = slide.template_id ?? deck.default_template_id ?? null;
   const activeTemplate = (deck.templates ?? []).find(
     (template) => template.id === effectiveTemplateId
@@ -1337,7 +1407,7 @@ export function slideWorkspacePage(options: {
                <form class="editor" data-narration-settings-editor data-versioned-form action="${slidePath}/narration/settings" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>表示形式<select name="display">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<option value="${value}"${narrationDisplay === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>スライド話者名<input name="speaker" maxlength="80" value="${escapeHtml(slide.narration?.speaker ?? "")}" placeholder="deck既定: ${escapeHtml(deck.narration_defaults?.speaker ?? "なし")}"></label></div><fieldset><legend>読み上げ枠</legend><div class="editor-grid"><label>配置<select name="placement">${[["bottom", "下部"], ["overlay-bottom", "下部に重ねる"], ["sidebar", "補足欄"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.placement === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>大きさ<select name="size">${[["compact", "小"], ["normal", "標準"], ["large", "大"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.size === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>文字揃え<select name="text_align"><option value="start"${narrationAppearance.text_align === "start" ? " selected" : ""}>左</option><option value="center"${narrationAppearance.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>文字倍率<input name="text_scale" type="number" min="0.75" max="1.5" step="0.05" value="${narrationAppearance.text_scale}"></label><label>最大行数<input name="max_lines" type="number" min="2" max="8" value="${narrationAppearance.max_lines}"></label></div><label class="check-label"><input name="speaker_visible" type="checkbox"${narrationAppearance.speaker_visible ? " checked" : ""}>話者名を表示</label><label class="check-label"><input name="progress_visible" type="checkbox"${narrationAppearance.progress_visible ? " checked" : ""}>読み上げ進捗を表示</label></fieldset><p class="inherit-note">話者の実効値: ${escapeHtml(effectiveSpeaker ?? "なし")}。この欄で保存するとslide設定として上書きします。</p><div class="actions"><button type="submit">読み上げ枠を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
                ${voiceSegments}
              </div></details>
-             <details class="inspector-section" data-inspector-section="structure"><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${componentOutline}</div></details>
+             <details class="inspector-section" data-inspector-section="structure"><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${sceneComponentEditors}${componentOutline}</div></details>
              <details class="inspector-section" data-inspector-section="quality" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-base-count="${qualityItems.length}" data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
            </aside>
          </div>

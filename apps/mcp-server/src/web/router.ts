@@ -35,6 +35,7 @@ import {
   presentationAspectRatioSchema,
   projectStageSchema,
   slideRoleSchema,
+  slideSceneNodeSchema,
   slideTypographySchema,
   visualPresetSchema
 } from "../projects/schema";
@@ -148,6 +149,10 @@ const slideFieldsRequestSchema = z.object({
 const slideTypographyRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   typography: slideTypographySchema
+});
+const sceneComponentRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  component: slideSceneNodeSchema
 });
 
 const templateFieldsRequestSchema = presentationTemplateSchema
@@ -1120,6 +1125,151 @@ async function handleSlideTypographyUpdate(
   }
 }
 
+async function handleSceneComponentUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string,
+  componentId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = sceneComponentRequestSchema.safeParse(read.value);
+  if (!parsed.success || parsed.data.component.id !== componentId) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_FIELDS", message: "componentの入力内容を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "scene") {
+          const error = new Error("The slide does not use a component scene.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        const index = slide.composition.nodes.findIndex((node) => node.id === componentId);
+        if (index === -1) {
+          const error = new Error("The component does not exist.");
+          Object.assign(error, { code: "COMPONENT_NOT_FOUND" });
+          throw error;
+        }
+        const existing = slide.composition.nodes[index]!;
+        const component = parsed.data.component;
+        if (existing.kind !== component.kind) {
+          const error = new Error("The component kind cannot be changed here.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        switch (component.kind) {
+          case "hero":
+            if (existing.kind === "hero") Object.assign(existing, {
+              eyebrow: component.eyebrow,
+              heading: component.heading,
+              subtitle: component.subtitle
+            });
+            break;
+          case "markdown":
+            if (existing.kind === "markdown") existing.markdown = component.markdown;
+            break;
+          case "image":
+            if (existing.kind === "image") Object.assign(existing, {
+              alt_text: component.alt_text,
+              caption: component.caption
+            });
+            break;
+          case "shape":
+            if (existing.kind === "shape") existing.label = component.label;
+            break;
+          case "card":
+            if (existing.kind === "card") Object.assign(existing, {
+              label: component.label,
+              markdown: component.markdown
+            });
+            break;
+          case "metric":
+            if (existing.kind === "metric") Object.assign(existing, {
+              value: component.value,
+              unit: component.unit,
+              caption: component.caption
+            });
+            break;
+          case "quote":
+            if (existing.kind === "quote") Object.assign(existing, {
+              quote: component.quote,
+              attribution: component.attribution
+            });
+            break;
+          case "callout":
+            if (existing.kind === "callout") Object.assign(existing, {
+              label: component.label,
+              heading: component.heading,
+              markdown: component.markdown
+            });
+            break;
+          default: {
+            const error = new Error("This component has no editable text fields.");
+            Object.assign(error, { code: "INVALID_FIELDS" });
+            throw error;
+          }
+        }
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_component_updated",
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        slide_id: slideId,
+        component_id: componentId,
+        version: project.version
+      },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      component_id: componentId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "componentを保存できませんでした。");
+  }
+}
+
 function projectMutationErrorResponse(
   error: unknown,
   fallbackMessage: string
@@ -1141,6 +1291,9 @@ function projectMutationErrorResponse(
     NARRATION_NOT_FOUND: "このスライドには読み上げがありません。",
     NARRATION_SEGMENT_NOT_FOUND: "読み上げ区間が見つかりません。",
     VOICE_PROFILE_NOT_FOUND: "VOICEVOX profileが見つかりません。",
+    COMPONENT_NOT_FOUND: "componentが見つかりません。",
+    INVALID_COMPOSITION_MODE: "このスライドはcomponent sceneではありません。",
+    INVALID_FIELDS: "componentの文言を確認してください。",
     PROJECT_VERSION_CONFLICT: "別の場所で更新されました。画面を読み込み直してください。"
   };
   const status =
@@ -1149,13 +1302,17 @@ function projectMutationErrorResponse(
     code === "TEMPLATE_NOT_FOUND" ||
     code === "NARRATION_NOT_FOUND" ||
     code === "NARRATION_SEGMENT_NOT_FOUND" ||
-    code === "VOICE_PROFILE_NOT_FOUND"
+    code === "VOICE_PROFILE_NOT_FOUND" ||
+    code === "COMPONENT_NOT_FOUND"
       ? 404
       : code === "PROJECT_VERSION_CONFLICT" ||
           code === "TEMPLATE_EXISTS" ||
-          code === "DECK_REQUIRED"
+          code === "DECK_REQUIRED" ||
+          code === "INVALID_COMPOSITION_MODE"
         ? 409
-        : 500;
+        : code === "INVALID_FIELDS"
+          ? 422
+          : 500;
   return jsonResponse(
     {
       ok: false,
@@ -2201,6 +2358,22 @@ export async function handleWebRequest(
       env,
       slideTypographyMatch[1],
       slideTypographyMatch[2]
+    );
+  }
+  const sceneComponentMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/components/([a-z0-9][a-z0-9-]{0,63})$`)
+  );
+  if (
+    sceneComponentMatch?.[1] !== undefined &&
+    sceneComponentMatch[2] !== undefined &&
+    sceneComponentMatch[3] !== undefined
+  ) {
+    return handleSceneComponentUpdate(
+      request,
+      env,
+      sceneComponentMatch[1],
+      sceneComponentMatch[2],
+      sceneComponentMatch[3]
     );
   }
   const slideFieldsMatch = path.match(
