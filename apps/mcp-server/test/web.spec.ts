@@ -554,6 +554,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("本文と見出しのfontをまとめて選ぶ");
     expect(workspaceHtml).toContain('data-animation-pick="wipe"');
     expect(workspaceHtml).toContain("動きをもう一度見る");
+    expect(workspaceHtml).toContain('data-tone-pick="signal"');
     expect(workspaceHtml).toContain('data-cover-pick="statement"');
     expect(workspaceHtml).toContain("表紙レイアウトを選ぶ");
     expect(workspaceHtml).toContain('data-narration-display-pick="inline"');
