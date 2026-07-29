@@ -426,7 +426,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
     expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");
     expect(detailHtml).toContain("公開前チェック ·");
-    expect(detailHtml).toContain("基本 1/3 · おすすめ 3/4");
+    expect(detailHtml).toContain("基本 2/4 · おすすめ 3/4");
+    expect(detailHtml).toContain("公開版の画像容量");
     expect(detailHtml).toContain("表紙スライド · おすすめ");
     expect(detailHtml).toContain("文字量と表示枠 · おすすめ");
     expect(detailHtml).toContain('data-state="recommendation"');

@@ -12,9 +12,12 @@ import {
   type VoicevoxTuning
 } from "@ultimate-freestyle/research-schema/voice";
 import {
+  MAX_PRESENTATION_ASSETS,
+  MAX_PRESENTATION_ASSET_BYTES,
   MAX_PRESENTATION_DURATION_SECONDS,
   type PublicationStatus
 } from "../publications/service";
+import { listPresentationAssetIds } from "../presentation/render";
 import { VOICEVOX_CATALOG } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import { resolveSlideTypography } from "../projects/typography";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
@@ -917,6 +920,15 @@ export function projectDetailPage(options: {
   const assetTotalSize = assetTotalBytes < 1024 * 1024
     ? `${Math.ceil(assetTotalBytes / 1024)} KiB`
     : `${(assetTotalBytes / 1024 / 1024).toFixed(1)} MiB`;
+  const referencedAssetIds = listPresentationAssetIds(options.project);
+  const referencedAssets = referencedAssetIds
+    .map((assetId) => options.assets.find((asset) => asset.asset_id === assetId))
+    .filter((asset): asset is ProjectAsset => asset !== undefined);
+  const referencedAssetBytes = referencedAssets.reduce((total, asset) => total + asset.byte_size, 0);
+  const referencedAssetsValid =
+    referencedAssets.length === referencedAssetIds.length &&
+    referencedAssetIds.length <= MAX_PRESENTATION_ASSETS &&
+    referencedAssetBytes <= MAX_PRESENTATION_ASSET_BYTES;
   const narrationSegments = slides.flatMap(
     (slide) => slide.narration?.segments ?? []
   );
@@ -1101,8 +1113,19 @@ export function projectDetailPage(options: {
           ? `全${slides.length}枚で文章量の事前警告はありません。`
           : `${slidesWithStaticQualityWarnings.length}/${slides.length}枚で文章量、表、読み上げ枠の確認をおすすめします。`,
       href: firstSlideWithStaticQualityWarning === undefined
-        ? firstSlidePath
-        : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithStaticQualityWarning.id)}`
+          ? firstSlidePath
+          : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithStaticQualityWarning.id)}`
+    },
+    {
+      complete: referencedAssetsValid,
+      recommended: false,
+      label: "公開版の画像容量",
+      detail: referencedAssets.length !== referencedAssetIds.length
+        ? `${referencedAssetIds.length - referencedAssets.length}件の参照画像が見つかりません。`
+        : referencedAssetsValid
+          ? `${referencedAssetIds.length}件 · ${(referencedAssetBytes / 1024 / 1024).toFixed(1)}MiBで上限内です。`
+          : `${referencedAssetIds.length}/${MAX_PRESENTATION_ASSETS}件 · ${(referencedAssetBytes / 1024 / 1024).toFixed(1)}/30MiBです。使用画像を減らしてください。`,
+      href: "#research-images"
     },
     {
       complete: durationWithinLimit,
