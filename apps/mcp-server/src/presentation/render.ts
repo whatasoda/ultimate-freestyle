@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@21";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@22";
 
 function escapeHtml(value: string): string {
   return value
@@ -963,6 +963,11 @@ export function renderPresentationHtml(
       const localProgress = slides[slide]?.querySelector('.narration-inline-progress');
       if (localProgress instanceof HTMLElement) localProgress.style.width = value;
     };
+    const setSecondaryProgressLabel = (label) => {
+      const meter = voiceProgress.parentElement;
+      meter?.setAttribute('aria-label', label);
+      if (meter instanceof HTMLElement) meter.title = label;
+    };
     const showVoiceUnlock = () => {
       if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = false;
       stage?.setAttribute('data-voice-blocked', 'true');
@@ -1002,10 +1007,16 @@ export function renderPresentationHtml(
       if (!auto || !started) return;
       const current = DECK.slides[slide];
       const delay = Math.max(1500, current.durationSeconds * 1000 / (current.revealSteps + 1));
-      autoTimer = setTimeout(advance, delay);
+      const begin = performance.now();
+      setSecondaryProgressLabel('自動送りまで');
+      setVoiceProgress(0);
+      clearInterval(voiceTimer);
+      voiceTimer = setInterval(() => setVoiceProgress((performance.now() - begin) / delay * 100), 100);
+      autoTimer = setTimeout(() => { clearInterval(voiceTimer); setVoiceProgress(100); advance(); }, delay);
     };
     const speakWithBrowser = (segment) => {
       if (!('speechSynthesis' in window)) { scheduleAutoAdvance(); return; }
+      setSecondaryProgressLabel('読み上げ進捗');
       const run = voiceRun;
       const tuning = segment.effectiveTuning || {};
       const utterance = new SpeechSynthesisUtterance(segment.text);
@@ -1033,6 +1044,7 @@ export function renderPresentationHtml(
       if (!speech || !segment) { hideVoiceUnlock(); scheduleAutoAdvance(); return; }
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
+      setSecondaryProgressLabel('読み上げ進捗');
       activeAudio = player;
       player.preload = 'auto';
       player.volume = clamp(Number(volume.value), 0, 1);
@@ -1324,7 +1336,7 @@ export function renderPresentationHtml(
       auto = !auto;
       autoButton.setAttribute('aria-pressed', String(auto));
       autoButton.textContent = '自動 ' + (auto ? 'ON' : 'OFF');
-      if (!auto) clearTimeout(autoTimer);
+      if (!auto) { clearTimeout(autoTimer); clearInterval(voiceTimer); setVoiceProgress(0); setSecondaryProgressLabel('読み上げ進捗'); }
       else if (!activeAudio && (!('speechSynthesis' in window) || !speechSynthesis.speaking)) scheduleAutoAdvance();
     });
     volume.addEventListener('input', () => { showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });

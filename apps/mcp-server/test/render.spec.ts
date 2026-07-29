@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@21");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@22");
     expect(html).toContain('title="実経過時間 / 現在位置の目安 / 想定合計時間"');
     expect(html).toContain('class="time-total"> / 全01:00</span>');
     expect(html).toContain("const expectedElapsed = () =>");
@@ -205,6 +205,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("setAttribute('aria-valuenow'");
     expect(html).toContain("const updateControls = () =>");
     expect(html).toContain("previousButton.disabled = !started || (slide === 0 && step === 0)");
+    expect(html).toContain("setSecondaryProgressLabel('自動送りまで')");
+    expect(html).toContain("(performance.now() - begin) / delay * 100");
     expect(html).toContain("発表はここまでです");
     expect(html).toContain("data-restart");
     expect(html).toContain("else { showCompletion(); return false; }");
