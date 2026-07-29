@@ -505,3 +505,8 @@
 - 入口READMEにホスト版を使う3ステップを追加し、開発環境を作る手順と明確に分けた。
 - Remote MCPの版、4:3対応、Webでの構成操作、本番VOICEVOX Container接続を現在の実装へ揃えた。
 - 「本番音声は将来」という古い説明を除き、手動の試聴ActionとWeb UIから起動する本番生成の役割を区別した。
+
+## 改善ループ81
+
+- Workerが返すサービス版とworkspace package版の食い違いを解消し、どの入口から確認しても`0.13.0`になるようにした。
+- 古いworkspace metadataが残っていたlockfileも同期した。
