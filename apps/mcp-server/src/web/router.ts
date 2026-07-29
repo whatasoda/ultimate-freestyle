@@ -2645,14 +2645,21 @@ export async function handleWebRequest(
   if (path === "/assets/dashboard.js" && request.method === "GET") {
     return dashboardScriptResponse();
   }
-  if (path === "/" && request.method === "GET") {
+  if (path === "/" && (request.method === "GET" || request.method === "HEAD")) {
     const session = await readWebSession(request, env.DB);
-    return session === null
+    const response = session === null
       ? landingPage({
           broadcasterLogin: env.TWITCH_BROADCASTER_LOGIN,
           minFollowDays: Number(env.MIN_FOLLOW_DAYS)
         })
       : redirectPage("/dashboard");
+    return request.method === "HEAD"
+      ? new Response(null, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        })
+      : response;
   }
   if (path === "/login") {
     return handleWebLogin(request, env, fetcher);

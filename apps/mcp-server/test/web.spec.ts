@@ -125,6 +125,18 @@ describe("Web dashboard", () => {
       "default-src 'none'"
     );
 
+    const landingHead = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/", { method: "HEAD" }),
+      authEnv
+    );
+    expect(landingHead.status).toBe(200);
+    expect(await landingHead.text()).toBe("");
+    expect(landingHead.headers.get("content-type")).toContain("text/html");
+    expect(landingHead.headers.get("content-security-policy")).toContain(
+      "default-src 'none'"
+    );
+
     const unauthenticatedDashboard = await requestProvider(
       provider,
       new Request("https://saijiyu-kenkyu.2764.moe/dashboard"),

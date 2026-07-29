@@ -897,3 +897,9 @@
 - `/healthz`とMCPの`health`へ現在のpresentation renderer versionを追加した。
 - 本番smokeは固定のservice versionだけでなく、checkout中のrenderer versionが反映されるまで待つようにした。
 - rendererを変更してもservice versionを上げない通常運用で、古いWorkerを新デプロイと誤認してCIが成功する余地をなくした。
+
+## 改善ループ148
+
+- 公開入口の`HEAD /`をGETと同じ状態・セキュリティヘッダーで、本文なしに応答するようにした。
+- ブラウザ利用には影響しないまま、外形監視やリンク確認が公開入口を404と誤判定する状態を解消した。
+- 本番smokeへHEAD確認を追加し、デプロイ後もこの運用上の契約を継続検証するようにした。

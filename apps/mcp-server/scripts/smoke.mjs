@@ -72,6 +72,18 @@ assert.match(
 );
 assert.match(await landingResponse.text(), /Twitchでログイン/);
 
+const landingHeadResponse = await fetch(new URL("/", baseUrl), {
+  method: "HEAD",
+  redirect: "manual",
+  signal: AbortSignal.timeout(15_000)
+});
+assert.equal(landingHeadResponse.status, 200);
+assert.equal(await landingHeadResponse.text(), "");
+assert.match(
+  landingHeadResponse.headers.get("content-security-policy") ?? "",
+  /default-src 'none'/
+);
+
 const dashboardResponse = await fetch(new URL("/dashboard", baseUrl), {
   redirect: "manual",
   signal: AbortSignal.timeout(15_000)
