@@ -889,6 +889,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       form.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
+  for (const button of document.querySelectorAll("[data-cover-pick]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      if (!(form instanceof HTMLFormElement)) return;
+      const layout = form.elements.namedItem("cover_layout");
+      const role = form.elements.namedItem("role");
+      if (layout instanceof HTMLSelectElement) layout.value = button.dataset.coverPick || layout.value;
+      if (role instanceof HTMLSelectElement) role.value = "cover";
+      for (const item of form.querySelectorAll("[data-cover-pick]")) {
+        if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
+      }
+      form.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   const activeFilmstripSlide = document.querySelector('.filmstrip-link[data-active="true"]');
   if (activeFilmstripSlide instanceof HTMLElement) {

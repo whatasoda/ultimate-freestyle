@@ -156,7 +156,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=53";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=54";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -397,6 +397,22 @@ function shell(title: string, body: string): string {
       .font-pick[data-font-pick="serif"] { font-family: Georgia, "Noto Serif JP", serif; }
       .font-pick[data-font-pick="monospace"] { font-family: "BIZ UDGothic", "SFMono-Regular", Consolas, monospace; }
       .font-pick[data-font-pick="display"] { font-family: "Arial Black", "Yu Gothic", sans-serif; font-weight: 850; }
+      .cover-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.6rem, 1fr)); gap: .45rem; }
+      .cover-pick { display: grid; gap: .35rem; min-height: 4.4rem; padding: .45rem; border: 1px solid var(--line); background: #0a111b; color: #cbd6e4; font-size: .68rem; }
+      .cover-pick[aria-pressed="true"] { border-color: #9d7bff; background: #8062df24; color: white; }
+      .cover-wire { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border: 1px solid #6b7c92; border-radius: .2rem; background: #162131; }
+      .cover-wire::before, .cover-wire::after { content: ""; position: absolute; border-radius: 99px; background: #dce6f3; }
+      .cover-wire::before { left: 18%; top: 38%; width: 64%; height: 12%; }
+      .cover-wire::after { left: 30%; top: 58%; width: 40%; height: 6%; background: #91ddff; }
+      .cover-pick[data-cover-pick="split"] .cover-wire { background: linear-gradient(90deg, #162131 50%, #26364b 50%); }
+      .cover-pick[data-cover-pick="split"] .cover-wire::before { left: 8%; width: 36%; }
+      .cover-pick[data-cover-pick="split"] .cover-wire::after { left: 57%; top: 30%; width: 30%; height: 36%; border-radius: .2rem; }
+      .cover-pick[data-cover-pick="poster"] .cover-wire::before { left: 7%; top: 22%; width: 75%; height: 22%; }
+      .cover-pick[data-cover-pick="poster"] .cover-wire::after { left: 7%; top: 52%; width: 52%; }
+      .cover-pick[data-cover-pick="minimal"] .cover-wire::before { left: 36%; top: 44%; width: 28%; height: 7%; }
+      .cover-pick[data-cover-pick="minimal"] .cover-wire::after { left: 42%; top: 57%; width: 16%; height: 4%; }
+      .cover-pick[data-cover-pick="statement"] .cover-wire::before { left: 9%; top: 30%; width: 82%; height: 25%; background: #91ddff; }
+      .cover-pick[data-cover-pick="statement"] .cover-wire::after { display: none; }
       .actions { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
       button:disabled { cursor: not-allowed; opacity: .55; }
       button[aria-busy="true"] { cursor: wait; }
@@ -1489,6 +1505,7 @@ export function slideWorkspacePage(options: {
     .join("");
   const visualPresetPicker = (selected: string) => `<div class="visual-picker" role="group" aria-label="見た目presetを選ぶ">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<button class="visual-pick" type="button" data-visual-pick="${value}" aria-pressed="${String(value === selected)}"><span class="visual-swatch" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const fontPresetPicker = (selected: string) => `<div class="font-picker" role="group" aria-label="本文と見出しのfontをまとめて選ぶ">${Object.entries(FONT_LABELS).map(([value, label]) => `<button class="font-pick" type="button" data-font-pick="${value}" aria-pressed="${String(value === selected)}"><span>最自由研究 Aa</span><small>${label}</small></button>`).join("")}</div>`;
+  const coverLayoutPicker = `<div class="cover-picker" role="group" aria-label="表紙レイアウトを選ぶ">${[["center", "中央"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言強調"]].map(([value, label]) => `<button class="cover-pick" type="button" data-cover-pick="${value}" aria-pressed="${String((slide.cover_layout ?? "center") === value)}"><span class="cover-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const templateCreator = `<details class="component-detail"${activeTemplate === undefined ? " open" : ""}><summary>編集できるtemplateを追加</summary><form class="editor" data-template-create data-versioned-form data-method="POST" action="${projectPath}/templates" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>template名<input name="name" maxlength="80" required value="自分のスタイル"></label><label>ID<input name="template_id" pattern="[a-z0-9][a-z0-9-]{0,63}" required value="style-${options.project.version}"></label><label>複製元（任意）<select name="source_template_id"><option value="">見た目presetから開始</option>${(deck.templates ?? []).map((template) => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join("")}</select></label><label>複製元なしの場合<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label></div><p class="inherit-note">複製元を選ぶと、そのtemplateの色、font、余白、animationを引き継ぎます。追加後に派生版だけを調整できます。</p><label class="check-label"><input type="checkbox" name="make_default" checked>発表全体の既定templateにする</label><div class="actions"><button type="submit">templateを追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
   const templateEditor = activeTemplate
     ? `<form class="editor" data-template-editor data-versioned-form action="${projectPath}/templates/${escapeHtml(activeTemplate.id)}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}">
@@ -1638,7 +1655,7 @@ export function slideWorkspacePage(options: {
                </form>
              </div></details>
              <details class="inspector-section" data-inspector-section="design"><summary>デザイン</summary><div class="inspector-body">
-               <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-preview-templates="${escapeHtml(JSON.stringify(appearancePreviewTemplates))}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>用途<select name="role"><option value="content"${slide.role !== "cover" ? " selected" : ""}>通常スライド</option><option value="cover"${slide.role === "cover" ? " selected" : ""}>表紙</option></select></label><label>表紙レイアウト<select name="cover_layout">${[["center", "中央タイトル"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言を強調"]].map(([value, label]) => `<option value="${value}"${(slide.cover_layout ?? "center") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div><div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
+               <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-preview-templates="${escapeHtml(JSON.stringify(appearancePreviewTemplates))}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>用途<select name="role"><option value="content"${slide.role !== "cover" ? " selected" : ""}>通常スライド</option><option value="cover"${slide.role === "cover" ? " selected" : ""}>表紙</option></select></label><label>表紙レイアウト<select name="cover_layout">${[["center", "中央タイトル"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言を強調"]].map(([value, label]) => `<option value="${value}"${(slide.cover_layout ?? "center") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div>${coverLayoutPicker}<div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
                ${typographyEditor}
                ${templateCreator}
                ${templateEditor}
