@@ -757,15 +757,48 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const altInput = uploadForm.querySelector('input[name="alt_text"]');
     const feedback = uploadForm.querySelector("[data-feedback]");
     const submit = uploadForm.querySelector('button[type="submit"]');
+    const preview = uploadForm.querySelector("[data-upload-preview]");
+    const previewImage = uploadForm.querySelector("[data-upload-preview-image]");
+    const previewName = uploadForm.querySelector("[data-upload-preview-name]");
+    const previewMeta = uploadForm.querySelector("[data-upload-preview-meta]");
+    const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    let previewObjectUrl;
+    const updateImagePreview = () => {
+      if (!(fileInput instanceof HTMLInputElement) || !(feedback instanceof HTMLElement)) return;
+      const file = fileInput.files?.[0];
+      if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+      previewObjectUrl = undefined;
+      if (!file) {
+        if (preview instanceof HTMLElement) preview.hidden = true;
+        fileInput.setCustomValidity("");
+        return;
+      }
+      const error = !acceptedImageTypes.has(file.type)
+        ? "JPEG、PNG、静止WebPのいずれかを選んでください。"
+        : file.size > 10 * 1024 * 1024
+          ? "画像は10MiB以下にしてください。"
+          : "";
+      fileInput.setCustomValidity(error);
+      feedback.textContent = error;
+      feedback.classList.toggle("warning", error !== "");
+      if (error) {
+        if (preview instanceof HTMLElement) preview.hidden = true;
+        return;
+      }
+      previewObjectUrl = URL.createObjectURL(file);
+      if (previewImage instanceof HTMLImageElement) previewImage.src = previewObjectUrl;
+      if (previewName instanceof HTMLElement) previewName.textContent = file.name;
+      if (previewMeta instanceof HTMLElement) previewMeta.textContent = (file.size / 1024 / 1024).toFixed(2) + " MiB · 保存時にWeb向けへ圧縮";
+      if (preview instanceof HTMLElement) preview.hidden = false;
+    };
+    if (fileInput instanceof HTMLInputElement) fileInput.addEventListener("change", updateImagePreview);
+    addEventListener("pagehide", () => { if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl); }, { once: true });
     uploadForm.addEventListener("submit", async (event) => {
       event.preventDefault();
       const file = fileInput instanceof HTMLInputElement ? fileInput.files?.[0] : null;
       if (!file || !(altInput instanceof HTMLInputElement) || !(feedback instanceof HTMLElement)) return;
-      if (file.size > 10 * 1024 * 1024) {
-        feedback.textContent = "画像は10MiB以下にしてください。";
-        return;
-      }
-      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      if (!acceptedImageTypes.has(file.type) || file.size > 10 * 1024 * 1024) return;
+      setButtonBusy(submit, true);
       feedback.textContent = "画像を圧縮して保存しています…";
       try {
         const url = new URL(uploadForm.action);
@@ -785,7 +818,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         location.reload();
       } catch (error) {
         feedback.textContent = error instanceof Error ? error.message : "画像を保存できませんでした。";
-        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+        feedback.classList.add("warning");
+        setButtonBusy(submit, false);
       }
     });
   }
@@ -794,7 +828,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(button instanceof HTMLButtonElement)) continue;
     button.addEventListener("click", async () => {
       if (!confirm("この画像を削除しますか？")) return;
-      button.disabled = true;
+      const originalLabel = button.textContent;
+      const feedback = button.parentElement?.querySelector("[data-delete-feedback]");
+      setButtonBusy(button, true);
+      button.textContent = "削除中…";
+      if (feedback instanceof HTMLElement) feedback.textContent = "画像を削除しています…";
       try {
         const response = await fetch(button.dataset.imageDelete || "", {
           method: "DELETE",
@@ -802,10 +840,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error?.message || "削除できませんでした。");
-        button.closest("[data-asset]")?.remove();
+        const asset = button.closest("[data-asset]");
+        if (feedback instanceof HTMLElement) feedback.textContent = "削除しました。";
+        asset?.remove();
       } catch (error) {
-        alert(error instanceof Error ? error.message : "削除できませんでした。");
-        button.disabled = false;
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = error instanceof Error ? error.message : "削除できませんでした。";
+          feedback.classList.add("warning");
+        }
+        button.textContent = originalLabel;
+        setButtonBusy(button, false);
       }
     });
   }

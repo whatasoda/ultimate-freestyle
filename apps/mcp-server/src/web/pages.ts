@@ -256,6 +256,11 @@ function shell(title: string, body: string): string {
       .upload { display: grid; gap: .8rem; margin-bottom: 1rem; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; background: #0c1724; }
       .upload label { display: grid; gap: .35rem; color: #c9d5e4; font-size: .9rem; }
       .upload input { width: 100%; padding: .65rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; }
+      .upload-preview { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: .8rem; align-items: center; padding: .7rem; border: 1px solid var(--line); border-radius: .7rem; background: #08111b; }
+      .upload-preview[hidden] { display: none; }
+      .upload-preview img { display: block; width: 7rem; aspect-ratio: 16 / 10; object-fit: contain; border-radius: .45rem; background: #05080d; }
+      .upload-preview p { margin: 0; color: #dce6f3; font-size: .82rem; overflow-wrap: anywhere; }
+      .upload-preview small { display: block; margin-top: .25rem; color: var(--muted); }
       .editor { display: grid; gap: 1rem; }
       .editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; }
       .editor label { display: grid; gap: .4rem; color: #c9d5e4; font-size: .9rem; }
@@ -574,7 +579,7 @@ export function projectDetailPage(options: {
   const assetCards = options.assets.length
     ? `<div class="asset-grid">${options.assets
         .map(
-          (asset) => `<article class="asset" data-asset><img src="${escapeHtml(asset.content_url)}" alt="${escapeHtml(asset.alt_text)}" loading="lazy"><div class="asset-body"><p>${escapeHtml(asset.alt_text || "装飾画像")}</p><p class="meta">${asset.width}×${asset.height} · ${Math.ceil(asset.byte_size / 1024)} KiB</p><button class="ghost" type="button" data-image-delete="/api/images/${escapeHtml(asset.asset_id)}" data-csrf="${escapeHtml(options.csrfToken)}">削除</button></div></article>`
+          (asset) => `<article class="asset" data-asset><img src="${escapeHtml(asset.content_url)}" alt="${escapeHtml(asset.alt_text)}" loading="lazy"><div class="asset-body"><p>${escapeHtml(asset.alt_text || "装飾画像")}</p><p class="meta">${asset.width}×${asset.height} · ${Math.ceil(asset.byte_size / 1024)} KiB</p><button class="ghost" type="button" data-image-delete="/api/images/${escapeHtml(asset.asset_id)}" data-csrf="${escapeHtml(options.csrfToken)}">削除</button><span class="feedback" data-delete-feedback aria-live="polite"></span></div></article>`
         )
         .join("")}</div>`
     : `<p class="prose">まだ画像がありません。</p>`;
@@ -786,8 +791,9 @@ export function projectDetailPage(options: {
              <section class="panel"><h2>研究画像</h2>
                <form class="upload" action="/api/projects/${escapeHtml(options.project.project_id)}/images" data-image-upload data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>画像ファイル<input type="file" accept="image/jpeg,image/png,image/webp" required></label>
-                 <label>画像の説明<input name="alt_text" maxlength="500" placeholder="写真や図が何を示しているか"></label>
-                 <div class="upload-actions"><button type="submit">画像を追加</button><span class="meta">JPEG / PNG / 静止WebP、10MiBまで</span></div>
+                 <div class="upload-preview" data-upload-preview hidden><img data-upload-preview-image alt="選択した画像の確認"><p><strong data-upload-preview-name></strong><small data-upload-preview-meta></small></p></div>
+                 <label>画像の説明<input name="alt_text" maxlength="500" placeholder="写真や図が何を示しているか"><small class="inherit-note">発表内容を伝える画像には説明を付けます。純粋な装飾なら空欄にできます。</small></label>
+                 <div class="upload-actions"><button type="submit">画像を追加</button><span class="meta">JPEG / PNG / 静止WebP、10MiBまで · 保存時にWeb向けへ圧縮</span></div>
                  <p class="feedback" data-feedback aria-live="polite"></p>
                </form>
                ${assetCards}

@@ -411,6 +411,9 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("VOICEVOX音声は 0 / 1 区間まで生成済みです");
     expect(detailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
+    expect(detailHtml).toContain("data-upload-preview");
+    expect(detailHtml).toContain("保存時にWeb向けへ圧縮");
+    expect(detailHtml).toContain("data-delete-feedback");
     expect(detailHtml).toContain("自由配置 1 block");
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
@@ -520,6 +523,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
     expect(dashboardScriptText).toContain("data-project-search-empty");
     expect(dashboardScriptText).toContain("filterProjects");
+    expect(dashboardScriptText).toContain("updateImagePreview");
+    expect(dashboardScriptText).toContain("URL.revokeObjectURL");
 
     const rejectedUpload = await requestProvider(
       provider,
