@@ -156,7 +156,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=46";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=47";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -353,6 +353,10 @@ function shell(title: string, body: string): string {
       .upload { display: grid; gap: .8rem; margin-bottom: 1rem; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; background: #0c1724; }
       .upload label { display: grid; gap: .35rem; color: #c9d5e4; font-size: .9rem; }
       .upload input { width: 100%; padding: .65rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; }
+      .upload-dropzone { padding: 1rem; border: 1px dashed #6b7f99; border-radius: .75rem; background: #08111b; text-align: center; transition: border-color .15s ease, background .15s ease; }
+      .upload-dropzone[data-drag-active="true"] { border-color: #91ddff; background: #123149; color: #e5f6ff; }
+      .upload-dropzone span { font-weight: 760; }
+      .upload-dropzone small { color: var(--muted); }
       .upload-preview { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: .8rem; align-items: center; padding: .7rem; border: 1px solid var(--line); border-radius: .7rem; background: #08111b; }
       .upload-preview[hidden] { display: none; }
       .upload-preview img { display: block; width: 7rem; aspect-ratio: 16 / 10; object-fit: contain; border-radius: .45rem; background: #05080d; }
@@ -1090,7 +1094,7 @@ export function projectDetailPage(options: {
              ${qualitySweepPanel}
              <section class="panel" id="research-images"><h2>研究画像</h2>
                <form class="upload" action="/api/projects/${escapeHtml(options.project.project_id)}/images" data-image-upload data-csrf="${escapeHtml(options.csrfToken)}">
-                 <label>画像ファイル<input type="file" accept="image/jpeg,image/png,image/webp" required></label>
+                 <label class="upload-dropzone" data-upload-dropzone><span>画像を選択、またはここへドロップ</span><small>JPEG / PNG / 静止WebP</small><input type="file" accept="image/jpeg,image/png,image/webp" required></label>
                  <div class="upload-preview" data-upload-preview hidden><img data-upload-preview-image alt="選択した画像の確認"><p><strong data-upload-preview-name></strong><small data-upload-preview-meta></small></p></div>
                  <label>画像の説明<input name="alt_text" maxlength="500" placeholder="写真や図が何を示しているか"><small class="inherit-note">発表内容を伝える画像には説明を付けます。純粋な装飾なら空欄にできます。</small></label>
                  <div class="upload-actions"><button type="submit">画像を追加</button><span class="meta">JPEG / PNG / 静止WebP、10MiB・40MP・一辺10000pxまで · 保存時に最大2560pxのWebPへ圧縮</span></div>

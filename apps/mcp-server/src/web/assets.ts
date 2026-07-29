@@ -1630,6 +1630,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const previewImage = uploadForm.querySelector("[data-upload-preview-image]");
     const previewName = uploadForm.querySelector("[data-upload-preview-name]");
     const previewMeta = uploadForm.querySelector("[data-upload-preview-meta]");
+    const dropzone = uploadForm.querySelector("[data-upload-dropzone]");
     const acceptedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
     let previewObjectUrl;
     const updateImagePreview = () => {
@@ -1691,6 +1692,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (preview instanceof HTMLElement) preview.hidden = false;
     };
     if (fileInput instanceof HTMLInputElement) fileInput.addEventListener("change", updateImagePreview);
+    if (dropzone instanceof HTMLElement && fileInput instanceof HTMLInputElement) {
+      for (const eventName of ["dragenter", "dragover"]) {
+        dropzone.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          if (event instanceof DragEvent && event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+          dropzone.dataset.dragActive = "true";
+        });
+      }
+      dropzone.addEventListener("dragleave", (event) => {
+        if (event.relatedTarget instanceof Node && dropzone.contains(event.relatedTarget)) return;
+        dropzone.dataset.dragActive = "false";
+      });
+      dropzone.addEventListener("drop", (event) => {
+        event.preventDefault();
+        dropzone.dataset.dragActive = "false";
+        const file = event.dataTransfer?.files?.[0];
+        if (!file) return;
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        fileInput.files = transfer.files;
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
     addEventListener("pagehide", () => { if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl); }, { once: true });
     uploadForm.addEventListener("submit", async (event) => {
       event.preventDefault();
