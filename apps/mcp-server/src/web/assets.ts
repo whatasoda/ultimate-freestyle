@@ -136,11 +136,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideEditor = document.querySelector("[data-slide-editor]");
   const typographyEditor = document.querySelector("[data-typography-editor]");
   const templateEditor = document.querySelector("[data-template-editor]");
+  const narrationSettingsEditor = document.querySelector("[data-narration-settings-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
   let draftFrameTimer;
   let draftTypographyTimer;
   let draftTemplateTimer;
+  let draftNarrationTimer;
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(slideEditor);
@@ -255,6 +257,49 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
   }
+  const syncNarrationDrafts = () => {
+    if (!(slideFrame instanceof HTMLIFrameElement)) return;
+    if (narrationSettingsEditor instanceof HTMLFormElement) {
+      const data = new FormData(narrationSettingsEditor);
+      slideFrame.contentWindow?.postMessage({
+        type: "ultimate-freestyle:preview-narration-settings",
+        slide_id: narrationSettingsEditor.dataset.slideId || "",
+        display: String(data.get("display") || "commentary"),
+        speaker: String(data.get("speaker") || ""),
+        appearance: {
+          placement: String(data.get("placement") || "bottom"),
+          size: String(data.get("size") || "normal"),
+          text_align: String(data.get("text_align") || "start"),
+          speaker_visible: data.has("speaker_visible"),
+          progress_visible: data.has("progress_visible"),
+          text_scale: Number(data.get("text_scale")),
+          max_lines: Number(data.get("max_lines"))
+        }
+      }, location.origin);
+    }
+    for (const form of document.querySelectorAll("[data-segment-editor]")) {
+      if (!(form instanceof HTMLFormElement)) continue;
+      const data = new FormData(form);
+      slideFrame.contentWindow?.postMessage({
+        type: "ultimate-freestyle:preview-narration-segment",
+        slide_id: form.dataset.slideId || "",
+        at: Number(form.dataset.segmentAt || 0),
+        text: String(data.get("text") || ""),
+        speaker: String(data.get("speaker") || "")
+      }, location.origin);
+    }
+  };
+  const scheduleNarrationDraft = () => {
+    clearTimeout(draftNarrationTimer);
+    draftNarrationTimer = setTimeout(syncNarrationDrafts, 120);
+    const layoutStatus = document.querySelector("[data-layout-status]");
+    if (layoutStatus instanceof HTMLElement) {
+      layoutStatus.textContent = "読み上げ枠をプレビューへ反映しています…";
+      layoutStatus.dataset.level = "";
+    }
+  };
+  narrationSettingsEditor?.addEventListener("input", scheduleNarrationDraft);
+  for (const form of document.querySelectorAll("[data-segment-editor]")) form.addEventListener("input", scheduleNarrationDraft);
   const setFrameLoading = (loading) => {
     if (frameLoading instanceof HTMLElement) frameLoading.hidden = !loading;
   };
@@ -494,6 +539,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         slide: Number(new URL(slideFrame.src).searchParams.get("slide") || 1),
         step: currentStep
       }, location.origin);
+      syncNarrationDrafts();
       for (const button of stepButtons) {
         if (!(button instanceof HTMLButtonElement)) continue;
         button.disabled =
@@ -528,6 +574,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncSlideDraft();
       syncTypographyDraft();
       syncTemplateDraft();
+      syncNarrationDrafts();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");

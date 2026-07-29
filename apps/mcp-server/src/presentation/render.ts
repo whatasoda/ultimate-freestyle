@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@23";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@24";
 
 function escapeHtml(value: string): string {
   return value
@@ -1242,6 +1242,61 @@ export function renderPresentationHtml(
       currentSlide.style.removeProperty('animation');
       scheduleFit();
     };
+    const previewNarrationSettings = (data) => {
+      const currentSlide = slides[slide];
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id || !data.appearance) return;
+      const region = currentSlide.querySelector('.narration');
+      if (!(region instanceof HTMLElement)) return;
+      region.dataset.display = String(data.display);
+      region.dataset.placement = String(data.appearance.placement);
+      region.dataset.size = String(data.appearance.size);
+      region.dataset.textAlign = String(data.appearance.text_align);
+      region.dataset.speakerVisible = String(data.appearance.speaker_visible);
+      region.dataset.progressVisible = String(data.appearance.progress_visible);
+      region.style.setProperty('--narration-text-scale', String(data.appearance.text_scale));
+      region.style.setProperty('--narration-max-lines', String(data.appearance.max_lines));
+      const speaker = region.querySelector('.narration-speaker');
+      const speakerText = String(data.speaker || DECK.slides[slide].narration?.speaker || '');
+      if (speaker instanceof HTMLElement) { speaker.textContent = speakerText; speaker.hidden = speakerText === ''; }
+      const track = region.querySelector('.narration-track');
+      if (track instanceof HTMLElement) {
+        track.replaceChildren();
+        if (data.display === 'inline') {
+          for (const segment of DECK.slides[slide].narration?.segments || []) {
+            const item = document.createElement('span');
+            item.className = 'narration-segment';
+            item.dataset.narrationAt = String(segment.at);
+            item.textContent = segment.text;
+            if (segment.at === step) { item.classList.add('is-current'); item.setAttribute('aria-current', 'true'); }
+            track.append(item);
+          }
+        } else {
+          const item = document.createElement('p');
+          item.className = 'narration-text';
+          item.textContent = narration()?.text || '';
+          track.append(item);
+        }
+      }
+      region.dataset.active = String(data.display === 'inline' || Boolean(narration()));
+      scheduleFit();
+    };
+    const previewNarrationSegment = (data) => {
+      const currentSlide = slides[slide];
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return;
+      const region = currentSlide.querySelector('.narration');
+      if (!(region instanceof HTMLElement)) return;
+      if (region.dataset.display === 'inline') {
+        const item = region.querySelector('[data-narration-at="' + Number(data.at) + '"]');
+        if (item instanceof HTMLElement) item.textContent = String(data.text || '');
+      } else if (Number(data.at) === step) {
+        const item = region.querySelector('.narration-text');
+        if (item instanceof HTMLElement) item.textContent = String(data.text || '');
+        const speaker = region.querySelector('.narration-speaker');
+        const speakerText = String(data.speaker || DECK.slides[slide].narration?.speaker || '');
+        if (speaker instanceof HTMLElement) { speaker.textContent = speakerText; speaker.hidden = speakerText === ''; }
+      }
+      scheduleFit();
+    };
     const setPosition = (nextSlide, nextStep, push) => {
       slide = clamp(Number(nextSlide) - 1, 0, slides.length - 1);
       step = clamp(Number(nextStep), 0, DECK.slides[slide].revealSteps);
@@ -1396,6 +1451,8 @@ export function renderPresentationHtml(
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-template') previewTemplate(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-narration-settings') previewNarrationSettings(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-narration-segment') previewNarrationSegment(event.data);
     });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
