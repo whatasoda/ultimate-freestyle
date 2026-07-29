@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@22";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@23";
 
 function escapeHtml(value: string): string {
   return value
@@ -27,17 +27,27 @@ function renderTextBlocks(markdown: string): string {
   const lines = markdown.split(/\r?\n/);
   const blocks: string[] = [];
   let list: string[] = [];
+  let listTag: "ul" | "ol" = "ul";
 
   const flushList = () => {
     if (list.length === 0) return;
-    blocks.push(`<ul>${list.map((item) => `<li>${item}</li>`).join("")}</ul>`);
+    blocks.push(`<${listTag}>${list.map((item) => `<li>${item}</li>`).join("")}</${listTag}>`);
     list = [];
   };
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (trimmed.startsWith("- ")) {
+      if (list.length > 0 && listTag !== "ul") flushList();
+      listTag = "ul";
       list.push(renderInlineText(trimmed.slice(2)));
+      continue;
+    }
+    const orderedItem = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (orderedItem?.[1] !== undefined) {
+      if (list.length > 0 && listTag !== "ol") flushList();
+      listTag = "ol";
+      list.push(renderInlineText(orderedItem[1]));
       continue;
     }
     flushList();
@@ -1134,13 +1144,25 @@ export function renderPresentationHtml(
     const renderDraftMarkdown = (target, markdown) => {
       target.replaceChildren();
       let list = null;
+      let listTag = '';
       const flushList = () => { if (list) { target.append(list); list = null; } };
       for (const source of String(markdown).split(String.fromCharCode(10))) {
         const line = source.trim();
         if (line.startsWith('- ')) {
-          if (!list) list = document.createElement('ul');
+          if (list && listTag !== 'ul') flushList();
+          if (!list) { list = document.createElement('ul'); listTag = 'ul'; }
           const item = document.createElement('li');
           appendDraftInline(item, line.slice(2));
+          list.append(item);
+          continue;
+        }
+        const markerEnd = line.indexOf('. ');
+        const ordered = markerEnd > 0 && Number.isInteger(Number(line.slice(0, markerEnd)));
+        if (ordered) {
+          if (list && listTag !== 'ol') flushList();
+          if (!list) { list = document.createElement('ol'); listTag = 'ol'; }
+          const item = document.createElement('li');
+          appendDraftInline(item, line.slice(markerEnd + 2));
           list.append(item);
           continue;
         }

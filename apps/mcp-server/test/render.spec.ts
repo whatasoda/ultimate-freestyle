@@ -116,7 +116,7 @@ describe("presentation artifact renderer", () => {
                 text_align: "start",
                 vertical_align: "start"
               },
-              content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A",
+              content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A\n1. 手順A\n2. 手順B",
               reveal_blocks: [
                 { at: 1, markdown: "追加で見せる証拠" }
               ],
@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@22");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@23");
     expect(html).toContain('title="実経過時間 / 現在位置の目安 / 想定合計時間"');
     expect(html).toContain('class="time-total"> / 全01:00</span>');
     expect(html).toContain("const expectedElapsed = () =>");
@@ -207,6 +207,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("previousButton.disabled = !started || (slide === 0 && step === 0)");
     expect(html).toContain("setSecondaryProgressLabel('自動送りまで')");
     expect(html).toContain("(performance.now() - begin) / delay * 100");
+    expect(html).toContain("<ol><li>手順A</li><li>手順B</li></ol>");
+    expect(html).toContain("document.createElement('ol')");
     expect(html).toContain("発表はここまでです");
     expect(html).toContain("data-restart");
     expect(html).toContain("else { showCompletion(); return false; }");
