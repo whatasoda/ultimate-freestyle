@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@37";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@38";
 
 function escapeHtml(value: string): string {
   return value
@@ -1716,7 +1716,9 @@ export function renderPresentationHtml(
       if (event.key === 'Escape' && hideCompletion()) { event.preventDefault(); return; }
       if (shortcuts instanceof HTMLElement && !shortcuts.hidden) return;
       const target = event.target;
-      if (target instanceof Element && target.closest('button, a, input, select, textarea')) return;
+      const interactive = target instanceof Element ? target.closest('button, a, input, select, textarea') : null;
+      if (interactive instanceof HTMLInputElement || interactive instanceof HTMLSelectElement || interactive instanceof HTMLTextAreaElement) return;
+      if (interactive instanceof HTMLElement && [' ', 'Enter'].includes(event.key)) return;
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); }
       else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(event.key)) { event.preventDefault(); document.querySelector('#prev').click(); }
       else if (event.key === 'Home') { event.preventDefault(); slide = 0; step = 0; syncUrl(); render(); }
