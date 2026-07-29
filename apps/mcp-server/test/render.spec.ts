@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@46");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@47");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -200,6 +200,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain(">自動 OFF</button>");
     expect(html).toContain("grid-template-columns: repeat(3, minmax(44px, auto))");
     expect(html).toContain("@media (max-width: 430px)");
+    expect(html).toContain(".time-part:nth-child(3)");
     expect(html).toContain(".controls button { width: 100%; min-width: 0;");
     expect(html).toContain("min-height: 42px");
     expect(html).toContain("data-voice-unlock");

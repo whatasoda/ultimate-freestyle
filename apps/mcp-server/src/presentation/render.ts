@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@46";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@47";
 
 function escapeHtml(value: string): string {
   return value
@@ -921,7 +921,7 @@ export function renderPresentationHtml(
       .time-label { display: none; }
       .time-total { display: none; }
       header strong { max-width: 35%; }
-      .time-part:nth-of-type(2), .time > span[aria-hidden] { display: none; }
+      .time-part:nth-child(3), .time > span[aria-hidden] { display: none; }
       .pace { display: none; }
       header .meta, .voice-credit { display: none; }
       footer { display: grid; grid-template-columns: auto minmax(3rem, 1fr) auto; gap: 6px 8px; min-height: 76px; }
