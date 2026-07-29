@@ -320,6 +320,12 @@ export function registerProjectTools(
             title: result.project.document.title,
             stage: result.project.document.stage,
             version: result.project.version,
+            has_presentation: result.project.document.deck !== null,
+            slide_count: result.project.document.deck?.slides.length ?? 0,
+            total_duration_seconds: result.project.document.deck?.slides.reduce(
+              (total, slide) => total + slide.duration_seconds,
+              0
+            ) ?? 0,
             created_at: result.project.created_at,
             updated_at: result.project.updated_at
           },

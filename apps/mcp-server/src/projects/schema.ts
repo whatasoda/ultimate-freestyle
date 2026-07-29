@@ -822,6 +822,9 @@ export const projectSummarySchema = z.object({
   title: z.string(),
   stage: projectStageSchema,
   version: z.number().int().positive(),
+  has_presentation: z.boolean(),
+  slide_count: z.number().int().nonnegative(),
+  total_duration_seconds: z.number().int().nonnegative(),
   created_at: z.string().datetime(),
   updated_at: z.string().datetime()
 });

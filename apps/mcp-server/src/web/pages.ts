@@ -725,6 +725,7 @@ export function dashboardPage(options: {
       (project) => `<a class="card-link" data-project-card data-search-text="${escapeHtml(`${project.title} ${STAGE_LABELS[project.stage]}`.toLocaleLowerCase("ja"))}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
         <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
+        <p class="meta">${project.has_presentation ? `発表 ${project.slide_count}枚 · ${formatDuration(project.total_duration_seconds)}` : "発表は未構成"}</p>
         <p class="meta">最終更新 ${escapeHtml(formatDate(project.updated_at))}</p>
       </article></a>`
     )

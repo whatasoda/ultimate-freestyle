@@ -124,7 +124,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.13.0",
+        version: "0.14.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -395,7 +395,10 @@ describe("MCP contract", () => {
             project_id: firstProject.project_id,
             title: "記憶と泥団子の研究",
             stage: "design",
-            version: 2
+            version: 2,
+            has_presentation: false,
+            slide_count: 0,
+            total_duration_seconds: 0
           }
         ]
       });

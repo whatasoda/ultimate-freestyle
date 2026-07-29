@@ -60,20 +60,33 @@ export async function listProjects(
 ): Promise<ProjectSummary[]> {
   const result = await db
     .prepare(
-      `SELECT id, title, stage, version, created_at, updated_at
+      `SELECT id, title, stage, version, created_at, updated_at,
+              CASE WHEN json_type(document_json, '$.deck') = 'object' THEN 1 ELSE 0 END AS has_presentation,
+              COALESCE(json_array_length(document_json, '$.deck.slides'), 0) AS slide_count,
+              COALESCE((
+                SELECT SUM(CAST(json_extract(slide.value, '$.duration_seconds') AS INTEGER))
+                FROM json_each(research_projects.document_json, '$.deck.slides') AS slide
+              ), 0) AS total_duration_seconds
        FROM research_projects
        WHERE owner_user_id = ?
        ORDER BY updated_at DESC
        LIMIT ?`
     )
     .bind(ownerUserId, MAX_PROJECTS_PER_USER)
-    .all<Omit<ProjectRow, "document_json">>();
+    .all<Omit<ProjectRow, "document_json"> & {
+      has_presentation: number;
+      slide_count: number;
+      total_duration_seconds: number;
+    }>();
 
   return result.results.map((row) => ({
     project_id: row.id,
     title: row.title,
     stage: projectDocumentSchema.shape.stage.parse(row.stage),
     version: row.version,
+    has_presentation: row.has_presentation === 1,
+    slide_count: row.slide_count,
+    total_duration_seconds: row.total_duration_seconds,
     created_at: row.created_at,
     updated_at: row.updated_at
   }));
