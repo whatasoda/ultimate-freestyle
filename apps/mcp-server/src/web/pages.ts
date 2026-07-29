@@ -156,7 +156,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=49";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=50";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -525,6 +525,7 @@ function shell(title: string, body: string): string {
       .voice-filter { display: flex; flex-wrap: wrap; gap: .45rem; }
       .voice-filter button { min-height: 2.2rem; padding: .45rem .7rem; font-size: .78rem; }
       .voice-filter button[aria-pressed="true"] { border-color: #9d7bff; background: #8062df30; color: white; }
+      .voice-search { width: 100%; min-height: 2.55rem; padding: .55rem .7rem; border: 1px solid var(--line); border-radius: .6rem; background: #0a111b; color: var(--ink); font: inherit; }
       .voice-review { overflow: hidden; border: 1px solid var(--line); border-radius: .75rem; background: #08111b77; }
       .voice-review > summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .8rem; cursor: pointer; }
       .voice-review > summary::marker { color: var(--accent); }
@@ -1259,7 +1260,7 @@ export function voiceFinishPage(options: {
           const statusLabel =
             VOICE_SEGMENT_STATUS_LABELS[segment.status] ?? segment.status;
           const generated = segment.audio_url !== null;
-          return `<details class="voice-review"${index === (attentionSegmentIndex === -1 ? 0 : attentionSegmentIndex) ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}">
+          return `<details class="voice-review"${index === (attentionSegmentIndex === -1 ? 0 : attentionSegmentIndex) ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}">
             <summary><span class="component-step">${String(index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
             <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
           </details>`;
@@ -1288,7 +1289,7 @@ export function voiceFinishPage(options: {
                <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.total === 0 ? "読み上げ原稿がありません" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.total === 0 ? "各スライドへ読み上げ原稿を追加すると生成できます。" : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : "生成中もこの画面を閉じて構いません。"}</p>
                ${voiceJobCard(currentJob)}
              </section>
-             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-filter" aria-label="区間の絞り込み"><button class="ghost" type="button" data-voice-filter="all" aria-pressed="true">すべて ${summary.total}</button><button class="ghost" type="button" data-voice-filter="needs_generation" aria-pressed="false">要生成 ${summary.needs_generation}</button><button class="ghost" type="button" data-voice-filter="ready" aria-pressed="false">生成済み ${summary.ready}</button><button class="ghost" type="button" data-voice-filter="failed" aria-pressed="false">失敗 ${summary.failed}</button></div><p class="search-empty" data-voice-filter-empty hidden>この条件に一致する読み上げ区間はありません。</p><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
+             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-filter" aria-label="区間の絞り込み"><input class="voice-search" type="search" data-voice-search placeholder="スライド名・原稿・声を検索" autocomplete="off"><button class="ghost" type="button" data-voice-filter="all" aria-pressed="true">すべて ${summary.total}</button><button class="ghost" type="button" data-voice-filter="needs_generation" aria-pressed="false">要生成 ${summary.needs_generation}</button><button class="ghost" type="button" data-voice-filter="ready" aria-pressed="false">生成済み ${summary.ready}</button><button class="ghost" type="button" data-voice-filter="failed" aria-pressed="false">失敗 ${summary.failed}</button></div><p class="search-empty" data-voice-filter-empty hidden>この条件に一致する読み上げ区間はありません。</p><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
            </div>
            <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>必要な区間だけVOICEVOXを生成</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">音声生成は任意です。未生成区間はブラウザ音声で代替してプレビューできます。</p></aside>
          </div>

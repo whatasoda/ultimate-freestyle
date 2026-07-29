@@ -1514,26 +1514,36 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
     }
     const segmentFilters = [...voicePage.querySelectorAll("[data-voice-filter]")];
+    const voiceSearch = voicePage.querySelector("[data-voice-search]");
     const voiceFilterEmpty = voicePage.querySelector("[data-voice-filter-empty]");
+    let activeVoiceFilter = "all";
+    const filterVoiceSegments = () => {
+      const query = voiceSearch instanceof HTMLInputElement
+        ? voiceSearch.value.trim().toLocaleLowerCase("ja")
+        : "";
+      let visible = 0;
+      for (const segment of voicePage.querySelectorAll("[data-voice-segment]")) {
+        if (!(segment instanceof HTMLElement)) continue;
+        const state = segment.dataset.state || "";
+        const matchesState = activeVoiceFilter === "all" || state === activeVoiceFilter ||
+          (activeVoiceFilter === "needs_generation" && ["queued", "running", "generating"].includes(state));
+        const matchesText = query === "" || (segment.dataset.searchText || "").includes(query);
+        segment.hidden = !(matchesState && matchesText);
+        if (!segment.hidden) visible += 1;
+      }
+      if (voiceFilterEmpty instanceof HTMLElement) voiceFilterEmpty.hidden = visible > 0;
+    };
     for (const filterButton of segmentFilters) {
       if (!(filterButton instanceof HTMLButtonElement)) continue;
       filterButton.addEventListener("click", () => {
-        const filter = filterButton.dataset.voiceFilter || "all";
+        activeVoiceFilter = filterButton.dataset.voiceFilter || "all";
         for (const button of segmentFilters) {
           if (button instanceof HTMLButtonElement) button.setAttribute("aria-pressed", String(button === filterButton));
         }
-        let visible = 0;
-        for (const segment of voicePage.querySelectorAll("[data-voice-segment]")) {
-          if (!(segment instanceof HTMLElement)) continue;
-          const state = segment.dataset.state || "";
-          const matches = filter === "all" || state === filter ||
-            (filter === "needs_generation" && ["queued", "running", "generating"].includes(state));
-          segment.hidden = !matches;
-          if (matches) visible += 1;
-        }
-        if (voiceFilterEmpty instanceof HTMLElement) voiceFilterEmpty.hidden = visible > 0;
+        filterVoiceSegments();
       });
     }
+    if (voiceSearch instanceof HTMLInputElement) voiceSearch.addEventListener("input", filterVoiceSegments);
     addEventListener("pagehide", () => stopPreview(), { once: true });
   }
 
