@@ -690,6 +690,46 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");
     const qualityList = document.querySelector("[data-quality-list]");
+    const diagnosticTarget = (id) => {
+      let sectionName = "structure";
+      let target = null;
+      if (id.startsWith("node:")) {
+        const componentId = id.slice(5);
+        target = [...document.querySelectorAll("[data-scene-component-editor]")].find((form) => form instanceof HTMLFormElement && form.dataset.componentId === componentId) || null;
+      } else if (id === "flow:main" || id === "flow:sidebar") {
+        sectionName = "content";
+        target = document.querySelector("[data-slide-editor]");
+      } else if (id === "narration") {
+        sectionName = "narration";
+        target = document.querySelector("[data-narration-settings-editor]");
+      }
+      const section = document.querySelector('[data-inspector-section="' + sectionName + '"]');
+      return { section, target: target || section };
+    };
+    const appendDiagnostic = (item, message) => {
+      if (!(qualityList instanceof HTMLElement)) return;
+      const row = document.createElement("li");
+      row.dataset.layoutWarning = "true";
+      row.append(document.createTextNode(message));
+      const { section, target } = diagnosticTarget(item.id);
+      if (section instanceof HTMLDetailsElement && target instanceof HTMLElement) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "ghost";
+        button.dataset.diagnosticFix = "true";
+        button.textContent = "修正欄へ";
+        button.addEventListener("click", () => {
+          section.open = true;
+          const componentDetail = target.closest("details.component-detail");
+          if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
+          target.scrollIntoView({ block: "center", behavior: "smooth" });
+          const field = target.querySelector("textarea, input, select");
+          if (field instanceof HTMLElement) field.focus({ preventScroll: true });
+        });
+        row.append(button);
+      }
+      qualityList.append(row);
+    };
     addEventListener("message", (event) => {
       if (event.origin !== location.origin || event.source !== slideFrame.contentWindow) return;
       const data = event.data;
@@ -709,16 +749,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (qualityList instanceof HTMLElement) {
         qualityList.querySelectorAll("[data-layout-warning]").forEach((item) => item.remove());
         for (const item of overflows) {
-          const row = document.createElement("li");
-          row.dataset.layoutWarning = "true";
-          row.textContent = item.region + "「" + item.id + "」が横" + Math.ceil(item.overflow_x) + "px・縦" + Math.ceil(item.overflow_y) + "px超過しています。";
-          qualityList.append(row);
+          appendDiagnostic(item, item.region + "「" + item.id + "」が横" + Math.ceil(item.overflow_x) + "px・縦" + Math.ceil(item.overflow_y) + "px超過しています。");
         }
         for (const item of compressed) {
-          const row = document.createElement("li");
-          row.dataset.layoutWarning = "true";
-          row.textContent = item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。";
-          qualityList.append(row);
+          appendDiagnostic(item, item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。");
         }
       }
       if (qualitySummary instanceof HTMLElement) {

@@ -116,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=31";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=32";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -410,6 +410,8 @@ function shell(title: string, body: string): string {
       .quality-status { display: flex; align-items: center; gap: .6rem; margin: 0; padding: .75rem; border: 1px solid #35506a; border-radius: .7rem; background: #0a1b29; color: #bfe6f7; font-size: .84rem; line-height: 1.55; }
       .quality-status[data-level="warning"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
       .quality-list { display: grid; gap: .45rem; margin: 0; padding-left: 1.2rem; color: #bdc9d8; font-size: .8rem; line-height: 1.55; }
+      .quality-list [data-layout-warning] { padding-right: .25rem; }
+      .quality-list [data-diagnostic-fix] { min-height: 1.9rem; margin-left: .5rem; padding: .25rem .5rem; font-size: .72rem; }
       .swatches { display: flex; gap: .35rem; }
       .swatch { width: 1.2rem; height: 1.2rem; border: 1px solid #ffffff55; border-radius: .3rem; background: var(--swatch); }
       [data-dirty="true"] button[type="submit"]::after { content: " · 未保存"; }
@@ -1208,7 +1210,7 @@ export function slideWorkspacePage(options: {
               ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(String(field.value ?? ""))}</textarea></label>`
               : `<label>${field.label}<input ${attributes}${field.number === undefined ? "" : ` type="number" min="${field.number.min}" max="${field.number.max}" step="${field.number.step ?? 1}"`} value="${escapeHtml(String(field.value ?? ""))}"></label>`;
           }).join("");
-          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の文言</summary><form class="editor" data-scene-component-editor data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}<div class="actions"><button type="submit">このcomponentを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の文言</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}<div class="actions"><button type="submit">このcomponentを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
         .filter(Boolean)
         .join("")
