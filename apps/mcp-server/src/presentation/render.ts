@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@28";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@29";
 
 function escapeHtml(value: string): string {
   return value
@@ -574,6 +574,7 @@ export function renderPresentationHtml(
     header, footer { display: flex; align-items: center; gap: 12px; min-height: 36px; color: #a9b5c7; }
     header strong { min-width: 0; overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
     header .time { display: flex; gap: .45em; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .timer-toggle { min-height: 28px; padding: .3em .65em; border-radius: 999px; color: #dce5f2; font-size: 11px; white-space: nowrap; }
     .time-part { display: inline-flex; gap: .2em; }
     .time-label { color: #718096; font-size: .78em; }
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
@@ -875,7 +876,7 @@ export function renderPresentationHtml(
 </head>
 <body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
-    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在位置の目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span></header>
+    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在位置の目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
     <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}">
       <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
         <div class="prelude-inner">
@@ -924,6 +925,7 @@ export function renderPresentationHtml(
     const volumeValue = document.querySelector('#volume-value');
     const speechButton = document.querySelector('#speech');
     const autoButton = document.querySelector('#auto');
+    const timerButton = document.querySelector('#timer-toggle');
     const previousButton = document.querySelector('#prev');
     const nextButton = document.querySelector('#next');
     const prelude = document.querySelector('[data-prelude]');
@@ -939,7 +941,7 @@ export function renderPresentationHtml(
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -958,11 +960,27 @@ export function renderPresentationHtml(
       return previous + current.durationSeconds * fraction;
     };
     const narration = () => DECK.slides[slide].narration?.segments.find((item) => item.at === step) ?? null;
+    const updateElapsed = () => {
+      const milliseconds = elapsedAccumulated + (timerRunning ? Date.now() - startedAt : 0);
+      elapsed.textContent = format(milliseconds / 1000);
+    };
+    const setTimerRunning = (running) => {
+      if (running === timerRunning) return;
+      if (!running && timerRunning && started) elapsedAccumulated += Date.now() - startedAt;
+      if (running) startedAt = Date.now();
+      timerRunning = running;
+      if (timerButton instanceof HTMLButtonElement) {
+        timerButton.setAttribute('aria-pressed', String(timerRunning));
+        timerButton.textContent = '時間計測 ' + (timerRunning ? 'ON' : '停止中');
+      }
+      updateElapsed();
+    };
     const updateControls = () => {
       if (previousButton instanceof HTMLButtonElement) previousButton.disabled = !started || (slide === 0 && step === 0);
       if (nextButton instanceof HTMLButtonElement) nextButton.disabled = !started;
       if (speechButton instanceof HTMLButtonElement) speechButton.disabled = !started;
       if (autoButton instanceof HTMLButtonElement) autoButton.disabled = !started;
+      if (timerButton instanceof HTMLButtonElement) timerButton.disabled = !started;
     };
     const syncUrl = () => history.pushState(null, '', '?slide=' + (slide + 1) + '&step=' + step);
     const setVoiceProgress = (percent) => {
@@ -1001,6 +1019,7 @@ export function renderPresentationHtml(
       autoButton.setAttribute('aria-pressed', 'false');
       autoButton.textContent = '自動 OFF';
       if (nextButton instanceof HTMLButtonElement) nextButton.disabled = true;
+      setTimerRunning(false);
       completion.hidden = false;
       if (restartButton instanceof HTMLButtonElement) restartButton.focus();
     };
@@ -1397,6 +1416,8 @@ export function renderPresentationHtml(
     const showPrelude = (push) => {
       if (!DECK.loadingScreen.enabled || editorFrame) return false;
       started = false;
+      elapsedAccumulated = 0;
+      setTimerRunning(false);
       stopVoice();
       hideVoiceUnlock();
       prelude.hidden = false;
@@ -1442,6 +1463,7 @@ export function renderPresentationHtml(
       const query = new URLSearchParams(location.search);
       if ((query.get('slide') === null || query.get('slide') === '0') && showPrelude(false)) return;
       started = true;
+      if (!timerRunning) setTimerRunning(true);
       prelude.hidden = true;
       slide = Math.min(Math.max(Number(query.get('slide') ?? 1) - 1, 0), slides.length - 1);
       step = Math.min(Math.max(Number(query.get('step') ?? 0), 0), DECK.slides[slide].revealSteps);
@@ -1508,6 +1530,7 @@ export function renderPresentationHtml(
       else if (!activeAudio && (!('speechSynthesis' in window) || !speechSynthesis.speaking)) scheduleAutoAdvance();
     });
     volume.addEventListener('input', () => { showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
+    timerButton?.addEventListener('click', () => { if (started) setTimerRunning(!timerRunning); });
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
     showVolume();
     addEventListener('keydown', (event) => {
@@ -1521,6 +1544,7 @@ export function renderPresentationHtml(
       else if (event.key === 'End') { event.preventDefault(); slide = slides.length - 1; step = DECK.slides[slide].revealSteps; syncUrl(); render(); }
       else if (event.key.toLowerCase() === 'm') { event.preventDefault(); speechButton.click(); }
       else if (event.key.toLowerCase() === 'a') { event.preventDefault(); autoButton.click(); }
+      else if (event.key.toLowerCase() === 't') { event.preventDefault(); timerButton.click(); }
     });
     stage?.addEventListener('click', (event) => {
       if (!started || editorFrame || getSelection()?.toString()) return;
@@ -1530,7 +1554,9 @@ export function renderPresentationHtml(
     });
     voiceUnlock?.addEventListener('click', () => { if (started) speak(); });
     restartButton?.addEventListener('click', () => {
-      startedAt = Date.now();
+      elapsedAccumulated = 0;
+      if (!timerRunning) setTimerRunning(true);
+      else startedAt = Date.now();
       slide = 0;
       step = 0;
       syncUrl();
@@ -1557,13 +1583,15 @@ export function renderPresentationHtml(
     preludeStart?.addEventListener('click', () => {
       started = true;
       prelude.hidden = true;
-      startedAt = Date.now();
+      elapsedAccumulated = 0;
+      if (!timerRunning) setTimerRunning(true);
+      else startedAt = Date.now();
       history.pushState(null, '', '?slide=1&step=0');
       slide = 0;
       step = 0;
       render();
     });
-    setInterval(() => { if (started) elapsed.textContent = format((Date.now() - startedAt) / 1000); }, 250);
+    setInterval(() => { if (started) updateElapsed(); }, 250);
     preparePrelude();
     restore();
   })();</script>
