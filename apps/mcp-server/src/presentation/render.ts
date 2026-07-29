@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@11";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@12";
 
 function escapeHtml(value: string): string {
   return value
@@ -838,6 +838,7 @@ export function renderPresentationHtml(
     button:focus-visible, input:focus-visible { outline: .18rem solid color-mix(in srgb, var(--accent) 70%, white); outline-offset: .15rem; }
     label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
     input[type="range"] { width: 80px; accent-color: var(--accent); }
+    .volume-value { min-width: 3.2em; color: #dce5f2; font-variant-numeric: tabular-nums; text-align: end; }
     @media (max-width: 680px) {
       .app { gap: 6px; padding: 6px; }
       header { gap: 7px; min-height: 30px; font-size: 12px; }
@@ -892,7 +893,7 @@ export function renderPresentationHtml(
         <button id="prev" aria-label="前へ">←</button><button id="next" aria-label="次へ">→</button>
         <button id="speech" aria-pressed="true" title="ページ移動時の自動読み上げ">音声 ON</button>
         <button id="auto" aria-pressed="false" title="読み上げ後、または想定時間後に自動で進む">自動 OFF</button>
-        <label>音量 <input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+        <label>音量 <input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-describedby="volume-value"><output class="volume-value" id="volume-value" for="volume">100%</output></label>
       </div>
     </footer>
   </main>
@@ -908,6 +909,7 @@ export function renderPresentationHtml(
     const elapsed = document.querySelector('#elapsed');
     const expected = document.querySelector('#expected');
     const volume = document.querySelector('#volume');
+    const volumeValue = document.querySelector('#volume-value');
     const speechButton = document.querySelector('#speech');
     const autoButton = document.querySelector('#auto');
     const prelude = document.querySelector('[data-prelude]');
@@ -926,6 +928,13 @@ export function renderPresentationHtml(
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
+    const normalizeVolume = (value) => Number.isFinite(Number(value)) ? clamp(Number(value), 0, 1) : 1;
+    const showVolume = () => {
+      const value = normalizeVolume(volume.value);
+      volume.value = String(value);
+      if (volumeValue instanceof HTMLOutputElement) volumeValue.value = Math.round(value * 100) + '%';
+      if (activeAudio) activeAudio.volume = value;
+    };
     const currentUnit = () => DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.revealSteps + 1, 0) + step + 1;
     const expectedElapsed = () => {
       const previous = DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.durationSeconds, 0);
@@ -1174,8 +1183,9 @@ export function renderPresentationHtml(
       if (!auto) clearTimeout(autoTimer);
       else if (!activeAudio && (!('speechSynthesis' in window) || !speechSynthesis.speaking)) scheduleAutoAdvance();
     });
-    volume.addEventListener('input', () => { if (activeAudio) activeAudio.volume = clamp(Number(volume.value), 0, 1); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
+    volume.addEventListener('input', () => { showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
+    showVolume();
     addEventListener('keydown', (event) => { if (['ArrowRight', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); } else if (event.key === 'ArrowLeft') { document.querySelector('#prev').click(); } });
     stage?.addEventListener('click', (event) => {
       if (!started || editorFrame || getSelection()?.toString()) return;
