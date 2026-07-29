@@ -404,7 +404,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=40"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=41"');
     expect(detailHtml).toContain("data-copy-public");
     expect(detailHtml).toContain('data-published-current="false"');
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
@@ -517,6 +517,9 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("この区間を保存");
     expect(workspaceHtml).toContain("最初の読み上げ文");
     expect(workspaceHtml).toContain('aria-current="page"');
+    expect(workspaceHtml).toContain('data-slide-action="duplicate"');
+    expect(workspaceHtml).toContain('data-slide-action="move"');
+    expect(workspaceHtml).toContain('data-slide-action="delete"');
     expect(workspaceHtml).toContain("現在有効な設定");
     expect(workspaceHtml).toContain("実験ノート");
     expect(workspaceHtml).toContain("サイエンス");
@@ -1425,6 +1428,102 @@ describe("Web dashboard", () => {
     expect(JSON.parse(tunedDocument!.document_json).deck.voicevox.profiles[0].tuning).toMatchObject({
       speedScale: 1.2,
       pauseLengthScale: 1.15
+    });
+
+    const duplicateSlide = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/actions",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 11, action: "duplicate" })
+        }
+      ),
+      authEnv
+    );
+    expect(duplicateSlide.status).toBe(200);
+    const duplicateResult = (await duplicateSlide.json()) as {
+      slide_id: string;
+      version: number;
+      next_url: string;
+    };
+    expect(duplicateResult).toMatchObject({ version: 12 });
+    expect(duplicateResult.next_url).toContain(duplicateResult.slide_id);
+    const duplicatedDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const duplicatedSlides = JSON.parse(duplicatedDocument!.document_json).deck.slides;
+    expect(duplicatedSlides).toHaveLength(2);
+    expect(duplicatedSlides[1]).toMatchObject({
+      id: duplicateResult.slide_id,
+      title: "はじめに（複製）",
+      narration: { segments: [{ audio_src: null }] }
+    });
+
+    const moveSlide = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/${duplicateResult.slide_id}/actions`,
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 12, action: "move", position: 0 })
+        }
+      ),
+      authEnv
+    );
+    expect(moveSlide.status).toBe(200);
+    expect(await moveSlide.json()).toMatchObject({ version: 13 });
+
+    const deleteSlide = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/${duplicateResult.slide_id}/actions`,
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 13, action: "delete" })
+        }
+      ),
+      authEnv
+    );
+    expect(deleteSlide.status).toBe(200);
+    expect(await deleteSlide.json()).toMatchObject({
+      version: 14,
+      slide_id: "intro"
+    });
+    const deleteLastSlide = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/actions",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 14, action: "delete" })
+        }
+      ),
+      authEnv
+    );
+    expect(deleteLastSlide.status).toBe(409);
+    expect(await deleteLastSlide.json()).toMatchObject({
+      error: { code: "LAST_SLIDE_REQUIRED" }
     });
 
     const unsupportedUpload = await requestProvider(

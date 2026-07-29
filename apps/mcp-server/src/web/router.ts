@@ -151,6 +151,22 @@ const slideFieldsRequestSchema = z.object({
   { message: "At least one slide field is required." }
 );
 
+const slideActionRequestSchema = z.discriminatedUnion("action", [
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("duplicate")
+  }),
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("move"),
+    position: z.number().int().nonnegative().max(99)
+  }),
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("delete")
+  })
+]);
+
 const slideTypographyRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   typography: slideTypographySchema
@@ -1139,6 +1155,112 @@ async function handleSlideFieldsUpdate(
   }
 }
 
+async function handleSlideAction(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = slideActionRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_FIELDS", message: "スライド操作を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  let destinationSlideId = slideId;
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const deck = document.deck;
+        if (deck === null) {
+          const error = new Error("The presentation deck does not exist.");
+          Object.assign(error, { code: "DECK_REQUIRED" });
+          throw error;
+        }
+        const index = deck.slides.findIndex((slide) => slide.id === slideId);
+        const slide = deck.slides[index];
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (parsed.data.action === "duplicate") {
+          destinationSlideId = `slide-${crypto.randomUUID()}`;
+          const copy = structuredClone(slide);
+          copy.id = destinationSlideId;
+          copy.title = `${slide.title}（複製）`.slice(0, 120);
+          for (const segment of copy.narration?.segments ?? []) {
+            segment.audio_src = null;
+          }
+          deck.slides.splice(index + 1, 0, copy);
+        } else if (parsed.data.action === "move") {
+          deck.slides.splice(index, 1);
+          deck.slides.splice(
+            Math.min(parsed.data.position, deck.slides.length),
+            0,
+            slide
+          );
+        } else {
+          if (deck.slides.length === 1) {
+            const error = new Error("The last slide cannot be deleted.");
+            Object.assign(error, { code: "LAST_SLIDE_REQUIRED" });
+            throw error;
+          }
+          deck.slides.splice(index, 1);
+          destinationSlideId = deck.slides[Math.min(index, deck.slides.length - 1)]!.id;
+        }
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: `project.slide_${parsed.data.action}`,
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        slide_id: slideId,
+        destination_slide_id: destinationSlideId,
+        version: project.version
+      },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: destinationSlideId,
+      version: project.version,
+      next_url: `/dashboard/projects/${projectId}/slides/${destinationSlideId}`,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "スライドを操作できませんでした。");
+  }
+}
+
 async function handleSlideTypographyUpdate(
   request: Request,
   env: Env,
@@ -1408,6 +1530,7 @@ function projectMutationErrorResponse(
     COMPONENT_NOT_FOUND: "componentが見つかりません。",
     INVALID_COMPOSITION_MODE: "このスライドはcomponent sceneではありません。",
     INVALID_FIELDS: "componentの文言を確認してください。",
+    LAST_SLIDE_REQUIRED: "最後の1枚は削除できません。先に別のスライドを複製または追加してください。",
     PROJECT_VERSION_CONFLICT: "別の場所で更新されました。画面を読み込み直してください。"
   };
   const status =
@@ -1422,7 +1545,8 @@ function projectMutationErrorResponse(
       : code === "PROJECT_VERSION_CONFLICT" ||
           code === "TEMPLATE_EXISTS" ||
           code === "DECK_REQUIRED" ||
-          code === "INVALID_COMPOSITION_MODE"
+          code === "INVALID_COMPOSITION_MODE" ||
+          code === "LAST_SLIDE_REQUIRED"
         ? 409
         : code === "INVALID_FIELDS"
           ? 422
@@ -2490,6 +2614,17 @@ export async function handleWebRequest(
       env,
       slideTypographyMatch[1],
       slideTypographyMatch[2]
+    );
+  }
+  const slideActionMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/actions$`)
+  );
+  if (slideActionMatch?.[1] !== undefined && slideActionMatch[2] !== undefined) {
+    return handleSlideAction(
+      request,
+      env,
+      slideActionMatch[1],
+      slideActionMatch[2]
     );
   }
   const sceneComponentMatch = path.match(

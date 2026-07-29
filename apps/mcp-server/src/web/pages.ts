@@ -117,7 +117,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=40";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=41";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -343,6 +343,9 @@ function shell(title: string, body: string): string {
       .workspace-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
       .workspace-head h1 { font-size: clamp(1.65rem, 3vw, 2.8rem); }
       .workspace-version { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .55rem; color: var(--muted); }
+      .slide-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+      .slide-actions button { min-height: 2.2rem; padding: .45rem .62rem; }
+      .slide-actions .danger { border-color: #7e3b49; color: #ffb8c3; }
       .save-state { padding: .28rem .55rem; border: 1px solid #36785b; border-radius: 999px; background: #15312566; color: #9be8c1; font-size: .75rem; font-weight: 760; white-space: nowrap; }
       .save-state[data-state="dirty"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
       .save-state[data-state="saving"] { border-color: #35506a; background: #0a1b29; color: #bfe6f7; }
@@ -1201,6 +1204,7 @@ export function slideWorkspacePage(options: {
     : `${slideDashboardPath}${escapeHtml(nextSlide.id)}`;
   const projectPath = `/api/projects/${escapeHtml(options.project.project_id)}`;
   const slidePath = `${projectPath}/slides/${escapeHtml(slide.id)}`;
+  const slideActionPath = `${slidePath}/actions`;
   const filmstrip = deck.slides
     .map(
       (item, index) => {
@@ -1452,7 +1456,7 @@ export function slideWorkspacePage(options: {
       `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main class="workspace-main">
          <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
-         <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a></div></div>
+         <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a><div class="slide-actions" role="group" aria-label="スライド構成の操作"><button class="ghost" type="button" data-slide-action="move" data-position="${Math.max(0, slideIndex - 1)}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-slide-action="move" data-position="${slideIndex + 1}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === deck.slides.length - 1 ? " disabled" : ""}>↓ 後へ</button><button class="ghost" type="button" data-slide-action="duplicate" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}">複製</button><button class="ghost danger" type="button" data-slide-action="delete" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${deck.slides.length === 1 ? " disabled" : ""}>削除</button></div><span class="feedback" data-slide-action-feedback aria-live="polite"></span></div></div>
          ${effectiveSummary}
          <div class="slide-workspace">
            <nav class="filmstrip" aria-label="スライド一覧"><label class="filmstrip-search">${deck.slides.length}枚から検索<input type="search" data-filmstrip-search placeholder="タイトル・構成・音声状態" autocomplete="off"></label>${filmstrip}<p class="filmstrip-empty" data-filmstrip-empty hidden>一致するスライドはありません。</p></nav>

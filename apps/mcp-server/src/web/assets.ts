@@ -667,6 +667,59 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  for (const button of document.querySelectorAll("[data-slide-action]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", async () => {
+      const action = button.dataset.slideAction || "";
+      const feedback = document.querySelector("[data-slide-action-feedback]");
+      const versionedForm = document.querySelector("[data-versioned-form]");
+      if (!(feedback instanceof HTMLElement) || !(versionedForm instanceof HTMLFormElement)) return;
+      const dirty = document.querySelector('[data-dirty="true"]') !== null;
+      const message = action === "delete"
+        ? dirty
+          ? "未保存の入力を破棄し、このスライドを削除しますか？"
+          : "このスライドを削除しますか？この操作は元に戻せません。"
+        : dirty
+          ? "未保存の入力を破棄してスライド構成を変更しますか？"
+          : "";
+      if (message && !confirm(message)) return;
+      setButtonBusy(button, true);
+      feedback.textContent = action === "duplicate"
+        ? "スライドを複製しています…"
+        : action === "delete"
+          ? "スライドを削除しています…"
+          : "スライドを移動しています…";
+      feedback.classList.remove("success", "warning");
+      try {
+        const body = {
+          expected_version: Number(versionedForm.dataset.version),
+          action
+        };
+        if (action === "move") body.position = Number(button.dataset.position);
+        const response = await fetch(button.dataset.actionUrl || "", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": button.dataset.csrf || ""
+          },
+          body: JSON.stringify(body)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "スライドを操作できませんでした。"));
+        feedback.textContent = "構成を更新しました。画面を切り替えます…";
+        feedback.classList.add("success");
+        for (const form of document.querySelectorAll('[data-dirty="true"]')) {
+          if (form instanceof HTMLElement) form.dataset.dirty = "false";
+        }
+        location.href = result.next_url;
+      } catch (error) {
+        feedback.textContent = caughtErrorMessage(error, "スライドを操作できませんでした。");
+        feedback.classList.add("warning");
+        setButtonBusy(button, false);
+      }
+    });
+  }
+
   const inspectorStateKey = "ultimate-freestyle:workspace-inspector";
   let inspectorState = {};
   try { inspectorState = JSON.parse(localStorage.getItem(inspectorStateKey) || "{}"); } catch {}
