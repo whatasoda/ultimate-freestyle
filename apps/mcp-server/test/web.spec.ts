@@ -409,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=54"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=55"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("全スライドの実表示を一括確認");
@@ -552,6 +552,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("本文と見出しのfontをまとめて選ぶ");
     expect(workspaceHtml).toContain('data-cover-pick="statement"');
     expect(workspaceHtml).toContain("表紙レイアウトを選ぶ");
+    expect(workspaceHtml).toContain('data-narration-display-pick="inline"');
+    expect(workspaceHtml).toContain("読み上げ文の表示形式を選ぶ");
     expect(workspaceHtml).toContain("data-template-create");
     expect(workspaceHtml).toContain("編集できるtemplateを追加");
     expect(workspaceHtml).toContain("data-narration-settings-editor");

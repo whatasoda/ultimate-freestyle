@@ -904,6 +904,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       form.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
+  for (const button of document.querySelectorAll("[data-narration-display-pick]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      if (!(form instanceof HTMLFormElement)) return;
+      const display = form.elements.namedItem("display");
+      if (display instanceof HTMLSelectElement) display.value = button.dataset.narrationDisplayPick || display.value;
+      for (const item of form.querySelectorAll("[data-narration-display-pick]")) {
+        if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
+      }
+      form.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   const activeFilmstripSlide = document.querySelector('.filmstrip-link[data-active="true"]');
   if (activeFilmstripSlide instanceof HTMLElement) {
