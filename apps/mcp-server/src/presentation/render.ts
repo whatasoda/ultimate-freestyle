@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@18";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@19";
 
 function escapeHtml(value: string): string {
   return value
@@ -1249,16 +1249,17 @@ export function renderPresentationHtml(
       step = Math.min(Math.max(Number(query.get('step') ?? 0), 0), DECK.slides[slide].revealSteps);
       render();
     };
-    const markPreloadProgress = (completed, total) => {
+    const markPreloadProgress = (completed, total, failed = 0) => {
       const percent = total === 0 ? 100 : completed / total * 100;
       if (preludeProgress) preludeProgress.style.width = percent + '%';
-      if (preludeStatus) preludeStatus.textContent = completed < total ? completed + ' / ' + total + ' 件を準備中' : '準備できました';
+      if (preludeStatus) preludeStatus.textContent = completed < total
+        ? completed + ' / ' + total + ' 件を準備中'
+        : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
     };
     const preloadResource = (url, kind) => new Promise((resolve) => {
       const media = kind === 'image' ? new Image() : new Audio();
-      const finish = () => resolve(url);
-      media.addEventListener(kind === 'image' ? 'load' : 'loadedmetadata', finish, { once: true });
-      media.addEventListener('error', finish, { once: true });
+      media.addEventListener(kind === 'image' ? 'load' : 'loadedmetadata', () => resolve({ url, ok: true }), { once: true });
+      media.addEventListener('error', () => resolve({ url, ok: false }), { once: true });
       if (kind === 'audio') media.preload = 'metadata';
       media.src = url;
       if (kind === 'audio') media.load();
@@ -1269,7 +1270,9 @@ export function renderPresentationHtml(
         while (cursor < resources.length) {
           const [url, kind] = resources[cursor++];
           const task = kind === 'font' ? (document.fonts?.ready ?? Promise.resolve()) : preloadResource(url, kind);
-          try { await task; } finally { onComplete(); }
+          let succeeded = true;
+          try { const result = await task; succeeded = result?.ok !== false; } catch { succeeded = false; }
+          finally { onComplete(succeeded); }
         }
       };
       const workerCount = Math.min(4, resources.length);
@@ -1281,16 +1284,18 @@ export function renderPresentationHtml(
         ...DECK.preload.images.map((url) => [url, 'image']),
         ...DECK.preload.audio.map((url) => [url, 'audio'])
       ];
-      let completed = 0;
-      markPreloadProgress(completed, resources.length);
+      let completed = 0, failed = 0;
+      markPreloadProgress(completed, resources.length, failed);
       const startedLoadingAt = performance.now();
       await Promise.race([
-        preloadResources(resources, () => { completed += 1; markPreloadProgress(completed, resources.length); }),
+        preloadResources(resources, (succeeded) => { completed += 1; if (!succeeded) failed += 1; markPreloadProgress(completed, resources.length, failed); }),
         new Promise((resolve) => setTimeout(resolve, 10_000))
       ]);
       const remaining = Math.max(0, Number(DECK.loadingScreen.minimum_duration_ms) - (performance.now() - startedLoadingAt));
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-      if (preludeStatus) preludeStatus.textContent = completed < resources.length ? '一部を読み込みながら開始できます' : '準備できました';
+      if (preludeStatus) preludeStatus.textContent = completed < resources.length
+        ? '一部を読み込みながら開始できます'
+        : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
       if (preludeStart) preludeStart.disabled = false;
     };
     document.querySelector('#next').addEventListener('click', () => { if (started) advance(); });
