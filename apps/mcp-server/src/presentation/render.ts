@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@29";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@30";
 
 function escapeHtml(value: string): string {
   return value
@@ -575,6 +575,8 @@ export function renderPresentationHtml(
     header strong { min-width: 0; overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
     header .time { display: flex; gap: .45em; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .timer-toggle { min-height: 28px; padding: .3em .65em; border-radius: 999px; color: #dce5f2; font-size: 11px; white-space: nowrap; }
+    .pace { padding: .16em .48em; border: 1px solid #3a485d; border-radius: 999px; color: #b7c4d4; font-size: 11px; }
+    .pace[data-state="over"] { border-color: #b55d38; background: #6b291d66; color: #ffd1b8; }
     .time-part { display: inline-flex; gap: .2em; }
     .time-label { color: #718096; font-size: .78em; }
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
@@ -857,6 +859,7 @@ export function renderPresentationHtml(
       header { gap: 7px; min-height: 30px; font-size: 12px; }
       .time-label { display: none; }
       .time-total { display: none; }
+      .pace { display: none; }
       header .meta, .voice-credit { display: none; }
       footer { display: grid; grid-template-columns: auto minmax(3rem, 1fr) auto; gap: 6px 8px; min-height: 76px; }
       footer .progress { width: 100%; }
@@ -876,7 +879,7 @@ export function renderPresentationHtml(
 </head>
 <body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
-    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在位置の目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
+    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
     <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}">
       <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
         <div class="prelude-inner">
@@ -921,6 +924,7 @@ export function renderPresentationHtml(
     const counter = document.querySelector('#counter');
     const elapsed = document.querySelector('#elapsed');
     const expected = document.querySelector('#expected');
+    const pace = document.querySelector('#pace');
     const volume = document.querySelector('#volume');
     const volumeValue = document.querySelector('#volume-value');
     const speechButton = document.querySelector('#speech');
@@ -962,7 +966,15 @@ export function renderPresentationHtml(
     const narration = () => DECK.slides[slide].narration?.segments.find((item) => item.at === step) ?? null;
     const updateElapsed = () => {
       const milliseconds = elapsedAccumulated + (timerRunning ? Date.now() - startedAt : 0);
-      elapsed.textContent = format(milliseconds / 1000);
+      const elapsedSeconds = milliseconds / 1000;
+      elapsed.textContent = format(elapsedSeconds);
+      if (pace instanceof HTMLElement) {
+        const remaining = expectedElapsed() - elapsedSeconds;
+        const over = remaining < 0;
+        pace.dataset.state = over ? 'over' : 'remaining';
+        pace.textContent = over ? '目安超過 ' + format(-remaining) : 'あと ' + format(remaining);
+        pace.title = over ? '現在の区切り目安を超えています' : '現在の区切り目安まで';
+      }
     };
     const setTimerRunning = (running) => {
       if (running === timerRunning) return;
@@ -1427,6 +1439,7 @@ export function renderPresentationHtml(
       progress.parentElement?.setAttribute('aria-valuenow', '0');
       elapsed.textContent = '00:00';
       expected.textContent = '00:00';
+      if (pace instanceof HTMLElement) { pace.dataset.state = 'remaining'; pace.textContent = 'あと --:--'; }
       updateControls();
       if (push) history.pushState(null, '', '?slide=0');
       else history.replaceState(null, '', '?slide=0');
