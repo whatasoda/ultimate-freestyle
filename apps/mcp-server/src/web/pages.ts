@@ -91,7 +91,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=5";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=6";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -176,6 +176,7 @@ function shell(title: string, body: string): string {
       h1 { margin: 0; font-size: clamp(2.25rem, 7vw, 5.4rem); line-height: 1.02; letter-spacing: -.045em; }
       .lead { max-width: 42rem; margin: 1.5rem 0 0; color: #bdc9d8; font-size: clamp(1rem, 2vw, 1.2rem); line-height: 1.8; }
       .button, button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; padding: .7rem 1rem; border: 0; border-radius: .7rem; background: var(--accent); color: white; font: inherit; font-weight: 780; text-decoration: none; cursor: pointer; }
+      :where(a, button, input, textarea, select, summary):focus-visible { outline: .2rem solid #91ddff; outline-offset: .18rem; }
       .button.primary { margin-top: 1.7rem; padding: .9rem 1.25rem; }
       .ghost { border: 1px solid var(--line); background: #152131; color: #d6dfeb; }
       .section-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1.25rem; }
@@ -258,7 +259,10 @@ function shell(title: string, body: string): string {
       .editor input, .editor textarea, .editor select { width: 100%; padding: .72rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; line-height: 1.5; }
       .editor textarea { min-height: 7rem; resize: vertical; }
       .actions { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
-      button:disabled { cursor: wait; opacity: .55; }
+      button:disabled { cursor: not-allowed; opacity: .55; }
+      button[aria-busy="true"] { cursor: wait; }
+      .character-count { justify-self: end; margin-top: -.2rem; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
+      .character-count[data-near-limit="true"] { color: #ffd681; font-weight: 750; }
       .publish-state { display: grid; gap: .8rem; }
       .status-row { display: flex; justify-content: space-between; gap: 1rem; padding: .65rem 0; border-top: 1px solid var(--line); }
       .status-row:first-of-type { border-top: 0; }
@@ -397,7 +401,7 @@ function shell(title: string, body: string): string {
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
       @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
-      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+      @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
     </style>
   </head>
   <body>${body}</body>

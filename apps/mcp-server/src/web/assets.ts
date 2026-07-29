@@ -1,4 +1,10 @@
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const setButtonBusy = (button, busy) => {
+    if (!(button instanceof HTMLButtonElement)) return;
+    button.disabled = busy;
+    if (busy) button.setAttribute("aria-busy", "true");
+    else button.removeAttribute("aria-busy");
+  };
   const syncPageVersion = (version) => {
     const value = String(version);
     for (const form of document.querySelectorAll("[data-versioned-form], [data-project-editor]")) {
@@ -33,7 +39,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     editor.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!(feedback instanceof HTMLElement)) return;
-      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      setButtonBusy(submit, true);
       feedback.textContent = "変更を保存しています…";
       const data = new FormData(editor);
       const nullableText = (name) => String(data.get(name) || "");
@@ -73,7 +79,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
         feedback.classList.remove("success");
       } finally {
-        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+        setButtonBusy(submit, false);
       }
     });
   }
@@ -207,7 +213,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         : undefined;
       if (!(feedback instanceof HTMLElement)) return;
       for (const button of submitButtons) {
-        if (button instanceof HTMLButtonElement) button.disabled = true;
+        setButtonBusy(button, true);
       }
       feedback.textContent = "変更を保存しています…";
       feedback.classList.remove("success", "warning");
@@ -241,11 +247,35 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.classList.add("warning");
       } finally {
         for (const button of submitButtons) {
-          if (button instanceof HTMLButtonElement) button.disabled = false;
+          setButtonBusy(button, false);
         }
       }
     });
   }
+
+  for (const field of document.querySelectorAll('textarea[maxlength], input[maxlength]:not([type]), input[type="text"][maxlength]')) {
+    if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement)) continue;
+    const counter = document.createElement("span");
+    counter.className = "character-count";
+    counter.setAttribute("aria-hidden", "true");
+    const updateCounter = () => {
+      counter.textContent = field.value.length.toLocaleString() + " / " + Number(field.maxLength).toLocaleString() + "字";
+      counter.dataset.nearLimit = String(field.value.length >= field.maxLength * 0.9);
+    };
+    field.insertAdjacentElement("afterend", counter);
+    field.addEventListener("input", updateCounter);
+    updateCounter();
+  }
+
+  document.addEventListener("keydown", (event) => {
+    if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "s") return;
+    const target = event.target;
+    const form = target instanceof Element ? target.closest("form") : null;
+    if (!(form instanceof HTMLFormElement) || form.dataset.dirty !== "true") return;
+    if (!form.matches("[data-versioned-form], [data-project-editor]")) return;
+    event.preventDefault();
+    form.requestSubmit();
+  });
 
   const activeFilmstripSlide = document.querySelector('.filmstrip-link[data-active="true"]');
   if (activeFilmstripSlide instanceof HTMLElement) {

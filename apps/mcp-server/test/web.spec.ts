@@ -388,7 +388,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=5"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=6"');
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
@@ -503,6 +503,10 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("70%未満まで縮小");
     expect(dashboardScriptText).toContain("syncPageVersion(result.version)");
     expect(dashboardScriptText).toContain('addEventListener("beforeunload"');
+    expect(dashboardScriptText).toContain('field.maxLength * 0.9');
+    expect(dashboardScriptText).toContain('event.key.toLowerCase() !== "s"');
+    expect(dashboardScriptText).toContain("form.requestSubmit()");
+    expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
 
     const rejectedUpload = await requestProvider(
       provider,
