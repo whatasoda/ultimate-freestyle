@@ -601,6 +601,44 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     form.requestSubmit();
   });
 
+  for (const button of document.querySelectorAll("[data-markdown-action]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      const field = form?.elements.namedItem(button.dataset.markdownTarget || "");
+      if (!(field instanceof HTMLTextAreaElement)) return;
+      const start = field.selectionStart;
+      const end = field.selectionEnd;
+      const selected = field.value.slice(start, end);
+      const action = button.dataset.markdownAction;
+      let replacement = selected;
+      let selectionStart = start;
+      let selectionEnd = end;
+      if (action === "bold") {
+        const content = selected || "強調する文";
+        replacement = "**" + content + "**";
+        selectionStart = start + 2;
+        selectionEnd = selectionStart + content.length;
+      } else {
+        const prefix = action === "heading" ? "## " : action === "number" ? "1. " : "- ";
+        const lineStart = field.value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;
+        const lines = field.value.slice(lineStart, end).split("\n");
+        replacement = lines.map((line) => prefix + line).join("\n");
+        field.setRangeText(replacement, lineStart, end, "end");
+        selectionStart = lineStart;
+        selectionEnd = lineStart + replacement.length;
+        field.focus();
+        field.setSelectionRange(selectionStart, selectionEnd);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+      field.setRangeText(replacement, start, end, "end");
+      field.focus();
+      field.setSelectionRange(selectionStart, selectionEnd);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
   const activeFilmstripSlide = document.querySelector('.filmstrip-link[data-active="true"]');
   if (activeFilmstripSlide instanceof HTMLElement) {
     activeFilmstripSlide.scrollIntoView({ block: "nearest", inline: "nearest" });

@@ -116,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=36";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=37";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -313,6 +313,8 @@ function shell(title: string, body: string): string {
       .editor label.wide { grid-column: 1 / -1; }
       .editor input, .editor textarea, .editor select { width: 100%; padding: .72rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; line-height: 1.5; }
       .editor textarea { min-height: 7rem; resize: vertical; }
+      .markdown-toolbar { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: -.55rem; }
+      .markdown-toolbar button { min-height: 2rem; padding: .35rem .55rem; font-size: .75rem; }
       .actions { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
       button:disabled { cursor: not-allowed; opacity: .55; }
       button[aria-busy="true"] { cursor: wait; }
@@ -1447,8 +1449,8 @@ export function slideWorkspacePage(options: {
                <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
                  <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"></label>
-                 <label>スライド本文（Markdown対応）<textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">見出しは #、箇条書きは -、番号付き手順は 1.、強調は ** で記述します。定型flowでは入力中も実表示へ反映し、自由配置・リッチ構成では代替表示に使います。</small></label>
-                 <label>補足欄（読み上げない情報）<textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea><small class="inherit-note">作者コメント、出典、追加データなど、音声に含めない情報を置けます。</small></label>
+                 <label>スライド本文（Markdown対応）<span class="markdown-toolbar" role="toolbar" aria-label="スライド本文の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="content_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="content_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="number" data-markdown-target="content_markdown">番号</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="content_markdown">強調</button></span><textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">定型flowでは入力中も実表示へ反映し、自由配置・リッチ構成では代替表示に使います。</small></label>
+                 <label>補足欄（読み上げない情報）<span class="markdown-toolbar" role="toolbar" aria-label="補足欄の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="sidebar_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="sidebar_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="sidebar_markdown">強調</button></span><textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea><small class="inherit-note">作者コメント、出典、追加データなど、音声に含めない情報を置けます。</small></label>
                  <div class="actions"><button type="submit">内容を保存</button>${nextSlidePath === null ? "" : `<button class="ghost" type="submit" data-save-next="${nextSlidePath}">保存して次へ</button>`}<span class="version" data-version-label>v${options.project.version}</span></div>
                  <p class="feedback" data-form-feedback aria-live="polite"></p>
                </form>
