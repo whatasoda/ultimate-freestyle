@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@27";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@28";
 
 function escapeHtml(value: string): string {
   return value
@@ -902,9 +902,9 @@ export function renderPresentationHtml(
       <span id="counter" aria-live="polite">1 / ${deck.slides.length}</span><div class="progress" role="progressbar" aria-label="発表の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
       <div class="voice-progress" title="読み上げ進捗" role="progressbar" aria-label="読み上げ進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="voice-progress"></i></div>
       <div class="controls">
-        <button id="prev" aria-label="前へ">←</button><button id="next" aria-label="次へ">→</button>
-        <button id="speech" aria-pressed="true" title="ページ移動時の自動読み上げ">音声 ON</button>
-        <button id="auto" aria-pressed="false" title="読み上げ後、または想定時間後に自動で進む">自動 OFF</button>
+        <button id="prev" aria-label="前へ" aria-keyshortcuts="ArrowLeft ArrowUp PageUp Backspace" title="前へ（← / PageUp）">←</button><button id="next" aria-label="次へ" aria-keyshortcuts="ArrowRight ArrowDown PageDown Space Enter" title="次へ（→ / Space / PageDown）">→</button>
+        <button id="speech" aria-pressed="true" aria-keyshortcuts="M" title="ページ移動時の自動読み上げ（M）">音声 ON</button>
+        <button id="auto" aria-pressed="false" aria-keyshortcuts="A" title="読み上げ後、または想定時間後に自動で進む（A）">自動 OFF</button>
         <label>音量 <input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-describedby="volume-value"><output class="volume-value" id="volume-value" for="volume">100%</output></label>
       </div>
     </footer>
@@ -1516,9 +1516,11 @@ export function renderPresentationHtml(
       const target = event.target;
       if (target instanceof Element && target.closest('button, a, input, select, textarea')) return;
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); }
-      else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); document.querySelector('#prev').click(); }
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(event.key)) { event.preventDefault(); document.querySelector('#prev').click(); }
       else if (event.key === 'Home') { event.preventDefault(); slide = 0; step = 0; syncUrl(); render(); }
       else if (event.key === 'End') { event.preventDefault(); slide = slides.length - 1; step = DECK.slides[slide].revealSteps; syncUrl(); render(); }
+      else if (event.key.toLowerCase() === 'm') { event.preventDefault(); speechButton.click(); }
+      else if (event.key.toLowerCase() === 'a') { event.preventDefault(); autoButton.click(); }
     });
     stage?.addEventListener('click', (event) => {
       if (!started || editorFrame || getSelection()?.toString()) return;
