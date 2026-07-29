@@ -277,6 +277,7 @@ function shell(title: string, body: string): string {
       .stat-list { display: grid; grid-template-columns: 1fr auto; gap: .55rem 1rem; margin: 0; }
       .stat-list dt { color: var(--muted); }
       .stat-list dd { margin: 0; font-weight: 750; text-align: right; }
+      .stat-list dd[data-state="warning"] { color: #ffd681; }
       .log { padding: .8rem 0; border-top: 1px solid var(--line); }
       .log:first-of-type { padding-top: 0; border-top: 0; }
       .log small { color: var(--muted); }
@@ -1002,6 +1003,7 @@ export function projectDetailPage(options: {
                <dt>更新日</dt><dd>${escapeHtml(formatDate(options.project.updated_at))}</dd>
                <dt>ログ</dt><dd>${document.logs.length}件</dd>
                <dt>スライド</dt><dd>${slides.length}枚</dd>
+               <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_SECONDS ? " · 20分超過" : ""}</dd>
              </dl></section>
              <section class="panel" id="presentation-structure"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideAiActions}</section>
              ${evaluationPanel}

@@ -422,6 +422,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("画像の説明");
     expect(detailHtml).toContain("表示・読み上げ文");
     expect(detailHtml).toContain("想定発表時間");
+    expect(detailHtml).toContain('<dt>想定時間</dt><dd data-state="ok">0分30秒</dd>');
     expect(detailHtml).toContain("固定プレビュー");
     expect(detailHtml).toContain("修正へ →");
     expect(detailHtml).toContain('href="#basic-information"');
