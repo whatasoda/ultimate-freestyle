@@ -36,10 +36,14 @@ function formatDuration(seconds: number): string {
 }
 
 type ProjectSlide = NonNullable<ProjectRecord["document"]["deck"]>["slides"][number];
+type ProjectVoicevox = NonNullable<
+  NonNullable<ProjectRecord["document"]["deck"]>["voicevox"]
+>;
 
 function staticSlideQuality(
   slide: ProjectSlide,
-  aspectRatio: "16:9" | "4:3"
+  aspectRatio: "16:9" | "4:3",
+  voicevox?: ProjectVoicevox | null
 ): string[] {
   const warnings: string[] = [];
   const titleLimit = slide.role === "cover"
@@ -84,7 +88,12 @@ function staticSlideQuality(
   }
   const unitDuration = slide.duration_seconds / (slide.reveal_steps + 1);
   if ((slide.narration?.segments ?? []).some((segment) => {
-    const speed = segment.voice_tuning?.speedScale ?? 1;
+    const profileId = segment.voice_profile_id ?? voicevox?.default_profile_id;
+    const profile = voicevox?.profiles.find((item) => item.id === profileId);
+    const speed = mergeVoicevoxTuning(
+      profile?.tuning ?? undefined,
+      segment.voice_tuning ?? undefined
+    ).speedScale;
     return segment.text.length / (7 * speed) > unitDuration * 1.15;
   })) {
     warnings.push("読み上げの概算時間がSTEPの想定秒数を超えています。原稿、話速、想定秒数を確認してください。");
@@ -907,7 +916,11 @@ export function projectDetailPage(options: {
           const voiceLabel = narration.length === 0
             ? "原稿なし"
             : `音声 ${readyVoice}/${narration.length}`;
-          const qualityWarnings = staticSlideQuality(slide, deck?.aspect_ratio ?? "16:9");
+          const qualityWarnings = staticSlideQuality(
+            slide,
+            deck?.aspect_ratio ?? "16:9",
+            deck?.voicevox
+          );
           return `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${slide.role === "cover" ? "表紙 · " : ""}${escapeHtml(slideCompositionLabel(slide))}</small>${qualityWarnings.length ? `<small class="slide-quality-warning">要確認 ${qualityWarnings.length}</small>` : ""}</strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階<small class="stage">${voiceLabel}</small></span></a>`;
         })
         .join("")
@@ -1010,7 +1023,11 @@ export function projectDetailPage(options: {
     (slide) => (slide.narration?.segments.length ?? 0) === 0
   );
   const slidesWithStaticQualityWarnings = slides.filter(
-    (slide) => staticSlideQuality(slide, deck?.aspect_ratio ?? "16:9").length > 0
+    (slide) => staticSlideQuality(
+      slide,
+      deck?.aspect_ratio ?? "16:9",
+      deck?.voicevox
+    ).length > 0
   );
   const firstSlideWithStaticQualityWarning = slidesWithStaticQualityWarnings[0];
   const firstSlidePath = slides[0] === undefined
@@ -1745,7 +1762,7 @@ export function slideWorkspacePage(options: {
             ? ["段組みの文章に見出しがありません。段の切り替わりを追いやすいよう、小見出しの追加を検討してください。"]
           : []
       : []),
-    ...staticSlideQuality(slide, deck.aspect_ratio ?? "16:9")
+    ...staticSlideQuality(slide, deck.aspect_ratio ?? "16:9", deck.voicevox)
   ])];
   const workspaceTotalDurationSeconds = deck.slides.reduce(
     (total, item) => total + item.duration_seconds,
