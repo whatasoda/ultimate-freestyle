@@ -93,6 +93,32 @@ const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   postPhonemeLength: "読み終わり後の無音"
 };
 
+const VOICE_SEGMENT_STATUS_LABELS: Record<string, string> = {
+  not_configured: "声未設定",
+  needs_generation: "要生成",
+  queued: "待機中",
+  running: "生成中",
+  generating: "生成中",
+  ready: "生成済み",
+  failed: "失敗",
+  superseded: "設定変更あり"
+};
+
+const VOICE_JOB_STATUS_LABELS: Record<string, string> = {
+  queued: "生成待ち",
+  starting: "音声エンジン準備中",
+  starting_engine: "音声エンジン準備中",
+  running: "音声を生成中",
+  synthesizing: "音声を生成中",
+  encoding: "MP3へ変換中",
+  storing: "音声を保存中",
+  attaching: "発表へ反映中",
+  completed: "生成完了",
+  partially_failed: "一部の生成に失敗",
+  failed: "生成に失敗",
+  cancelled: "キャンセル済み"
+};
+
 function headers(setCookies: string[] = []): Headers {
   const result = new Headers({
     "cache-control": "no-store",
@@ -283,9 +309,55 @@ function shell(title: string, body: string): string {
       .swatches { display: flex; gap: .35rem; }
       .swatch { width: 1.2rem; height: 1.2rem; border: 1px solid #ffffff55; border-radius: .3rem; background: var(--swatch); }
       [data-dirty="true"] button[type="submit"]::after { content: " · 未保存"; }
+      main.voice-main { width: min(94vw, 84rem); padding-top: 1rem; }
+      .voice-hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: end; margin-bottom: 1.2rem; }
+      .voice-hero h1 { font-size: clamp(2rem, 5vw, 4rem); }
+      .voice-hero .lead { margin-top: .8rem; }
+      .voice-flow { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(18rem, .8fr); gap: 1rem; align-items: start; }
+      .voice-column { display: grid; gap: 1rem; }
+      .voice-step { display: grid; gap: .9rem; }
+      .voice-step-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .8rem; align-items: start; }
+      .voice-step-number { display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: 50%; background: var(--accent); color: white; font: 850 .8rem/1 ui-monospace, monospace; }
+      .voice-step h2 { margin: .2rem 0 0; }
+      .voice-step-head p { margin: .3rem 0 0; color: var(--muted); font-size: .85rem; line-height: 1.55; }
+      .voice-preset { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .85rem; align-items: center; padding: .9rem; border: 1px solid #52647c; border-radius: .8rem; background: linear-gradient(135deg, #102531, #111827); }
+      .voice-character { display: grid; place-items: center; width: 3.2rem; height: 3.2rem; border: 2px solid #b6ef78; border-radius: 48% 52% 45% 55%; background: #6bbd45; color: #10230d; font-size: 1.4rem; box-shadow: inset 0 0 0 .35rem #d6f6a8; }
+      .voice-preset strong, .voice-preset small { display: block; }
+      .voice-preset small { margin-top: .25rem; color: var(--muted); line-height: 1.5; }
+      .voice-preset .stage { justify-self: end; }
+      .voice-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
+      .voice-stat { padding: .75rem; border: 1px solid var(--line); border-radius: .7rem; background: #08111b88; }
+      .voice-stat span, .voice-stat strong { display: block; }
+      .voice-stat span { color: var(--muted); font-size: .72rem; }
+      .voice-stat strong { margin-top: .25rem; font-size: 1.35rem; }
+      .voice-stat.ready strong { color: #74e6b2; }
+      .voice-stat.pending strong { color: #ffd681; }
+      .job-card { display: grid; gap: .7rem; padding: .9rem; border: 1px solid #52647c; border-radius: .8rem; background: #0b1724; }
+      .job-card[data-state="completed"] { border-color: #36785b; }
+      .job-card[data-state="failed"], .job-card[data-state="partially_failed"] { border-color: #8b514f; }
+      .job-head { display: flex; justify-content: space-between; gap: .8rem; align-items: center; }
+      .job-progress { width: 100%; height: .65rem; accent-color: var(--accent); }
+      .job-numbers { display: flex; flex-wrap: wrap; gap: .75rem; color: var(--muted); font-size: .78rem; }
+      .voice-segment-list { display: grid; gap: .55rem; }
+      .voice-review { overflow: hidden; border: 1px solid var(--line); border-radius: .75rem; background: #08111b77; }
+      .voice-review > summary { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; align-items: center; padding: .8rem; cursor: pointer; }
+      .voice-review > summary::marker { color: var(--accent); }
+      .voice-review-title { min-width: 0; }
+      .voice-review-title strong, .voice-review-title small { display: block; overflow-wrap: anywhere; }
+      .voice-review-title small { margin-top: .2rem; color: var(--muted); }
+      .voice-review-body { display: grid; gap: .75rem; padding: 0 .8rem .8rem; }
+      .voice-review-body p { margin: 0; color: #d7e0eb; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .voice-status { display: inline-flex; padding: .28rem .5rem; border-radius: 999px; background: #354052; color: #d8e1eb; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+      .voice-status.ready, .voice-status.completed { background: #174d3a; color: #91efc4; }
+      .voice-status.needs_generation, .voice-status.queued, .voice-status.running, .voice-status.generating { background: #5a4618; color: #ffe29a; }
+      .voice-status.failed, .voice-status.partially_failed { background: #622f33; color: #ffb6b6; }
+      .voice-play[aria-pressed="true"] { border-color: #74e6b2; background: #164a38; }
+      .voice-next { display: grid; gap: .7rem; position: sticky; top: 1rem; }
+      .voice-next ol { margin: 0; padding-left: 1.3rem; color: #bdc9d8; font-size: .85rem; line-height: 1.7; }
+      .voice-next li + li { margin-top: .35rem; }
       form { margin: 0; }
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
-      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } }
+      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
     </style>
@@ -478,7 +550,7 @@ export function projectDetailPage(options: {
     : !previewRendererCurrent
       ? "表示エンジンが更新されたため、新しいプレビューの確認が必要です。"
       : "公開中の版は、下書きを編集しても自動では変わりません。";
-  const publicationPanel = `<section class="panel publish-state" data-publication>
+  const publicationPanel = `<section class="panel publish-state" id="publication" data-publication>
     <h2>プレビューと公開</h2>
     <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
     <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
@@ -491,6 +563,18 @@ export function projectDetailPage(options: {
       <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}"${previewCurrent ? "" : " disabled"}>確認した版を公開</button>
     </div>
     <p class="feedback${preview !== null && !previewCurrent ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
+  </section>`;
+  const narrationSegments = slides.flatMap(
+    (slide) => slide.narration?.segments ?? []
+  );
+  const readyVoiceSegments = narrationSegments.filter(
+    (segment) => segment.audio_src !== null
+  ).length;
+  const voicePanel = `<section class="panel publish-state"><h2>読み上げ音声</h2>
+    <div class="status-row"><span>読み上げ区間</span><strong>${narrationSegments.length}件</strong></div>
+    <div class="status-row"><span>VOICEVOX生成済み</span><strong>${readyVoiceSegments} / ${narrationSegments.length}</strong></div>
+    <a class="button" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/voice">音声を仕上げる</a>
+    <p class="feedback">ずんだもんの設定、生成状況、区間ごとの試聴を一つの画面で確認できます。</p>
   </section>`;
   const presentationSettingsPanel = deck === null
     ? ""
@@ -562,9 +646,133 @@ export function projectDetailPage(options: {
                <dt>スライド</dt><dd>${slides.length}枚</dd>
              </dl></section>
              <section class="panel"><h2>発表構成</h2>${slideRows}</section>
+             ${voicePanel}
              ${publicationPanel}
              <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>
            </aside>
+         </div>
+       </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
+    ),
+    { headers: headers() }
+  );
+}
+
+export type VoiceFinishJob = {
+  job_id: string;
+  status: string;
+  total_segments: number;
+  completed_segments: number;
+  failed_segments: number;
+  cached_segments: number;
+  status_url: string;
+};
+
+export type VoiceFinishState = {
+  ok: boolean;
+  project_id: string;
+  version: number;
+  configured: boolean;
+  default_profile: {
+    id?: string;
+    label: string;
+    speaker_name?: string;
+    style_name?: string;
+  } | null;
+  summary: {
+    total: number;
+    ready: number;
+    needs_generation: number;
+    failed: number;
+    queued: number;
+  };
+  segments: Array<{
+    slide_id: string;
+    slide_title: string;
+    at: number;
+    text: string;
+    speaker: string | null;
+    profile_label: string | null;
+    status: string;
+    audio_url: string | null;
+  }>;
+  active_job: VoiceFinishJob | null;
+  latest_job: VoiceFinishJob | null;
+};
+
+function voiceJobCard(job: VoiceFinishJob | null): string {
+  if (job === null) {
+    return `<div class="job-card" data-voice-job data-state="idle">
+      <div class="job-head"><strong data-job-label>まだ生成していません</strong><span class="voice-status" data-job-status>準備中</span></div>
+      <progress class="job-progress" data-job-progress max="1" value="0">0 / 0</progress>
+      <div class="job-numbers"><span>完了 <strong data-job-completed>0</strong> / <span data-job-total>0</span></span><span>cache <strong data-job-cached>0</strong></span><span>失敗 <strong data-job-failed>0</strong></span></div>
+      <p class="feedback" data-job-feedback aria-live="polite">声と原稿を確認したら、不足している区間だけをまとめて生成できます。</p>
+    </div>`;
+  }
+  const completed = Math.min(
+    job.total_segments,
+    job.completed_segments + job.failed_segments
+  );
+  const statusLabel = VOICE_JOB_STATUS_LABELS[job.status] ?? job.status;
+  return `<div class="job-card" data-voice-job data-state="${escapeHtml(job.status)}" data-status-url="${escapeHtml(job.status_url)}">
+    <div class="job-head"><strong data-job-label>${escapeHtml(statusLabel)}</strong><span class="voice-status ${escapeHtml(job.status)}" data-job-status>${escapeHtml(statusLabel)}</span></div>
+    <progress class="job-progress" data-job-progress max="${Math.max(1, job.total_segments)}" value="${completed}">${completed} / ${job.total_segments}</progress>
+    <div class="job-numbers"><span>完了 <strong data-job-completed>${job.completed_segments}</strong> / <span data-job-total>${job.total_segments}</span></span><span>cache <strong data-job-cached>${job.cached_segments}</strong></span><span>失敗 <strong data-job-failed>${job.failed_segments}</strong></span></div>
+    <p class="feedback" data-job-feedback aria-live="polite">${job.status === "completed" ? "生成した音声を区間一覧から試聴できます。" : job.status === "failed" || job.status === "partially_failed" ? "失敗した区間を確認し、もう一度生成できます。" : "画面を閉じても生成は続きます。"}</p>
+  </div>`;
+}
+
+export function voiceFinishPage(options: {
+  twitchLogin: string;
+  csrfToken: string;
+  project: ProjectRecord;
+  voice: VoiceFinishState;
+}): Response {
+  const projectId = escapeHtml(options.project.project_id);
+  const summary = options.voice.summary;
+  const currentJob = options.voice.active_job ?? options.voice.latest_job;
+  const jobActive =
+    options.voice.active_job !== null &&
+    !["completed", "partially_failed", "failed", "cancelled"].includes(
+      options.voice.active_job.status
+    );
+  const defaultProfileLabel =
+    options.voice.default_profile?.label ?? "ずんだもん・ノーマル";
+  const segmentList = options.voice.segments.length
+    ? options.voice.segments
+        .map((segment, index) => {
+          const statusLabel =
+            VOICE_SEGMENT_STATUS_LABELS[segment.status] ?? segment.status;
+          const generated = segment.audio_url !== null;
+          return `<details class="voice-review"${index === 0 ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}">
+            <summary><span class="component-step">${String(index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
+            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}">この区間を編集</a></div></div>
+          </details>`;
+        })
+        .join("")
+    : `<section class="empty"><h2>読み上げ原稿がありません</h2><p>先にAIクライアントまたはスライド編集画面から、読み上げ区間を追加してください。</p></section>`;
+  const generateDisabled =
+    !options.voice.configured || summary.needs_generation === 0 || jobActive;
+  return new Response(
+    shell(
+      `音声を仕上げる — ${options.project.document.title}`,
+      `${accountHeader(options.twitchLogin, options.csrfToken)}
+       <main class="voice-main" data-voice-page data-project-id="${projectId}" data-version="${options.voice.version}" data-csrf="${escapeHtml(options.csrfToken)}" data-summary-url="/api/projects/${projectId}/voice">
+         <a class="back" href="/dashboard/projects/${projectId}">← 研究詳細へ戻る</a>
+         <section class="voice-hero"><div><p class="eyebrow">Voice finishing</p><h1>音声を仕上げる</h1><p class="lead">ずんだもんの声を設定し、不足している読み上げ音声を生成して、区間ごとに確認できます。</p></div><a class="button ghost" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ</a></section>
+         <div class="voice-flow">
+           <div class="voice-column">
+             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">1</span><div><h2>声を決める</h2><p>最初は聞き取りやすい「ずんだもん・ノーマル」がおすすめです。あとから区間ごとに変更できます。</p></div></div>
+               <div class="voice-preset"><span class="voice-character" aria-hidden="true">ず</span><span><strong>ずんだもん・ノーマル</strong><small>VOICEVOX · 発表全体の既定音声として設定します</small></span><span class="stage">おすすめ</span></div>
+               <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/setup-zundamon"${options.voice.configured ? " disabled" : ""}>${options.voice.configured ? `${escapeHtml(defaultProfileLabel)}を設定済み` : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? "発表の既定音声として利用できます。" : "設定すると未指定の読み上げ区間へ自動的に適用されます。"}</p>
+             </section>
+             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">2</span><div><h2>不足分を生成する</h2><p>設定や原稿が変わった区間だけを生成します。生成済みの音声は再利用します。</p></div></div>
+               <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成</span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>
+               <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : "生成中もこの画面を閉じて構いません。"}</p>
+               ${voiceJobCard(currentJob)}
+             </section>
+             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
+           </div>
+           <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>生成済み件数が原稿数と一致しているか確認</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">生成がない区間は公開画面でもブラウザ音声へ切り替わります。</p></aside>
          </div>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),

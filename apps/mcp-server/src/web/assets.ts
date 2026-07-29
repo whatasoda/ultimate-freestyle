@@ -298,6 +298,218 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     } catch {}
   }
 
+  const voicePage = document.querySelector("[data-voice-page]");
+  if (voicePage instanceof HTMLElement) {
+    const csrf = voicePage.dataset.csrf || "";
+    const setupButton = voicePage.querySelector("[data-voice-setup]");
+    const setupFeedback = voicePage.querySelector("[data-voice-setup-feedback]");
+    const generateButton = voicePage.querySelector("[data-voice-generate]");
+    const generateFeedback = voicePage.querySelector("[data-voice-generate-feedback]");
+    const jobCard = voicePage.querySelector("[data-voice-job]");
+    const terminalStatuses = new Set(["completed", "partially_failed", "failed", "cancelled"]);
+    const jobLabels = {
+      queued: "生成待ち",
+      starting: "音声エンジン準備中",
+      starting_engine: "音声エンジン準備中",
+      running: "音声を生成中",
+      synthesizing: "音声を生成中",
+      encoding: "MP3へ変換中",
+      storing: "音声を保存中",
+      attaching: "発表へ反映中",
+      completed: "生成完了",
+      partially_failed: "一部の生成に失敗",
+      failed: "生成に失敗",
+      cancelled: "キャンセル済み"
+    };
+    const safeStatusUrl = (value) => {
+      try {
+        const url = new URL(value, location.href);
+        return url.origin === location.origin ? url.toString() : null;
+      } catch {
+        return null;
+      }
+    };
+    const updateJob = (job) => {
+      if (!(jobCard instanceof HTMLElement) || !job || typeof job.status !== "string") return;
+      const total = Number(job.total_segments || 0);
+      const completed = Number(job.completed_segments || 0);
+      const failed = Number(job.failed_segments || 0);
+      const cached = Number(job.cached_segments || 0);
+      const status = job.status;
+      const label = jobLabels[status] || status;
+      jobCard.dataset.state = status;
+      const labelNode = jobCard.querySelector("[data-job-label]");
+      const statusNode = jobCard.querySelector("[data-job-status]");
+      const progress = jobCard.querySelector("[data-job-progress]");
+      const totalNode = jobCard.querySelector("[data-job-total]");
+      const completedNode = jobCard.querySelector("[data-job-completed]");
+      const failedNode = jobCard.querySelector("[data-job-failed]");
+      const cachedNode = jobCard.querySelector("[data-job-cached]");
+      const feedback = jobCard.querySelector("[data-job-feedback]");
+      if (labelNode instanceof HTMLElement) labelNode.textContent = label;
+      if (statusNode instanceof HTMLElement) {
+        statusNode.textContent = label;
+        statusNode.className = "voice-status " + status;
+      }
+      if (progress instanceof HTMLProgressElement) {
+        progress.max = Math.max(1, total);
+        progress.value = Math.min(total, completed + failed);
+      }
+      if (totalNode instanceof HTMLElement) totalNode.textContent = String(total);
+      if (completedNode instanceof HTMLElement) completedNode.textContent = String(completed);
+      if (failedNode instanceof HTMLElement) failedNode.textContent = String(failed);
+      if (cachedNode instanceof HTMLElement) cachedNode.textContent = String(cached);
+      if (feedback instanceof HTMLElement) {
+        feedback.textContent = status === "completed"
+          ? "生成が完了しました。音声一覧を更新します…"
+          : status === "failed" || status === "partially_failed"
+            ? "生成できなかった区間があります。画面を更新して失敗分を再実行できます。"
+            : "画面を閉じても生成は続きます。";
+        feedback.classList.toggle("warning", status === "failed" || status === "partially_failed");
+        feedback.classList.toggle("success", status === "completed");
+      }
+      if (generateButton instanceof HTMLButtonElement) {
+        generateButton.disabled = !terminalStatuses.has(status);
+        generateButton.textContent = terminalStatuses.has(status) && status !== "completed"
+          ? "失敗した区間をもう一度生成"
+          : status === "completed"
+            ? "生成完了"
+            : "生成中です";
+      }
+    };
+    let pollTimer;
+    let pollFailures = 0;
+    const pollJob = async (statusUrl) => {
+      const url = safeStatusUrl(statusUrl);
+      if (url === null) return;
+      clearTimeout(pollTimer);
+      try {
+        const response = await fetch(url, { headers: { accept: "application/json" } });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error?.message || "生成状況を取得できませんでした。");
+        const job = result.job || result;
+        pollFailures = 0;
+        updateJob(job);
+        if (terminalStatuses.has(job.status)) {
+          if (job.status === "completed") setTimeout(() => location.reload(), 800);
+          return;
+        }
+        pollTimer = setTimeout(() => pollJob(url), document.hidden ? 8000 : 2500);
+      } catch (error) {
+        pollFailures += 1;
+        const feedback = jobCard?.querySelector("[data-job-feedback]");
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = "生成は継続しています。通信を確認して再接続します…";
+          feedback.classList.add("warning");
+        }
+        pollTimer = setTimeout(() => pollJob(url), Math.min(15000, 2000 * 2 ** pollFailures));
+      }
+    };
+    if (setupButton instanceof HTMLButtonElement) {
+      setupButton.addEventListener("click", async () => {
+        setupButton.disabled = true;
+        if (setupFeedback instanceof HTMLElement) setupFeedback.textContent = "ずんだもん・ノーマルを設定しています…";
+        try {
+          const response = await fetch(setupButton.dataset.voiceSetup || "", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-csrf-token": csrf },
+            body: JSON.stringify({ expected_version: Number(voicePage.dataset.version) })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error?.message || "声を設定できませんでした。");
+          if (setupFeedback instanceof HTMLElement) {
+            setupFeedback.textContent = "設定しました。音声の状態を更新します…";
+            setupFeedback.classList.add("success");
+          }
+          setTimeout(() => location.reload(), 500);
+        } catch (error) {
+          setupButton.disabled = false;
+          if (setupFeedback instanceof HTMLElement) {
+            setupFeedback.textContent = error instanceof Error ? error.message : "声を設定できませんでした。";
+            setupFeedback.classList.add("warning");
+          }
+        }
+      });
+    }
+    if (generateButton instanceof HTMLButtonElement) {
+      generateButton.addEventListener("click", async () => {
+        generateButton.disabled = true;
+        if (generateFeedback instanceof HTMLElement) {
+          generateFeedback.textContent = "生成jobを登録しています…";
+          generateFeedback.classList.remove("warning", "success");
+        }
+        try {
+          const response = await fetch(generateButton.dataset.voiceGenerate || "", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-csrf-token": csrf },
+            body: JSON.stringify({
+              expected_version: Number(voicePage.dataset.version),
+              idempotency_key: crypto.randomUUID()
+            })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error?.message || "音声生成を開始できませんでした。");
+          const job = result.job || result;
+          const statusUrl = result.status_url || job.status_url;
+          updateJob({ ...job, status_url: statusUrl });
+          if (jobCard instanceof HTMLElement) jobCard.dataset.statusUrl = statusUrl || "";
+          if (generateFeedback instanceof HTMLElement) {
+            generateFeedback.textContent = "生成を受け付けました。進捗は自動で更新されます。";
+            generateFeedback.classList.add("success");
+          }
+          if (statusUrl) pollJob(statusUrl);
+        } catch (error) {
+          generateButton.disabled = false;
+          if (generateFeedback instanceof HTMLElement) {
+            generateFeedback.textContent = error instanceof Error ? error.message : "音声生成を開始できませんでした。";
+            generateFeedback.classList.add("warning");
+          }
+        }
+      });
+    }
+    if (jobCard instanceof HTMLElement && !terminalStatuses.has(jobCard.dataset.state || "")) {
+      const initialStatusUrl = jobCard.dataset.statusUrl;
+      if (initialStatusUrl) pollJob(initialStatusUrl);
+    }
+    let activePlayer = null;
+    let activePreviewButton = null;
+    const stopPreview = () => {
+      if (activePlayer) { activePlayer.pause(); activePlayer.removeAttribute("src"); activePlayer.load(); activePlayer = null; }
+      if ("speechSynthesis" in window) speechSynthesis.cancel();
+      if (activePreviewButton instanceof HTMLButtonElement) {
+        activePreviewButton.setAttribute("aria-pressed", "false");
+        activePreviewButton.textContent = activePreviewButton.dataset.audioUrl ? "生成音声を試聴" : "ブラウザ音声で仮試聴";
+      }
+      activePreviewButton = null;
+    };
+    for (const button of voicePage.querySelectorAll("[data-voice-preview]")) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      button.addEventListener("click", () => {
+        if (activePreviewButton === button) { stopPreview(); return; }
+        stopPreview();
+        activePreviewButton = button;
+        button.setAttribute("aria-pressed", "true");
+        button.textContent = "停止";
+        const audioUrl = safeStatusUrl(button.dataset.audioUrl || "");
+        if (audioUrl !== null && button.dataset.audioUrl) {
+          const player = new Audio(audioUrl);
+          activePlayer = player;
+          player.addEventListener("ended", stopPreview, { once: true });
+          player.addEventListener("error", stopPreview, { once: true });
+          player.play().catch(stopPreview);
+          return;
+        }
+        if (!("speechSynthesis" in window)) { stopPreview(); return; }
+        const utterance = new SpeechSynthesisUtterance(button.dataset.voiceText || "");
+        utterance.lang = "ja-JP";
+        utterance.onend = stopPreview;
+        utterance.onerror = stopPreview;
+        speechSynthesis.speak(utterance);
+      });
+    }
+    addEventListener("pagehide", stopPreview, { once: true });
+  }
+
   const previewButton = document.querySelector("[data-create-preview]");
   const publishButton = document.querySelector("[data-publish-preview]");
   const publishFeedback = document.querySelector("[data-publish-feedback]");
