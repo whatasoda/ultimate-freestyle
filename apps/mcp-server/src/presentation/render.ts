@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@8";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@9";
 
 function escapeHtml(value: string): string {
   return value
@@ -783,6 +783,8 @@ export function renderPresentationHtml(
     .prelude-help { margin: .35cqh 0 0; color: #8fa0b5; font-size: .9cqw; }
     .prelude-start { min-width: 10em; padding: .8em 1.4em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: var(--accent); font-weight: 850; }
     .prelude-start:disabled { cursor: wait; opacity: .45; }
+    .voice-unlock { position: absolute; z-index: 45; left: 50%; bottom: 4%; translate: -50% 0; min-width: 12em; padding: .75em 1.1em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: #101827ee; box-shadow: 0 1em 3em #0009; font-weight: 850; }
+    .voice-unlock[hidden] { display: none; }
     .prelude[data-style="pulse"]::before { content: ""; position: absolute; width: 28cqw; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 36%, transparent), transparent 68%); animation: prelude-pulse 1.7s ease-in-out infinite alternate; }
     .prelude[data-style="orbit"]::before, .prelude[data-style="orbit"]::after { content: ""; position: absolute; width: 32cqw; aspect-ratio: 1; border: .12cqw solid #ffffff22; border-radius: 50%; animation: prelude-orbit 7s linear infinite; }
     .prelude[data-style="orbit"]::after { width: 21cqw; border-color: color-mix(in srgb, var(--accent) 55%, transparent); animation-direction: reverse; animation-duration: 4s; }
@@ -857,6 +859,7 @@ export function renderPresentationHtml(
         </div>
       </section>
       ${slideHtml}
+      <button class="voice-unlock" type="button" data-voice-unlock hidden>音声を開始</button>
     </div></div>
     <footer>
       <span id="counter" aria-live="polite">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
@@ -888,6 +891,7 @@ export function renderPresentationHtml(
     const preludeProgress = document.querySelector('[data-prelude-progress]');
     const preludeStatus = document.querySelector('[data-prelude-status]');
     const stage = document.querySelector('.stage');
+    const voiceUnlock = document.querySelector('[data-voice-unlock]');
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -909,6 +913,14 @@ export function renderPresentationHtml(
       voiceProgress.style.width = value;
       const localProgress = slides[slide]?.querySelector('.narration-inline-progress');
       if (localProgress instanceof HTMLElement) localProgress.style.width = value;
+    };
+    const showVoiceUnlock = () => {
+      if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = false;
+      stage?.setAttribute('data-voice-blocked', 'true');
+    };
+    const hideVoiceUnlock = () => {
+      if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = true;
+      stage?.removeAttribute('data-voice-blocked');
     };
     const stopVoice = () => {
       if ('speechSynthesis' in window) speechSynthesis.cancel();
@@ -944,14 +956,15 @@ export function renderPresentationHtml(
       const estimated = Math.max(1.5, segment.text.length / (7 * utterance.rate));
       const begin = performance.now();
       voiceTimer = setInterval(() => setVoiceProgress((performance.now() - begin) / 10 / estimated), 100);
+      utterance.onstart = hideVoiceUnlock;
       utterance.onend = finishVoice;
-      utterance.onerror = () => { clearInterval(voiceTimer); setVoiceProgress(0); };
+      utterance.onerror = (event) => { clearInterval(voiceTimer); setVoiceProgress(0); if (event.error === 'not-allowed') showVoiceUnlock(); };
       speechSynthesis.speak(utterance);
     };
     const speak = () => {
       stopVoice(); const segment = narration();
       if (!started) return;
-      if (!speech || !segment) { scheduleAutoAdvance(); return; }
+      if (!speech || !segment) { hideVoiceUnlock(); scheduleAutoAdvance(); return; }
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
       activeAudio = player;
@@ -966,7 +979,12 @@ export function renderPresentationHtml(
         player.pause(); activeAudio = null; setVoiceProgress(0); speakWithBrowser(segment);
       };
       player.addEventListener('error', fallback, { once: true });
-      player.play().catch(fallback);
+      player.play().then(hideVoiceUnlock).catch((error) => {
+        if (error instanceof DOMException && error.name === 'NotAllowedError') {
+          player.pause(); activeAudio = null; showVoiceUnlock(); return;
+        }
+        fallback();
+      });
     };
     const collectOverflow = (target) => {
       const ignoreVertical = target.dataset.fitScroll === 'true';
@@ -1031,6 +1049,7 @@ export function renderPresentationHtml(
       if (!DECK.loadingScreen.enabled || editorFrame) return false;
       started = false;
       stopVoice();
+      hideVoiceUnlock();
       prelude.hidden = false;
       slides.forEach((item) => { item.hidden = true; item.dataset.state = 'inactive'; });
       counter.textContent = '0 / ' + slides.length;
@@ -1125,8 +1144,10 @@ export function renderPresentationHtml(
     stage?.addEventListener('click', (event) => {
       if (!started || editorFrame || getSelection()?.toString()) return;
       if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
+      if (voiceUnlock instanceof HTMLButtonElement && !voiceUnlock.hidden) { speak(); return; }
       advance();
     });
+    voiceUnlock?.addEventListener('click', () => { if (started) speak(); });
     addEventListener('message', (event) => { if (!editorFrame || event.source !== parent || event.origin !== location.origin || event.data?.type !== 'ultimate-freestyle:set-position') return; setPosition(event.data.slide, event.data.step, false); });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
