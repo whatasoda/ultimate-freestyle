@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@35";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@36";
 
 function escapeHtml(value: string): string {
   return value
@@ -973,6 +973,7 @@ export function renderPresentationHtml(
             <div><dt>音声</dt><dd><kbd>M</kbd></dd></div>
             <div><dt>自動送り</dt><dd><kbd>A</kbd></dd></div>
             <div><dt>時間計測</dt><dd><kbd>T</kbd></dd></div>
+            <div><dt>全画面</dt><dd><kbd>F</kbd></dd></div>
           </dl>
           <button type="button" data-dismiss-shortcuts>ガイドを閉じる</button>
         </div>
@@ -985,6 +986,7 @@ export function renderPresentationHtml(
         <button id="prev" aria-label="前へ" aria-keyshortcuts="ArrowLeft ArrowUp PageUp Backspace" title="前へ（← / PageUp）">←</button><button id="next" aria-label="次へ" aria-keyshortcuts="ArrowRight ArrowDown PageDown Space Enter" title="次へ（→ / Space / PageDown）">→</button>
         <button id="speech" aria-pressed="true" aria-keyshortcuts="M" title="ページ移動時の自動読み上げ（M）">音声 ON</button>
         <button id="auto" aria-pressed="false" aria-keyshortcuts="A" title="読み上げ後、または想定時間後に自動で進む（A）">自動 OFF</button>
+        <button id="fullscreen" aria-pressed="false" aria-keyshortcuts="F" title="全画面表示を切り替える（F）">全画面</button>
         <button id="help" aria-haspopup="dialog" aria-keyshortcuts="?" title="操作ガイドを開く（?）">操作</button>
         <label>音量 <input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-describedby="volume-value"><output class="volume-value" id="volume-value" for="volume">100%</output></label>
       </div>
@@ -1008,6 +1010,7 @@ export function renderPresentationHtml(
     const autoButton = document.querySelector('#auto');
     const timerButton = document.querySelector('#timer-toggle');
     const helpButton = document.querySelector('#help');
+    const fullscreenButton = document.querySelector('#fullscreen');
     const previousButton = document.querySelector('#prev');
     const nextButton = document.querySelector('#next');
     const prelude = document.querySelector('[data-prelude]');
@@ -1687,6 +1690,21 @@ export function renderPresentationHtml(
     timerButton?.addEventListener('click', () => { if (started) setTimerRunning(!timerRunning); });
     helpButton?.addEventListener('click', showShortcuts);
     dismissShortcutsButton?.addEventListener('click', hideShortcuts);
+    const syncFullscreen = () => {
+      if (!(fullscreenButton instanceof HTMLButtonElement)) return;
+      const active = document.fullscreenElement !== null;
+      fullscreenButton.setAttribute('aria-pressed', String(active));
+      fullscreenButton.textContent = active ? '全画面を終了' : '全画面';
+    };
+    fullscreenButton?.addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+      } catch {}
+    });
+    if (!document.fullscreenEnabled && fullscreenButton instanceof HTMLButtonElement) fullscreenButton.hidden = true;
+    addEventListener('fullscreenchange', syncFullscreen);
+    syncFullscreen();
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
     showVolume();
     addEventListener('keydown', (event) => {
@@ -1703,6 +1721,7 @@ export function renderPresentationHtml(
       else if (event.key.toLowerCase() === 'm') { event.preventDefault(); speechButton.click(); }
       else if (event.key.toLowerCase() === 'a') { event.preventDefault(); autoButton.click(); }
       else if (event.key.toLowerCase() === 't') { event.preventDefault(); timerButton.click(); }
+      else if (event.key.toLowerCase() === 'f') { event.preventDefault(); fullscreenButton.click(); }
       else if (event.key === '?') { event.preventDefault(); showShortcuts(); }
     });
     stage?.addEventListener('click', (event) => {
