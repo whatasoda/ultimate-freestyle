@@ -1696,22 +1696,25 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const segmentFilters = [...voicePage.querySelectorAll("[data-voice-filter]")];
     const voiceSearch = voicePage.querySelector("[data-voice-search]");
     const voiceFilterEmpty = voicePage.querySelector("[data-voice-filter-empty]");
+    const voiceVisible = voicePage.querySelector("[data-voice-visible]");
+    const voiceSegments = [...voicePage.querySelectorAll("[data-voice-segment]")];
     let activeVoiceFilter = "all";
     const filterVoiceSegments = () => {
       const query = voiceSearch instanceof HTMLInputElement
         ? voiceSearch.value.trim().toLocaleLowerCase("ja")
         : "";
       let visible = 0;
-      for (const segment of voicePage.querySelectorAll("[data-voice-segment]")) {
+      for (const segment of voiceSegments) {
         if (!(segment instanceof HTMLElement)) continue;
         const state = segment.dataset.state || "";
         const matchesState = activeVoiceFilter === "all" || state === activeVoiceFilter ||
-          (activeVoiceFilter === "needs_generation" && ["queued", "running", "generating"].includes(state));
+          (activeVoiceFilter === "needs_generation" && ["queued", "running", "generating", "failed"].includes(state));
         const matchesText = query === "" || (segment.dataset.searchText || "").includes(query);
         segment.hidden = !(matchesState && matchesText);
         if (!segment.hidden) visible += 1;
       }
       if (voiceFilterEmpty instanceof HTMLElement) voiceFilterEmpty.hidden = visible > 0;
+      if (voiceVisible instanceof HTMLOutputElement) voiceVisible.textContent = visible + " / " + voiceSegments.length + "件表示";
     };
     for (const filterButton of segmentFilters) {
       if (!(filterButton instanceof HTMLButtonElement)) continue;
@@ -1723,7 +1726,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         filterVoiceSegments();
       });
     }
-    if (voiceSearch instanceof HTMLInputElement) voiceSearch.addEventListener("input", filterVoiceSegments);
+    if (voiceSearch instanceof HTMLInputElement) {
+      voiceSearch.addEventListener("input", filterVoiceSegments);
+      voiceSearch.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape") return;
+        voiceSearch.value = "";
+        filterVoiceSegments();
+        voiceSearch.blur();
+      });
+    }
     addEventListener("pagehide", () => stopPreview(), { once: true });
   }
 

@@ -500,6 +500,8 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("該当区間の再生成が必要になります");
     expect(voicePageHtml).toContain('data-voice-filter="needs_generation"');
     expect(voicePageHtml).toContain("data-voice-search");
+    expect(voicePageHtml).toContain("要生成（失敗含む）");
+    expect(voicePageHtml).toContain("data-voice-visible");
     expect(voicePageHtml).toContain("スライド名・原稿・声を検索");
     expect(voicePageHtml).toContain("data-voice-preview-feedback");
     expect(voicePageHtml).toContain("data-voice-filter-empty");
