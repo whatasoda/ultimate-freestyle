@@ -409,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=62"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=63"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -1598,6 +1598,9 @@ describe("Web dashboard", () => {
     );
     const workspaceWithoutNarrationHtml = await workspaceWithoutNarration.text();
     expect(workspaceWithoutNarrationHtml).toContain("data-narration-segment-create");
+    expect(workspaceWithoutNarrationHtml).toContain("data-segment-preview");
+    expect(workspaceWithoutNarrationHtml).toContain("data-segment-speech-preview");
+    expect(workspaceWithoutNarrationHtml).toContain("data-duration-breakdown");
     expect(workspaceWithoutNarrationHtml).toContain("最初の原稿を入力できます");
 
     const createNarrationSegment = await requestProvider(

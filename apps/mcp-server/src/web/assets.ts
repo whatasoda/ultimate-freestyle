@@ -367,6 +367,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const durationInput = slideEditor.elements.namedItem("duration_seconds");
     const durationStatus = document.querySelector("[data-workspace-duration]");
     const durationLabel = durationStatus?.querySelector("[data-workspace-duration-label]");
+    const durationBreakdown = slideEditor.querySelector("[data-duration-breakdown]");
     if (
       durationInput instanceof HTMLInputElement &&
       durationStatus instanceof HTMLElement &&
@@ -383,6 +384,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const overLimit = total > 20 * 60;
         durationStatus.dataset.state = overLimit ? "warning" : "ok";
         durationLabel.textContent = minutes + "分" + seconds + "秒" + (overLimit ? " · 20分超過" : "");
+        if (durationBreakdown instanceof HTMLElement) {
+          const stepCount = Number(slideEditor.dataset.stepCount || 1);
+          durationBreakdown.textContent = "読み上げを含むスライド全体の目安です。" + stepCount + "段階では1段階あたり約" + (nextSlide / stepCount).toFixed(1) + "秒です。";
+        }
       };
       durationInput.addEventListener("input", updateDurationStatus);
     }
@@ -1383,7 +1388,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     output.textContent = "概算 " + estimated.toFixed(1) + "秒 / STEP目安 " + stepDuration.toFixed(1) + "秒";
     output.dataset.state = estimated > stepDuration * 1.15 ? "warning" : "ok";
   };
-  for (const form of document.querySelectorAll("[data-segment-editor]")) {
+  for (const form of document.querySelectorAll("[data-segment-preview]")) {
     if (!(form instanceof HTMLFormElement)) continue;
     updateSegmentDuration(form);
     form.addEventListener("input", () => updateSegmentDuration(form));
@@ -1410,7 +1415,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           other.textContent = "ブラウザで仮試聴";
         }
       }
-      const form = button.closest("[data-segment-editor]");
+      const form = button.closest("[data-segment-preview]");
       if (!(form instanceof HTMLFormElement)) return;
       const data = new FormData(form);
       const utterance = new SpeechSynthesisUtterance(String(data.get("text") || ""));

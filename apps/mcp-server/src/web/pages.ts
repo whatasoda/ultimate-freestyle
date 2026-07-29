@@ -178,7 +178,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=62";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=63";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1654,6 +1654,9 @@ export function slideWorkspacePage(options: {
     <fieldset><legend>配置</legend><div class="editor-grid"><label>文字揃え<select name="text_align"><option value=""${slide.typography?.text_align === undefined ? " selected" : ""}>presetを使用（${typography.text_align === "center" ? "中央" : "左"}）</option><option value="start"${slide.typography?.text_align === "start" ? " selected" : ""}>左</option><option value="center"${slide.typography?.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>縦位置<select name="vertical_align"><option value=""${slide.typography?.vertical_align === undefined ? " selected" : ""}>presetを使用（${typography.vertical_align === "center" ? "中央" : "上"}）</option><option value="start"${slide.typography?.vertical_align === "start" ? " selected" : ""}>上</option><option value="center"${slide.typography?.vertical_align === "center" ? " selected" : ""}>中央</option></select></label></div></fieldset>
     <div class="actions"><button type="submit">文章レイアウトを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
   </form>`;
+  const defaultNarrationTuning = mergeVoicevoxTuning(
+    defaultProfile?.tuning ?? undefined
+  );
   const voiceSegments = slide.narration?.segments.length
     ? slide.narration.segments
         .map((segment) => {
@@ -1676,7 +1679,7 @@ export function slideWorkspacePage(options: {
               (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
             )
           ].join("");
-          return `<form class="voice-segment editor" data-segment-editor data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
+          return `<form class="voice-segment editor" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
             <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="voice-timing" data-segment-duration data-state="${estimatedDuration > stepDuration * 1.15 ? "warning" : "ok"}">概算 ${estimatedDuration.toFixed(1)}秒 / STEP目安 ${stepDuration.toFixed(1)}秒</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
             <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
             <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOX profile<select name="voice_profile_id">${profileOptions}</select></label></div>
@@ -1696,7 +1699,7 @@ export function slideWorkspacePage(options: {
     (_, index) => index
   ).filter((step) => !usedNarrationSteps.has(step));
   const narrationSegmentCreator = availableNarrationSteps.length
-    ? `<details class="component-detail"><summary>読み上げ区間を追加</summary><form class="editor" data-narration-segment-create data-versioned-form data-method="POST" action="${slidePath}/narration/segments" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>表示する段階<select name="at">${availableNarrationSteps.map((step) => `<option value="${step}">STEP ${step}</option>`).join("")}</select></label><label>表示・読み上げ文<textarea name="text" maxlength="2000" required placeholder="この段階で読み上げる文"></textarea></label><div class="actions"><button type="submit">区間を追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
+    ? `<details class="component-detail"><summary>読み上げ区間を追加</summary><form class="editor" data-narration-segment-create data-segment-preview data-versioned-form data-method="POST" action="${slidePath}/narration/segments" data-version="${options.project.version}" data-effective-tuning="${escapeHtml(JSON.stringify(defaultNarrationTuning))}" data-step-duration="${slide.duration_seconds / (slide.reveal_steps + 1)}" data-csrf="${escapeHtml(options.csrfToken)}"><label>表示する段階<select name="at">${availableNarrationSteps.map((step) => `<option value="${step}">STEP ${step}</option>`).join("")}</select></label><label>表示・読み上げ文<textarea name="text" maxlength="2000" required placeholder="この段階で読み上げる文"></textarea></label><span class="voice-timing" data-segment-duration data-state="ok">概算 1.5秒 / STEP目安 ${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒</span><div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false">ブラウザで仮試聴</button><button type="submit">区間を追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
     : `<p class="inherit-note">STEP 0〜${slide.reveal_steps}にはすべて読み上げ区間があります。</p>`;
   const missingAlt =
     slide.composition?.mode === "canvas"
@@ -1777,9 +1780,9 @@ export function slideWorkspacePage(options: {
            </section>
            <aside class="inspector">
              <details class="inspector-section" data-inspector-section="content" open><summary>内容</summary><div class="inspector-body">
-               <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
+               <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-max-step="${slide.reveal_steps}" data-step-count="${slide.reveal_steps + 1}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
-                 <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"><small class="inherit-note">読み上げを含むスライド全体の目安です。${slide.reveal_steps + 1}段階では1段階あたり約${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒です。</small></label>
+                 <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"><small class="inherit-note" data-duration-breakdown>読み上げを含むスライド全体の目安です。${slide.reveal_steps + 1}段階では1段階あたり約${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒です。</small></label>
                  <label>スライド本文（Markdown対応）<span class="markdown-toolbar" role="toolbar" aria-label="スライド本文の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="content_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="content_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="number" data-markdown-target="content_markdown">番号</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="content_markdown">強調</button><button class="ghost" type="button" data-markdown-action="table" data-markdown-target="content_markdown">比較表</button></span><textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">定型flowでは入力中も実表示へ反映し、自由配置・リッチ構成では代替表示に使います。</small></label>
                  <label>補足欄（読み上げない情報）<span class="markdown-toolbar" role="toolbar" aria-label="補足欄の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="sidebar_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="sidebar_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="sidebar_markdown">強調</button><button class="ghost" type="button" data-markdown-action="table" data-markdown-target="sidebar_markdown">比較表</button></span><textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea><small class="inherit-note">作者コメント、出典、追加データなど、音声に含めない情報を置けます。</small></label>
                  <div class="actions"><button type="submit">内容を保存</button>${nextSlidePath === null ? "" : `<button class="ghost" type="submit" data-save-next="${nextSlidePath}">保存して次へ</button>`}<span class="version" data-version-label>v${options.project.version}</span></div>
