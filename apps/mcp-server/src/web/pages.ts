@@ -610,6 +610,9 @@ export function projectDetailPage(options: {
         )
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
+  const addSlidePrompt = `「${document.title}」の発表へ新しいスライドを1枚追加したいです。前後の流れを確認し、入れる位置・役割・内容を提案してから作成してください。`;
+  const reviseSlidesPrompt = `「${document.title}」の発表構成を見直したいです。現在の全スライドを確認し、過不足と順番の改善案を先に示してください。合意した部分だけを個別に変更してください。`;
+  const slideAiActions = `<details class="component-detail"><summary>AIでスライドを追加・構成変更</summary><div class="disclosure-body"><p class="inherit-note">接続中のAIクライアントへ依頼文を貼り付けます。AIは現在の構成をresourceから確認できます。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(addSlidePrompt)}">追加を頼む文をコピー</button><button class="ghost" type="button" data-copy-text="${escapeHtml(reviseSlidesPrompt)}">構成見直しを頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
   const assetCards = options.assets.length
     ? `<div class="asset-grid">${options.assets
         .map(
@@ -842,7 +845,7 @@ export function projectDetailPage(options: {
                <dt>ログ</dt><dd>${document.logs.length}件</dd>
                <dt>スライド</dt><dd>${slides.length}枚</dd>
              </dl></section>
-             <section class="panel"><h2>発表構成</h2><div class="slide-list">${slideRows}</div></section>
+             <section class="panel"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideAiActions}</section>
              ${voicePanel}
              ${publicationPanel}
              <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>

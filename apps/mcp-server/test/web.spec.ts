@@ -411,6 +411,9 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("完成までの流れ");
     expect(detailHtml).toContain("研究の問いと方法を整理する");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
+    expect(detailHtml).toContain("AIでスライドを追加・構成変更");
+    expect(detailHtml).toContain("追加を頼む文をコピー");
+    expect(detailHtml).toContain("構成見直しを頼む文をコピー");
     expect(detailHtml).toContain("VOICEVOX音声は 0 / 1 区間まで生成済みです");
     expect(detailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
