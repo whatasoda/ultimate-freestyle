@@ -4,7 +4,7 @@ import type {
   SlideSceneNode
 } from "../projects/schema";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@3";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@4";
 
 function escapeHtml(value: string): string {
   return value
@@ -366,6 +366,21 @@ export function renderPresentationHtml(
           ) ?? []
       )
     )
+  ].slice(0, 2);
+  const voiceCredits = [
+    ...new Set(
+      deck.slides.flatMap(
+        (slide) =>
+          slide.narration?.segments.flatMap((segment) => {
+            if (segment.audio_src === null) return [];
+            const profile =
+              (segment.voice_profile_id
+                ? profiles.get(segment.voice_profile_id)
+                : undefined) ?? defaultProfile;
+            return profile ? [`VOICEVOX:${profile.speaker_name}`] : [];
+          }) ?? []
+      )
+    )
   ];
 
   const runtimeDeck = {
@@ -378,6 +393,7 @@ export function renderPresentationHtml(
     accent: deck.accent,
     loadingScreen,
     preload: { images: preloadImages, audio: preloadAudio },
+    voiceCredits,
     slides: deck.slides.map((slide) => {
       const segments = slide.narration?.segments.map((segment) => {
         const profile =
@@ -774,6 +790,7 @@ export function renderPresentationHtml(
     .slide:not([hidden])[data-animation="blur"] { animation: slide-blur var(--motion-duration) var(--motion-ease) both; }
     .slide:not([hidden])[data-animation="wipe"] { animation: slide-wipe var(--motion-duration) var(--motion-ease) both; }
     footer { justify-content: center; }
+    .voice-credit { max-width: 22ch; overflow: hidden; color: #9caabd; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
     .progress { flex: 1; max-width: 520px; height: 7px; overflow: hidden; border-radius: 99px; background: #263244; }
     .progress i, .voice-progress i { display: block; width: 0; height: 100%; background: var(--accent); transition: width .25s ease; }
     .voice-progress { width: 120px; height: 5px; overflow: hidden; border-radius: 99px; background: #263244; }
@@ -803,7 +820,7 @@ export function renderPresentationHtml(
       ${slideHtml}
     </div></div>
     <footer>
-      <span id="counter">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div>
+      <span id="counter">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
       <div class="voice-progress" title="読み上げ進捗"><i id="voice-progress"></i></div>
       <div class="controls">
         <button id="prev" aria-label="前へ">←</button><button id="next" aria-label="次へ">→</button>
@@ -882,10 +899,9 @@ export function renderPresentationHtml(
       if (!started || !speech || !segment) return;
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
-      const tuning = segment.effectiveTuning || {};
       activeAudio = player;
       player.preload = 'auto';
-      player.volume = clamp(Number(volume.value) * Number(tuning.volumeScale || 1), 0, 1);
+      player.volume = clamp(Number(volume.value), 0, 1);
       player.addEventListener('timeupdate', () => {
         if (Number.isFinite(player.duration) && player.duration > 0) setVoiceProgress(player.currentTime / player.duration * 100);
       });
@@ -1040,7 +1056,7 @@ export function renderPresentationHtml(
     document.querySelector('#prev').addEventListener('click', () => { if (!started) return; if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
     speechButton.addEventListener('click', () => { speech = !speech; speechButton.setAttribute('aria-pressed', String(speech)); render(); });
     autoButton.addEventListener('click', () => { auto = !auto; autoButton.setAttribute('aria-pressed', String(auto)); });
-    volume.addEventListener('input', () => { if (activeAudio) { const tuning = narration()?.effectiveTuning || {}; activeAudio.volume = clamp(Number(volume.value) * Number(tuning.volumeScale || 1), 0, 1); } try { localStorage.setItem(volumeKey, volume.value); } catch {} });
+    volume.addEventListener('input', () => { if (activeAudio) activeAudio.volume = clamp(Number(volume.value), 0, 1); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
     addEventListener('keydown', (event) => { if (['ArrowRight', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); } else if (event.key === 'ArrowLeft') { document.querySelector('#prev').click(); } });
     addEventListener('message', (event) => { if (!editorFrame || event.source !== parent || event.origin !== location.origin || event.data?.type !== 'ultimate-freestyle:set-position') return; setPosition(event.data.slide, event.data.step, false); });

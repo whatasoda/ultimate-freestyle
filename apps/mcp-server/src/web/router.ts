@@ -41,11 +41,23 @@ import {
   getPublicationStatus,
   PublicationError,
   publishPresentationPreview,
+  readOwnerPresentationAudio,
   readOwnerPreview,
   readOwnerPresentationAsset,
+  readPublishedPresentationAudio,
   readPublishedPresentation,
   readPublishedPresentationAsset
 } from "../publications/service";
+import {
+  createVoiceGenerationJob,
+  getVoiceGenerationJob,
+  getVoiceProjectStatus,
+  hydrateProjectVoice,
+  readOwnerVoiceArtifact,
+  resolveVoiceArtifacts,
+  setupZundamonProfile,
+  VoiceGenerationError
+} from "../voicevox/service";
 import { z } from "zod";
 import { dashboardScriptResponse } from "./assets";
 import {
@@ -54,7 +66,8 @@ import {
   projectDetailPage,
   projectNotFoundPage,
   redirectPage,
-  slideWorkspacePage
+  slideWorkspacePage,
+  voiceFinishPage
 } from "./pages";
 
 const MAX_FORM_BYTES = 16 * 1024;
@@ -92,6 +105,14 @@ const deckSettingsRequestSchema = z.object({
 
 const publishRequestSchema = z.object({
   revision_id: z.string().uuid()
+});
+
+const voiceSetupRequestSchema = z.object({
+  expected_version: z.number().int().positive()
+});
+
+const voiceJobRequestSchema = voiceSetupRequestSchema.extend({
+  idempotency_key: z.string().uuid()
 });
 
 const slideFieldsRequestSchema = z.object({
@@ -267,7 +288,7 @@ async function handleProjectDetail(
   if (session === null) {
     return redirectPage("/", clearWebSessionCookies());
   }
-  const project = await getProject(env.DB, session.userId, projectId);
+  const project = await getHydratedProject(env, session.userId, projectId);
   if (project === null) {
     return projectNotFoundPage();
   }
@@ -278,6 +299,22 @@ async function handleProjectDetail(
     assets: await listProjectAssets(env.DB, session.userId, projectId),
     publication: (await getPublicationStatus(env.DB, session.userId, projectId))!
   });
+}
+
+async function getHydratedProject(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  ownerUserId: string,
+  projectId: string
+) {
+  const project = await getProject(env.DB, ownerUserId, projectId);
+  if (project === null) return null;
+  const artifacts = await resolveVoiceArtifacts(env.DB, ownerUserId, project);
+  return hydrateProjectVoice(
+    project,
+    artifacts,
+    (segment) =>
+      `/api/projects/${projectId}/voice/audio/${segment.fingerprint}`
+  );
 }
 
 async function handleSlideWorkspace(
@@ -293,7 +330,7 @@ async function handleSlideWorkspace(
   if (session === null) {
     return redirectPage("/", clearWebSessionCookies());
   }
-  const project = await getProject(env.DB, session.userId, projectId);
+  const project = await getHydratedProject(env, session.userId, projectId);
   if (project === null) return projectNotFoundPage();
   return slideWorkspacePage({
     twitchLogin: session.twitchLogin,
@@ -314,7 +351,7 @@ async function handleSlideFrame(
   }
   const session = await readWebSession(request, env.DB);
   if (session === null) return new Response(null, { status: 404 });
-  const project = await getProject(env.DB, session.userId, projectId);
+  const project = await getHydratedProject(env, session.userId, projectId);
   if (
     project === null ||
     project.document.deck === null ||
@@ -339,6 +376,354 @@ async function handleSlideFrame(
       "x-frame-options": "SAMEORIGIN"
     }
   });
+}
+
+function voiceErrorResponse(error: unknown): Response {
+  if (error instanceof VoiceGenerationError) {
+    const status =
+      error.code === "PROJECT_NOT_FOUND" || error.code === "VOICE_JOB_NOT_FOUND"
+        ? 404
+        : error.code === "VOICE_JOB_LIMIT" ||
+            error.code === "VOICE_CHARACTER_LIMIT"
+          ? 429
+          : error.code === "PROJECT_VERSION_CONFLICT"
+            ? 409
+            : 422;
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: error.code,
+          message: error.message,
+          current_version: error.currentVersion
+        },
+        request_id: crypto.randomUUID()
+      },
+      status
+    );
+  }
+  console.error(
+    JSON.stringify({
+      message: "VOICEVOX web request failed",
+      error: error instanceof Error ? error.message : String(error)
+    })
+  );
+  return jsonResponse(
+    {
+      ok: false,
+      error: {
+        code: "INTERNAL_ERROR",
+        message: "音声の処理を完了できませんでした。"
+      },
+      request_id: crypto.randomUUID()
+    },
+    500
+  );
+}
+
+async function handleVoicePage(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return redirectPage("/", clearWebSessionCookies());
+  const [project, voice] = await Promise.all([
+    getProject(env.DB, session.userId, projectId),
+    getVoiceProjectStatus(env.DB, session.userId, projectId)
+  ]);
+  if (project === null || voice === null) return projectNotFoundPage();
+  return voiceFinishPage({
+    twitchLogin: session.twitchLogin,
+    csrfToken: session.csrfToken,
+    project,
+    voice: { ...voice, ok: true }
+  });
+}
+
+async function handleVoiceStatus(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      401
+    );
+  }
+  const voice = await getVoiceProjectStatus(env.DB, session.userId, projectId);
+  return voice === null
+    ? jsonResponse(
+        {
+          ok: false,
+          error: { code: "PROJECT_NOT_FOUND", message: "研究が見つかりません。" },
+          request_id: crypto.randomUUID()
+        },
+        404
+      )
+    : jsonResponse({ ok: true, voice, error: null, request_id: crypto.randomUUID() });
+}
+
+async function handleVoiceSetup(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = voiceSetupRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: "versionを確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await setupZundamonProfile(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "voicevox.profile_configured",
+      outcome: "succeeded",
+      details: { project_id: projectId, project_version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      version: project.version,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return voiceErrorResponse(error);
+  }
+}
+
+async function handleVoiceJobCreate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = voiceJobRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: "生成条件を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const result = await createVoiceGenerationJob(env, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      idempotencyKey: parsed.data.idempotency_key
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "voicevox.generation_requested",
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        job_id: result.job.job_id,
+        replayed: result.replayed
+      },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse(
+      {
+        ok: true,
+        job: result.job,
+        status_url: result.job.status_url,
+        replayed: result.replayed,
+        error: null,
+        request_id: crypto.randomUUID()
+      },
+      result.replayed ? 200 : 202
+    );
+  } catch (error) {
+    return voiceErrorResponse(error);
+  }
+}
+
+async function handleVoiceJobRead(
+  request: Request,
+  env: Env,
+  projectId: string,
+  jobId: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return new Response(null, { status: 404 });
+  const job = await getVoiceGenerationJob(
+    env.DB,
+    session.userId,
+    projectId,
+    jobId
+  );
+  return job === null
+    ? jsonResponse(
+        {
+          ok: false,
+          error: { code: "VOICE_JOB_NOT_FOUND", message: "生成jobが見つかりません。" },
+          request_id: crypto.randomUUID()
+        },
+        404
+      )
+    : jsonResponse({ ok: true, job, error: null, request_id: crypto.randomUUID() });
+}
+
+function audioResponse(
+  object: R2ObjectBody | null,
+  cacheControl: string,
+  partial: boolean
+): Response {
+  if (object === null) return new Response(null, { status: 404 });
+  const headers = new Headers({
+    "accept-ranges": "bytes",
+    "cache-control": cacheControl,
+    "content-type": "audio/mpeg",
+    etag: object.httpEtag,
+    "x-content-type-options": "nosniff"
+  });
+  if (
+    object.range !== undefined &&
+    "offset" in object.range &&
+    object.range.offset !== undefined &&
+    object.range.length !== undefined
+  ) {
+    const length = object.range.length;
+    headers.set("content-length", String(length));
+    headers.set(
+      "content-range",
+      `bytes ${object.range.offset}-${object.range.offset + length - 1}/${object.size}`
+    );
+  }
+  return new Response(object.body, {
+    status: partial && object.range !== undefined ? 206 : 200,
+    headers
+  });
+}
+
+async function handleOwnerVoiceAudio(
+  request: Request,
+  env: Env,
+  projectId: string,
+  fingerprint: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return new Response(null, { status: 404 });
+  const hasRange = request.headers.has("range");
+  return audioResponse(
+    await readOwnerVoiceArtifact(
+      env,
+      session.userId,
+      projectId,
+      fingerprint,
+      hasRange ? request.headers : undefined
+    ),
+    "private, max-age=31536000, immutable",
+    hasRange
+  );
+}
+
+async function handlePresentationAudio(
+  request: Request,
+  env: Env,
+  revisionId: string,
+  slideId: string,
+  segmentAt: number
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const hasRange = request.headers.has("range");
+  const published = await readPublishedPresentationAudio(
+    env,
+    revisionId,
+    slideId,
+    segmentAt,
+    hasRange ? request.headers : undefined
+  );
+  if (published !== null) {
+    return audioResponse(
+      published,
+      "public, max-age=31536000, immutable",
+      hasRange
+    );
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return new Response(null, { status: 404 });
+  return audioResponse(
+    await readOwnerPresentationAudio(
+      env,
+      session.userId,
+      revisionId,
+      slideId,
+      segmentAt,
+      hasRange ? request.headers : undefined
+    ),
+    "private, no-store",
+    hasRange
+  );
 }
 
 async function readRequestJson(
@@ -1550,6 +1935,31 @@ export async function handleWebRequest(
       "private, no-store"
     );
   }
+  const presentationAudioMatch = path.match(
+    new RegExp(
+      `^/presentation-audio/${UUID_PATH}/([a-z0-9][a-z0-9-]{0,63})/(\\d{1,3})\\.mp3$`,
+      "i"
+    )
+  );
+  if (
+    presentationAudioMatch?.[1] !== undefined &&
+    presentationAudioMatch[2] !== undefined &&
+    presentationAudioMatch[3] !== undefined
+  ) {
+    return handlePresentationAudio(
+      request,
+      env,
+      presentationAudioMatch[1],
+      presentationAudioMatch[2],
+      Number(presentationAudioMatch[3])
+    );
+  }
+  const voicePageMatch = path.match(
+    new RegExp(`^/dashboard/projects/${UUID_PATH}/voice$`, "i")
+  );
+  if (voicePageMatch?.[1] !== undefined) {
+    return handleVoicePage(request, env, voicePageMatch[1]);
+  }
   const projectMatch = path.match(
     new RegExp(`^/dashboard/projects/${UUID_PATH}$`, "i")
   );
@@ -1581,6 +1991,55 @@ export async function handleWebRequest(
   );
   if (projectImageMatch?.[1] !== undefined) {
     return handleImageUpload(request, env, projectImageMatch[1]);
+  }
+  const ownerVoiceAudioMatch = path.match(
+    new RegExp(
+      `^/api/projects/${UUID_PATH}/voice/audio/([0-9a-f]{64})$`,
+      "i"
+    )
+  );
+  if (
+    ownerVoiceAudioMatch?.[1] !== undefined &&
+    ownerVoiceAudioMatch[2] !== undefined
+  ) {
+    return handleOwnerVoiceAudio(
+      request,
+      env,
+      ownerVoiceAudioMatch[1],
+      ownerVoiceAudioMatch[2]
+    );
+  }
+  const voiceJobReadMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/voice/jobs/${UUID_PATH}$`, "i")
+  );
+  if (
+    voiceJobReadMatch?.[1] !== undefined &&
+    voiceJobReadMatch[2] !== undefined
+  ) {
+    return handleVoiceJobRead(
+      request,
+      env,
+      voiceJobReadMatch[1],
+      voiceJobReadMatch[2]
+    );
+  }
+  const voiceJobsMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/voice/jobs$`, "i")
+  );
+  if (voiceJobsMatch?.[1] !== undefined) {
+    return handleVoiceJobCreate(request, env, voiceJobsMatch[1]);
+  }
+  const voiceSetupMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/voice/setup-zundamon$`, "i")
+  );
+  if (voiceSetupMatch?.[1] !== undefined) {
+    return handleVoiceSetup(request, env, voiceSetupMatch[1]);
+  }
+  const voiceStatusMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/voice$`, "i")
+  );
+  if (voiceStatusMatch?.[1] !== undefined) {
+    return handleVoiceStatus(request, env, voiceStatusMatch[1]);
   }
   const projectFieldsMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/fields$`, "i")

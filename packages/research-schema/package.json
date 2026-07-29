@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./voice": "./src/voice.ts"
+    "./voice": "./src/voice.ts",
+    "./voice-generation": "./src/voice-generation.ts"
   }
 }

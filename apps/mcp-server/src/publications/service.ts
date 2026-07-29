@@ -7,10 +7,17 @@ import {
 } from "../presentation/render";
 import { getProject } from "../projects/repository";
 import type { ProjectRecord } from "../projects/schema";
+import {
+  getVoiceProjectStatus,
+  hydrateProjectVoice,
+  resolveVoiceArtifacts,
+  type VoiceSegmentPlan
+} from "../voicevox/service";
 
 const MAX_PRESENTATION_BYTES = 2 * 1024 * 1024;
 const MAX_PRESENTATION_ASSETS = 30;
 const MAX_PRESENTATION_ASSET_BYTES = 30 * 1024 * 1024;
+const MAX_PRESENTATION_AUDIO_BYTES = 100 * 1024 * 1024;
 
 export type PublicationErrorCode =
   | "PROJECT_NOT_FOUND"
@@ -19,6 +26,7 @@ export type PublicationErrorCode =
   | "PREVIEW_STALE"
   | "PRESENTATION_ASSET_LIMIT"
   | "PRESENTATION_ASSET_NOT_FOUND"
+  | "VOICE_INCOMPLETE"
   | "PRESENTATION_TOO_LARGE";
 
 export class PublicationError extends Error {
@@ -83,6 +91,12 @@ async function sha256(value: Uint8Array): Promise<string> {
 
 type RevisionAsset = {
   asset: StoredProjectAsset;
+  objectKey: string;
+  contentUrl: string;
+};
+
+type RevisionAudio = {
+  segment: VoiceSegmentPlan;
   objectKey: string;
   contentUrl: string;
 };
@@ -166,6 +180,79 @@ async function snapshotPresentationAssets(
         asset,
         objectKey,
         contentUrl: `/presentation-assets/${revisionId}/${asset.asset_id}`
+      });
+    }
+    return snapshots;
+  } catch (error) {
+    await removeObjects(env.MEDIA_BUCKET, attemptedObjectKeys);
+    throw error;
+  }
+}
+
+async function snapshotPresentationAudio(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  ownerUserId: string,
+  project: ProjectRecord,
+  revisionId: string
+): Promise<RevisionAudio[]> {
+  const status = await getVoiceProjectStatus(
+    env.DB,
+    ownerUserId,
+    project.project_id
+  );
+  if (
+    status?.configured &&
+    (status.summary.total === 0 || status.summary.ready !== status.summary.total)
+  ) {
+    throw new PublicationError(
+      "VOICE_INCOMPLETE",
+      status.summary.total === 0
+        ? "読み上げ原稿を追加してからプレビューを作成してください。"
+        : `VOICEVOX音声が ${status.summary.ready} / ${status.summary.total} 区間まで生成されています。音声を仕上げてからプレビューを作成してください。`
+    );
+  }
+  const segments = await resolveVoiceArtifacts(env.DB, ownerUserId, project);
+  const totalBytes = segments.reduce(
+    (sum, segment) => sum + (segment.artifact?.byte_size ?? 0),
+    0
+  );
+  if (totalBytes > MAX_PRESENTATION_AUDIO_BYTES) {
+    throw new PublicationError(
+      "PRESENTATION_ASSET_LIMIT",
+      "1つの発表で使用する音声は合計100MiBまでです。"
+    );
+  }
+
+  const snapshots: RevisionAudio[] = [];
+  const attemptedObjectKeys: string[] = [];
+  try {
+    for (const segment of segments) {
+      if (segment.artifact === null) continue;
+      const source = await env.MEDIA_BUCKET.get(segment.artifact.object_key);
+      if (source === null) {
+        throw new PublicationError(
+          "VOICE_INCOMPLETE",
+          `スライド「${segment.slideTitle}」の音声を読み取れませんでした。再生成してください。`
+        );
+      }
+      const objectKey = `presentation-revisions/${ownerUserId}/${project.project_id}/${revisionId}/audio/${segment.slideId}-${segment.at}.mp3`;
+      attemptedObjectKeys.push(objectKey);
+      await env.MEDIA_BUCKET.put(objectKey, source.body, {
+        httpMetadata: {
+          contentType: "audio/mpeg",
+          cacheControl: "public, max-age=31536000, immutable"
+        },
+        customMetadata: {
+          projectId: project.project_id,
+          projectVersion: String(project.version),
+          revisionId,
+          fingerprint: segment.fingerprint
+        }
+      });
+      snapshots.push({
+        segment,
+        objectKey,
+        contentUrl: `/presentation-audio/${revisionId}/${segment.slideId}/${segment.at}.mp3`
       });
     }
     return snapshots;
@@ -272,13 +359,30 @@ export async function createPresentationPreview(
   const cleanupKeys = snapshots.map((snapshot) => snapshot.objectKey);
 
   try {
+    const audioSnapshots = await snapshotPresentationAudio(
+      env,
+      ownerUserId,
+      project,
+      revisionId
+    );
+    cleanupKeys.push(...audioSnapshots.map((snapshot) => snapshot.objectKey));
     const assetUrls = Object.fromEntries(
       snapshots.map((snapshot) => [
         snapshot.asset.asset_id,
         snapshot.contentUrl
       ])
     );
-    const html = renderPresentationHtml(project, { assetUrls });
+    const hydratedProject = hydrateProjectVoice(
+      project,
+      audioSnapshots.map((snapshot) => snapshot.segment),
+      (segment) =>
+        audioSnapshots.find(
+          (snapshot) =>
+            snapshot.segment.slideId === segment.slideId &&
+            snapshot.segment.at === segment.at
+        )?.contentUrl ?? ""
+    );
+    const html = renderPresentationHtml(hydratedProject, { assetUrls });
     const bytes = new TextEncoder().encode(html);
     if (bytes.byteLength > MAX_PRESENTATION_BYTES) {
       throw new PublicationError(
@@ -344,6 +448,28 @@ export async function createPresentationPreview(
             snapshot.asset.width,
             snapshot.asset.height,
             snapshot.asset.byte_size,
+            now
+          )
+      ),
+      ...audioSnapshots.map((snapshot) =>
+        env.DB
+          .prepare(
+            `INSERT INTO presentation_revision_audio (
+               revision_id, owner_user_id, project_id, slide_id, segment_at,
+               artifact_fingerprint, object_key, content_hash, mime_type,
+               byte_size, duration_ms, created_at
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'audio/mpeg', ?, NULL, ?)`
+          )
+          .bind(
+            revisionId,
+            ownerUserId,
+            projectId,
+            snapshot.segment.slideId,
+            snapshot.segment.at,
+            snapshot.segment.fingerprint,
+            snapshot.objectKey,
+            snapshot.segment.artifact!.content_hash,
+            snapshot.segment.artifact!.byte_size,
             now
           )
       )
@@ -489,4 +615,54 @@ export async function readPublishedPresentationAsset(
     .bind(revisionId, assetId)
     .first<{ object_key: string }>();
   return row === null ? null : env.MEDIA_BUCKET.get(row.object_key);
+}
+
+export async function readOwnerPresentationAudio(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  ownerUserId: string,
+  revisionId: string,
+  slideId: string,
+  segmentAt: number,
+  rangeHeaders?: Headers
+): Promise<R2ObjectBody | null> {
+  const row = await env.DB
+    .prepare(
+      `SELECT a.object_key
+       FROM presentation_revision_audio a
+       JOIN presentation_revisions r ON r.id = a.revision_id
+       WHERE a.revision_id = ? AND a.slide_id = ? AND a.segment_at = ?
+         AND r.owner_user_id = ?`
+    )
+    .bind(revisionId, slideId, segmentAt, ownerUserId)
+    .first<{ object_key: string }>();
+  return row === null
+    ? null
+    : env.MEDIA_BUCKET.get(
+        row.object_key,
+        rangeHeaders ? { range: rangeHeaders } : undefined
+      );
+}
+
+export async function readPublishedPresentationAudio(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  revisionId: string,
+  slideId: string,
+  segmentAt: number,
+  rangeHeaders?: Headers
+): Promise<R2ObjectBody | null> {
+  const row = await env.DB
+    .prepare(
+      `SELECT a.object_key
+       FROM presentation_revision_audio a
+       JOIN project_publications p ON p.published_revision_id = a.revision_id
+       WHERE a.revision_id = ? AND a.slide_id = ? AND a.segment_at = ?`
+    )
+    .bind(revisionId, slideId, segmentAt)
+    .first<{ object_key: string }>();
+  return row === null
+    ? null
+    : env.MEDIA_BUCKET.get(
+        row.object_key,
+        rangeHeaders ? { range: rangeHeaders } : undefined
+      );
 }

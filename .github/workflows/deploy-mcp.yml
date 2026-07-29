@@ -17,7 +17,7 @@ jobs:
   deploy:
     name: Test, migrate, deploy, and smoke test
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     env:
       CI: "true"
       CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
@@ -71,5 +71,5 @@ jobs:
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- Worker: \`ultimate-freestyle-mcp\`"
             echo "- URL: https://saijiyu-kenkyu.2764.moe"
-            echo "- D1 migrations, Worker deployment, and production smoke test completed."
+            echo "- D1 migrations, Worker and VOICEVOX Container deployment, and production smoke test completed."
           } >> "$GITHUB_STEP_SUMMARY"

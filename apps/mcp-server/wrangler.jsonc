@@ -47,8 +47,49 @@
   "images": {
     "binding": "IMAGES"
   },
+  "queues": {
+    "producers": [
+      {
+        "binding": "VOICE_JOBS_QUEUE",
+        "queue": "ultimate-freestyle-voice-jobs"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "ultimate-freestyle-voice-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 2,
+        "max_retries": 3,
+        "retry_delay": 60,
+        "dead_letter_queue": "ultimate-freestyle-voice-jobs-dlq",
+        "max_concurrency": 1
+      }
+    ]
+  },
+  "containers": [
+    {
+      "class_name": "VoicevoxContainer",
+      "image": "./voicevox/Dockerfile",
+      "instance_type": "standard-2",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "VOICEVOX_CONTAINER",
+        "class_name": "VoicevoxContainer"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "voicevox-container-v1",
+      "new_sqlite_classes": ["VoicevoxContainer"]
+    }
+  ],
   "triggers": {
-    "crons": ["17 3 * * *"]
+    "crons": ["*/2 * * * *", "17 3 * * *"]
   },
   "observability": {
     "enabled": true,

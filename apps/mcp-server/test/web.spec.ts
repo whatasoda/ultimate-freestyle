@@ -10,6 +10,13 @@ import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { createEmptyProject } from "../src/projects/schema";
 import type { Fetcher } from "../src/auth/twitch";
+import {
+  VOICEVOX_ENGINE
+} from "@ultimate-freestyle/research-schema/voice-generation";
+import {
+  createVoiceGenerationJob,
+  type VoiceGenerationMessage
+} from "../src/voicevox/service";
 
 function createAuthEnv(): Env {
   return {
@@ -17,6 +24,8 @@ function createAuthEnv(): Env {
     AUTH_STATE_KV: env.AUTH_STATE_KV,
     MEDIA_BUCKET: env.MEDIA_BUCKET,
     DB: env.DB,
+    VOICE_JOBS_QUEUE: env.VOICE_JOBS_QUEUE,
+    VOICEVOX_CONTAINER: env.VOICEVOX_CONTAINER,
     IMAGES: env.IMAGES,
     MCP_AUTH_MODE: "twitch",
     TWITCH_BROADCASTER_ID: "67879379",
@@ -424,7 +433,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("編集できるtemplateを追加");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-editor");
-    expect(workspaceHtml).toContain("VOICEVOX音声あり");
+    expect(workspaceHtml).toContain("VOICEVOX音声が未生成");
     expect(workspaceHtml).toContain("ずんだもん・ノーマル");
     expect(workspaceHtml).toContain("全設定を確認");
     expect(workspaceHtml).toContain("data-layout-status");
@@ -650,6 +659,69 @@ describe("Web dashboard", () => {
     expect(updatedWorkspaceHtml).toContain("一枚ずつ確認できる結果");
     expect(updatedWorkspaceHtml).toContain("Webで調整した読み上げ文");
 
+    const incompletePreview = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/previews",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 4 })
+        }
+      ),
+      authEnv
+    );
+    expect(incompletePreview.status).toBe(409);
+    expect(await incompletePreview.json()).toMatchObject({
+      error: { code: "VOICE_INCOMPLETE" }
+    });
+
+    const queuedVoice: VoiceGenerationMessage[] = [];
+    const voiceJob = await createVoiceGenerationJob(
+      {
+        DB: env.DB,
+        VOICE_JOBS_QUEUE: {
+          sendBatch: async (
+            messages: Array<{ body: VoiceGenerationMessage }>
+          ) => queuedVoice.push(...messages.map((message) => message.body))
+        } as unknown as Queue<VoiceGenerationMessage>
+      },
+      {
+        ownerUserId: "twitch-dashboard-viewer-id",
+        projectId: "10000000-0000-4000-8000-000000000001",
+        expectedVersion: 4,
+        idempotencyKey: "71000000-0000-4000-8000-000000000007"
+      }
+    );
+    expect(voiceJob.job.status).toBe("queued");
+    expect(queuedVoice).toHaveLength(1);
+    const fingerprint = queuedVoice[0]!.fingerprint;
+    const voiceObjectKey = `voice-cache/test/${fingerprint}.mp3`;
+    const voiceBytes = new Uint8Array([0x49, 0x44, 0x33, 0x04]);
+    await env.MEDIA_BUCKET.put(voiceObjectKey, voiceBytes, {
+      httpMetadata: { contentType: "audio/mpeg" }
+    });
+    await env.DB.prepare(
+      `INSERT INTO voice_audio_artifacts (
+         fingerprint, owner_user_id, project_id, object_key, content_hash,
+         mime_type, byte_size, engine_version, image_digest, created_at
+       ) VALUES (?, ?, ?, ?, ?, 'audio/mpeg', ?, ?, ?, ?)`
+    ).bind(
+      fingerprint,
+      "twitch-dashboard-viewer-id",
+      "10000000-0000-4000-8000-000000000001",
+      voiceObjectKey,
+      "a".repeat(64),
+      voiceBytes.byteLength,
+      VOICEVOX_ENGINE.version,
+      VOICEVOX_ENGINE.imageDigest,
+      now
+    ).run();
+
     const previewCreate = await requestProvider(
       provider,
       new Request(
@@ -692,6 +764,8 @@ describe("Web dashboard", () => {
     expect(previewHtml).toContain("Webで微調整した研究");
     expect(previewHtml).toContain("Webで調整した読み上げ文");
     expect(previewHtml).not.toContain("/stale-audio.mp3");
+    const presentationAudioUrl = `/presentation-audio/${previewResult.revision.revision_id}/intro/0.mp3`;
+    expect(previewHtml).toContain(presentationAudioUrl);
     const presentationAssetUrl = `/presentation-assets/${previewResult.revision.revision_id}/${presentationAssetId}`;
     expect(previewHtml).toContain(presentationAssetUrl);
 
@@ -710,6 +784,22 @@ describe("Web dashboard", () => {
     );
     expect(privateAsset.status).toBe(200);
     expect(privateAsset.headers.get("cache-control")).toBe("private, no-store");
+    const privateAudioWithoutSession = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${presentationAudioUrl}`),
+      authEnv
+    );
+    expect(privateAudioWithoutSession.status).toBe(404);
+    const privateAudio = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${presentationAudioUrl}`, {
+        headers: { cookie: browserCookies }
+      }),
+      authEnv
+    );
+    expect(privateAudio.status).toBe(200);
+    expect(privateAudio.headers.get("content-type")).toBe("audio/mpeg");
+    await env.MEDIA_BUCKET.delete(voiceObjectKey);
     await env.MEDIA_BUCKET.delete(presentationSourceKey);
 
     await env.DB.prepare(
@@ -796,6 +886,14 @@ describe("Web dashboard", () => {
     expect(new Uint8Array(await publishedAsset.arrayBuffer())).toEqual(
       new Uint8Array([82, 73, 70, 70])
     );
+    const publishedAudio = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${presentationAudioUrl}`),
+      authEnv
+    );
+    expect(publishedAudio.status).toBe(200);
+    expect(publishedAudio.headers.get("cache-control")).toContain("immutable");
+    expect(new Uint8Array(await publishedAudio.arrayBuffer())).toEqual(voiceBytes);
 
     const templateUpdate = await requestProvider(
       provider,

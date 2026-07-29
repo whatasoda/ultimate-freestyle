@@ -772,7 +772,7 @@ export function voiceFinishPage(options: {
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
            </div>
-           <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>生成済み件数が原稿数と一致しているか確認</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">生成がない区間は公開画面でもブラウザ音声へ切り替わります。</p></aside>
+           <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>生成済み件数が原稿数と一致しているか確認</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">VOICEVOXを設定した発表は、全区間の生成が完了するまで固定プレビューを作成できません。</p></aside>
          </div>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
@@ -921,7 +921,7 @@ export function slideWorkspacePage(options: {
   const qualityItems = [
     ...(missingAlt > 0 ? [`説明のない画像が${missingAlt}件あります。`] : []),
     ...(missingAudio > 0
-      ? [`${missingAudio}区間はVOICEVOX音声が未生成で、ブラウザ音声を使います。`]
+      ? [`${missingAudio}区間はVOICEVOX音声が未生成です。編集画面ではブラウザ音声で仮試聴できます。`]
       : []),
     ...(slide.composition?.clip_content
       ? ["枠外を隠す設定です。実表示の見切れ診断を確認してください。"]

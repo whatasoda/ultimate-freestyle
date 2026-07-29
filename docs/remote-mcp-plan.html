@@ -1532,9 +1532,9 @@ docs/                  # 設計・運用手順</pre>
             Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価tool、動的resource、3つの伴走promptまで実装・本番配置済み。巨大な<code>update_project</code>は廃止し、基本項目、箇条書き、ログ、deck、template、slide、reveal、narrationを個別更新する小粒度toolへ移行した。
             Phase 4は安全なHTML renderer、宣言的な利用者template、標準<code>data-*</code> hook、不変preview、確認後publish、private R2配信まで実装・自動検証済み。定型flow、絶対配置canvasに加え、<code>layer</code>／<code>stack</code>／<code>grid</code>へ登録済み<code>uf-*</code> Web Componentsを入れ子にするsceneを追加した。文章、情報card、数値、callout、棒グラフ、timeline、画像、図形を分類別の小粒度toolで一件ずつ編集する。任意HTML／CSS／script／外部URLは受け付けず、参照画像はpreview revision専用R2 objectへ固定して元画像の変更や削除から公開版を分離する。
             Web UIはトップページ、Twitchログイン、D1上の24時間Web専用セッション、CSRF付きログアウト、所有者限定の研究一覧・詳細、基本文言編集、競合防止、preview／publish導線まで実装済み。さらに各スライドをfilmstrip、公開版と同じrendererの16:9 iframe、内容・デザイン・読み上げ・構造・品質のinspectorで確認する一枚編集workspaceを追加した。7種類のvisual presetとfont preset、密度、配色、領域、余白、motion、5種類の読み上げ表示、segment別VOICEVOX profileと7種の調声値を小粒度APIから編集できる。rendererはstage基準の寸法、自動文字fit、編集用overflow診断、音声file優先再生とbrowser fallbackに対応し、STEP切替ではiframeを再読込しない。
-            private R2 bucketとImages binding、Web UIの画像追加・閲覧・削除は実装済み。入力10 MiB、40 MP、一辺10,000 px、保存2 MiB・最大辺2,560 px、100画像/project・300画像/user・150 MiB/userを上限とし、原本を残さずWebPへ正規化する。VOICEVOXは全talk styleを対象に、UUID + style IDの複数profile、segment別profile、7種の調声値、生成manifest v2、使用話者の自動クレジットまでschemaとローカル生成へ実装済み。Container job接続は後続とする。
+            private R2 bucketとImages binding、Web UIの画像追加・閲覧・削除は実装済み。入力10 MiB、40 MP、一辺10,000 px、保存2 MiB・最大辺2,560 px、100画像/project・300画像/user・150 MiB/userを上限とし、原本を残さずWebPへ正規化する。VOICEVOXはUUID + style IDの複数profile、segment別profile、7種の調声値、生成入力fingerprint、Cloudflare Queue、outbox、VOICEVOX ENGINE 0.25.1固定Container、MP3変換、private R2 cache、Web UIの生成・進捗・試聴、公開revisionへの不変音声snapshot、使用話者の自動クレジットまで接続済み。
             main pushではGitHub Actionsが自動contract testを通した後、後方互換な未適用D1 migration、Worker deploy、本番smokeを直列実行する。GitHub Pagesの自動deployは廃止し、VOICEVOX Actionは手動／専用tagの試聴artifact生成に限定した。
-            Codexでは<code>health</code>と<code>get_access_status</code>の実呼び出しまで確認済み。ChatGPT実クライアント確認を残し、Queue、Containerは未着手。
+            Codexでは<code>health</code>と<code>get_access_status</code>の実呼び出しまで確認済み。ChatGPT実クライアント確認と、Queue・Containerを含む本番音声生成の継続的な費用・cold start計測を残す。
           </p>
         </div>
 
@@ -1588,7 +1588,7 @@ docs/                  # 設計・運用手順</pre>
             <div class="phase-id">PHASE 5</div>
             <div class="phase-main">
               <h3>VOICEVOX Container</h3>
-              <p>複数talk profile、全調声値、差分fingerprint v2、ローカルffmpeg生成は実装済み。固定ENGINE image、standard-2、Queue、R2保存を接続し、文章長・発表一式・資源のベンチマークを取る。</p>
+              <p>複数talk profile、全調声値、差分fingerprint、固定ENGINE image、standard-2、Queue、outbox、R2保存、公開revision snapshotまで実装済み。文章長・発表一式・cold start・資源消費の本番ベンチマークを継続する。</p>
             </div>
             <div class="phase-done"><strong>DONE WHEN</strong><p>非同期jobが冪等に完了し、性能と実測原価を説明できる。</p></div>
           </article>

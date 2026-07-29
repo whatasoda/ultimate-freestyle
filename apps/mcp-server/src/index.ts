@@ -7,6 +7,27 @@ import {
   createHealthResult,
   createServer
 } from "./server";
+import {
+  dispatchPendingVoiceOutbox,
+  failVoiceGenerationMessage,
+  processVoiceGenerationMessage,
+  type VoiceGenerationMessage
+} from "./voicevox/service";
+
+export { VoicevoxContainer } from "./voicevox/container";
+
+function isVoiceGenerationMessage(value: unknown): value is VoiceGenerationMessage {
+  if (value === null || typeof value !== "object") return false;
+  const message = value as Record<string, unknown>;
+  return (
+    typeof message.job_id === "string" &&
+    /^[0-9a-f-]{36}$/i.test(message.job_id) &&
+    typeof message.segment_id === "string" &&
+    /^[0-9a-f-]{36}$/i.test(message.segment_id) &&
+    typeof message.fingerprint === "string" &&
+    /^[0-9a-f]{64}$/.test(message.fingerprint)
+  );
+}
 
 function jsonResponse(body: object, init?: ResponseInit): Response {
   const headers = new Headers(init?.headers);
@@ -88,24 +109,77 @@ export default {
     }
   },
   async scheduled(
-    _controller: ScheduledController,
+    controller: ScheduledController,
     env: Env,
     ctx: ExecutionContext
   ): Promise<void> {
-    const provider = createOAuthProvider(env, handleMcpRequest);
+    if (controller.cron === "17 3 * * *") {
+      const provider = createOAuthProvider(env, handleMcpRequest);
+      ctx.waitUntil(
+        Promise.all([
+          provider.purgeExpiredData(env, { batchSize: 50 }),
+          purgeExpiredWebSessions(env.DB)
+        ]).then(([result, webSessionsPurged]) => {
+          console.log(
+            JSON.stringify({
+              message: "OAuth KV cleanup completed",
+              ...result,
+              web_sessions_purged: webSessionsPurged
+            })
+          );
+        })
+      );
+    }
     ctx.waitUntil(
-      Promise.all([
-        provider.purgeExpiredData(env, { batchSize: 50 }),
-        purgeExpiredWebSessions(env.DB)
-      ]).then(([result, webSessionsPurged]) => {
+      dispatchPendingVoiceOutbox(env).then((voiceMessagesDispatched) => {
+        if (voiceMessagesDispatched === 0) return;
         console.log(
           JSON.stringify({
-            message: "OAuth KV cleanup completed",
-            ...result,
-            web_sessions_purged: webSessionsPurged
+            message: "VOICEVOX outbox dispatched",
+            voice_messages_dispatched: voiceMessagesDispatched
           })
         );
       })
     );
+  },
+  async queue(
+    batch: MessageBatch<VoiceGenerationMessage>,
+    env: Env
+  ): Promise<void> {
+    for (const message of batch.messages) {
+      if (!isVoiceGenerationMessage(message.body)) {
+        console.error(
+          JSON.stringify({
+            message: "Invalid VOICEVOX queue message rejected",
+            queue_message_id: message.id
+          })
+        );
+        message.ack();
+        continue;
+      }
+      try {
+        await processVoiceGenerationMessage(env, message.body);
+        message.ack();
+      } catch (error) {
+        const finalAttempt = message.attempts >= 3;
+        await failVoiceGenerationMessage(
+          env.DB,
+          message.body,
+          error,
+          finalAttempt
+        );
+        console.error(
+          JSON.stringify({
+            message: "VOICEVOX queue message failed",
+            queue_message_id: message.id,
+            attempt: message.attempts,
+            final_attempt: finalAttempt,
+            error: error instanceof Error ? error.message : String(error)
+          })
+        );
+        if (finalAttempt) message.ack();
+        else message.retry({ delaySeconds: 60 });
+      }
+    }
   }
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env, VoiceGenerationMessage>;
