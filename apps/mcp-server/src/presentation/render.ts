@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@9";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@10";
 
 function escapeHtml(value: string): string {
   return value
@@ -349,6 +349,11 @@ export function renderPresentationHtml(
     ? profiles.get(deck.voicevox.default_profile_id)
     : undefined;
   const aspectRatio = deck.aspect_ratio ?? "16:9";
+  const totalDurationSeconds = deck.slides.reduce(
+    (total, slide) => total + slide.duration_seconds,
+    0
+  );
+  const formattedTotalDuration = `${String(Math.floor(totalDurationSeconds / 60)).padStart(2, "0")}:${String(totalDurationSeconds % 60).padStart(2, "0")}`;
   const loadingScreen = {
     enabled: true,
     style: "pulse" as const,
@@ -558,7 +563,9 @@ export function renderPresentationHtml(
     body[data-editor-frame="true"] .stage { width: 100%; height: 100%; border: 0; box-shadow: none; }
     header, footer { display: flex; align-items: center; gap: 12px; min-height: 36px; color: #a9b5c7; }
     header strong { min-width: 0; overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
-    header .time { margin-left: auto; font-variant-numeric: tabular-nums; }
+    header .time { display: flex; gap: .45em; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .time-part { display: inline-flex; gap: .2em; }
+    .time-label { color: #718096; font-size: .78em; }
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
     .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; }
@@ -826,6 +833,8 @@ export function renderPresentationHtml(
     @media (max-width: 680px) {
       .app { gap: 6px; padding: 6px; }
       header { gap: 7px; min-height: 30px; font-size: 12px; }
+      .time-label { display: none; }
+      .time-total { display: none; }
       header .meta, .voice-credit { display: none; }
       footer { display: grid; grid-template-columns: auto minmax(3rem, 1fr) auto; gap: 6px 8px; min-height: 76px; }
       footer .progress { width: 100%; }
@@ -845,7 +854,7 @@ export function renderPresentationHtml(
 </head>
 <body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
-    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 想定経過時間"><span id="elapsed">00:00</span> / <span id="expected">00:00</span></span></header>
+    <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在位置の目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span></header>
     <div class="stage-wrap"><div class="stage" aria-label="${escapeHtml(project.document.title)}">
       <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
         <div class="prelude-inner">
@@ -903,7 +912,7 @@ export function renderPresentationHtml(
     const expectedElapsed = () => {
       const previous = DECK.slides.slice(0, slide).reduce((sum, item) => sum + item.durationSeconds, 0);
       const current = DECK.slides[slide];
-      const fraction = current.revealSteps === 0 ? 0 : step / current.revealSteps;
+      const fraction = (step + 1) / (current.revealSteps + 1);
       return previous + current.durationSeconds * fraction;
     };
     const narration = () => DECK.slides[slide].narration?.segments.find((item) => item.at === step) ?? null;
