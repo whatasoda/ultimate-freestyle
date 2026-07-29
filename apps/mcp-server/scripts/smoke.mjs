@@ -1,4 +1,10 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const packageJson = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8")
+);
+const expectedVersion = packageJson.version;
 
 const baseUrl = new URL(
   process.env.MCP_BASE_URL ?? "https://saijiyu-kenkyu.2764.moe"
@@ -21,10 +27,21 @@ async function fetchJson(path, init) {
   return { response, body: await response.json() };
 }
 
-const health = await fetchJson("/healthz");
+async function waitForDeployedHealth() {
+  let latest;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    latest = await fetchJson(`/healthz?deployment_check=${Date.now()}`);
+    if (latest.body.version === expectedVersion) return latest;
+    await new Promise((resolve) => setTimeout(resolve, 3_000));
+  }
+  assert.equal(latest?.body.version, expectedVersion);
+}
+
+const health = await waitForDeployedHealth();
 assert.equal(health.response.status, 200);
 assert.equal(health.body.ok, true);
 assert.equal(health.body.service, "ultimate-freestyle-mcp");
+assert.equal(health.body.version, expectedVersion);
 assert.equal(health.body.eligibility?.broadcaster_id, "67879379");
 
 const landingResponse = await fetch(new URL("/", baseUrl), {
