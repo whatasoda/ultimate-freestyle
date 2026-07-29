@@ -1955,7 +1955,12 @@ export async function handleWebRequest(
   }
   if (path === "/" && request.method === "GET") {
     const session = await readWebSession(request, env.DB);
-    return session === null ? landingPage() : redirectPage("/dashboard");
+    return session === null
+      ? landingPage({
+          broadcasterLogin: env.TWITCH_BROADCASTER_LOGIN,
+          minFollowDays: Number(env.MIN_FOLLOW_DAYS)
+        })
+      : redirectPage("/dashboard");
   }
   if (path === "/login") {
     return handleWebLogin(request, env, fetcher);

@@ -111,7 +111,10 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(landing.status).toBe(200);
-    expect(await landing.text()).toContain("Twitchでログイン");
+    const landingHtml = await landing.text();
+    expect(landingHtml).toContain("Twitchでログイン");
+    expect(landingHtml).toContain("kashiwoを30日以上フォロー");
+    expect(landingHtml).toContain("現在サブスク中");
     expect(landing.headers.get("content-security-policy")).toContain(
       "default-src 'none'"
     );

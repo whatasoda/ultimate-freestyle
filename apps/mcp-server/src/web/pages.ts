@@ -526,7 +526,10 @@ function sceneComponentOutline(nodes: SlideSceneNode[]): string {
   return renderChildren(null);
 }
 
-export function landingPage(): Response {
+export function landingPage(options: {
+  broadcasterLogin: string;
+  minFollowDays: number;
+}): Response {
   return new Response(
     shell(
       "最自由研究",
@@ -536,6 +539,7 @@ export function landingPage(): Response {
          <h1>気になったことを、研究にする。</h1>
          <p class="lead">AIとの対話で自由研究を育て、発表用のWebスライドまで一つの場所で管理します。Twitchで本人確認すると、自分の研究一覧を確認できます。</p>
          <a class="button primary" href="/login">Twitchでログイン</a>
+         <p class="hint">限定公開中です。Twitchで${escapeHtml(options.broadcasterLogin)}を${options.minFollowDays}日以上フォローしている方、または現在サブスク中の方が利用できます。</p>
        </section></main>`
     ),
     { headers: headers() }
