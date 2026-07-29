@@ -17,7 +17,7 @@ import type { ProjectRecord } from "../projects/schema";
 
 const MAX_JOBS_PER_MONTH = 20;
 const MAX_CHARACTERS_PER_MONTH = 200_000;
-const MAX_JOB_CHARACTERS = 30_000;
+export const MAX_JOB_CHARACTERS = 30_000;
 const MAX_SEGMENTS_PER_JOB = 100;
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 
