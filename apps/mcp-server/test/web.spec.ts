@@ -549,6 +549,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-visual-pick="neon"');
     expect(workspaceHtml).toContain("配色presetを選ぶ");
     expect(workspaceHtml).toContain("data-visual-palette=");
+    expect(workspaceHtml).toContain('data-color-text="background"');
     expect(workspaceHtml).toContain('data-font-pick="mincho"');
     expect(workspaceHtml).toContain("本文と見出しのfontをまとめて選ぶ");
     expect(workspaceHtml).toContain('data-animation-pick="wipe"');

@@ -870,7 +870,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       try { palette = JSON.parse(button.dataset.visualPalette || "{}"); } catch {}
       for (const [name, value] of Object.entries(palette)) {
         const input = form.elements.namedItem(name);
-        if (input instanceof HTMLInputElement && input.type === "color" && typeof value === "string") input.value = value;
+        if (input instanceof HTMLInputElement && input.type === "color" && typeof value === "string") {
+          input.value = value;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
       }
       select.dispatchEvent(new Event("input", { bubbles: true }));
       select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -953,6 +956,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const form = button.closest("form");
       const select = form?.elements.namedItem(button.dataset.animationReplay || "enter_animation");
       if (select instanceof HTMLSelectElement) select.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+  for (const text of document.querySelectorAll("[data-color-text]")) {
+    if (!(text instanceof HTMLInputElement)) continue;
+    const form = text.closest("form");
+    const color = form?.elements.namedItem(text.dataset.colorText || "");
+    if (!(color instanceof HTMLInputElement) || color.type !== "color") continue;
+    text.addEventListener("input", () => {
+      const valid = /^#[0-9a-f]{6}$/i.test(text.value);
+      text.setAttribute("aria-invalid", String(!valid));
+      if (!valid) return;
+      color.value = text.value;
+      color.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    color.addEventListener("input", () => {
+      text.value = color.value;
+      text.setAttribute("aria-invalid", "false");
     });
   }
 
