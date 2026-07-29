@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@6";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@7";
 
 function escapeHtml(value: string): string {
   return value
@@ -561,7 +561,8 @@ export function renderPresentationHtml(
     header .time { margin-left: auto; font-variant-numeric: tabular-nums; }
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
-    .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; }
+    .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; }
+    body[data-editor-frame="true"] .stage { cursor: default; }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
     .slide::before, .slide::after { content: ""; position: absolute; z-index: 0; pointer-events: none; }
     .slide > * { position: relative; z-index: 1; }
@@ -779,6 +780,7 @@ export function renderPresentationHtml(
     .prelude-meter { width: min(100%, 32rem); height: .55cqh; overflow: hidden; border-radius: 99px; background: #ffffff18; }
     .prelude-meter i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, var(--accent), #65ccff); transition: width .2s ease; }
     .prelude-status { min-height: 1.5em; margin: 0; color: #8fa0b5; font: 700 1cqw/1.4 ui-monospace, monospace; }
+    .prelude-help { margin: .35cqh 0 0; color: #8fa0b5; font-size: .9cqw; }
     .prelude-start { min-width: 10em; padding: .8em 1.4em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: var(--accent); font-weight: 850; }
     .prelude-start:disabled { cursor: wait; opacity: .45; }
     .prelude[data-style="pulse"]::before { content: ""; position: absolute; width: 28cqw; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 36%, transparent), transparent 68%); animation: prelude-pulse 1.7s ease-in-out infinite alternate; }
@@ -815,6 +817,8 @@ export function renderPresentationHtml(
     .controls { display: flex; align-items: center; gap: 6px; }
     button { min-width: 40px; min-height: 34px; border: 1px solid #3a485d; border-radius: 8px; background: #172131; color: #fff; cursor: pointer; }
     button:hover { border-color: var(--accent); }
+    button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 28%, #172131); }
+    button:focus-visible, input:focus-visible { outline: .18rem solid color-mix(in srgb, var(--accent) 70%, white); outline-offset: .15rem; }
     label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
     input[type="range"] { width: 80px; accent-color: var(--accent); }
     @media (max-width: 680px) { .app { padding: 6px; } header .meta { display: none; } .voice-progress { width: 70px; } }
@@ -833,17 +837,18 @@ export function renderPresentationHtml(
           <div class="prelude-meter"${loadingScreen.show_progress ? "" : " hidden"} aria-hidden="true"><i data-prelude-progress></i></div>
           <p class="prelude-status" data-prelude-status aria-live="polite">コンテンツを確認しています…</p>
           <button class="prelude-start" type="button" data-prelude-start disabled>発表を始める</button>
+          <p class="prelude-help">スライドをクリック、または → / Space で進みます</p>
         </div>
       </section>
       ${slideHtml}
     </div></div>
     <footer>
-      <span id="counter">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
+      <span id="counter" aria-live="polite">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
       <div class="voice-progress" title="読み上げ進捗"><i id="voice-progress"></i></div>
       <div class="controls">
         <button id="prev" aria-label="前へ">←</button><button id="next" aria-label="次へ">→</button>
-        <button id="speech" aria-pressed="true" title="自動読み上げ">音声</button>
-        <button id="auto" aria-pressed="false" title="自動送り">自動</button>
+        <button id="speech" aria-pressed="true" title="ページ移動時の自動読み上げ">音声 ON</button>
+        <button id="auto" aria-pressed="false" title="読み上げ後、または想定時間後に自動で進む">自動 OFF</button>
         <label>音量 <input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
       </div>
     </footer>
@@ -866,10 +871,11 @@ export function renderPresentationHtml(
     const preludeStart = document.querySelector('[data-prelude-start]');
     const preludeProgress = document.querySelector('[data-prelude-progress]');
     const preludeStatus = document.querySelector('[data-prelude-status]');
+    const stage = document.querySelector('.stage');
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), voiceTimer, activeAudio, fitFrame;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), voiceTimer, autoTimer, activeAudio, fitFrame;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -891,10 +897,11 @@ export function renderPresentationHtml(
     const stopVoice = () => {
       if ('speechSynthesis' in window) speechSynthesis.cancel();
       clearInterval(voiceTimer);
+      clearTimeout(autoTimer);
       if (activeAudio) { activeAudio.pause(); activeAudio.removeAttribute('src'); activeAudio.load(); activeAudio = null; }
       setVoiceProgress(0);
     };
-    const finishVoice = () => { clearInterval(voiceTimer); setVoiceProgress(100); if (auto) setTimeout(advance, 350); };
+    const finishVoice = () => { clearInterval(voiceTimer); setVoiceProgress(100); if (auto) autoTimer = setTimeout(advance, 350); };
     const advance = () => {
       if (!started) return false;
       const current = DECK.slides[slide];
@@ -903,8 +910,15 @@ export function renderPresentationHtml(
       else return false;
       syncUrl(); render(); return true;
     };
+    const scheduleAutoAdvance = () => {
+      clearTimeout(autoTimer);
+      if (!auto || !started) return;
+      const current = DECK.slides[slide];
+      const delay = Math.max(1500, current.durationSeconds * 1000 / (current.revealSteps + 1));
+      autoTimer = setTimeout(advance, delay);
+    };
     const speakWithBrowser = (segment) => {
-      if (!('speechSynthesis' in window)) return;
+      if (!('speechSynthesis' in window)) { scheduleAutoAdvance(); return; }
       const tuning = segment.effectiveTuning || {};
       const utterance = new SpeechSynthesisUtterance(segment.text);
       utterance.lang = 'ja-JP';
@@ -920,7 +934,8 @@ export function renderPresentationHtml(
     };
     const speak = () => {
       stopVoice(); const segment = narration();
-      if (!started || !speech || !segment) return;
+      if (!started) return;
+      if (!speech || !segment) { scheduleAutoAdvance(); return; }
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
       activeAudio = player;
@@ -1080,11 +1095,22 @@ export function renderPresentationHtml(
     };
     document.querySelector('#next').addEventListener('click', () => { if (started) advance(); });
     document.querySelector('#prev').addEventListener('click', () => { if (!started) return; if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
-    speechButton.addEventListener('click', () => { speech = !speech; speechButton.setAttribute('aria-pressed', String(speech)); render(); });
-    autoButton.addEventListener('click', () => { auto = !auto; autoButton.setAttribute('aria-pressed', String(auto)); });
+    speechButton.addEventListener('click', () => { speech = !speech; speechButton.setAttribute('aria-pressed', String(speech)); speechButton.textContent = '音声 ' + (speech ? 'ON' : 'OFF'); render(); });
+    autoButton.addEventListener('click', () => {
+      auto = !auto;
+      autoButton.setAttribute('aria-pressed', String(auto));
+      autoButton.textContent = '自動 ' + (auto ? 'ON' : 'OFF');
+      if (!auto) clearTimeout(autoTimer);
+      else if (!activeAudio && (!('speechSynthesis' in window) || !speechSynthesis.speaking)) scheduleAutoAdvance();
+    });
     volume.addEventListener('input', () => { if (activeAudio) activeAudio.volume = clamp(Number(volume.value), 0, 1); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
     addEventListener('keydown', (event) => { if (['ArrowRight', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); } else if (event.key === 'ArrowLeft') { document.querySelector('#prev').click(); } });
+    stage?.addEventListener('click', (event) => {
+      if (!started || editorFrame || getSelection()?.toString()) return;
+      if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
+      advance();
+    });
     addEventListener('message', (event) => { if (!editorFrame || event.source !== parent || event.origin !== location.origin || event.data?.type !== 'ultimate-freestyle:set-position') return; setPosition(event.data.slide, event.data.step, false); });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
