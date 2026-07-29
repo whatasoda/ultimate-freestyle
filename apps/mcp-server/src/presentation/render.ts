@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@36";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@37";
 
 function escapeHtml(value: string): string {
   return value
@@ -920,18 +920,21 @@ export function renderPresentationHtml(
       header { gap: 7px; min-height: 30px; font-size: 12px; }
       .time-label { display: none; }
       .time-total { display: none; }
+      header strong { max-width: 35%; }
+      .time-part:nth-of-type(2), .time > span[aria-hidden] { display: none; }
       .pace { display: none; }
       header .meta, .voice-credit { display: none; }
       footer { display: grid; grid-template-columns: auto minmax(3rem, 1fr) auto; gap: 6px 8px; min-height: 76px; }
       footer .progress { width: 100%; }
       .voice-progress { width: 64px; }
-      .controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, minmax(44px, auto)); width: 100%; }
+      .controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(44px, auto)); width: 100%; }
       .controls button { min-height: 42px; }
       .controls label { grid-column: 1 / -1; justify-content: center; }
       .controls input[type="range"] { width: min(100%, 110px); }
     }
     @media (max-width: 430px) {
-      .controls { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .controls button { padding-inline: 4px; font-size: 12px; }
       .controls label { grid-column: 1 / -1; justify-content: center; min-height: 32px; }
       .controls input[type="range"] { width: min(100%, 220px); }
     }
