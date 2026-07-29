@@ -541,12 +541,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.classList.toggle("success", status === "completed");
       }
       if (generateButton instanceof HTMLButtonElement) {
-        generateButton.disabled = !terminalStatuses.has(status);
-        generateButton.textContent = terminalStatuses.has(status) && status !== "completed"
-          ? "失敗した区間をもう一度生成"
-          : status === "completed"
-            ? "生成完了"
-            : "生成中です";
+        generateButton.disabled = true;
+        generateButton.textContent = terminalStatuses.has(status)
+          ? "結果を反映しています"
+          : "生成中です";
       }
     };
     let pollTimer;
@@ -563,7 +561,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         pollFailures = 0;
         updateJob(job);
         if (terminalStatuses.has(job.status)) {
-          if (job.status === "completed") setTimeout(() => location.reload(), 800);
+          setTimeout(() => location.reload(), job.status === "completed" ? 800 : 1200);
           return;
         }
         pollTimer = setTimeout(() => pollJob(url), document.hidden ? 8000 : 2500);
