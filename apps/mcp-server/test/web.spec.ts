@@ -404,7 +404,10 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=34"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=35"');
+    expect(detailHtml).toContain("data-copy-public");
+    expect(detailHtml).toContain('data-published-current="false"');
+    expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
     expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");

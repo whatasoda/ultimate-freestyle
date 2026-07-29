@@ -59,7 +59,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   };
   const markDraftChanged = () => {
     const publishButton = document.querySelector("[data-publish-preview]");
-    if (publishButton instanceof HTMLButtonElement) publishButton.disabled = true;
+    if (publishButton instanceof HTMLButtonElement) {
+      publishButton.disabled = true;
+      publishButton.dataset.publishedCurrent = "false";
+      publishButton.textContent = "確認した版を公開";
+    }
     const previewStatus = document.querySelector("[data-preview-status]");
     if (previewStatus instanceof HTMLElement && !previewStatus.textContent.includes("要再生成")) {
       previewStatus.textContent += " · 要再生成";
@@ -1112,6 +1116,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const publishedStatus = document.querySelector("[data-published-status]");
   const previewLink = document.querySelector("[data-preview-link]");
   const publicLink = document.querySelector("[data-public-link]");
+  const copyPublicButton = document.querySelector("[data-copy-public]");
+  const copyPublicFeedback = document.querySelector("[data-copy-public-feedback]");
   if (previewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     previewButton.addEventListener("click", async () => {
       previewButton.disabled = true;
@@ -1151,7 +1157,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.classList.add("success");
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.revision = result.revision.revision_id;
-          publishButton.disabled = publishButton.dataset.durationValid !== "true";
+          publishButton.disabled = publishButton.dataset.durationValid !== "true" || publishButton.dataset.publishedCurrent === "true";
         }
         if (previewStatus instanceof HTMLElement) {
           previewStatus.textContent = "v" + result.revision.project_version + " · " + result.revision.renderer_version;
@@ -1198,11 +1204,24 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           publicLink.href = result.public_url;
           publicLink.hidden = false;
         }
-        publishButton.disabled = false;
+        publishButton.dataset.publishedCurrent = "true";
+        publishButton.textContent = "この版は公開済み";
+        if (copyPublicButton instanceof HTMLButtonElement) copyPublicButton.hidden = false;
       } catch (error) {
         publishFeedback.textContent = caughtErrorMessage(error, "公開できませんでした。");
         publishFeedback.classList.add("warning");
         publishButton.disabled = false;
+      }
+    });
+  }
+  if (copyPublicButton instanceof HTMLButtonElement && publicLink instanceof HTMLAnchorElement) {
+    copyPublicButton.addEventListener("click", async () => {
+      if (publicLink.hidden || publicLink.getAttribute("href") === "#") return;
+      try {
+        await navigator.clipboard.writeText(new URL(publicLink.href, location.origin).href);
+        if (copyPublicFeedback instanceof HTMLElement) copyPublicFeedback.textContent = "公開URLをコピーしました。";
+      } catch {
+        if (copyPublicFeedback instanceof HTMLElement) copyPublicFeedback.textContent = "コピーできませんでした。公開ページを開いてURLをコピーしてください。";
       }
     });
   }

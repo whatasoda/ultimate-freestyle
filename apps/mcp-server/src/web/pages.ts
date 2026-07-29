@@ -116,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=34";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=35";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -922,9 +922,10 @@ export function projectDetailPage(options: {
     <div class="status-row"><span>公開中</span><strong data-published-status>${published === null ? "未公開" : `v${published.project_version} · ${escapeHtml(published.renderer_version)}`}</strong></div>
     <a class="button ghost" data-preview-link href="${preview === null ? "#" : `/preview/${escapeHtml(preview.revision_id)}`}" target="_blank" rel="noopener"${preview === null ? " hidden" : ""}>最新プレビューを開く</a>
     <a class="button ghost" data-public-link href="${published !== null && options.publication.slug !== null ? `/p/${escapeHtml(options.publication.slug)}` : "#"}" target="_blank" rel="noopener"${published === null || options.publication.slug === null ? " hidden" : ""}>公開ページを開く</a>
+    <button class="ghost" type="button" data-copy-public${published === null || options.publication.slug === null ? " hidden" : ""}>公開URLをコピー</button><span class="feedback" data-copy-public-feedback aria-live="polite"></span>
     <div class="actions">
       <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 ? " disabled" : ""}>現在の下書きをプレビュー</button>
-      <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}" data-duration-valid="${String(durationWithinLimit)}"${previewCurrent && durationWithinLimit ? "" : " disabled"}>確認した版を公開</button>
+      <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}" data-duration-valid="${String(durationWithinLimit)}" data-published-current="${String(publishedCurrent)}"${previewCurrent && durationWithinLimit && !publishedCurrent ? "" : " disabled"}>${publishedCurrent ? "この版は公開済み" : "確認した版を公開"}</button>
     </div>
     <p class="feedback${!durationWithinLimit || voiceIncomplete || (preview !== null && !previewCurrent) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : !durationWithinLimit ? `想定発表時間が${formatDuration(totalDurationSeconds)}です。20分以内に短縮してから公開してください。プレビューは短縮前でも確認できます。` : voiceIncomplete ? `VOICEVOX音声は ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成済みです。未生成区間はブラウザ音声で代替してプレビューできます。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
