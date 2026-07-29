@@ -1034,7 +1034,41 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (profileTuningForm instanceof HTMLFormElement) {
       const tuningFeedback = profileTuningForm.querySelector("[data-voice-profile-tuning-feedback]");
       const tuningSubmit = profileTuningForm.querySelector('button[type="submit"]');
+      const tuningPreview = profileTuningForm.querySelector("[data-voice-profile-tuning-preview]");
       profileTuningForm.addEventListener("input", () => { profileTuningForm.dataset.dirty = "true"; });
+      if (tuningPreview instanceof HTMLButtonElement) {
+        tuningPreview.addEventListener("click", () => {
+          if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
+            if (tuningFeedback instanceof HTMLElement) tuningFeedback.textContent = "このブラウザでは音声の仮試聴を利用できません。";
+            return;
+          }
+          if (tuningPreview.getAttribute("aria-pressed") === "true") {
+            speechSynthesis.cancel();
+            tuningPreview.setAttribute("aria-pressed", "false");
+            tuningPreview.textContent = "ブラウザで仮試聴";
+            if (tuningFeedback instanceof HTMLElement) tuningFeedback.textContent = "仮試聴を停止しました。";
+            return;
+          }
+          speechSynthesis.cancel();
+          const data = new FormData(profileTuningForm);
+          const clampValue = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, Number(value)));
+          const utterance = new SpeechSynthesisUtterance("これは最自由研究の読み上げテストです。聞き取りやすい速さと高さを確認してください。");
+          utterance.lang = "ja-JP";
+          utterance.rate = clampValue(data.get("tuning_speedScale"), 0.5, 2);
+          utterance.pitch = clampValue(1 + Number(data.get("tuning_pitchScale")) * 2, 0.5, 2);
+          utterance.volume = clampValue(data.get("tuning_volumeScale"), 0, 1);
+          const finish = () => {
+            tuningPreview.setAttribute("aria-pressed", "false");
+            tuningPreview.textContent = "ブラウザで仮試聴";
+          };
+          utterance.addEventListener("end", finish, { once: true });
+          utterance.addEventListener("error", finish, { once: true });
+          tuningPreview.setAttribute("aria-pressed", "true");
+          tuningPreview.textContent = "仮試聴を停止";
+          if (tuningFeedback instanceof HTMLElement) tuningFeedback.textContent = "話速・高さ・音量をブラウザ音声で近似しています…";
+          speechSynthesis.speak(utterance);
+        });
+      }
       profileTuningForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (!(tuningFeedback instanceof HTMLElement)) return;
