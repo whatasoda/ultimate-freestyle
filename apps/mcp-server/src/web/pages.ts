@@ -91,7 +91,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=4";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=5";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -197,6 +197,22 @@ function shell(title: string, body: string): string {
       .empty h2 { margin-top: 0; }
       .empty p { color: var(--muted); line-height: 1.7; }
       .hint { margin: 1.5rem 0 0; padding: 1rem 1.15rem; border-left: .2rem solid #62d6ff; background: #112334; color: #bfcedd; line-height: 1.7; }
+      .journey { display: grid; gap: 1rem; margin: 1.5rem 0; padding: clamp(1rem, 3vw, 1.5rem); border: 1px solid #52647c; border-radius: 1rem; background: linear-gradient(135deg, #16253aee, #111827ee); box-shadow: 0 1rem 3rem #0003; }
+      .journey-head { display: flex; align-items: start; justify-content: space-between; gap: 1rem; }
+      .journey-head h2, .journey-next h3 { margin: 0; }
+      .journey-head p, .journey-next p { margin: .35rem 0 0; color: var(--muted); line-height: 1.65; }
+      .journey-progress { min-width: 8rem; text-align: right; }
+      .journey-progress strong { display: block; font-size: 1.35rem; }
+      .journey-progress progress { width: 8rem; accent-color: #74e6b2; }
+      .journey-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; margin: 0; padding: 0; list-style: none; }
+      .journey-step { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .55rem; align-items: center; padding: .7rem; border: 1px solid var(--line); border-radius: .7rem; color: var(--muted); }
+      .journey-step::before { content: "○"; color: #6f8096; font-weight: 900; }
+      .journey-step[data-complete="true"] { border-color: #36785b; background: #15312566; color: #c9f7df; }
+      .journey-step[data-complete="true"]::before { content: "✓"; color: #74e6b2; }
+      .journey-step small { display: block; margin-top: .15rem; color: inherit; opacity: .72; }
+      .journey-next { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; align-items: center; padding: 1rem; border-radius: .8rem; background: #08111baa; }
+      .copy-box { display: grid; gap: .65rem; margin-top: 1rem; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; background: #0c1724; text-align: left; }
+      .copy-box code { color: #dce6f3; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
       .back { display: inline-flex; margin-bottom: 1.5rem; color: #b9c7d8; text-decoration: none; }
       .detail-title { font-size: clamp(2rem, 6vw, 4.5rem); overflow-wrap: anywhere; }
       .detail-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); gap: 1rem; margin-top: 1.5rem; }
@@ -369,7 +385,7 @@ function shell(title: string, body: string): string {
       .voice-next li + li { margin-top: .35rem; }
       form { margin: 0; }
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
-      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
+      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
     </style>
@@ -495,7 +511,7 @@ export function dashboardPage(options: {
   const content =
     cards.length > 0
       ? `<div class="grid">${cards}</div>`
-      : `<section class="empty"><h2>まだ研究がありません</h2><p>Codexなどの対応AIクライアントから、最自由研究MCPに「新しい研究を作りたい」と話しかけると、ここに追加されます。</p></section>`;
+      : `<section class="empty"><h2>まだ研究がありません</h2><p>Codexなどの対応AIクライアントへ、下の文を貼り付けると最初の研究を始められます。</p><div class="copy-box"><code>最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。</code><div class="actions"><button type="button" data-copy-text="最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></section>`;
 
   return new Response(
     shell(
@@ -505,7 +521,7 @@ export function dashboardPage(options: {
          <div class="section-head"><div><p class="eyebrow">My research</p><h1>自分の研究</h1></div><span class="count">${options.projects.length} / 20 件</span></div>
          ${content}
          <p class="hint">研究を開くと、内容確認、文言の微調整、発表プレビュー、公開操作を行えます。大きな構成変更は接続したAIクライアントから進めます。</p>
-       </main>`
+       </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
     { headers: headers() }
   );
@@ -566,6 +582,57 @@ export function projectDetailPage(options: {
   const previewRendererCurrent =
     preview?.renderer_version === options.publication.current_renderer_version;
   const previewCurrent = previewDraftCurrent && previewRendererCurrent;
+  const publishedCurrent =
+    published?.project_version === options.project.version &&
+    published.renderer_version === options.publication.current_renderer_version;
+  const researchReady =
+    (document.question?.trim().length ?? 0) > 0 &&
+    (document.method?.trim().length ?? 0) > 0;
+  const slidesReady = slides.length > 0;
+  const journeySteps = [
+    { label: "研究内容", detail: "問いと方法", complete: researchReady },
+    { label: "発表構成", detail: `${slides.length}枚`, complete: slidesReady },
+    { label: "プレビュー", detail: previewCurrent ? "確認可能" : "未確認", complete: previewCurrent },
+    { label: "公開", detail: publishedCurrent ? "最新版" : "未反映", complete: publishedCurrent }
+  ];
+  const journeyCompleted = journeySteps.filter((step) => step.complete).length;
+  const slidePrompt = `「${document.title}」の研究内容をもとに、発表スライドの構成を対話しながら作ってください。`;
+  const nextJourneyAction = !researchReady
+    ? {
+        title: "研究の問いと方法を整理する",
+        description: "まず基本情報を埋めると、AIが発表構成を作りやすくなります。",
+        action: `<a class="button" href="#basic-information">基本情報を編集</a>`
+      }
+    : !slidesReady
+      ? {
+          title: "AIと発表スライドを作る",
+          description: "接続中のAIクライアントへ依頼文を貼り付けて、構成づくりを始めます。",
+          action: `<button type="button" data-copy-text="${escapeHtml(slidePrompt)}">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span>`
+        }
+      : !previewCurrent
+        ? {
+            title: "現在の見た目をプレビューする",
+            description: "固定された確認用URLを開き、文字・音声・ページ送りを通して確認します。",
+            action: `<a class="button" href="#publication">プレビューへ進む</a>`
+          }
+        : !publishedCurrent
+          ? {
+              title: "確認したプレビューを公開する",
+              description: "公開操作をしても、確認した固定版だけが公開されます。",
+              action: `<a class="button" href="#publication">公開へ進む</a>`
+            }
+          : {
+              title: "最新版が公開されています",
+              description: "修正すると公開版はそのまま残り、次のプレビュー確認が必要になります。",
+              action: options.publication.slug === null
+                ? `<a class="button ghost" href="#publication">公開状態を確認</a>`
+                : `<a class="button ghost" href="/p/${escapeHtml(options.publication.slug)}" target="_blank" rel="noopener">公開ページを開く</a>`
+            };
+  const workflowPanel = `<section class="journey" aria-labelledby="journey-title">
+    <div class="journey-head"><div><p class="eyebrow">Next action</p><h2 id="journey-title">完成までの流れ</h2><p>研究内容から公開まで、現在地と次の操作をまとめています。</p></div><div class="journey-progress"><strong>${journeyCompleted} / ${journeySteps.length}</strong><progress max="${journeySteps.length}" value="${journeyCompleted}">${journeyCompleted} / ${journeySteps.length}</progress></div></div>
+    <ol class="journey-steps">${journeySteps.map((step) => `<li class="journey-step" data-complete="${String(step.complete)}"><span>${step.label}<small>${step.detail}</small></span></li>`).join("")}</ol>
+    <div class="journey-next"><div><h3>${nextJourneyAction.title}</h3><p>${nextJourneyAction.description}${voiceIncomplete ? ` VOICEVOXは${readyVoiceSegments}/${narrationSegments.length}区間まで生成済みですが、ブラウザ音声でプレビューできます。` : ""}</p></div><div class="actions">${nextJourneyAction.action}</div></div>
+  </section>`;
   const previewStaleMessage = !previewDraftCurrent
     ? "下書きが変わったため、新しいプレビューの確認が必要です。"
     : !previewRendererCurrent
@@ -580,10 +647,10 @@ export function projectDetailPage(options: {
     <a class="button ghost" data-preview-link href="${preview === null ? "#" : `/preview/${escapeHtml(preview.revision_id)}`}" target="_blank" rel="noopener"${preview === null ? " hidden" : ""}>最新プレビューを開く</a>
     ${published !== null && options.publication.slug !== null ? `<a class="button ghost" href="/p/${escapeHtml(options.publication.slug)}" target="_blank" rel="noopener">公開ページを開く</a>` : ""}
     <div class="actions">
-      <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 || voiceIncomplete ? " disabled" : ""}>現在の下書きをプレビュー</button>
+      <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 ? " disabled" : ""}>現在の下書きをプレビュー</button>
       <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}"${previewCurrent ? "" : " disabled"}>確認した版を公開</button>
     </div>
-    <p class="feedback${voiceIncomplete || (preview !== null && !previewCurrent) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : voiceIncomplete ? `VOICEVOX音声が ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成されています。先に「音声を仕上げる」を完了してください。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
+    <p class="feedback${voiceIncomplete || (preview !== null && !previewCurrent) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : voiceIncomplete ? `VOICEVOX音声は ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成済みです。未生成区間はブラウザ音声で代替してプレビューできます。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
   const voicePanel = `<section class="panel publish-state"><h2>読み上げ音声</h2>
     <div class="status-row"><span>読み上げ区間</span><strong>${narrationSegments.length}件</strong></div>
@@ -619,9 +686,10 @@ export function projectDetailPage(options: {
          <div class="card-top"><span class="stage">${STAGE_LABELS[document.stage]}</span><span class="version">v${options.project.version}</span></div>
          <h1 class="detail-title">${escapeHtml(document.title)}</h1>
          <p class="lead">${escapeHtml(document.summary || "概要はまだ記入されていません。")}</p>
+         ${workflowPanel}
          <div class="detail-grid">
            <div class="detail-column">
-             <section class="panel"><h2>基本情報を編集</h2>
+             <section class="panel" id="basic-information"><h2>基本情報を編集</h2>
                <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <div class="editor-grid">
                    <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label>

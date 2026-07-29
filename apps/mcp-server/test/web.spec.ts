@@ -388,15 +388,17 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=4"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=5"');
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
     expect(detailHtml).toContain("ワイド 16:9");
     expect(detailHtml).toContain("標準 4:3");
+    expect(detailHtml).toContain("完成までの流れ");
+    expect(detailHtml).toContain("研究の問いと方法を整理する");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
-    expect(detailHtml).toContain("VOICEVOX音声が 0 / 1 区間まで生成されています");
-    expect(detailHtml).toMatch(/data-create-preview=[^>]+ disabled/);
+    expect(detailHtml).toContain("VOICEVOX音声は 0 / 1 区間まで生成済みです");
+    expect(detailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("自由配置 1 block");
     expect(detailHtml).toContain(
@@ -496,6 +498,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("qualitySummary.dataset.baseCount");
     expect(dashboardScriptText).toContain("Array.isArray(data.fits)");
     expect(dashboardScriptText).toContain("70%未満まで縮小");
+    expect(dashboardScriptText).toContain("syncPageVersion(result.version)");
+    expect(dashboardScriptText).toContain('addEventListener("beforeunload"');
 
     const rejectedUpload = await requestProvider(
       provider,

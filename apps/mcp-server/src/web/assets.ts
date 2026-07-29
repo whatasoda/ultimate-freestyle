@@ -1,9 +1,35 @@
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const syncPageVersion = (version) => {
+    const value = String(version);
+    for (const form of document.querySelectorAll("[data-versioned-form], [data-project-editor]")) {
+      if (form instanceof HTMLFormElement) form.dataset.version = value;
+    }
+    for (const label of document.querySelectorAll("[data-workspace-version], [data-version-label], [data-editor-version]")) {
+      if (label instanceof HTMLElement) label.textContent = "v" + value;
+    }
+    const previewButton = document.querySelector("[data-create-preview]");
+    if (previewButton instanceof HTMLButtonElement) previewButton.dataset.version = value;
+  };
+  const markDraftChanged = () => {
+    const publishButton = document.querySelector("[data-publish-preview]");
+    if (publishButton instanceof HTMLButtonElement) publishButton.disabled = true;
+    const previewStatus = document.querySelector("[data-preview-status]");
+    if (previewStatus instanceof HTMLElement && !previewStatus.textContent.includes("要再生成")) {
+      previewStatus.textContent += " · 要再生成";
+    }
+    const publishFeedback = document.querySelector("[data-publish-feedback]");
+    if (publishFeedback instanceof HTMLElement) {
+      publishFeedback.textContent = "下書きが変わったため、新しいプレビューの確認が必要です。";
+      publishFeedback.classList.add("warning");
+      publishFeedback.classList.remove("success");
+    }
+  };
   const editor = document.querySelector("[data-project-editor]");
   if (editor instanceof HTMLFormElement) {
     const feedback = editor.querySelector("[data-editor-feedback]");
     const versionLabel = editor.querySelector("[data-editor-version]");
     const submit = editor.querySelector('button[type="submit"]');
+    editor.addEventListener("input", () => { editor.dataset.dirty = "true"; });
     editor.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!(feedback instanceof HTMLElement)) return;
@@ -30,19 +56,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
-        editor.dataset.version = String(result.version);
+        syncPageVersion(result.version);
+        editor.dataset.dirty = "false";
         if (versionLabel instanceof HTMLElement) versionLabel.textContent = "v" + result.version;
-        const previewButton = document.querySelector("[data-create-preview]");
-        if (previewButton instanceof HTMLButtonElement) previewButton.dataset.version = String(result.version);
         feedback.textContent = "v" + result.version + " として保存しました。";
         feedback.classList.add("success");
-        const publishButton = document.querySelector("[data-publish-preview]");
-        if (publishButton instanceof HTMLButtonElement) publishButton.disabled = true;
-        const publishFeedback = document.querySelector("[data-publish-feedback]");
-        if (publishFeedback instanceof HTMLElement) {
-          publishFeedback.textContent = "下書きが変わったため、新しいプレビューの確認が必要です。";
-          publishFeedback.classList.add("warning");
-        }
+        markDraftChanged();
       } catch (error) {
         feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
         feedback.classList.remove("success");
@@ -57,17 +76,6 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const frameLoading = document.querySelector("[data-frame-loading]");
   const setFrameLoading = (loading) => {
     if (frameLoading instanceof HTMLElement) frameLoading.hidden = !loading;
-  };
-  const syncSlideVersion = (version) => {
-    const value = String(version);
-    for (const form of document.querySelectorAll("[data-versioned-form]")) {
-      if (form instanceof HTMLFormElement) form.dataset.version = value;
-    }
-    for (const label of document.querySelectorAll("[data-workspace-version], [data-version-label]")) {
-      if (label instanceof HTMLElement) label.textContent = "v" + value;
-    }
-    const previewButton = document.querySelector("[data-create-preview]");
-    if (previewButton instanceof HTMLButtonElement) previewButton.dataset.version = value;
   };
   const refreshSlideFrame = (version) => {
     if (!(slideFrame instanceof HTMLIFrameElement)) return;
@@ -202,7 +210,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
-        syncSlideVersion(result.version);
+        syncPageVersion(result.version);
         form.dataset.dirty = "false";
         if (form.matches("[data-template-create]")) {
           location.reload();
@@ -210,6 +218,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
+        markDraftChanged();
         refreshSlideFrame(result.version);
       } catch (error) {
         feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
@@ -323,6 +332,25 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     } catch {}
   }
+
+  for (const button of document.querySelectorAll("[data-copy-text]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", async () => {
+      const feedback = button.parentElement?.querySelector("[data-copy-feedback]");
+      try {
+        await navigator.clipboard.writeText(button.dataset.copyText || "");
+        if (feedback instanceof HTMLElement) feedback.textContent = "AIに貼り付ける文をコピーしました。";
+      } catch {
+        if (feedback instanceof HTMLElement) feedback.textContent = "コピーできませんでした。文を選択してコピーしてください。";
+      }
+    });
+  }
+
+  addEventListener("beforeunload", (event) => {
+    if (!document.querySelector('[data-dirty="true"]')) return;
+    event.preventDefault();
+    event.returnValue = "";
+  });
 
   const voicePage = document.querySelector("[data-voice-page]");
   if (voicePage instanceof HTMLElement) {
