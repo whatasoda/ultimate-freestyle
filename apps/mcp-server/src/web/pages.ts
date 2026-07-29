@@ -41,6 +41,35 @@ type ProjectVoicevox = NonNullable<
   NonNullable<ProjectRecord["document"]["deck"]>["voicevox"]
 >;
 
+function markdownTableShape(markdown: string): { columns: number; rows: number } {
+  const lines = markdown.split(/\r?\n/);
+  let columns = 0;
+  let rows = 0;
+  const cells = (line: string) => line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+  for (let index = 0; index < lines.length - 1; index += 1) {
+    const header = cells(lines[index] ?? "");
+    const separator = cells(lines[index + 1] ?? "");
+    if (
+      header.length < 2 ||
+      header.length !== separator.length ||
+      !separator.every((cell) => /^:?-{3,}:?$/.test(cell))
+    ) continue;
+    let tableRows = 1;
+    for (let row = index + 2; row < lines.length; row += 1) {
+      if (!(lines[row] ?? "").includes("|")) break;
+      tableRows += 1;
+    }
+    columns = Math.max(columns, header.length);
+    rows = Math.max(rows, tableRows);
+  }
+  return { columns, rows };
+}
+
 function staticSlideQuality(
   slide: ProjectSlide,
   aspectRatio: "16:9" | "4:3",
@@ -69,15 +98,13 @@ function staticSlideQuality(
     if ((slide.sidebar_markdown?.length ?? 0) > (aspectRatio === "4:3" ? 220 : 300)) {
       warnings.push("補足欄の文章量が多いため、本文との配分を確認してください。");
     }
-    const tableLines = slide.content_markdown
-      .split("\n")
-      .filter((line) => /^\s*\|.*\|\s*$/.test(line));
-    const tableColumns = Math.max(
-      0,
-      ...tableLines.map((line) => line.split("|").slice(1, -1).length)
-    );
-    if (tableColumns > (aspectRatio === "4:3" ? 3 : 4) || tableLines.length > 8) {
+    const contentTable = markdownTableShape(slide.content_markdown);
+    if (contentTable.columns > (aspectRatio === "4:3" ? 3 : 4) || contentTable.rows > 7) {
       warnings.push("比較表が密です。列数・行数またはスライド分割を確認してください。");
+    }
+    const sidebarTable = markdownTableShape(slide.sidebar_markdown ?? "");
+    if (sidebarTable.columns > 2 || sidebarTable.rows > 5) {
+      warnings.push("補足欄の比較表が密です。列数・行数または本文側への移動を確認してください。");
     }
   }
   const narrationAppearance = slide.narration?.appearance;
