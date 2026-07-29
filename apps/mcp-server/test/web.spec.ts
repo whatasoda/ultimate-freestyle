@@ -421,6 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("表紙スライド");
     expect(detailHtml).toContain("画像の説明");
     expect(detailHtml).toContain("表示・読み上げ文");
+    expect(detailHtml).toContain("音声 0/1");
     expect(detailHtml).toContain("想定発表時間");
     expect(detailHtml).toContain('<dt>想定時間</dt><dd data-state="ok">0分30秒</dd>');
     expect(detailHtml).toContain("固定プレビュー");

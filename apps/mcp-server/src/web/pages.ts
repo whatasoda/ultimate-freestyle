@@ -725,9 +725,14 @@ export function projectDetailPage(options: {
   };
   const slideRows = slides.length
     ? slides
-        .map(
-          (slide, index) => `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${slide.role === "cover" ? "表紙 · " : ""}${escapeHtml(slideCompositionLabel(slide))}</small></strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階</span></a>`
-        )
+        .map((slide, index) => {
+          const narration = slide.narration?.segments ?? [];
+          const readyVoice = narration.filter((segment) => segment.audio_src).length;
+          const voiceLabel = narration.length === 0
+            ? "原稿なし"
+            : `音声 ${readyVoice}/${narration.length}`;
+          return `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${slide.role === "cover" ? "表紙 · " : ""}${escapeHtml(slideCompositionLabel(slide))}</small></strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階<small class="stage">${voiceLabel}</small></span></a>`;
+        })
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
   const addSlidePrompt = `「${document.title}」の発表へ新しいスライドを1枚追加したいです。前後の流れを確認し、入れる位置・役割・内容を提案してから作成してください。`;
@@ -767,6 +772,13 @@ export function projectDetailPage(options: {
   const totalDurationSeconds = slides.reduce(
     (total, slide) => total + slide.duration_seconds,
     0
+  );
+  const longestSlide = slides.reduce<(typeof slides)[number] | undefined>(
+    (longest, slide) =>
+      longest === undefined || slide.duration_seconds > longest.duration_seconds
+        ? slide
+        : longest,
+    undefined
   );
   const durationWithinLimit =
     totalDurationSeconds > 0 && totalDurationSeconds <= MAX_PRESENTATION_DURATION_SECONDS;
@@ -914,7 +926,9 @@ export function projectDetailPage(options: {
         : durationWithinLimit
           ? `${formatDuration(totalDurationSeconds)}です。20分以内に収まっています。`
           : `現在${formatDuration(totalDurationSeconds)}で、20分以内を${formatDuration(totalDurationSeconds - MAX_PRESENTATION_DURATION_SECONDS)}超えています。`,
-      href: firstSlidePath
+      href: totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS && longestSlide !== undefined
+        ? `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(longestSlide.id)}`
+        : firstSlidePath
     },
     {
       complete: previewCurrent,
