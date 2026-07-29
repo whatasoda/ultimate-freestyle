@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@39";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@40";
 
 function escapeHtml(value: string): string {
   return value
@@ -624,7 +624,7 @@ export function renderPresentationHtml(
     .time-label { color: #718096; font-size: .78em; }
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
-    .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; }
+    .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; touch-action: pan-y; }
     .stage:focus-visible { outline: .2rem solid var(--accent); outline-offset: .18rem; }
     body[data-editor-frame="true"] .stage { cursor: default; }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
@@ -977,6 +977,7 @@ export function renderPresentationHtml(
             <div><dt>自動送り</dt><dd><kbd>A</kbd></dd></div>
             <div><dt>時間計測</dt><dd><kbd>T</kbd></dd></div>
             <div><dt>全画面</dt><dd><kbd>F</kbd></dd></div>
+            <div><dt>タッチ操作</dt><dd>左右へスワイプ</dd></div>
           </dl>
           <button type="button" data-dismiss-shortcuts>ガイドを閉じる</button>
         </div>
@@ -1032,6 +1033,7 @@ export function renderPresentationHtml(
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let swipeStart = null, suppressStageClick = false;
     let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
@@ -1731,7 +1733,28 @@ export function renderPresentationHtml(
       else if (event.key.toLowerCase() === 'f') { event.preventDefault(); fullscreenButton.click(); }
       else if (event.key === '?') { event.preventDefault(); showShortcuts(); }
     });
+    stage?.addEventListener('pointerdown', (event) => {
+      if (!started || editorFrame || event.pointerType === 'mouse' || !event.isPrimary) return;
+      if (shortcuts instanceof HTMLElement && !shortcuts.hidden) return;
+      if (completion instanceof HTMLElement && !completion.hidden) return;
+      if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
+      swipeStart = { x: event.clientX, y: event.clientY, pointerId: event.pointerId };
+      stage.setPointerCapture?.(event.pointerId);
+    });
+    stage?.addEventListener('pointerup', (event) => {
+      if (!swipeStart || swipeStart.pointerId !== event.pointerId) return;
+      const deltaX = event.clientX - swipeStart.x;
+      const deltaY = event.clientY - swipeStart.y;
+      swipeStart = null;
+      if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.25) return;
+      suppressStageClick = true;
+      if (deltaX < 0) advance();
+      else document.querySelector('#prev').click();
+      setTimeout(() => { suppressStageClick = false; }, 0);
+    });
+    stage?.addEventListener('pointercancel', () => { swipeStart = null; });
     stage?.addEventListener('click', (event) => {
+      if (suppressStageClick) { suppressStageClick = false; return; }
       if (!started || editorFrame || getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
       if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
       if (voiceUnlock instanceof HTMLButtonElement && !voiceUnlock.hidden) { speak(); return; }

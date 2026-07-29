@@ -168,13 +168,16 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@39");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@40");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
     expect(html).toContain('aria-keyshortcuts="F"');
     expect(html).toContain("interactive instanceof HTMLInputElement");
     expect(html).toContain("if (editorFrame) { hideVoiceUnlock(); setVoiceProgress(0); return; }");
+    expect(html).toContain("touch-action: pan-y");
+    expect(html).toContain("左右へスワイプ");
+    expect(html).toContain("suppressStageClick = true");
     expect(html).toContain("<table><thead><tr>");
     expect(html).toContain('<th class="align-center"><strong>値</strong></th>');
     expect(html).toContain("&lt;table-script&gt;");
