@@ -1308,6 +1308,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
       setButtonBusy(submit, true);
       feedback.textContent = "画像を圧縮して保存しています…";
+      feedback.classList.remove("warning", "success");
+      const longUploadTimer = setTimeout(() => {
+        feedback.textContent = "大きな画像を圧縮しています。この画面を閉じずにお待ちください…";
+      }, 5000);
       try {
         const url = new URL(uploadForm.action);
         url.searchParams.set("filename", file.name);
@@ -1323,11 +1327,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "画像を保存できませんでした。"));
         feedback.textContent = "保存しました。画面を更新します。";
+        feedback.classList.add("success");
         location.reload();
       } catch (error) {
         feedback.textContent = caughtErrorMessage(error, "画像を保存できませんでした。");
         feedback.classList.add("warning");
         setButtonBusy(submit, false);
+      } finally {
+        clearTimeout(longUploadTimer);
       }
     });
   }
