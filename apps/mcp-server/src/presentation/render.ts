@@ -3,8 +3,9 @@ import type {
   SlideBlock,
   SlideSceneNode
 } from "../projects/schema";
+import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@5";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@6";
 
 function escapeHtml(value: string): string {
   return value
@@ -483,6 +484,10 @@ export function renderPresentationHtml(
       if (template === null && deck.layout === "minimal") {
         appearance.visual_preset = "paper";
       }
+      const typography = resolveSlideTypography(
+        slide.typography,
+        appearance.line_height
+      );
       const regionLayout = template?.region_layout ?? "sidebar-right";
       const enterAnimation =
         slide.enter_animation ?? template?.enter_animation ?? "fade";
@@ -516,13 +521,13 @@ export function renderPresentationHtml(
           ? `<div class="slide-scene" data-region="scene" data-runtime-version="${composition.runtime_version}">${renderScene(composition.nodes, options.assetUrls ?? {})}</div>`
         : `<div class="slide-main" data-region="main" data-fit-content data-fit-id="flow:main" data-fit-region="main">
     <p class="eyebrow">${String(index + 1).padStart(2, "0")} · ${escapeHtml(slide.title)}</p>
-    <div class="slide-content">${renderTextBlocks(slide.content_markdown)}</div>
+    <div class="slide-content" data-columns="${typography.columns}">${renderTextBlocks(slide.content_markdown)}</div>
     ${slide.reveal_blocks.map((block) => `<div class="reveal-block" data-reveal="${block.at}" data-reveal-at="${block.at}" data-animation="${revealAnimation}" aria-hidden="true">${renderTextBlocks(block.markdown)}</div>`).join("\n")}
   </div>
   <aside class="slide-sidebar" data-region="sidebar" data-fit-content data-fit-id="flow:sidebar" data-fit-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
     ${slide.sidebar_markdown === null ? "" : renderTextBlocks(slide.sidebar_markdown)}
   </aside>`;
-      return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${appearance.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em" hidden>
+      return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em" hidden>
   ${content}
   <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" style="--narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines}" aria-live="polite">
     <span class="narration-speaker"${narrationSpeaker === "" ? " hidden" : ""}>${escapeHtml(narrationSpeaker)}</span>
@@ -557,7 +562,7 @@ export function renderPresentationHtml(
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
     .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; }
-    .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
+    .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
     .slide::before, .slide::after { content: ""; position: absolute; z-index: 0; pointer-events: none; }
     .slide > * { position: relative; z-index: 1; }
     .slide[data-user-template="true"] { --accent: var(--template-accent); --accent-secondary: var(--template-accent-secondary); --theme-background: var(--template-background); --theme-surface: var(--template-surface); --theme-foreground: var(--template-foreground); --theme-muted: var(--template-muted); --theme-border: var(--template-border); --slide-base: var(--theme-background); grid-template-columns: minmax(0, 1fr) var(--template-sidebar-width); border-radius: var(--template-radius); }
@@ -697,6 +702,11 @@ export function renderPresentationHtml(
     .canvas-block[data-shape] span { margin: auto; font-size: calc(1.5cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); line-height: 1.3; overflow-wrap: anywhere; }
     .slide[hidden] { display: none; }
     .slide-main { --fit-scale: 1; min-width: 0; min-height: 0; padding: calc(7% * var(--density-scale)) calc(7% * var(--density-scale)) calc(4% * var(--density-scale)); overflow: hidden; }
+    .slide[data-composition="flow"][data-vertical-align="center"] .slide-main { display: flex; flex-direction: column; justify-content: center; }
+    .slide[data-composition="flow"][data-text-align="center"] .slide-main { text-align: center; }
+    .slide[data-composition="flow"][data-text-preset="article"] .slide-main,
+    .slide[data-composition="flow"][data-text-preset="columns"] .slide-main,
+    .slide[data-composition="flow"][data-text-preset="dense"] .slide-main { padding: calc(4.5% * var(--density-scale)) calc(5.5% * var(--density-scale)) calc(3.5% * var(--density-scale)); }
     .slide-sidebar { --fit-scale: 1; min-width: 0; min-height: 0; padding: calc(9% * var(--density-scale)) calc(8% * var(--density-scale)); border-left: max(1px, .07cqw) solid var(--theme-border); background: var(--theme-surface); color: var(--theme-muted); overflow: hidden; }
     .slide-sidebar[hidden] { display: none; }
     .slide:has(.slide-sidebar[hidden]) { grid-template-columns: 1fr; }
@@ -721,10 +731,18 @@ export function renderPresentationHtml(
     .narration[data-display="inline"] .narration-track { display: grid; gap: .32em; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
     .narration-segment { opacity: .34; transition: opacity var(--motion-duration) var(--motion-ease), translate var(--motion-duration) var(--motion-ease); overflow-wrap: anywhere; }
     .narration-segment.is-current { opacity: 1; translate: .35em 0; font-weight: 800; }
-    .eyebrow { margin: 0 0 4%; color: var(--accent); font-size: calc(1cqw * var(--template-font-scale) * var(--fit-scale)); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
-    .slide-content h2, .slide-content h3, .slide-content h4 { margin: 0 0 .5em; font-family: var(--font-heading); line-height: 1.12; font-size: calc(4.4cqw * var(--template-font-scale) * var(--fit-scale)); font-weight: var(--heading-weight); overflow-wrap: anywhere; }
-    .slide-content p, .slide-content li { font-size: calc(2.05cqw * var(--template-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
-    .slide-content ul { padding-left: 1.3em; }
+    .eyebrow { margin: 0 0 4%; color: var(--accent); font-size: calc(1cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .slide-content { min-width: 0; column-gap: var(--slide-column-gap); column-fill: balance; }
+    .slide-content[data-columns="2"] { column-count: 2; }
+    .slide-content[data-columns="3"] { column-count: 3; }
+    .slide-content > * { break-inside: avoid; }
+    .slide-content h2, .slide-content h3, .slide-content h4 { margin: 0 0 .5em; break-after: avoid; font-family: var(--font-heading); line-height: 1.12; font-size: calc(4.4cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); font-weight: var(--heading-weight); overflow-wrap: anywhere; }
+    .slide-content h3 { font-size: calc(3.1cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); }
+    .slide-content h4 { font-size: calc(2.35cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); }
+    .slide-content p, .slide-content li { font-size: calc(2.05cqw * var(--template-font-scale) * var(--slide-body-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
+    .slide-content p { margin: 0 0 var(--slide-paragraph-spacing); }
+    .slide-content ul { margin: 0 0 var(--slide-paragraph-spacing); padding-left: 1.3em; }
+    .slide-content li + li { margin-top: calc(var(--slide-paragraph-spacing) * .45); }
     .reveal-block { opacity: 0; transition: opacity var(--motion-duration) var(--motion-ease), translate var(--motion-duration) var(--motion-ease), scale var(--motion-duration) var(--motion-ease), filter var(--motion-duration) var(--motion-ease), clip-path var(--motion-duration) var(--motion-ease); }
     .reveal-block.is-visible { opacity: 1; translate: 0 0; }
     .reveal-block[data-animation="none"] { transition: none; translate: none; }
@@ -741,7 +759,7 @@ export function renderPresentationHtml(
     .reveal-block[data-animation="blur"].is-visible { filter: blur(0); }
     .reveal-block[data-animation="wipe"] { clip-path: inset(0 100% 0 0); translate: none; }
     .reveal-block[data-animation="wipe"].is-visible { clip-path: inset(0); }
-    .reveal-block p, .reveal-block li { font-size: calc(1.65cqw * var(--template-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
+    .reveal-block p, .reveal-block li { font-size: calc(1.65cqw * var(--template-font-scale) * var(--slide-body-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
     .slide-sidebar h2, .slide-sidebar h3, .slide-sidebar h4 { color: var(--accent); }
     .slide-sidebar p, .slide-sidebar li { font-size: calc(1.1cqw * var(--template-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
     .slide[data-composition="flow"].tone-light { background: #f6f1e8; color: #162033; }
@@ -951,6 +969,7 @@ export function renderPresentationHtml(
     const fitAndReport = () => {
       const currentSlide = slides[slide];
       const diagnostics = [];
+      const fits = [];
       currentSlide.querySelectorAll('[data-fit-content]').forEach((target) => {
         if (!(target instanceof HTMLElement) || target.hidden || target.offsetParent === null) return;
         target.style.setProperty('--fit-scale', '1');
@@ -965,9 +984,10 @@ export function renderPresentationHtml(
         const overflowing = clippedOverflow.x > 1 || clippedOverflow.y > 1;
         target.dataset.overflow = String(overflowing);
         target.dataset.fitScale = String(scale);
+        fits.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', fit_scale: scale });
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
       });
-      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, overflows: diagnostics }, location.origin);
+      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, overflows: diagnostics, fits }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
     const setPosition = (nextSlide, nextStep, push) => {

@@ -13,7 +13,7 @@ import { registerResearchGuides } from "./projects/guides";
 import { registerVoiceTools } from "./voicevox/tools";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.9.0";
+export const SERVICE_VERSION = "0.10.0";
 
 export type EligibilityConfig = Pick<
   Env,

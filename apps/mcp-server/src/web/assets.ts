@@ -97,6 +97,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       role: String(data.get("role") || "content"),
       cover_layout: String(data.get("cover_layout") || "center")
     });
+    if (form.matches("[data-typography-editor]")) Object.assign(body, {
+      typography: {
+        preset: String(data.get("preset") || "standard"),
+        columns: optionalNumberValue(data, "columns"),
+        body_scale: optionalNumberValue(data, "body_scale"),
+        heading_scale: optionalNumberValue(data, "heading_scale"),
+        line_height: optionalNumberValue(data, "typography_line_height"),
+        paragraph_spacing_em: optionalNumberValue(data, "paragraph_spacing_em"),
+        column_gap_em: optionalNumberValue(data, "column_gap_em"),
+        text_align: String(data.get("text_align") || "") || undefined,
+        vertical_align: String(data.get("vertical_align") || "") || undefined
+      }
+    });
     if (form.matches("[data-deck-editor]")) Object.assign(body, {
       aspect_ratio: String(data.get("aspect_ratio") || "16:9"),
       loading_screen: {
@@ -264,11 +277,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const data = event.data;
       if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || !Array.isArray(data.overflows)) return;
       const overflows = data.overflows.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.overflow_x) && Number.isFinite(item.overflow_y));
+      const compressed = Array.isArray(data.fits)
+        ? data.fits.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.fit_scale) && item.fit_scale < 0.7)
+        : [];
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = overflows.length
           ? overflows.length + "か所で文字が収まりません。品質確認から対象を確認してください。"
+          : compressed.length
+            ? compressed.length + "か所の文字を70%未満まで縮小しています。組版か文章量を見直してください。"
           : "このSTEPの文字は" + (slideFrame.dataset.aspectRatio || "16:9") + "の枠内に収まっています。";
-        layoutStatus.dataset.level = overflows.length ? "warning" : "ok";
+        layoutStatus.dataset.level = overflows.length || compressed.length ? "warning" : "ok";
       }
       if (qualityList instanceof HTMLElement) {
         qualityList.querySelectorAll("[data-layout-warning]").forEach((item) => item.remove());
@@ -278,13 +296,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           row.textContent = item.region + "「" + item.id + "」が横" + Math.ceil(item.overflow_x) + "px・縦" + Math.ceil(item.overflow_y) + "px超過しています。";
           qualityList.append(row);
         }
+        for (const item of compressed) {
+          const row = document.createElement("li");
+          row.dataset.layoutWarning = "true";
+          row.textContent = item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。";
+          qualityList.append(row);
+        }
       }
       if (qualitySummary instanceof HTMLElement) {
         const baseCount = Number(qualitySummary.dataset.baseCount || 0);
-        const total = baseCount + overflows.length;
+        const total = baseCount + overflows.length + compressed.length;
         qualitySummary.dataset.level = total ? "warning" : "ok";
         qualitySummary.textContent = overflows.length
           ? total + "件の確認事項があります（うち見切れ" + overflows.length + "件）。"
+          : compressed.length
+            ? total + "件の確認事項があります（うち過剰な自動縮小" + compressed.length + "件）。"
           : baseCount
             ? baseCount + "件の確認事項があります。"
             : "保存データ上の確認事項はありません。";

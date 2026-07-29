@@ -1,10 +1,11 @@
 {
   "name": "@ultimate-freestyle/mcp-server",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler dev --config wrangler.jsonc",
+    "dev:typography": "bun scripts/typography-preview.ts",
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --config wrangler.jsonc --dry-run --outdir dist",
     "migrate": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler d1 migrations apply ultimate-freestyle --remote --config wrangler.jsonc",
     "deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy --config wrangler.jsonc",

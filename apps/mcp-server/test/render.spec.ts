@@ -5,12 +5,33 @@ import {
   renderPresentationHtml
 } from "../src/presentation/render";
 import { slideWorkspacePage } from "../src/web/pages";
+import { resolveSlideTypography } from "../src/projects/typography";
 import {
   projectRecordSchema,
   slideCompositionSchema
 } from "../src/projects/schema";
 
 describe("presentation artifact renderer", () => {
+  it("resolves readable defaults for text-heavy slide presets", () => {
+    expect(resolveSlideTypography({ preset: "article" })).toMatchObject({
+      columns: 1,
+      body_scale: 0.7,
+      line_height: 1.6
+    });
+    expect(resolveSlideTypography({ preset: "columns" })).toMatchObject({
+      columns: 2,
+      body_scale: 0.65
+    });
+    expect(resolveSlideTypography({ preset: "dense", columns: 3 })).toMatchObject({
+      columns: 3,
+      body_scale: 0.55
+    });
+    expect(resolveSlideTypography(undefined, 1.75)).toMatchObject({
+      preset: "standard",
+      line_height: 1.75
+    });
+  });
+
   it("renders a self-contained interactive deck and escapes project content", () => {
     const project = projectRecordSchema.parse({
       project_id: "63ab1ec4-20a0-4cf6-a1a0-f74ced56778a",
@@ -84,6 +105,17 @@ describe("presentation artifact renderer", () => {
               template_id: "my-biim",
               role: "cover",
               cover_layout: "poster",
+              typography: {
+                preset: "columns",
+                columns: 3,
+                body_scale: 0.6,
+                heading_scale: 0.7,
+                line_height: 1.55,
+                paragraph_spacing_em: 0.6,
+                column_gap_em: 2.4,
+                text_align: "start",
+                vertical_align: "start"
+              },
               content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A",
               reveal_blocks: [
                 { at: 1, markdown: "追加で見せる証拠" }
@@ -136,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@5");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@6");
     expect(html).toContain('title="実経過時間 / 想定経過時間"');
     expect(html).toContain("const expectedElapsed = () =>");
     expect(html).toContain("step / current.revealSteps");
@@ -144,6 +176,11 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-style="orbit"');
     expect(html).toContain('data-slide-role="cover"');
     expect(html).toContain('data-cover-layout="poster"');
+    expect(html).toContain('data-text-preset="columns"');
+    expect(html).toContain('data-columns="3"');
+    expect(html).toContain('--slide-body-scale:0.6');
+    expect(html).toContain('--slide-heading-scale:0.7');
+    expect(html).toContain('--slide-column-gap:2.4em');
     expect(html).toContain('--template-accent-secondary: #65ccff');
     expect(html).toContain('--template-border: #334155');
     expect(html).toContain('"/presentation-assets/revision/image"');
@@ -167,6 +204,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('"speaker":"ずんだもん"');
     expect(html).toContain("segment?.speaker || DECK.slides[slide].narration?.speaker");
     expect(html).toContain("ultimate-freestyle:render-diagnostics");
+    expect(html).toContain("overflows: diagnostics, fits");
     expect(html).toContain("ultimate-freestyle:set-position");
     expect(html).toContain("container: presentation-stage / size");
     expect(html).not.toMatch(/\d(?:\.\d+)?vw/);

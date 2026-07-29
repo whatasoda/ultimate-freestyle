@@ -81,6 +81,28 @@ export const coverLayoutSchema = z.enum([
   "statement"
 ]);
 
+export const slideTypographyPresetSchema = z.enum([
+  "statement",
+  "standard",
+  "article",
+  "columns",
+  "dense"
+]);
+
+export const slideTypographySchema = z.object({
+  preset: slideTypographyPresetSchema,
+  columns: z.number().int().min(1).max(3).optional(),
+  body_scale: z.number().min(0.5).max(1.4).multipleOf(0.05).optional(),
+  heading_scale: z.number().min(0.5).max(1.5).multipleOf(0.05).optional(),
+  line_height: z.number().min(1).max(2).multipleOf(0.05).optional(),
+  paragraph_spacing_em: z.number().min(0).max(2).multipleOf(0.05).optional(),
+  column_gap_em: z.number().min(0.5).max(5).multipleOf(0.1).optional(),
+  text_align: z.enum(["start", "center"]).optional(),
+  vertical_align: z.enum(["start", "center"]).optional()
+});
+
+export type SlideTypography = z.infer<typeof slideTypographySchema>;
+
 export const narrationDisplaySchema = z.enum([
   "dialogue",
   "commentary",
@@ -598,6 +620,7 @@ export const projectSlideSchema = z
     enter_animation: animationSchema.nullable().optional(),
     role: slideRoleSchema.optional(),
     cover_layout: coverLayoutSchema.optional(),
+    typography: slideTypographySchema.optional(),
     composition: slideCompositionSchema.nullable().optional(),
     content_markdown: z.string().min(1).max(20_000),
     reveal_blocks: z

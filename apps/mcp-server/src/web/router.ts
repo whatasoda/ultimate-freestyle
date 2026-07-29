@@ -34,6 +34,7 @@ import {
   presentationAspectRatioSchema,
   projectStageSchema,
   slideRoleSchema,
+  slideTypographySchema,
   visualPresetSchema
 } from "../projects/schema";
 import {
@@ -137,6 +138,11 @@ const slideFieldsRequestSchema = z.object({
     ),
   { message: "At least one slide field is required." }
 );
+
+const slideTypographyRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  typography: slideTypographySchema
+});
 
 const templateFieldsRequestSchema = presentationTemplateSchema
   .omit({ id: true })
@@ -1036,6 +1042,75 @@ async function handleSlideFieldsUpdate(
       },
       status
     );
+  }
+}
+
+async function handleSlideTypographyUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = slideTypographyRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_TYPOGRAPHY", message: "文章レイアウトの入力内容を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        slide.typography = parsed.data.typography;
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_typography_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "文章レイアウトを保存できませんでした。");
   }
 }
 
@@ -2060,6 +2135,20 @@ export async function handleWebRequest(
   );
   if (deckSettingsMatch?.[1] !== undefined) {
     return handleDeckSettingsUpdate(request, env, deckSettingsMatch[1]);
+  }
+  const slideTypographyMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/typography$`)
+  );
+  if (
+    slideTypographyMatch?.[1] !== undefined &&
+    slideTypographyMatch[2] !== undefined
+  ) {
+    return handleSlideTypographyUpdate(
+      request,
+      env,
+      slideTypographyMatch[1],
+      slideTypographyMatch[2]
+    );
   }
   const slideFieldsMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})$`)

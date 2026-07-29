@@ -59,6 +59,13 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - 0ページ目は画像、生成音声、利用可能なfontをpreloadし、開始クリック後に経過時間と初回読み上げを始める。slide数と進捗には含めない。
 - 表紙相当の一枚は \`update_slide_fields\` で \`role: "cover"\` とし、\`center\`、\`split\`、\`poster\`、\`minimal\`、\`statement\`から \`cover_layout\` を選ぶ。sceneやcanvasがある場合は、その自由構成を優先する。
 
+## 一枚ごとの文章組版
+
+- 定型flowは \`update_slide_typography\` で一枚ずつ調整する。短い主張は \`statement\`、通常は \`standard\`、文章主体は \`article\`、まとまりを並べる長文は \`columns\`、資料性を優先する場合は \`dense\`。
+- presetだけで本文・見出し倍率、行間、段落間隔、段数、縦横揃えの安全な既定値が決まる。必要な項目だけを追加で上書きし、元へ戻す項目はnull、上書きをまとめて消す場合は \`reset_overrides: true\` を使う。
+- \`columns\` は既定2段、最大3段。4:3の3段組みは行長が短くなるため、Web UIの実rendererと見切れ診断を必ず確認する。
+- 文章量が多い一枚を自動fitだけで極端に縮小しない。まず組版presetと段数を選び、それでも読めない場合は内容を複数スライドへ分ける。
+
 ## 読み上げ表示
 
 - 発表全体の既定値は \`configure_deck_narration\`、一枚の表示方式と枠は \`configure_slide_narration\` で設定する。
@@ -295,7 +302,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。research://guide/presentation-componentsとresearch://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。research://guide/presentation-componentsとresearch://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
           }
         }
       ]

@@ -21,6 +21,8 @@ import {
   researchLogEntrySchema,
   slideBlockSchema,
   slideRoleSchema,
+  slideTypographyPresetSchema,
+  slideTypographySchema,
   slideSceneDataNodeSchema,
   slideSceneInfoNodeSchema,
   slideSceneLayoutNodeSchema,
@@ -1013,6 +1015,70 @@ export function registerProjectMutationTools(
             );
           }
           Object.assign(findSlide(document, slide_id), fields);
+        }
+      })
+  );
+
+  server.registerTool(
+    "update_slide_typography",
+    {
+      title: "一枚の文章レイアウトを調整",
+      description:
+        "定型flowの組版preset、段数、本文と見出しの倍率、行間、段落間隔、揃えを部分更新します。文章主体の一枚はarticle、columns、denseを使います。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        preset: slideTypographyPresetSchema.optional(),
+        columns: z.number().int().min(1).max(3).nullable().optional(),
+        body_scale: z.number().min(0.5).max(1.4).multipleOf(0.05).nullable().optional(),
+        heading_scale: z.number().min(0.5).max(1.5).multipleOf(0.05).nullable().optional(),
+        line_height: z.number().min(1).max(2).multipleOf(0.05).nullable().optional(),
+        paragraph_spacing_em: z.number().min(0).max(2).multipleOf(0.05).nullable().optional(),
+        column_gap_em: z.number().min(0.5).max(5).multipleOf(0.1).nullable().optional(),
+        text_align: z.enum(["start", "center"]).nullable().optional(),
+        vertical_align: z.enum(["start", "center"]).nullable().optional(),
+        reset_overrides: z.boolean().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, reset_overrides, ...fields }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_typography_updated",
+        changedId: slide_id,
+        mutate: (document) => {
+          if (
+            !reset_overrides &&
+            Object.values(fields).every((value) => value === undefined)
+          ) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "At least one typography field must be supplied."
+            );
+          }
+          const slide = findSlide(document, slide_id);
+          const preset = fields.preset ?? slide.typography?.preset ?? "standard";
+          if (reset_overrides) {
+            slide.typography = slideTypographySchema.parse({ preset });
+            return;
+          }
+          const typography: Record<string, unknown> = {
+            ...(slide.typography ?? { preset }),
+            preset
+          };
+          for (const [key, value] of Object.entries(fields)) {
+            if (value === undefined || key === "preset") continue;
+            if (value === null) delete typography[key];
+            else typography[key] = value;
+          }
+          slide.typography = slideTypographySchema.parse(typography);
         }
       })
   );

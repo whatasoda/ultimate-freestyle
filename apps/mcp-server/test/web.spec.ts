@@ -388,7 +388,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=3"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=4"');
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
@@ -494,6 +494,8 @@ describe("Web dashboard", () => {
     expect(() => new Function(dashboardScriptText)).not.toThrow();
     expect(dashboardScriptText).toContain("queueMicrotask(syncFramePosition)");
     expect(dashboardScriptText).toContain("qualitySummary.dataset.baseCount");
+    expect(dashboardScriptText).toContain("Array.isArray(data.fits)");
+    expect(dashboardScriptText).toContain("70%未満まで縮小");
 
     const rejectedUpload = await requestProvider(
       provider,
@@ -1136,6 +1138,52 @@ describe("Web dashboard", () => {
       template_id: "web-neon",
       version: 9
     });
+
+    const typographyUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/typography",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 9,
+            typography: {
+              preset: "columns",
+              columns: 3,
+              body_scale: 0.6,
+              heading_scale: 0.7,
+              line_height: 1.55,
+              paragraph_spacing_em: 0.6,
+              column_gap_em: 2.4,
+              text_align: "start",
+              vertical_align: "start"
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(typographyUpdate.status).toBe(200);
+    expect(await typographyUpdate.json()).toMatchObject({
+      ok: true,
+      slide_id: "intro",
+      version: 10
+    });
+
+    const typographyWorkspace = await requestProvider(
+      provider,
+      new Request(workspaceUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const typographyWorkspaceHtml = await typographyWorkspace.text();
+    expect(typographyWorkspaceHtml).toContain("2段組み · 3段");
+    expect(typographyWorkspaceHtml).toContain('data-typography-editor');
+    expect(typographyWorkspaceHtml).toContain('name="body_scale"');
 
     const unsupportedUpload = await requestProvider(
       provider,

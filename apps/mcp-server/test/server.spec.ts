@@ -63,6 +63,7 @@ describe("MCP contract", () => {
           "upsert_presentation_template",
           "create_slide",
           "update_slide_fields",
+          "update_slide_typography",
           "set_slide_reveal",
           "set_slide_narration",
           "configure_slide_narration",
@@ -111,7 +112,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.9.0",
+        version: "0.10.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",

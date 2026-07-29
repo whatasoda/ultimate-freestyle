@@ -13,6 +13,7 @@ import {
 } from "@ultimate-freestyle/research-schema/voice";
 import type { PublicationStatus } from "../publications/service";
 import { VOICEVOX_CATALOG } from "@ultimate-freestyle/research-schema/voicevox-catalog";
+import { resolveSlideTypography } from "../projects/typography";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   discovery: "発見",
@@ -68,6 +69,14 @@ const DENSITY_LABELS = {
   compact: "コンパクト"
 } as const;
 
+const SLIDE_TYPOGRAPHY_LABELS = {
+  statement: "一言を強調",
+  standard: "標準",
+  article: "読み物",
+  columns: "2段組み",
+  dense: "高密度"
+} as const;
+
 const MOTION_LABELS = {
   calm: "穏やか",
   snappy: "小気味よい",
@@ -82,7 +91,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=3";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=4";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -846,6 +855,10 @@ export function slideWorkspacePage(options: {
   const headingFont = activeTemplate?.heading_font ?? "system-sans";
   const density = activeTemplate?.density ?? "comfortable";
   const motion = activeTemplate?.motion_style ?? "calm";
+  const typography = resolveSlideTypography(
+    slide.typography,
+    activeTemplate?.line_height ?? 1.5
+  );
   const effectiveEnter = slide.enter_animation ?? activeTemplate?.enter_animation ?? "fade";
   const narrationDisplay =
     slide.narration?.display ?? deck.narration_defaults?.display ?? "commentary";
@@ -901,6 +914,13 @@ export function slideWorkspacePage(options: {
         <div class="actions"><button type="submit">templateを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
       </form>`
     : `<p class="mode-note">組み込みstyleを使用中です。templateを選ぶと色、font、密度、余白、動きを編集できます。</p>`;
+  const typographyEditor = `<form class="editor" data-typography-editor data-versioned-form action="${slidePath}/typography" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+    <p class="inherit-note">定型flowの文章配分を一枚単位で調整します。未入力の項目は選択した組版presetを使います。</p>
+    <div class="editor-grid"><label>組版preset<select name="preset">${Object.entries(SLIDE_TYPOGRAPHY_LABELS).map(([value, label]) => `<option value="${value}"${typography.preset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>段数<input name="columns" type="number" min="1" max="3" value="${slide.typography?.columns ?? ""}" placeholder="実効 ${typography.columns}"></label></div>
+    <fieldset><legend>文字サイズと行送り</legend><div class="editor-grid"><label>本文倍率<input name="body_scale" type="number" min="0.5" max="1.4" step="0.05" value="${slide.typography?.body_scale ?? ""}" placeholder="実効 ${typography.body_scale}"></label><label>見出し倍率<input name="heading_scale" type="number" min="0.5" max="1.5" step="0.05" value="${slide.typography?.heading_scale ?? ""}" placeholder="実効 ${typography.heading_scale}"></label><label>行間<input name="typography_line_height" type="number" min="1" max="2" step="0.05" value="${slide.typography?.line_height ?? ""}" placeholder="実効 ${typography.line_height}"></label><label>段落間隔（em）<input name="paragraph_spacing_em" type="number" min="0" max="2" step="0.05" value="${slide.typography?.paragraph_spacing_em ?? ""}" placeholder="実効 ${typography.paragraph_spacing_em}"></label><label>段間隔（em）<input name="column_gap_em" type="number" min="0.5" max="5" step="0.1" value="${slide.typography?.column_gap_em ?? ""}" placeholder="実効 ${typography.column_gap_em}"></label></div></fieldset>
+    <fieldset><legend>配置</legend><div class="editor-grid"><label>文字揃え<select name="text_align"><option value=""${slide.typography?.text_align === undefined ? " selected" : ""}>presetを使用（${typography.text_align === "center" ? "中央" : "左"}）</option><option value="start"${slide.typography?.text_align === "start" ? " selected" : ""}>左</option><option value="center"${slide.typography?.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>縦位置<select name="vertical_align"><option value=""${slide.typography?.vertical_align === undefined ? " selected" : ""}>presetを使用（${typography.vertical_align === "center" ? "中央" : "上"}）</option><option value="start"${slide.typography?.vertical_align === "start" ? " selected" : ""}>上</option><option value="center"${slide.typography?.vertical_align === "center" ? " selected" : ""}>中央</option></select></label></div></fieldset>
+    <div class="actions"><button type="submit">文章レイアウトを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
+  </form>`;
   const voiceSegments = slide.narration?.segments.length
     ? slide.narration.segments
         .map((segment) => {
@@ -941,6 +961,15 @@ export function slideWorkspacePage(options: {
         : 0;
   const missingAudio =
     slide.narration?.segments.filter((segment) => segment.audio_src === null).length ?? 0;
+  const markdownBlocks = slide.content_markdown
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const headingCount = markdownBlocks.filter((block) => /^#{1,6}\s/m.test(block)).length;
+  const paragraphCount = markdownBlocks.filter((block) => !/^(?:#{1,6}\s|[-*+]\s)/m.test(block)).length;
+  const needsReadingLayout =
+    slide.content_markdown.length > 550 ||
+    (headingCount >= 2 && paragraphCount >= 3);
   const qualityItems = [
     ...(missingAlt > 0 ? [`説明のない画像が${missingAlt}件あります。`] : []),
     ...(missingAudio > 0
@@ -948,6 +977,15 @@ export function slideWorkspacePage(options: {
       : []),
     ...(slide.composition?.clip_content
       ? ["枠外を隠す設定です。実表示の見切れ診断を確認してください。"]
+      : []),
+    ...(slide.composition === null || slide.composition === undefined
+      ? needsReadingLayout && ["statement", "standard"].includes(typography.preset)
+        ? ["文章量が多いため、「読み物」または「2段組み」の組版presetも確認してください。"]
+        : typography.columns === 3 && (deck.aspect_ratio ?? "16:9") === "4:3"
+          ? ["4:3で3段組みを使っています。1段あたりの行長と見切れ診断を確認してください。"]
+          : typography.columns > 1 && headingCount === 0 && slide.content_markdown.length > 320
+            ? ["段組みの文章に見出しがありません。段の切り替わりを追いやすいよう、小見出しの追加を検討してください。"]
+          : []
       : [])
   ];
   const effectiveSummary = `<div class="setting-summary" aria-label="現在有効な設定">
@@ -955,6 +993,7 @@ export function slideWorkspacePage(options: {
     <span class="setting-chip"><small>template</small>${escapeHtml(activeTemplate?.name ?? "組み込み")}</span>
     <span class="setting-chip"><small>visual</small>${VISUAL_LABELS[visualPreset]}</span>
     <span class="setting-chip"><small>font</small>${FONT_LABELS[bodyFont]} / ${FONT_LABELS[headingFont]}</span>
+    <span class="setting-chip"><small>組版</small>${SLIDE_TYPOGRAPHY_LABELS[typography.preset]} · ${typography.columns}段</span>
     <span class="setting-chip"><small>tone</small>${TONE_LABELS[slide.tone]}</span>
     <span class="setting-chip"><small>animation</small>${ANIMATION_LABELS[effectiveEnter]}</span>
     <span class="setting-chip"><small>読み上げ</small>${NARRATION_DISPLAY_LABELS[narrationDisplay]}</span>
@@ -988,6 +1027,7 @@ export function slideWorkspacePage(options: {
              </div></details>
              <details class="inspector-section"><summary>デザイン</summary><div class="inspector-body">
                <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>template<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>用途<select name="role"><option value="content"${slide.role !== "cover" ? " selected" : ""}>通常スライド</option><option value="cover"${slide.role === "cover" ? " selected" : ""}>表紙</option></select></label><label>表紙レイアウト<select name="cover_layout">${[["center", "中央タイトル"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言を強調"]].map(([value, label]) => `<option value="${value}"${(slide.cover_layout ?? "center") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div><div class="editor-grid"><label>tone<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>templateを継承</option>${animationOptions}</select></label></div><div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
+               ${typographyEditor}
                ${templateCreator}
                ${templateEditor}
              </div></details>
