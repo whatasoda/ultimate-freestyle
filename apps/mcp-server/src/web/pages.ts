@@ -82,6 +82,13 @@ function staticSlideQuality(
   if ((slide.narration?.segments ?? []).some((segment) => segment.text.length > narrationLimit)) {
     warnings.push("一度に表示する読み上げ文が長いため、区間分割または表示形式を確認してください。");
   }
+  const unitDuration = slide.duration_seconds / (slide.reveal_steps + 1);
+  if ((slide.narration?.segments ?? []).some((segment) => {
+    const speed = segment.voice_tuning?.speedScale ?? 1;
+    return segment.text.length / (7 * speed) > unitDuration * 1.15;
+  })) {
+    warnings.push("読み上げの概算時間がSTEPの想定秒数を超えています。原稿、話速、想定秒数を確認してください。");
+  }
   return warnings;
 }
 
