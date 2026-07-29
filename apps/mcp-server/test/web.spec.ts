@@ -409,6 +409,10 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("表示・読み上げ文");
     expect(detailHtml).toContain("想定発表時間");
     expect(detailHtml).toContain("固定プレビュー");
+    expect(detailHtml).toContain("修正へ →");
+    expect(detailHtml).toContain('href="#basic-information"');
+    expect(detailHtml).toContain('id="research-images"');
+    expect(detailHtml).toContain('id="presentation-structure"');
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
