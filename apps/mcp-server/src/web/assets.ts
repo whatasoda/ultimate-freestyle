@@ -930,6 +930,28 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       form.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
+  for (const button of document.querySelectorAll("[data-animation-pick]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      if (!(form instanceof HTMLFormElement)) return;
+      const target = button.dataset.animationTarget || "enter_animation";
+      const select = form.elements.namedItem(target);
+      if (!(select instanceof HTMLSelectElement)) return;
+      select.value = button.dataset.animationPick || "";
+      syncPicker(form, '[data-animation-pick][data-animation-target="' + target + '"]', "animationPick", select.value);
+      select.dispatchEvent(new Event("input", { bubbles: true }));
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
+  for (const button of document.querySelectorAll("[data-animation-replay]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      const select = form?.elements.namedItem(button.dataset.animationReplay || "enter_animation");
+      if (select instanceof HTMLSelectElement) select.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   const syncPicker = (form, selector, datasetKey, selected) => {
     for (const item of form.querySelectorAll(selector)) {
@@ -950,6 +972,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         syncPicker(form, "[data-narration-display-pick]", "narrationDisplayPick", field.value);
       } else if (field.name === "region_layout") {
         syncPicker(form, "[data-region-pick]", "regionPick", field.value);
+      } else if (field.name === "enter_animation") {
+        syncPicker(form, '[data-animation-pick][data-animation-target="enter_animation"]', "animationPick", field.value);
       } else if (field.name === "body_font" || field.name === "heading_font") {
         const body = form.elements.namedItem("body_font");
         const heading = form.elements.namedItem("heading_font");
