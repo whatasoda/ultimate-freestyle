@@ -1176,10 +1176,10 @@
                 <td>所有者IDを常に強制</td>
               </tr>
               <tr>
-                <td><code>get_project_outline</code> / <code>get_project</code></td>
+                <td><code>get_project_outline</code> / <code>research://projects/{id}</code></td>
                 <td><span class="tag">READ</span></td>
-                <td>軽量な構成確認／診断用の全量取得</td>
-                <td>通常編集はoutlineを入口にする</td>
+                <td>軽量な構成確認／標準MCP resourceでの全量取得</td>
+                <td>一枚だけなら<code>research://projects/{id}/slides/{slideId}</code></td>
               </tr>
               <tr>
                 <td><code>create_project</code></td>
@@ -1194,10 +1194,10 @@
                 <td>全体置換を廃止し、各変更で楽観ロック</td>
               </tr>
               <tr>
-                <td><code>evaluate_project</code></td>
+                <td><code>review_research</code> prompt / <code>research://guide/evaluation</code></td>
                 <td><span class="tag">READ</span></td>
-                <td>評価基準と現在データを返す</td>
-                <td>採点自体はクライアントAIが担当</td>
+                <td>評価の対話手順と8観点の基準を返す</td>
+                <td>研究本体はresourceから読み、採点はクライアントAIが担当</td>
               </tr>
               <tr>
                 <td>Web UI: preview作成</td>
@@ -1234,6 +1234,8 @@
               すべてのtoolはJSON Schema、安定したerror code、<code>request_id</code>、
               変更後のversionを返す。初期化時の<code>instructions</code>先頭には、推奨手順、
               destructive操作、quota、再試行条件を短く完結して記載する。
+              全量読取はresourceへ分離し、tool定義は38件以下、一覧JSONは160KB未満、
+              一件のinput schemaは12KB未満をcontract testで維持する。
             </p>
           </article>
           <article class="card">
@@ -1529,7 +1531,7 @@ docs/                  # 設計・運用手順</pre>
             Phase 2はOAuth用KV、state用KV、D1 migration、二段OAuth、PKCE、CSRF、
             フォロー期間／サブスク／override判定、token更新、<code>get_access_status</code>とfixture E2Eまで実装済み。
             Twitchアプリのclient ID／secretをWorker secretへ投入し、本番MCPのOAuth必須化、metadata、未認証401、Twitch認可URLのcallback／scope一致、実アカウントによるCodex OAuth完走まで確認済み。
-            Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価tool、動的resource、3つの伴走promptまで実装・本番配置済み。巨大な<code>update_project</code>は廃止し、基本項目、箇条書き、ログ、deck、template、slide、reveal、narrationを個別更新する小粒度toolへ移行した。
+            Phase 3は固定schema、所有者分離、冪等作成、version競合検知、研究CRUD、評価resource、動的resource、3つの伴走promptまで実装・本番配置済み。巨大な<code>update_project</code>と全量読取toolは廃止し、基本項目、箇条書き、ログ、deck、template、slide、reveal、narrationを個別更新する小粒度toolと、全体・一枚単位の標準MCP resourceへ移行した。
             Phase 4は安全なHTML renderer、宣言的な利用者template、標準<code>data-*</code> hook、不変preview、確認後publish、private R2配信まで実装・自動検証済み。定型flow、絶対配置canvasに加え、<code>layer</code>／<code>stack</code>／<code>grid</code>へ登録済み<code>uf-*</code> Web Componentsを入れ子にするsceneを追加した。文章、情報card、数値、callout、棒グラフ、timeline、画像、図形を分類別の小粒度toolで一件ずつ編集する。任意HTML／CSS／script／外部URLは受け付けず、参照画像はpreview revision専用R2 objectへ固定して元画像の変更や削除から公開版を分離する。
             Web UIはトップページ、Twitchログイン、D1上の24時間Web専用セッション、CSRF付きログアウト、所有者限定の研究一覧・詳細、基本文言編集、競合防止、preview／publish導線まで実装済み。さらに各スライドをfilmstrip、公開版と同じrendererの16:9 iframe、内容・デザイン・読み上げ・構造・品質のinspectorで確認する一枚編集workspaceを追加した。7種類のvisual presetとfont preset、密度、配色、領域、余白、motion、5種類の読み上げ表示、segment別VOICEVOX profileと7種の調声値を小粒度APIから編集できる。rendererはstage基準の寸法、自動文字fit、編集用overflow診断、音声file優先再生とbrowser fallbackに対応し、STEP切替ではiframeを再読込しない。
             private R2 bucketとImages binding、Web UIの画像追加・閲覧・削除は実装済み。入力10 MiB、40 MP、一辺10,000 px、保存2 MiB・最大辺2,560 px、100画像/project・300画像/user・150 MiB/userを上限とし、原本を残さずWebPへ正規化する。VOICEVOXはUUID + style IDの複数profile、segment別profile、7種の調声値、生成入力fingerprint、Cloudflare Queue、outbox、VOICEVOX ENGINE 0.25.1固定Container、MP3変換、private R2 cache、Web UIの生成・進捗・試聴、公開revisionへの不変音声snapshot、使用話者の自動クレジットまで接続済み。

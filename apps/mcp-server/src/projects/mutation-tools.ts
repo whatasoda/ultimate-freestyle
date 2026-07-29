@@ -789,40 +789,6 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
-    "upsert_presentation_template",
-    {
-      title: "発表テンプレートを作成・更新",
-      description:
-        "安全な色・配置・余白・animation presetだけからなるtemplateを一件保存します。HTML/CSS/JavaScriptは受け付けません。",
-      inputSchema: {
-        ...projectIdInput,
-        template: presentationTemplateSchema
-      },
-      outputSchema: mutationOutput,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, template }) =>
-      executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: "template_upserted",
-        changedId: template.id,
-        mutate: (document) => {
-          const deck = requireDeck(document);
-          deck.templates ??= [];
-          const index = deck.templates.findIndex((item) => item.id === template.id);
-          if (index === -1) deck.templates.push(template);
-          else deck.templates[index] = template;
-        }
-      })
-  );
-
-  server.registerTool(
     "upsert_voicevox_profile",
     {
       title: "VOICEVOX音声profileを作成・更新",

@@ -43,7 +43,9 @@ preview作成時に参照画像をrevision専用R2 keyへstream copyし、D1の`
 - `set_slide_canvas`: canvasの有効化、背景色、overflow方針を設定する。
 - `upsert_slide_block`: block一件を追加・置換する。
 - `delete_slide_block`: block一件を削除する。
-- `get_project_slide`: 現在のblockとversionを一枚単位で取得する。
+- `research://projects/{id}/slides/{slideId}`: 現在のblockとversionを一枚単位で取得する。
+
+2026-07-29追補: 一枚取得をtoolから標準MCP resourceへ移した。入力のない読取schemaをtool一覧へ重複させず、個別編集の取得粒度は維持する。
 
 すべて既存の`expected_version`による楽観的排他制御を使い、研究全体やslide全体の再送を要求しない。
 

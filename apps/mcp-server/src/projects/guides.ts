@@ -49,7 +49,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - visual presetは \`studio\`、\`paper\`、\`editorial\`、\`neon\`、\`retro-game\`、\`soft-pop\`、\`scientific\`。
 - font presetは \`system-sans\`、\`gothic\`、\`rounded\`、\`mincho\`、\`serif\`、\`monospace\`、\`display\`。任意font名やURLは入力しない。
 - 密度は \`spacious\`、\`comfortable\`、\`compact\`、動きの傾向は \`calm\`、\`snappy\`、\`dramatic\`。
-- 色、配置、font、密度、animationの調整は \`update_presentation_template_fields\` で変更項目だけを送る。互換用の全量upsertを通常の編集には使わない。
+- 色、配置、font、密度、animationの調整は \`update_presentation_template_fields\` で変更項目だけを送る。
 - 領域配置は単一、左右補足、下段補足に加え、左右均等の \`split\`、上段補足の \`top-band\`、中央集中の \`focus\`を選べる。
 - 基本5色に加えて \`accent_secondary\` と \`border\` を指定できる。値は6桁hexだけを使い、任意CSSやgradientは入力しない。
 
@@ -235,6 +235,54 @@ export function registerResearchGuides(
     }
   );
 
+  server.registerResource(
+    "research-project-slide",
+    new ResourceTemplate("research://projects/{id}/slides/{slideId}", {
+      list: undefined
+    }),
+    {
+      title: "研究発表の一枚",
+      description:
+        "個別編集前に読む、現在versionと指定スライド一枚だけのデータです。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const project =
+        !("error" in auth) && typeof id === "string"
+          ? await getProject(db, auth.ownerUserId, id)
+          : null;
+      const slide =
+        project !== null && typeof slideId === "string"
+          ? project.document.deck?.slides.find((item) => item.id === slideId)
+          : undefined;
+      const body =
+        "error" in auth
+          ? { ok: false, error: { code: auth.error } }
+          : project === null
+            ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+            : slide === undefined
+              ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+              : {
+                  ok: true,
+                  project_id: project.project_id,
+                  version: project.version,
+                  slide
+                };
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(body)
+          }
+        ]
+      };
+    }
+  );
+
   server.registerPrompt(
     "start_research",
     {
@@ -281,7 +329,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_projectで${project_id}を取得し、research://guide/evaluationを読んでください。根拠不足はNEとし、各評価にproject内の根拠を示してください。強み、最大のリスク、最優先の改善を一つずつ挙げ、最後は改善につながる質問一問だけで終えてください。`
+            text: `research://projects/${project_id}とresearch://guide/evaluationを読んでください。根拠不足はNEとし、各評価にproject内の根拠を示してください。強み、最大のリスク、最優先の改善を一つずつ挙げ、最後は改善につながる質問一問だけで終えてください。`
           }
         }
       ]
@@ -302,7 +350,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけget_projectで取得してください。research://guide/presentation-componentsとresearch://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけresearch://projects/${project_id}またはresearch://projects/${project_id}/slides/{slideId}から読んでください。research://guide/presentation-componentsとresearch://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
           }
         }
       ]

@@ -13,7 +13,7 @@ import { registerResearchGuides } from "./projects/guides";
 import { registerVoiceTools } from "./voicevox/tools";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.10.0";
+export const SERVICE_VERSION = "0.11.0";
 
 export type EligibilityConfig = Pick<
   Env,
@@ -56,7 +56,7 @@ export function createServer(
     },
     {
       instructions:
-        "最自由研究の制作を支援するサーバーです。まずhealth、get_access_status、get_project_outlineを呼んでください。変更は目的に合う小粒度toolへexpected_versionを渡し、研究全体を送り直さないでください。リッチな発表はresearch://guide/presentation-componentsを読んでscene componentを一件ずつ構成してください。競合時は該当範囲を再取得し、ユーザーの変更を失わないでください。読み上げ編集後はget_voice_generation_statusで差分を確認し、ユーザーの合意後にgenerate_voice_audioを呼んでください。画像binaryの追加と公開前確認はWeb UIを案内します。"
+        "最自由研究の制作を支援するサーバーです。まずhealth、get_access_status、get_project_outlineを呼んでください。全体はresearch://projects/{id}、一枚はresearch://projects/{id}/slides/{slideId}から読み、変更は目的に合う小粒度toolへexpected_versionを渡してください。リッチな発表はresearch://guide/presentation-componentsを読んでscene componentを一件ずつ構成してください。競合時は該当範囲を再取得し、ユーザーの変更を失わないでください。読み上げ編集後はget_voice_generation_statusで差分を確認し、ユーザーの合意後にgenerate_voice_audioを呼んでください。画像binaryの追加と公開前確認はWeb UIを案内します。"
     }
   );
 

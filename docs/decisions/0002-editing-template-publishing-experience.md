@@ -27,7 +27,9 @@
 4. 競合時だけ該当範囲を再取得して相談・再試行する。
 5. 発表を構成したら Web UI のプレビュー確認を案内する。
 
-全体置換の `update_project` は外部利用者がいない現段階で廃止する。全量の `get_project` は評価や移行診断用に残すが、通常の編集導線から外す。
+全体置換の `update_project` は外部利用者がいない現段階で廃止する。
+
+2026-07-29追補: tool定義全体が338,689 byteへ増えたため、全量の`get_project`と`evaluate_project`も廃止した。全量取得は`research://projects/{id}`、評価基準は`research://guide/evaluation`を使い、tool一覧へ巨大な出力schemaを重複させない。
 
 ### Web UI
 

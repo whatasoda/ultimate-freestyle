@@ -5,7 +5,16 @@ import { describe, expect, it } from "vitest";
 
 import { createServer } from "../src/server";
 import { createProjectAsset } from "../src/assets/repository";
-import { projectRecordSchema } from "../src/projects/schema";
+import { projectSummarySchema } from "../src/projects/schema";
+
+async function readJsonResource(client: Client, uri: string): Promise<unknown> {
+  const resource = await client.readResource({ uri });
+  const content = resource.contents[0];
+  if (content === undefined || !("text" in content)) {
+    throw new Error(`Text resource not found: ${uri}`);
+  }
+  return JSON.parse(content.text);
+}
 
 const eligibilityConfig = {
   DB: env.DB,
@@ -42,7 +51,6 @@ describe("MCP contract", () => {
       expect(tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining([
           "get_project_outline",
-          "get_project_slide",
           "upsert_voicevox_profile",
           "update_voicevox_profile_tuning",
           "set_slide_canvas",
@@ -60,7 +68,6 @@ describe("MCP contract", () => {
           "configure_deck_narration",
           "create_presentation_template",
           "update_presentation_template_fields",
-          "upsert_presentation_template",
           "create_slide",
           "update_slide_fields",
           "update_slide_typography",
@@ -75,10 +82,15 @@ describe("MCP contract", () => {
         ])
       );
       expect(tools.map((tool) => tool.name)).not.toContain("update_project");
+      expect(tools.map((tool) => tool.name)).not.toContain("get_project");
+      expect(tools.map((tool) => tool.name)).not.toContain("get_project_slide");
+      expect(tools.map((tool) => tool.name)).not.toContain("evaluate_project");
       const largestInputSchema = Math.max(
         ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
       );
       expect(largestInputSchema).toBeLessThan(12_000);
+      expect(tools.length).toBeLessThanOrEqual(38);
+      expect(JSON.stringify(tools).length).toBeLessThan(160_000);
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
@@ -112,7 +124,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.10.0",
+        version: "0.11.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -289,7 +301,7 @@ describe("MCP contract", () => {
           idempotency_key: "project-contract-001"
         }
       });
-      const firstProject = projectRecordSchema.parse(
+      const firstProject = projectSummarySchema.parse(
         (firstCreate.structuredContent as { project?: unknown } | undefined)
           ?.project
       );
@@ -410,15 +422,14 @@ describe("MCP contract", () => {
       });
       expect(await env.MEDIA_BUCKET.get(objectKey)).toBeNull();
 
-      const evaluation = await client.callTool({
-        name: "evaluate_project",
-        arguments: { project_id: firstProject.project_id }
+      const evaluationGuide = await client.readResource({
+        uri: "research://guide/evaluation"
       });
-      expect(evaluation.structuredContent).toMatchObject({
-        ok: true,
-        project: { project_id: firstProject.project_id, version: 2 },
-        rubric_markdown: expect.stringContaining("根拠不足は0ではなくNE")
-      });
+      expect(evaluationGuide.contents).toContainEqual(
+        expect.objectContaining({
+          text: expect.stringContaining("根拠不足は0ではなくNE")
+        })
+      );
 
       const { resourceTemplates } = await client.listResourceTemplates();
       expect(resourceTemplates).toEqual(
@@ -428,6 +439,9 @@ describe("MCP contract", () => {
           }),
           expect.objectContaining({
             uriTemplate: "research://projects/{id}/deck"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/slides/{slideId}"
           })
         ])
       );
@@ -469,26 +483,13 @@ describe("MCP contract", () => {
       });
       expect(configured.structuredContent).toMatchObject({ ok: true, version: 3 });
       const templated = await client.callTool({
-        name: "upsert_presentation_template",
+        name: "create_presentation_template",
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 3,
-          template: {
-            id: "mud-biim",
-            name: "泥団子BIIM",
-            region_layout: "sidebar-right",
-            sidebar_width_percent: 32,
-            background: "#132035",
-            surface: "#08111f",
-            foreground: "#f8fafc",
-            muted: "#b8c6d9",
-            accent: "#f2c14e",
-            corner_radius_px: 8,
-            spacing_scale: 1,
-            font_scale: 1,
-            enter_animation: "fade",
-            reveal_animation: "rise"
-          }
+          template_id: "mud-biim",
+          name: "泥団子BIIM",
+          visual_preset: "studio"
         }
       });
       expect(templated.structuredContent).toMatchObject({ ok: true, version: 4 });
@@ -537,11 +538,11 @@ describe("MCP contract", () => {
         }
       });
       expect(narration.structuredContent).toMatchObject({ ok: true, version: 8 });
-      const granularProject = await client.callTool({
-        name: "get_project",
-        arguments: { project_id: firstProject.project_id }
-      });
-      expect(granularProject.structuredContent).toMatchObject({
+      const granularProject = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}`
+      );
+      expect(granularProject).toMatchObject({
         ok: true,
         project: {
           version: 8,
@@ -595,14 +596,11 @@ describe("MCP contract", () => {
         }
       });
       expect(block.structuredContent).toMatchObject({ ok: true, version: 10 });
-      const canvasSlide = await client.callTool({
-        name: "get_project_slide",
-        arguments: {
-          project_id: firstProject.project_id,
-          slide_id: "question"
-        }
-      });
-      expect(canvasSlide.structuredContent).toMatchObject({
+      const canvasSlide = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question`
+      );
+      expect(canvasSlide).toMatchObject({
         ok: true,
         version: 10,
         slide: {
@@ -702,14 +700,11 @@ describe("MCP contract", () => {
         ok: true,
         version: 14
       });
-      const sceneSlide = await client.callTool({
-        name: "get_project_slide",
-        arguments: {
-          project_id: firstProject.project_id,
-          slide_id: "question"
-        }
-      });
-      expect(sceneSlide.structuredContent).toMatchObject({
+      const sceneSlide = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question`
+      );
+      expect(sceneSlide).toMatchObject({
         ok: true,
         version: 14,
         slide: {
@@ -735,14 +730,12 @@ describe("MCP contract", () => {
         .bind(otherSubjectId, "other-owner", "other-owner", now, now)
         .run();
       activeAuthProps = { ...authProps, subject_id: otherSubjectId };
-      const crossOwnerRead = await client.callTool({
-        name: "get_project",
-        arguments: { project_id: firstProject.project_id }
-      });
-      expect(crossOwnerRead.isError).toBe(true);
-      expect(crossOwnerRead.structuredContent).toMatchObject({
+      const crossOwnerRead = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}`
+      );
+      expect(crossOwnerRead).toMatchObject({
         ok: false,
-        project: null,
         error: { code: "PROJECT_NOT_FOUND" }
       });
       expect(JSON.stringify(crossOwnerRead)).not.toContain(
@@ -801,7 +794,7 @@ describe("MCP contract", () => {
           idempotency_key: "presentation-settings-contract-001"
         }
       });
-      const project = projectRecordSchema.parse(
+      const project = projectSummarySchema.parse(
         (created.structuredContent as { project?: unknown } | undefined)
           ?.project
       );
@@ -1010,11 +1003,11 @@ describe("MCP contract", () => {
         error: { code: "SCOPE_REQUIRED" }
       });
 
-      const result = await client.callTool({
-        name: "get_project",
-        arguments: { project_id: projectId }
-      });
-      expect(result.structuredContent).toMatchObject({
+      const result = await readJsonResource(
+        client,
+        `research://projects/${projectId}`
+      );
+      expect(result).toMatchObject({
         ok: true,
         project: {
           version: 14,
