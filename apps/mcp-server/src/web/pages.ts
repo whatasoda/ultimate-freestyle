@@ -724,12 +724,12 @@ function slideCompositionLabel(
   slide: NonNullable<ProjectRecord["document"]["deck"]>["slides"][number]
 ): string {
   if (slide.composition?.mode === "canvas") {
-    return `自由配置 ${slide.composition.blocks.length} block`;
+    return `自由配置 ${slide.composition.blocks.length}パーツ`;
   }
   if (slide.composition?.mode === "scene") {
-    return `リッチ構成 ${slide.composition.nodes.length} component`;
+    return `リッチ構成 ${slide.composition.nodes.length}パーツ`;
   }
-  return "定型flow";
+  return "定型レイアウト";
 }
 
 function settingValue(value: unknown): string {
@@ -955,7 +955,7 @@ export function projectDetailPage(options: {
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
   const addSlidePrompt = `「${document.title}」の発表へ新しいスライドを1枚追加したいです。前後の流れを確認し、入れる位置・役割・内容を提案してから作成してください。`;
   const reviseSlidesPrompt = `「${document.title}」の発表構成を見直したいです。現在の全スライドを確認し、過不足と順番の改善案を先に示してください。合意した部分だけを個別に変更してください。`;
-  const slideAiActions = `<details class="component-detail"><summary>AIでスライドを追加・構成変更</summary><div class="disclosure-body"><p class="inherit-note">接続中のAIクライアントへ依頼文を貼り付けます。AIは現在の構成をresourceから確認できます。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(addSlidePrompt)}">追加を頼む文をコピー</button><button class="ghost" type="button" data-copy-text="${escapeHtml(reviseSlidesPrompt)}">構成見直しを頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
+  const slideAiActions = `<details class="component-detail"><summary>AIでスライドを追加・構成変更</summary><div class="disclosure-body"><p class="inherit-note">接続中のAIクライアントへ依頼文を貼り付けます。AIは現在の構成を自動で確認できます。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(addSlidePrompt)}">追加を頼む文をコピー</button><button class="ghost" type="button" data-copy-text="${escapeHtml(reviseSlidesPrompt)}">構成見直しを頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
   const evaluationPrompt = `「${document.title}」をresearch://guide/evaluationの8観点でレビューしてください。research://projects/${options.project.project_id}を根拠にし、情報不足は0点ではなくNEにしてください。強み、最大のリスク、最優先の改善を一つずつ示し、最後はその改善につながる質問を一問だけしてください。`;
   const imageAiPrompt = `research://projects/${options.project.project_id}の研究画像一覧を確認し、説明と寸法を根拠に「${document.title}」の発表で有効な使い方を提案してください。まだスライドは変更せず、使う画像と配置の合意後に個別編集してください。`;
   const evaluationPanel = `<details class="panel panel-disclosure"><summary>AIで研究を8観点レビュー</summary><div class="disclosure-body"><p class="prose">問い、仮説、方法、証拠、考察、独自性、発表、制作整合性を0〜4で確認します。根拠がない項目はNEとして扱います。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(evaluationPrompt)}">評価を頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
@@ -1488,8 +1488,8 @@ export function voiceFinishPage(options: {
            <div class="voice-column">
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">1</span><div><h2>声を決める</h2><p>40話者・118種類のトークスタイルから発表全体の既定音声を選べます。最初は「ずんだもん・ノーマル」がおすすめです。</p></div></div>
                <div class="voice-quick" aria-label="おすすめの声">${quickProfiles.map((profile) => `<button class="ghost" type="button" data-voice-pick="${escapeHtml(profile.id)}">${escapeHtml(profile.label)}</button>`).join("")}</div>
-               <div class="voice-preset"><span class="voice-character" aria-hidden="true">声</span><div><strong>既定の話者・スタイル</strong><div class="voice-preset-fields"><label>話者<select data-voice-speaker>${speakerOptions}</select></label><label>スタイル<select data-voice-profile data-voice-catalog="${escapeHtml(JSON.stringify(voiceCatalogData))}">${profileOptions}</select></label></div><small>区間ごとのprofileと7種の調声値は、各スライドの読み上げ設定で変更できます。</small></div><span class="stage">${options.voice.configured ? "設定済み" : "おすすめ"}</span></div>
-               <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/profile"${jobActive ? " disabled" : ""}>${options.voice.configured ? "選択した声へ変更" : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? `現在の既定音声は「${escapeHtml(defaultProfileLabel)}」です。声を変えると該当区間の再生成が必要になります。` : "設定するとprofile未指定の読み上げ区間へ自動的に適用されます。"}</p>
+               <div class="voice-preset"><span class="voice-character" aria-hidden="true">声</span><div><strong>既定の話者・スタイル</strong><div class="voice-preset-fields"><label>話者<select data-voice-speaker>${speakerOptions}</select></label><label>スタイル<select data-voice-profile data-voice-catalog="${escapeHtml(JSON.stringify(voiceCatalogData))}">${profileOptions}</select></label></div><small>区間ごとの声と7種の調声値は、各スライドの読み上げ設定で変更できます。</small></div><span class="stage">${options.voice.configured ? "設定済み" : "おすすめ"}</span></div>
+               <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/profile"${jobActive ? " disabled" : ""}>${options.voice.configured ? "選択した声へ変更" : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? `現在の既定音声は「${escapeHtml(defaultProfileLabel)}」です。声を変えると該当区間の再生成が必要になります。` : "設定すると個別の声を指定していない読み上げ区間へ自動的に適用されます。"}</p>
                ${options.voice.configured ? `<details class="component-detail"><summary>既定のトーンを細かく調整</summary><form class="editor" data-voice-profile-tuning data-default-tuning="${escapeHtml(JSON.stringify(DEFAULT_VOICEVOX_TUNING))}" action="/api/projects/${projectId}/voice/profile/tuning"><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" required value="${defaultProfileTuning[key]}"></label>`).join("")}</div><p class="inherit-note">profile未指定の区間へ共通で適用されます。保存すると、この声を使う生成済み音声は再生成が必要です。ブラウザ仮試聴は話速・高さ・音量の近似で、抑揚・間・前後無音はVOICEVOX生成後に確認します。</p><div class="actions"><button class="ghost" type="button" data-voice-profile-tuning-preview aria-pressed="false">ブラウザで仮試聴</button><button class="ghost" type="button" data-voice-profile-tuning-reset>VOICEVOX標準値へ戻す</button><button type="submit"${jobActive ? " disabled" : ""}>既定のトーンを保存</button></div><p class="feedback" data-voice-profile-tuning-feedback aria-live="polite"></p></form></details>` : ""}
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">2</span><div><h2>不足分を生成する</h2><p>設定や原稿が変わった区間だけを生成します。生成済みの音声は再利用します。</p></div></div>
@@ -1573,7 +1573,7 @@ export function slideWorkspacePage(options: {
               ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(String(field.value ?? ""))}</textarea></label>`
               : `<label>${field.label}<input ${attributes}${field.number === undefined ? "" : ` type="number" min="${field.number.min}" max="${field.number.max}" step="${field.number.step ?? 1}"`} value="${escapeHtml(String(field.value ?? ""))}"></label>`;
           }).join("");
-          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の文言</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}<div class="actions"><button type="submit">このcomponentを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の文言</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}<div class="actions"><button type="submit">この表示パーツを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
         .filter(Boolean)
         .join("")
@@ -1745,7 +1745,7 @@ export function slideWorkspacePage(options: {
             segment.text.length / (7 * effectiveTuning.speedScale)
           );
           const profileOptions = [
-            `<option value=""${segment.voice_profile_id === null || segment.voice_profile_id === undefined ? " selected" : ""}>deck既定${defaultProfile ? `（${escapeHtml(defaultProfile.label)}）` : ""}</option>`,
+            `<option value=""${segment.voice_profile_id === null || segment.voice_profile_id === undefined ? " selected" : ""}>発表全体の既定${defaultProfile ? `（${escapeHtml(defaultProfile.label)}）` : ""}</option>`,
             ...profiles.map(
               (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
             )
@@ -1753,8 +1753,8 @@ export function slideWorkspacePage(options: {
           return `<form class="voice-segment editor" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-profile-tunings="${escapeHtml(JSON.stringify(profileTunings))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
             <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="voice-timing" data-segment-duration data-state="${estimatedDuration > stepDuration * 1.15 ? "warning" : "ok"}">概算 ${estimatedDuration.toFixed(1)}秒 / STEP目安 ${stepDuration.toFixed(1)}秒</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
             <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
-            <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOX profile<select name="voice_profile_id">${profileOptions}</select></label></div>
-            <p class="inherit-note">実効profile: ${escapeHtml(profile ? `${profile.label} / ${profile.speaker_name} ${profile.style_name}` : "未設定（Web Speech）")}。空欄の調声値はprofileまたはVOICEVOX標準値を継承します。</p>
+            <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOXの声<select name="voice_profile_id">${profileOptions}</select></label></div>
+            <p class="inherit-note">現在有効な声: ${escapeHtml(profile ? `${profile.label} / ${profile.speaker_name} ${profile.style_name}` : "未設定（ブラウザ音声）")}。空欄の調声値は選んだ声またはVOICEVOX標準値を継承します。</p>
             <fieldset><legend>調声（空欄で継承）</legend><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" value="${segment.voice_tuning?.[key] ?? ""}" placeholder="実効 ${effectiveTuning[key]}"></label>`).join("")}</div></fieldset>
             <p class="inherit-note">ブラウザ仮試聴では速度・高さ・音量を近似します。抑揚、間、前後の無音はVOICEVOX生成後に確認してください。</p>
             <div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false">ブラウザで仮試聴</button><button type="submit">この区間を保存</button><button type="button" class="ghost danger" data-narration-segment-delete data-delete-url="${slidePath}/narration/segments/${segment.at}" data-csrf="${escapeHtml(options.csrfToken)}">区間を削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>

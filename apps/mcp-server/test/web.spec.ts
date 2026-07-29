@@ -479,7 +479,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("data-image-label");
     expect(detailHtml).toContain("data-image-alt");
     expect(detailHtml).toContain("説明を保存");
-    expect(detailHtml).toContain("自由配置 1 block");
+    expect(detailHtml).toContain("自由配置 1パーツ");
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
     );
@@ -543,7 +543,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-markdown-action="bold"');
     expect(workspaceHtml).toContain('data-markdown-action="table"');
     expect(DASHBOARD_SCRIPT).toContain('field.dispatchEvent(new Event("input"');
-    expect(workspaceHtml).toContain("自由配置 1 block");
+    expect(workspaceHtml).toContain("自由配置 1パーツ");
     expect(workspaceHtml).toContain("data-slide-frame");
     expect(workspaceHtml).toContain('data-aspect-ratio="16:9"');
     expect(workspaceHtml).toContain("表紙レイアウト");
