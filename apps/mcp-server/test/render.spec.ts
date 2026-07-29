@@ -700,11 +700,11 @@ describe("presentation artifact renderer", () => {
     }).text();
     expect(workspaceHtml).toContain('class="component-outline-row"');
     expect(workspaceHtml).toContain('class="filmstrip-meta"');
-    expect(workspaceHtml).toContain("60秒 · 3段階 · リッチ構成 6 component");
+    expect(workspaceHtml).toContain("60秒 · 3段階 · リッチ構成 6パーツ");
     expect(workspaceHtml).toContain("data-scene-component-editor");
     expect(workspaceHtml).toContain('data-component-id="headline"');
     expect(workspaceHtml).toContain('data-save-state data-state="saved"');
-    expect(workspaceHtml).toContain("このcomponentを保存");
+    expect(workspaceHtml).toContain("この表示パーツを保存");
     expect(workspaceHtml).toContain("/components/headline");
     expect(workspaceHtml).toContain("/components/comparison");
     expect(workspaceHtml).toContain("グラフの最大値");
