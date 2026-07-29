@@ -1979,7 +1979,7 @@ async function handleNarrationSegmentCreate(
           throw error;
         }
         slide.narration ??= {
-          display: deck.narration_defaults?.display ?? "dialogue",
+          display: deck.narration_defaults?.display ?? "commentary",
           speaker: deck.narration_defaults?.speaker ?? null,
           segments: []
         };

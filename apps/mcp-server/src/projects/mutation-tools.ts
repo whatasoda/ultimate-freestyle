@@ -678,7 +678,7 @@ export function registerProjectMutationTools(
             return;
           }
           deck.narration_defaults ??= {
-            display: fields.display ?? "dialogue",
+            display: fields.display ?? "commentary",
             speaker: fields.speaker ?? null,
             credit: fields.credit ?? null
           };
@@ -1548,7 +1548,7 @@ export function registerProjectMutationTools(
             display:
               fields.display ??
               deck.narration_defaults?.display ??
-              "dialogue",
+              "commentary",
             speaker:
               fields.speaker === undefined
                 ? (deck.narration_defaults?.speaker ?? null)
@@ -1671,7 +1671,7 @@ export function registerProjectMutationTools(
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
           slide.narration ??= {
-            display: display ?? "dialogue",
+            display: display ?? "commentary",
             speaker: speaker ?? null,
             segments: []
           };
