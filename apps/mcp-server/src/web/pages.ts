@@ -552,7 +552,7 @@ export function landingPage(options: {
          <p class="lead">AIとの対話で自由研究を育て、発表用のWebスライドまで一つの場所で管理します。Twitchで本人確認すると、自分の研究一覧を確認できます。</p>
          <a class="button primary" href="/login">Twitchでログイン</a>
          <p class="hint">限定公開中です。Twitchで${escapeHtml(options.broadcasterLogin)}を${options.minFollowDays}日以上フォローしている方、または現在サブスク中の方が利用できます。</p></div>
-         <ol class="landing-flow" aria-label="利用の流れ"><li><span><strong>AIと研究を作る</strong><small>CodexなどのRemote MCP対応clientから対話します。</small></span></li><li><span><strong>Webで一枚ずつ確認</strong><small>文言、組版、配色、音声、見切れを実表示で仕上げます。</small></span></li><li><span><strong>確認した版を公開</strong><small>固定previewを最後まで見てから公開版を切り替えます。</small></span></li></ol>
+         <ol class="landing-flow" aria-label="利用の流れ"><li><span><strong>AIと研究を作る</strong><small>Codexなど、Remote MCPに対応したAIアプリから対話します。</small></span></li><li><span><strong>Webで一枚ずつ確認</strong><small>文言、組版、配色、音声、見切れを実表示で仕上げます。</small></span></li><li><span><strong>確認した版を公開</strong><small>固定プレビューを最後まで見てから公開版を切り替えます。</small></span></li></ol>
        </section></main>`
     ),
     { headers: headers() }
