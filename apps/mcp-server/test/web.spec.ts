@@ -1012,6 +1012,47 @@ describe("Web dashboard", () => {
       previewResult.revision.revision_id
     ).run();
 
+    const overDurationDocument = structuredClone(ownDocument);
+    overDurationDocument.deck!.slides[0].duration_seconds = 1_200;
+    overDurationDocument.deck!.slides.push({
+      ...structuredClone(overDurationDocument.deck!.slides[0]),
+      id: "over-duration",
+      title: "時間超過確認",
+      duration_seconds: 1
+    });
+    await env.DB.prepare(
+      "UPDATE research_projects SET document_json = ? WHERE id = ?"
+    ).bind(
+      JSON.stringify(overDurationDocument),
+      "10000000-0000-4000-8000-000000000001"
+    ).run();
+    const overDurationPublish = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/publish",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ revision_id: previewResult.revision.revision_id })
+        }
+      ),
+      authEnv
+    );
+    expect(overDurationPublish.status).toBe(409);
+    expect(await overDurationPublish.json()).toMatchObject({
+      error: { code: "PRESENTATION_DURATION_EXCEEDED" }
+    });
+    await env.DB.prepare(
+      "UPDATE research_projects SET document_json = ? WHERE id = ?"
+    ).bind(
+      JSON.stringify(ownDocument),
+      "10000000-0000-4000-8000-000000000001"
+    ).run();
+
     const publish = await requestProvider(
       provider,
       new Request(

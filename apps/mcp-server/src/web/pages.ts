@@ -11,7 +11,10 @@ import {
   mergeVoicevoxTuning,
   type VoicevoxTuning
 } from "@ultimate-freestyle/research-schema/voice";
-import type { PublicationStatus } from "../publications/service";
+import {
+  MAX_PRESENTATION_DURATION_SECONDS,
+  type PublicationStatus
+} from "../publications/service";
 import { VOICEVOX_CATALOG } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import { resolveSlideTypography } from "../projects/typography";
 
@@ -23,8 +26,6 @@ const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   production: "制作",
   review: "見直し"
 };
-
-const MAX_PRESENTATION_SECONDS = 20 * 60;
 
 function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, "0")}秒`;
@@ -758,7 +759,7 @@ export function projectDetailPage(options: {
     0
   );
   const durationWithinLimit =
-    totalDurationSeconds > 0 && totalDurationSeconds <= MAX_PRESENTATION_SECONDS;
+    totalDurationSeconds > 0 && totalDurationSeconds <= MAX_PRESENTATION_DURATION_SECONDS;
   const coverSlideCount = slides.filter((slide) => slide.role === "cover").length;
   const narratedSlideCount = slides.filter(
     (slide) => (slide.narration?.segments.length ?? 0) > 0
@@ -902,7 +903,7 @@ export function projectDetailPage(options: {
         ? "各スライドの想定秒数を確認してください。"
         : durationWithinLimit
           ? `${formatDuration(totalDurationSeconds)}です。20分以内に収まっています。`
-          : `現在${formatDuration(totalDurationSeconds)}で、20分以内を${formatDuration(totalDurationSeconds - MAX_PRESENTATION_SECONDS)}超えています。`,
+          : `現在${formatDuration(totalDurationSeconds)}で、20分以内を${formatDuration(totalDurationSeconds - MAX_PRESENTATION_DURATION_SECONDS)}超えています。`,
       href: firstSlidePath
     },
     {
@@ -1005,7 +1006,7 @@ export function projectDetailPage(options: {
                <dt>更新日</dt><dd>${escapeHtml(formatDate(options.project.updated_at))}</dd>
                <dt>ログ</dt><dd>${document.logs.length}件</dd>
                <dt>スライド</dt><dd>${slides.length}枚</dd>
-               <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_SECONDS ? " · 20分超過" : ""}</dd>
+               <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
              </dl></section>
              <section class="panel" id="presentation-structure"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideAiActions}</section>
              ${evaluationPanel}

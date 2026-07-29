@@ -18,12 +18,14 @@ const MAX_PRESENTATION_BYTES = 2 * 1024 * 1024;
 const MAX_PRESENTATION_ASSETS = 30;
 const MAX_PRESENTATION_ASSET_BYTES = 30 * 1024 * 1024;
 const MAX_PRESENTATION_AUDIO_BYTES = 100 * 1024 * 1024;
+export const MAX_PRESENTATION_DURATION_SECONDS = 20 * 60;
 
 export type PublicationErrorCode =
   | "PROJECT_NOT_FOUND"
   | "DECK_REQUIRED"
   | "PREVIEW_NOT_FOUND"
   | "PREVIEW_STALE"
+  | "PRESENTATION_DURATION_EXCEEDED"
   | "PRESENTATION_ASSET_LIMIT"
   | "PRESENTATION_ASSET_NOT_FOUND"
   | "VOICE_INCOMPLETE"
@@ -515,6 +517,20 @@ export async function publishPresentationPreview(
   const status = await getPublicationStatus(db, ownerUserId, projectId);
   if (status === null) {
     throw new PublicationError("PROJECT_NOT_FOUND", "研究が見つかりません。");
+  }
+  const project = await getProject(db, ownerUserId, projectId);
+  if (project === null) {
+    throw new PublicationError("PROJECT_NOT_FOUND", "研究が見つかりません。");
+  }
+  const totalDurationSeconds = project.document.deck?.slides.reduce(
+    (total, slide) => total + slide.duration_seconds,
+    0
+  ) ?? 0;
+  if (totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS) {
+    throw new PublicationError(
+      "PRESENTATION_DURATION_EXCEEDED",
+      `想定発表時間が${Math.floor(totalDurationSeconds / 60)}分${String(totalDurationSeconds % 60).padStart(2, "0")}秒です。20分以内に短縮してから公開してください。`
+    );
   }
   const revision = await db
     .prepare(
