@@ -115,6 +115,9 @@ describe("Web dashboard", () => {
     expect(landingHtml).toContain("Twitchでログイン");
     expect(landingHtml).toContain("kashiwoを30日以上フォロー");
     expect(landingHtml).toContain("現在サブスク中");
+    expect(landingHtml).toContain("AIと研究を作る");
+    expect(landingHtml).toContain("Webで一枚ずつ確認");
+    expect(landingHtml).toContain("確認した版を公開");
     expect(landing.headers.get("content-security-policy")).toContain(
       "default-src 'none'"
     );

@@ -190,7 +190,13 @@ function shell(title: string, body: string): string {
       .account { display: flex; align-items: center; gap: .75rem; color: var(--muted); }
       .account strong { color: var(--ink); }
       main { width: min(92vw, 72rem); margin: 0 auto; padding: clamp(2rem, 7vw, 6rem) 0 5rem; }
-      .hero { max-width: 49rem; }
+      .hero { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(18rem, .75fr); gap: clamp(2rem, 6vw, 5rem); align-items: center; }
+      .hero-copy { min-width: 0; }
+      .landing-flow { display: grid; gap: .75rem; margin: 0; padding: 1rem; border: 1px solid var(--line); border-radius: 1rem; background: #101a28cc; list-style: none; counter-reset: landing-step; }
+      .landing-flow li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .75rem; align-items: start; padding: .8rem; border-radius: .75rem; background: #08111bbb; color: #c7d3e1; line-height: 1.55; counter-increment: landing-step; }
+      .landing-flow li::before { content: counter(landing-step); display: grid; place-items: center; width: 1.8rem; height: 1.8rem; border-radius: 50%; background: var(--accent); color: white; font-weight: 850; }
+      .landing-flow strong { display: block; margin-bottom: .2rem; color: var(--ink); }
+      .landing-flow small { color: var(--muted); }
       .eyebrow { margin: 0 0 .7rem; color: #91ddff; font-size: .78rem; font-weight: 850; letter-spacing: .14em; text-transform: uppercase; }
       h1 { margin: 0; font-size: clamp(2.25rem, 7vw, 5.4rem); line-height: 1.02; letter-spacing: -.045em; }
       .lead { max-width: 42rem; margin: 1.5rem 0 0; color: #bdc9d8; font-size: clamp(1rem, 2vw, 1.2rem); line-height: 1.8; }
@@ -446,7 +452,7 @@ function shell(title: string, body: string): string {
       .voice-next li + li { margin-top: .35rem; }
       form { margin: 0; }
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
-      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next, .setup-steps { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
+      @media (max-width: 48rem) { .hero, .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next, .setup-steps { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
     </style>
@@ -535,11 +541,12 @@ export function landingPage(options: {
       "最自由研究",
       `<header class="site-header"><a class="brand" href="/">最自由研究</a></header>
        <main><section class="hero">
-         <p class="eyebrow">Ultimate freestyle research</p>
+         <div class="hero-copy"><p class="eyebrow">Ultimate freestyle research</p>
          <h1>気になったことを、研究にする。</h1>
          <p class="lead">AIとの対話で自由研究を育て、発表用のWebスライドまで一つの場所で管理します。Twitchで本人確認すると、自分の研究一覧を確認できます。</p>
          <a class="button primary" href="/login">Twitchでログイン</a>
-         <p class="hint">限定公開中です。Twitchで${escapeHtml(options.broadcasterLogin)}を${options.minFollowDays}日以上フォローしている方、または現在サブスク中の方が利用できます。</p>
+         <p class="hint">限定公開中です。Twitchで${escapeHtml(options.broadcasterLogin)}を${options.minFollowDays}日以上フォローしている方、または現在サブスク中の方が利用できます。</p></div>
+         <ol class="landing-flow" aria-label="利用の流れ"><li><span><strong>AIと研究を作る</strong><small>CodexなどのRemote MCP対応clientから対話します。</small></span></li><li><span><strong>Webで一枚ずつ確認</strong><small>文言、組版、配色、音声、見切れを実表示で仕上げます。</small></span></li><li><span><strong>確認した版を公開</strong><small>固定previewを最後まで見てから公開版を切り替えます。</small></span></li></ol>
        </section></main>`
     ),
     { headers: headers() }
