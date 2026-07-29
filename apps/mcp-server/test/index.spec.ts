@@ -8,6 +8,7 @@ describe("MCP Worker", () => {
       ok: boolean;
       service: string;
       version: string;
+      renderer_version: string;
       request_id: string;
       eligibility: {
         broadcaster_id: string;
@@ -22,6 +23,7 @@ describe("MCP Worker", () => {
       ok: true,
       service: "ultimate-freestyle-mcp",
       version: "0.14.0",
+      renderer_version: "uf-renderer@47",
       eligibility: {
         broadcaster_id: "67879379",
         broadcaster_login: "kashiwo",

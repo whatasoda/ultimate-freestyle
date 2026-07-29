@@ -891,3 +891,9 @@
 
 - Markdown表の事前診断を公開rendererと同じ「外側の`|`は任意」という記法へ合わせ、列数とデータ行数を正しく数えるようにした。
 - 本文だけでなく狭い補足欄の表も別基準で診断し、BIIM右欄などで密な表が自動縮小へ頼りすぎる状態を保存データから検出するようにした。
+
+## 改善ループ147
+
+- `/healthz`とMCPの`health`へ現在のpresentation renderer versionを追加した。
+- 本番smokeは固定のservice versionだけでなく、checkout中のrenderer versionが反映されるまで待つようにした。
+- rendererを変更してもservice versionを上げない通常運用で、古いWorkerを新デプロイと誤認してCIが成功する余地をなくした。

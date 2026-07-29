@@ -10,6 +10,7 @@ import {
 import { registerProjectTools } from "./projects/tools";
 import { registerProjectMutationTools } from "./projects/mutation-tools";
 import { registerResearchGuides } from "./projects/guides";
+import { PRESENTATION_RENDERER_VERSION } from "./presentation/render";
 import { registerVoiceTools } from "./voicevox/tools";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
@@ -35,6 +36,7 @@ export function createHealthResult(config: EligibilityConfig) {
     ok: true,
     service: SERVICE_NAME,
     version: SERVICE_VERSION,
+    renderer_version: PRESENTATION_RENDERER_VERSION,
     request_id: crypto.randomUUID(),
     eligibility: {
       broadcaster_id: config.TWITCH_BROADCASTER_ID,
@@ -71,6 +73,7 @@ export function createServer(
         ok: z.literal(true),
         service: z.literal(SERVICE_NAME),
         version: z.literal(SERVICE_VERSION),
+        renderer_version: z.literal(PRESENTATION_RENDERER_VERSION),
         request_id: z.string().uuid(),
         eligibility: z.object({
           broadcaster_id: z.string(),

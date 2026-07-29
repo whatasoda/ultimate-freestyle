@@ -5,6 +5,14 @@ const packageJson = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8")
 );
 const expectedVersion = packageJson.version;
+const rendererSource = await readFile(
+  new URL("../src/presentation/render.ts", import.meta.url),
+  "utf8"
+);
+const expectedRendererVersion = rendererSource.match(
+  /PRESENTATION_RENDERER_VERSION = "([^"]+)"/
+)?.[1];
+assert.ok(expectedRendererVersion, "renderer version was not found");
 
 const baseUrl = new URL(
   process.env.MCP_BASE_URL ?? "https://saijiyu-kenkyu.2764.moe"
@@ -31,10 +39,14 @@ async function waitForDeployedHealth() {
   let latest;
   for (let attempt = 0; attempt < 20; attempt += 1) {
     latest = await fetchJson(`/healthz?deployment_check=${Date.now()}`);
-    if (latest.body.version === expectedVersion) return latest;
+    if (
+      latest.body.version === expectedVersion &&
+      latest.body.renderer_version === expectedRendererVersion
+    ) return latest;
     await new Promise((resolve) => setTimeout(resolve, 3_000));
   }
   assert.equal(latest?.body.version, expectedVersion);
+  assert.equal(latest?.body.renderer_version, expectedRendererVersion);
 }
 
 const health = await waitForDeployedHealth();
@@ -42,6 +54,7 @@ assert.equal(health.response.status, 200);
 assert.equal(health.body.ok, true);
 assert.equal(health.body.service, "ultimate-freestyle-mcp");
 assert.equal(health.body.version, expectedVersion);
+assert.equal(health.body.renderer_version, expectedRendererVersion);
 assert.equal(health.body.eligibility?.broadcaster_id, "67879379");
 
 const landingResponse = await fetch(new URL("/", baseUrl), {
@@ -131,6 +144,7 @@ console.log(
     origin: baseUrl.origin,
     service: health.body.service,
     version: health.body.version,
+    renderer_version: health.body.renderer_version,
     mcp_auth: "required",
     web_dashboard: "available",
     authorization_endpoint: authorizationMetadata.body.authorization_endpoint
