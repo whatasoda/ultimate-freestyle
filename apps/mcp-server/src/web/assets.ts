@@ -78,14 +78,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const projectSearch = document.querySelector("[data-project-search]");
   if (projectSearch instanceof HTMLInputElement) {
     const projectCards = [...document.querySelectorAll("[data-project-card]")];
+    const projectFilters = [...document.querySelectorAll("[data-project-filter]")];
     const resultCount = document.querySelector("[data-project-count]");
     const emptyResult = document.querySelector("[data-project-search-empty]");
+    let activeFilter = "all";
     const filterProjects = () => {
       const query = projectSearch.value.trim().toLocaleLowerCase("ja");
       let visible = 0;
       for (const card of projectCards) {
         if (!(card instanceof HTMLElement)) continue;
-        const matches = query === "" || (card.dataset.searchText || "").includes(query);
+        const matchesText = query === "" || (card.dataset.searchText || "").includes(query);
+        const matchesFilter = activeFilter === "all" || card.dataset.presentation === activeFilter;
+        const matches = matchesText && matchesFilter;
         card.hidden = !matches;
         if (matches) visible += 1;
       }
@@ -93,6 +97,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (emptyResult instanceof HTMLElement) emptyResult.hidden = visible > 0;
     };
     projectSearch.addEventListener("input", filterProjects);
+    for (const button of projectFilters) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      button.addEventListener("click", () => {
+        activeFilter = button.dataset.projectFilter || "all";
+        for (const item of projectFilters) {
+          if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
+        }
+        filterProjects();
+      });
+    }
   }
   const qualitySweepButton = document.querySelector("[data-quality-sweep]");
   const qualitySweepFrame = document.querySelector("[data-quality-sweep-frame]");
