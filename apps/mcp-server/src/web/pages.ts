@@ -91,7 +91,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=12";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=13";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1198,10 +1198,10 @@ export function slideWorkspacePage(options: {
            </section>
            <aside class="inspector">
              <details class="inspector-section" open><summary>内容</summary><div class="inspector-body">
-               <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
+               <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
                  <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"></label>
-                 <label>スライド本文（Markdown対応）<textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">見出しは #、箇条書きは - で始めます。自由配置・リッチ構成では代替表示にも使います。</small></label>
+                 <label>スライド本文（Markdown対応）<textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">見出しは #、箇条書きは - で始めます。定型flowでは入力中も実表示へ反映し、自由配置・リッチ構成では代替表示に使います。</small></label>
                  <label>補足欄（読み上げない情報）<textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea><small class="inherit-note">作者コメント、出典、追加データなど、音声に含めない情報を置けます。</small></label>
                  <div class="actions"><button type="submit">内容を保存</button>${nextSlidePath === null ? "" : `<button class="ghost" type="submit" data-save-next="${nextSlidePath}">保存して次へ</button>`}<span class="version" data-version-label>v${options.project.version}</span></div>
                  <p class="feedback" data-form-feedback aria-live="polite"></p>

@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@14";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@15";
 
 function escapeHtml(value: string): string {
   return value
@@ -525,11 +525,11 @@ export function renderPresentationHtml(
         : composition?.mode === "scene"
           ? `<div class="slide-scene" data-region="scene" data-runtime-version="${composition.runtime_version}">${renderScene(composition.nodes, options.assetUrls ?? {})}</div>`
         : `<div class="slide-main" data-region="main" data-fit-content data-fit-id="flow:main" data-fit-region="main">
-    <p class="eyebrow">${String(index + 1).padStart(2, "0")} · ${escapeHtml(slide.title)}</p>
-    <div class="slide-content" data-columns="${typography.columns}">${renderTextBlocks(slide.content_markdown)}</div>
+    <p class="eyebrow" data-flow-title>${String(index + 1).padStart(2, "0")} · ${escapeHtml(slide.title)}</p>
+    <div class="slide-content" data-flow-content data-columns="${typography.columns}">${renderTextBlocks(slide.content_markdown)}</div>
     ${slide.reveal_blocks.map((block) => `<div class="reveal-block" data-reveal="${block.at}" data-reveal-at="${block.at}" data-animation="${revealAnimation}" aria-hidden="true">${renderTextBlocks(block.markdown)}</div>`).join("\n")}
   </div>
-  <aside class="slide-sidebar" data-region="sidebar" data-fit-content data-fit-id="flow:sidebar" data-fit-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
+  <aside class="slide-sidebar" data-flow-sidebar data-region="sidebar" data-fit-content data-fit-id="flow:sidebar" data-fit-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
     ${slide.sidebar_markdown === null ? "" : renderTextBlocks(slide.sidebar_markdown)}
   </aside>`;
       return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em" hidden>
@@ -1091,6 +1091,59 @@ export function renderPresentationHtml(
       if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, overflows: diagnostics, fits }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
+    const appendDraftInline = (target, text) => {
+      let cursor = 0;
+      while (cursor < text.length) {
+        const opening = text.indexOf('**', cursor);
+        if (opening === -1) { target.append(document.createTextNode(text.slice(cursor))); break; }
+        const closing = text.indexOf('**', opening + 2);
+        if (closing === -1) { target.append(document.createTextNode(text.slice(cursor))); break; }
+        if (opening > cursor) target.append(document.createTextNode(text.slice(cursor, opening)));
+        const strong = document.createElement('strong');
+        strong.textContent = text.slice(opening + 2, closing);
+        target.append(strong);
+        cursor = closing + 2;
+      }
+    };
+    const renderDraftMarkdown = (target, markdown) => {
+      target.replaceChildren();
+      let list = null;
+      const flushList = () => { if (list) { target.append(list); list = null; } };
+      for (const source of String(markdown).split(String.fromCharCode(10))) {
+        const line = source.trim();
+        if (line.startsWith('- ')) {
+          if (!list) list = document.createElement('ul');
+          const item = document.createElement('li');
+          appendDraftInline(item, line.slice(2));
+          list.append(item);
+          continue;
+        }
+        flushList();
+        if (!line) continue;
+        let headingLevel = 0;
+        while (headingLevel < line.length && line[headingLevel] === '#') headingLevel += 1;
+        const heading = headingLevel >= 1 && headingLevel <= 3 && line[headingLevel] === ' ';
+        const block = document.createElement(heading ? 'h' + Math.min(headingLevel + 1, 4) : 'p');
+        appendDraftInline(block, heading ? line.slice(headingLevel + 1) : line);
+        target.append(block);
+      }
+      flushList();
+    };
+    const previewDraft = (data) => {
+      const currentSlide = slides[slide];
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'flow' || data.slide_id !== DECK.slides[slide].id) return;
+      const title = currentSlide.querySelector('[data-flow-title]');
+      const content = currentSlide.querySelector('[data-flow-content]');
+      const sidebar = currentSlide.querySelector('[data-flow-sidebar]');
+      if (title instanceof HTMLElement) title.textContent = String(slide + 1).padStart(2, '0') + ' · ' + String(data.title || '');
+      if (content instanceof HTMLElement) renderDraftMarkdown(content, data.content_markdown || '');
+      if (sidebar instanceof HTMLElement) {
+        const markdown = String(data.sidebar_markdown || '');
+        sidebar.hidden = markdown.trim() === '';
+        renderDraftMarkdown(sidebar, markdown);
+      }
+      scheduleFit();
+    };
     const setPosition = (nextSlide, nextStep, push) => {
       slide = clamp(Number(nextSlide) - 1, 0, slides.length - 1);
       step = clamp(Number(nextStep), 0, DECK.slides[slide].revealSteps);
@@ -1221,7 +1274,11 @@ export function renderPresentationHtml(
       if (completion instanceof HTMLElement) completion.hidden = true;
       document.querySelector('#prev')?.focus();
     });
-    addEventListener('message', (event) => { if (!editorFrame || event.source !== parent || event.origin !== location.origin || event.data?.type !== 'ultimate-freestyle:set-position') return; setPosition(event.data.slide, event.data.step, false); });
+    addEventListener('message', (event) => {
+      if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
+      if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
+      else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
+    });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
     document.fonts?.ready.then(scheduleFit);

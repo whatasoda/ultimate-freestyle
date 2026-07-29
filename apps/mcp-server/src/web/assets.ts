@@ -125,6 +125,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideEditor = document.querySelector("[data-slide-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
+  let draftFrameTimer;
+  const syncSlideDraft = () => {
+    if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    const data = new FormData(slideEditor);
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:preview-fields",
+      slide_id: slideEditor.dataset.slideId || "",
+      title: String(data.get("title") || ""),
+      content_markdown: String(data.get("content_markdown") || ""),
+      sidebar_markdown: String(data.get("sidebar_markdown") || "")
+    }, location.origin);
+  };
+  if (slideEditor instanceof HTMLFormElement) {
+    slideEditor.addEventListener("input", () => {
+      clearTimeout(draftFrameTimer);
+      draftFrameTimer = setTimeout(syncSlideDraft, 120);
+      const layoutStatus = document.querySelector("[data-layout-status]");
+      if (layoutStatus instanceof HTMLElement) {
+        layoutStatus.textContent = "入力内容をプレビューへ反映しています…";
+        layoutStatus.dataset.level = "";
+      }
+    });
+  }
   const setFrameLoading = (loading) => {
     if (frameLoading instanceof HTMLElement) frameLoading.hidden = !loading;
   };
@@ -395,6 +418,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     slideFrame.addEventListener("load", () => {
       setFrameLoading(false);
       syncFramePosition();
+      syncSlideDraft();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");

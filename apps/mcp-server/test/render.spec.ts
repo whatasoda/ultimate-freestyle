@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@14");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@15");
     expect(html).toContain('title="実経過時間 / 現在位置の目安 / 想定合計時間"');
     expect(html).toContain('class="time-total"> / 全01:00</span>');
     expect(html).toContain("const expectedElapsed = () =>");
@@ -188,6 +188,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("showVoiceUnlock()");
     expect(html).toContain("if (run !== voiceRun) return;");
     expect(html).toContain("else scheduleAutoAdvance();");
+    expect(html).toContain("ultimate-freestyle:preview-fields");
+    expect(html).toContain("const renderDraftMarkdown =");
+    expect(html).toContain("data-flow-content");
     expect(html).toContain("発表はここまでです");
     expect(html).toContain("data-restart");
     expect(html).toContain("else { showCompletion(); return false; }");
@@ -238,6 +241,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("\\u003c/script\\u003e\\u003cscript");
     expect(html).not.toContain("<script>alert('content')</script>");
     expect(html).not.toContain("<script>alert('voice')</script>");
+    const runtimeScript = html.match(/<script nonce="saijiyu-static">([\s\S]+)<\/script>/)?.[1];
+    expect(runtimeScript).toBeDefined();
+    expect(() => new Function(runtimeScript)).not.toThrow();
   });
 
   it("rejects a project without slides", () => {
