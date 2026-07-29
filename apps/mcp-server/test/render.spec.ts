@@ -613,6 +613,9 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain(">全文追従</span>");
     expect(workspaceHtml).toContain("スライド本文（Markdown対応）");
     expect(workspaceHtml).toContain("補足欄（読み上げない情報）");
+    expect(workspaceHtml).toContain("data-preview-focus");
+    expect(workspaceHtml).toContain("プレビューを広げる");
+    expect(workspaceHtml).toContain("別画面で開く");
     expect(workspaceHtml).toContain("標準（短文・箇条書き）");
     expect(workspaceHtml.indexOf(">root<")).toBeLessThan(
       workspaceHtml.indexOf(">headline<")

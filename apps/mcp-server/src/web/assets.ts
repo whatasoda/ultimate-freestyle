@@ -301,6 +301,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     activeFilmstripSlide.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
+  const previewFocusButton = document.querySelector("[data-preview-focus]");
+  if (previewFocusButton instanceof HTMLButtonElement) {
+    const previewFocusKey = "ultimate-freestyle:workspace-preview-focus";
+    const setPreviewFocus = (enabled) => {
+      document.body.dataset.previewFocus = String(enabled);
+      previewFocusButton.setAttribute("aria-pressed", String(enabled));
+      previewFocusButton.textContent = enabled ? "編集欄を戻す" : "プレビューを広げる";
+      try { localStorage.setItem(previewFocusKey, String(enabled)); } catch {}
+    };
+    let initialPreviewFocus = false;
+    try { initialPreviewFocus = localStorage.getItem(previewFocusKey) === "true"; } catch {}
+    setPreviewFocus(initialPreviewFocus);
+    previewFocusButton.addEventListener("click", () => {
+      setPreviewFocus(document.body.dataset.previewFocus !== "true");
+    });
+  }
+
   const stepOutput = document.querySelector("[data-step-output]");
   const stepButtons = [...document.querySelectorAll("[data-step-direction]")];
   if (
