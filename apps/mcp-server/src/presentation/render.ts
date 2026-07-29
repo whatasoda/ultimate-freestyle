@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@42";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@43";
 
 function escapeHtml(value: string): string {
   return value
@@ -1034,7 +1034,7 @@ export function renderPresentationHtml(
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let swipeStart = null, suppressStageClick = false;
-    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -1166,7 +1166,8 @@ export function renderPresentationHtml(
       clearTimeout(autoTimer);
       if (!auto || !started) return;
       const current = DECK.slides[slide];
-      const delay = Math.max(1500, current.durationSeconds * 1000 / (current.revealSteps + 1));
+      const targetDuration = Math.max(1500, current.durationSeconds * 1000 / (current.revealSteps + 1));
+      const delay = Math.max(500, targetDuration - (performance.now() - unitStartedAt));
       const begin = performance.now();
       setSecondaryProgressLabel('自動送りまで');
       setVoiceProgress(0);
@@ -1597,6 +1598,7 @@ export function renderPresentationHtml(
       return true;
     };
     const render = () => {
+      unitStartedAt = performance.now();
       if (completion instanceof HTMLElement) completion.hidden = true;
       updateControls();
       stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
