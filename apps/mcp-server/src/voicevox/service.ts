@@ -753,6 +753,7 @@ export async function processVoiceGenerationMessage(
   env: Pick<Env, "DB" | "MEDIA_BUCKET" | "VOICEVOX_CONTAINER">,
   body: VoiceGenerationMessage
 ): Promise<void> {
+  const processingStartedAt = Date.now();
   const leaseToken = crypto.randomUUID();
   const now = new Date();
   const leaseExpiresAt = new Date(now.getTime() + 10 * 60_000).toISOString();
@@ -953,6 +954,17 @@ export async function processVoiceGenerationMessage(
       .run();
   }
   await refreshJobTotals(env.DB, body.job_id);
+  console.log(
+    JSON.stringify({
+      message: "VOICEVOX segment stored",
+      job_id: body.job_id,
+      segment_id: body.segment_id,
+      cache_hit: cached,
+      character_count: [...input.text].length,
+      byte_size: bytes.byteLength,
+      processing_duration_ms: Date.now() - processingStartedAt
+    })
+  );
 }
 
 export async function failVoiceGenerationMessage(

@@ -10,6 +10,7 @@ import { projectRecordSchema } from "../src/projects/schema";
 const eligibilityConfig = {
   DB: env.DB,
   MEDIA_BUCKET: env.MEDIA_BUCKET,
+  VOICE_JOBS_QUEUE: env.VOICE_JOBS_QUEUE,
   TWITCH_BROADCASTER_ID: "67879379",
   TWITCH_BROADCASTER_LOGIN: "kashiwo",
   MIN_FOLLOW_DAYS: "30"
@@ -66,6 +67,8 @@ describe("MCP contract", () => {
           "set_slide_narration",
           "configure_slide_narration",
           "update_slide_narration_voice",
+          "get_voice_generation_status",
+          "generate_voice_audio",
           "move_slide",
           "delete_slide"
         ])
@@ -92,12 +95,23 @@ describe("MCP contract", () => {
           })
         })
       );
+      expect(tools).toContainEqual(
+        expect.objectContaining({
+          name: "generate_voice_audio",
+          annotations: expect.objectContaining({
+            readOnlyHint: false,
+            destructiveHint: false,
+            idempotentHint: true,
+            openWorldHint: false
+          })
+        })
+      );
 
       const result = await client.callTool({ name: "health", arguments: {} });
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.8.0",
+        version: "0.9.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -967,6 +981,32 @@ describe("MCP contract", () => {
       expect(expandedTemplate.structuredContent).toMatchObject({
         ok: true,
         version: 14
+      });
+
+      const voiceStatus = await client.callTool({
+        name: "get_voice_generation_status",
+        arguments: { project_id: projectId }
+      });
+      expect(voiceStatus.structuredContent).toMatchObject({
+        ok: true,
+        voice: {
+          version: 14,
+          configured: true,
+          summary: { total: 1, ready: 0, needs_generation: 1 }
+        }
+      });
+      const deniedGeneration = await client.callTool({
+        name: "generate_voice_audio",
+        arguments: {
+          project_id: projectId,
+          expected_version: 14,
+          idempotency_key: "72000000-0000-4000-8000-000000000007"
+        }
+      });
+      expect(deniedGeneration.isError).toBe(true);
+      expect(deniedGeneration.structuredContent).toMatchObject({
+        ok: false,
+        error: { code: "SCOPE_REQUIRED" }
       });
 
       const result = await client.callTool({

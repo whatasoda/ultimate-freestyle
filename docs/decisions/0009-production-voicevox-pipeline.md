@@ -6,7 +6,7 @@
 
 ## 決定
 
-- Web UIからVOICEVOXの既定profileを設定し、差分生成jobを登録する。
+- Web UIまたは標準MCPの小粒度toolからVOICEVOXの既定profileを設定し、差分生成jobを登録する。
 - jobはD1へ先に永続化し、Cloudflare Queueへ区間単位で送る。送信失敗はoutboxを2分ごとに再送する。
 - Queue consumerがVOICEVOX ENGINE 0.25.1のCPU imageをCloudflare Containerで起動し、MP3 mono・24 kHz・64 kbpsへ変換する。
 - 生成入力は原稿、speaker UUID、style ID、7種の調声値、ENGINE image、辞書、codecを含むfingerprintで識別する。

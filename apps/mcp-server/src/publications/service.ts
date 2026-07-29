@@ -190,28 +190,12 @@ async function snapshotPresentationAssets(
 }
 
 async function snapshotPresentationAudio(
-  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  env: Pick<Env, "MEDIA_BUCKET">,
   ownerUserId: string,
   project: ProjectRecord,
-  revisionId: string
+  revisionId: string,
+  segments: VoiceSegmentPlan[]
 ): Promise<RevisionAudio[]> {
-  const status = await getVoiceProjectStatus(
-    env.DB,
-    ownerUserId,
-    project.project_id
-  );
-  if (
-    status?.configured &&
-    (status.summary.total === 0 || status.summary.ready !== status.summary.total)
-  ) {
-    throw new PublicationError(
-      "VOICE_INCOMPLETE",
-      status.summary.total === 0
-        ? "読み上げ原稿を追加してからプレビューを作成してください。"
-        : `VOICEVOX音声が ${status.summary.ready} / ${status.summary.total} 区間まで生成されています。音声を仕上げてからプレビューを作成してください。`
-    );
-  }
-  const segments = await resolveVoiceArtifacts(env.DB, ownerUserId, project);
   const totalBytes = segments.reduce(
     (sum, segment) => sum + (segment.artifact?.byte_size ?? 0),
     0
@@ -260,6 +244,28 @@ async function snapshotPresentationAudio(
     await removeObjects(env.MEDIA_BUCKET, attemptedObjectKeys);
     throw error;
   }
+}
+
+async function resolvePresentationAudio(
+  db: D1Database,
+  ownerUserId: string,
+  project: ProjectRecord
+): Promise<VoiceSegmentPlan[]> {
+  const status = await getVoiceProjectStatus(
+    db,
+    ownerUserId,
+    project.project_id
+  );
+  if (
+    status?.configured &&
+    status.summary.ready !== status.summary.total
+  ) {
+    throw new PublicationError(
+      "VOICE_INCOMPLETE",
+      `VOICEVOX音声が ${status.summary.ready} / ${status.summary.total} 区間まで生成されています。音声を仕上げてからプレビューを作成してください。`
+    );
+  }
+  return resolveVoiceArtifacts(db, ownerUserId, project);
 }
 
 export async function getPublicationStatus(
@@ -350,6 +356,11 @@ export async function createPresentationPreview(
   const slug = existingPublication?.slug ?? crypto.randomUUID();
   const objectKey = `presentation-revisions/${ownerUserId}/${projectId}/${revisionId}.html`;
   const now = new Date().toISOString();
+  const audioSegments = await resolvePresentationAudio(
+    env.DB,
+    ownerUserId,
+    project
+  );
   const snapshots = await snapshotPresentationAssets(
     env,
     ownerUserId,
@@ -363,7 +374,8 @@ export async function createPresentationPreview(
       env,
       ownerUserId,
       project,
-      revisionId
+      revisionId,
+      audioSegments
     );
     cleanupKeys.push(...audioSnapshots.map((snapshot) => snapshot.objectKey));
     const assetUrls = Object.fromEntries(

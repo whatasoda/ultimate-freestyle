@@ -395,6 +395,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("ワイド 16:9");
     expect(detailHtml).toContain("標準 4:3");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
+    expect(detailHtml).toContain("VOICEVOX音声が 0 / 1 区間まで生成されています");
+    expect(detailHtml).toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("自由配置 1 block");
     expect(detailHtml).toContain(

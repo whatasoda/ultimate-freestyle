@@ -6,7 +6,7 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-本番の入口は `saijiyu-kenkyu.2764.moe` です。Remote MCP v0.8.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走prompt、安全な発表rendererを提供します。同じWorkerのWeb UIでは、自分の研究を一枚ずつ確認・編集し、画像、固定preview、公開版を管理できます。mainへのpushは検証後にD1 migrationとWorkerをCloudflareへ自動デプロイします。GitHub Pagesは公開経路に含めません。
+本番の入口は `saijiyu-kenkyu.2764.moe` です。Remote MCP v0.9.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走prompt、安全な発表renderer、VOICEVOX差分生成を提供します。同じWorkerのWeb UIでは、自分の研究を一枚ずつ確認・編集し、画像、音声、固定preview、公開版を管理できます。mainへのpushは検証後にD1 migrationとWorker・ContainerをCloudflareへ自動デプロイします。GitHub Pagesは公開経路に含めません。
 
 ## できること
 

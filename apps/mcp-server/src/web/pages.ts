@@ -542,6 +542,15 @@ export function projectDetailPage(options: {
         )
         .join("")}</div>`
     : `<p class="prose">まだ画像がありません。</p>`;
+  const narrationSegments = slides.flatMap(
+    (slide) => slide.narration?.segments ?? []
+  );
+  const readyVoiceSegments = narrationSegments.filter(
+    (segment) => segment.audio_src !== null
+  ).length;
+  const voiceConfigured = deck?.voicevox !== null && deck?.voicevox !== undefined;
+  const voiceIncomplete =
+    voiceConfigured && readyVoiceSegments !== narrationSegments.length;
   const preview = options.publication.latest_preview;
   const published = options.publication.published;
   const previewDraftCurrent = preview?.project_version === options.project.version;
@@ -562,22 +571,16 @@ export function projectDetailPage(options: {
     <a class="button ghost" data-preview-link href="${preview === null ? "#" : `/preview/${escapeHtml(preview.revision_id)}`}" target="_blank" rel="noopener"${preview === null ? " hidden" : ""}>最新プレビューを開く</a>
     ${published !== null && options.publication.slug !== null ? `<a class="button ghost" href="/p/${escapeHtml(options.publication.slug)}" target="_blank" rel="noopener">公開ページを開く</a>` : ""}
     <div class="actions">
-      <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 ? " disabled" : ""}>現在の下書きをプレビュー</button>
+      <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 || voiceIncomplete ? " disabled" : ""}>現在の下書きをプレビュー</button>
       <button class="ghost" type="button" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}"${previewCurrent ? "" : " disabled"}>確認した版を公開</button>
     </div>
-    <p class="feedback${preview !== null && !previewCurrent ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
+    <p class="feedback${voiceIncomplete || (preview !== null && !previewCurrent) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : voiceIncomplete ? `VOICEVOX音声が ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成されています。先に「音声を仕上げる」を完了してください。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
-  const narrationSegments = slides.flatMap(
-    (slide) => slide.narration?.segments ?? []
-  );
-  const readyVoiceSegments = narrationSegments.filter(
-    (segment) => segment.audio_src !== null
-  ).length;
   const voicePanel = `<section class="panel publish-state"><h2>読み上げ音声</h2>
     <div class="status-row"><span>読み上げ区間</span><strong>${narrationSegments.length}件</strong></div>
     <div class="status-row"><span>VOICEVOX生成済み</span><strong>${readyVoiceSegments} / ${narrationSegments.length}</strong></div>
     <a class="button" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/voice">音声を仕上げる</a>
-    <p class="feedback">ずんだもんの設定、生成状況、区間ごとの試聴を一つの画面で確認できます。</p>
+    <p class="feedback">VOICEVOXの話者・スタイル・調声、生成状況、区間ごとの試聴を一つの画面で確認できます。</p>
   </section>`;
   const presentationSettingsPanel = deck === null
     ? ""
@@ -787,7 +790,7 @@ export function voiceFinishPage(options: {
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">2</span><div><h2>不足分を生成する</h2><p>設定や原稿が変わった区間だけを生成します。生成済みの音声は再利用します。</p></div></div>
                <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成</span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>
-               <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : "生成中もこの画面を閉じて構いません。"}</p>
+               <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.total === 0 ? "読み上げ原稿がありません" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.total === 0 ? "各スライドへ読み上げ原稿を追加すると生成できます。" : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : "生成中もこの画面を閉じて構いません。"}</p>
                ${voiceJobCard(currentJob)}
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
