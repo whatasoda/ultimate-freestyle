@@ -135,6 +135,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const qualitySweepStatus = document.querySelector("[data-quality-sweep-status]");
     const qualitySweepResults = document.querySelector("[data-quality-sweep-results]");
     const qualitySweepPreview = document.querySelector("[data-quality-sweep-preview]");
+    const qualitySweepCancel = document.querySelector("[data-quality-sweep-cancel]");
     let slides = [];
     try { slides = JSON.parse(qualitySweepButton.dataset.slides || "[]"); } catch {}
     let sweepIndex = 0;
@@ -158,6 +159,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       clearTimeout(sweepTimer);
       setButtonBusy(qualitySweepButton, false);
       qualitySweepButton.textContent = "もう一度チェック";
+      if (qualitySweepCancel instanceof HTMLButtonElement) qualitySweepCancel.hidden = true;
       if (qualitySweepStatus instanceof HTMLElement) {
         qualitySweepStatus.textContent = sweepIssueCount
           ? sweepIssueCount + "枚に確認事項があります。"
@@ -217,6 +219,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       sweepIssueCount = 0;
       setButtonBusy(qualitySweepButton, true);
       qualitySweepButton.textContent = "確認中…";
+      if (qualitySweepCancel instanceof HTMLButtonElement) qualitySweepCancel.hidden = false;
       if (qualitySweepResults instanceof HTMLOListElement) qualitySweepResults.replaceChildren();
       if (qualitySweepProgress instanceof HTMLProgressElement) {
         qualitySweepProgress.hidden = false;
@@ -232,6 +235,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       qualitySweepFrame.src = url.toString();
       waitForSweepResult();
     });
+    if (qualitySweepCancel instanceof HTMLButtonElement) {
+      qualitySweepCancel.addEventListener("click", () => {
+        if (!sweepRunning) return;
+        sweepRunning = false;
+        clearTimeout(sweepTimer);
+        qualitySweepFrame.removeAttribute("src");
+        qualitySweepCancel.hidden = true;
+        setButtonBusy(qualitySweepButton, false);
+        qualitySweepButton.textContent = "最初からチェック";
+        if (qualitySweepStatus instanceof HTMLElement) {
+          qualitySweepStatus.textContent = sweepIndex + " / " + slides.length + "枚で中断しました。途中結果は下に残しています。";
+          qualitySweepStatus.classList.remove("success", "warning");
+        }
+      });
+    }
   }
   const editor = document.querySelector("[data-project-editor]");
   if (editor instanceof HTMLFormElement) {

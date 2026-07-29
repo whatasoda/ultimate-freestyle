@@ -156,7 +156,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=50";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=51";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1067,7 +1067,7 @@ export function projectDetailPage(options: {
   }));
   const qualitySweepPanel = qualitySweepSlides.length === 0
     ? ""
-    : `<details class="panel panel-disclosure"><summary>全スライドの実表示を一括確認</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で全${qualitySweepSlides.length}枚を順番に描画し、見切れと70%未満の自動縮小を探します。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`${qualitySweepSlides[0]?.href}/frame?slide=1&step=0`)}">一括チェックを開始</button><progress data-quality-sweep-progress max="${qualitySweepSlides.length}" value="0" hidden>0 / ${qualitySweepSlides.length}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">未実行</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="全スライドの表示確認"></iframe></div></div></details>`;
+    : `<details class="panel panel-disclosure"><summary>全スライドの実表示を一括確認</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で全${qualitySweepSlides.length}枚を順番に描画し、見切れと70%未満の自動縮小を探します。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`${qualitySweepSlides[0]?.href}/frame?slide=1&step=0`)}">一括チェックを開始</button><button class="ghost" type="button" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepSlides.length}" value="0" hidden>0 / ${qualitySweepSlides.length}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">未実行</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="全スライドの表示確認"></iframe></div></div></details>`;
 
   return new Response(
     shell(
