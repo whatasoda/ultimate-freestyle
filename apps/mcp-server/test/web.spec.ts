@@ -403,7 +403,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=26"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=27"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -459,6 +459,8 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain('label="四国めたん"');
     expect(voicePageHtml).toContain("7種の調声値");
     expect(voicePageHtml).toContain("おすすめの声");
+    expect(voicePageHtml).toContain('data-voice-configured="true"');
+    expect(voicePageHtml).toContain("該当区間の再生成が必要になります");
     expect(voicePageHtml).toContain('data-voice-filter="needs_generation"');
     expect(voicePageHtml).toContain("音声生成は任意です");
 
@@ -589,6 +591,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
     expect(dashboardScriptText).toContain("componentの文言をプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("changingConfiguredVoice");
+    expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
 
     const rejectedUpload = await requestProvider(
       provider,

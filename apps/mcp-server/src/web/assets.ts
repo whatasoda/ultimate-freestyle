@@ -890,11 +890,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     };
     if (setupButton instanceof HTMLButtonElement) {
+      const initialProfileId = profileSelect instanceof HTMLSelectElement ? profileSelect.value : "";
       setupButton.addEventListener("click", async () => {
-        setupButton.disabled = true;
         const selectedLabel = profileSelect instanceof HTMLSelectElement
           ? profileSelect.selectedOptions[0]?.textContent || "選択した声"
           : "選択した声";
+        const changingConfiguredVoice = voicePage.dataset.voiceConfigured === "true" &&
+          profileSelect instanceof HTMLSelectElement && profileSelect.value !== initialProfileId;
+        if (changingConfiguredVoice && !confirm("既定の声を「" + selectedLabel + "」へ変更しますか？生成済みの区間は新しい声で再生成が必要になります。")) return;
+        setupButton.disabled = true;
         if (setupFeedback instanceof HTMLElement) setupFeedback.textContent = selectedLabel + "を設定しています…";
         try {
           const response = await fetch(setupButton.dataset.voiceSetup || "", {
