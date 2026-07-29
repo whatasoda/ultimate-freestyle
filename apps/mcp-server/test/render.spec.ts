@@ -766,7 +766,7 @@ describe("presentation artifact renderer", () => {
     expect(overLimitHtml).toContain("23分20秒");
     expect(overLimitHtml).toContain("20分以内を3分20秒超えています");
     expect(overLimitHtml).toContain("発表を20分以内に収める");
-    expect(overLimitHtml).toContain('data-duration-valid="false" disabled');
+    expect(overLimitHtml).toContain('data-duration-valid="false" data-published-current="false" disabled');
   });
 
   it("maps every safe visual and font preset and renders bounded narration variants", () => {
