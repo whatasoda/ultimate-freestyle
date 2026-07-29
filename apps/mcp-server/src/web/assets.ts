@@ -1,4 +1,20 @@
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const apiErrorMessage = (result, fallback) => {
+    const messages = {
+      AUTH_REQUIRED: "ログインの有効期限が切れました。研究一覧からログインし直してください。",
+      PROJECT_VERSION_CONFLICT: "別の画面またはAIから先に更新されました。入力内容を退避してから画面を再読み込みしてください。",
+      PROJECT_NOT_FOUND: "研究が見つかりません。研究一覧へ戻って選び直してください。",
+      SLIDE_NOT_FOUND: "スライドが見つかりません。画面を再読み込みしてください。",
+      TEMPLATE_NOT_FOUND: "templateが見つかりません。画面を再読み込みしてください。",
+      VOICE_PROFILE_NOT_FOUND: "選んだ声が見つかりません。声を選び直してください。",
+      VOICE_JOB_NOT_FOUND: "音声生成の状況が見つかりません。音声仕上げ画面を再読み込みしてください。"
+    };
+    const code = result?.error?.code;
+    return (code && messages[code]) || result?.error?.message || fallback;
+  };
+  const caughtErrorMessage = (error, fallback) => error instanceof TypeError
+    ? "サーバーと通信できませんでした。接続を確認して、もう一度お試しください。"
+    : error instanceof Error ? error.message : fallback;
   const setButtonBusy = (button, busy) => {
     if (!(button instanceof HTMLButtonElement)) return;
     button.disabled = busy;
@@ -60,6 +76,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (!(feedback instanceof HTMLElement)) return;
       setButtonBusy(submit, true);
       feedback.textContent = "変更を保存しています…";
+      feedback.classList.remove("success", "warning");
       const data = new FormData(editor);
       const nullableText = (name) => String(data.get(name) || "");
       const textList = (name) => String(data.get(name) || "")
@@ -86,7 +103,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           })
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
+        if (!response.ok) throw new Error(apiErrorMessage(result, "保存できませんでした。"));
         syncPageVersion(result.version);
         editor.dataset.dirty = "false";
         if (versionLabel instanceof HTMLElement) versionLabel.textContent = "v" + result.version;
@@ -95,8 +112,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         markDraftChanged();
         setTimeout(() => location.reload(), 500);
       } catch (error) {
-        feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
+        feedback.textContent = caughtErrorMessage(error, "保存できませんでした。");
         feedback.classList.remove("success");
+        feedback.classList.add("warning");
       } finally {
         setButtonBusy(submit, false);
       }
@@ -246,7 +264,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           body: JSON.stringify(serializeVersionedForm(form))
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "保存できませんでした。");
+        if (!response.ok) throw new Error(apiErrorMessage(result, "保存できませんでした。"));
         syncPageVersion(result.version);
         form.dataset.dirty = "false";
         if (form.matches("[data-template-create]")) {
@@ -262,7 +280,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         refreshSlideFrame(result.version);
       } catch (error) {
-        feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
+        feedback.textContent = caughtErrorMessage(error, "保存できませんでした。");
         feedback.classList.add("warning");
       } finally {
         for (const button of submitButtons) {
@@ -530,7 +548,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       try {
         const response = await fetch(url, { headers: { accept: "application/json" } });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "生成状況を取得できませんでした。");
+        if (!response.ok) throw new Error(apiErrorMessage(result, "生成状況を取得できませんでした。"));
         const job = result.job || result;
         pollFailures = 0;
         updateJob(job);
@@ -566,7 +584,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             })
           });
           const result = await response.json();
-          if (!response.ok) throw new Error(result.error?.message || "声を設定できませんでした。");
+          if (!response.ok) throw new Error(apiErrorMessage(result, "声を設定できませんでした。"));
           if (setupFeedback instanceof HTMLElement) {
             setupFeedback.textContent = "設定しました。音声の状態を更新します…";
             setupFeedback.classList.add("success");
@@ -575,7 +593,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         } catch (error) {
           setupButton.disabled = false;
           if (setupFeedback instanceof HTMLElement) {
-            setupFeedback.textContent = error instanceof Error ? error.message : "声を設定できませんでした。";
+            setupFeedback.textContent = caughtErrorMessage(error, "声を設定できませんでした。");
             setupFeedback.classList.add("warning");
           }
         }
@@ -610,7 +628,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             })
           });
           const result = await response.json();
-          if (!response.ok) throw new Error(result.error?.message || "音声生成を開始できませんでした。");
+          if (!response.ok) throw new Error(apiErrorMessage(result, "音声生成を開始できませんでした。"));
           const job = result.job || result;
           const statusUrl = result.status_url || job.status_url;
           updateJob({ ...job, status_url: statusUrl });
@@ -623,7 +641,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         } catch (error) {
           generateButton.disabled = false;
           if (generateFeedback instanceof HTMLElement) {
-            generateFeedback.textContent = error instanceof Error ? error.message : "音声生成を開始できませんでした。";
+            generateFeedback.textContent = caughtErrorMessage(error, "音声生成を開始できませんでした。");
             generateFeedback.classList.add("warning");
           }
         }
@@ -711,7 +729,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           body: JSON.stringify({ expected_version: Number(previewButton.dataset.version) })
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "プレビューを作成できませんでした。");
+        if (!response.ok) throw new Error(apiErrorMessage(result, "プレビューを作成できませんでした。"));
         publishFeedback.textContent = "プレビューを作成しました。表示を確認してから公開してください。";
         publishFeedback.classList.add("success");
         if (publishButton instanceof HTMLButtonElement) {
@@ -729,7 +747,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         else window.open(result.preview_url, "_blank", "noopener");
       } catch (error) {
         previewWindow?.close();
-        publishFeedback.textContent = error instanceof Error ? error.message : "プレビューを作成できませんでした。";
+        publishFeedback.textContent = caughtErrorMessage(error, "プレビューを作成できませんでした。");
         publishFeedback.classList.add("warning");
       } finally {
         previewButton.disabled = false;
@@ -753,7 +771,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           body: JSON.stringify({ revision_id: publishButton.dataset.revision || "" })
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "公開できませんでした。");
+        if (!response.ok) throw new Error(apiErrorMessage(result, "公開できませんでした。"));
         publishFeedback.textContent = "公開しました: " + result.public_url;
         publishFeedback.classList.add("success");
         if (publishedStatus instanceof HTMLElement && result.publication?.published) {
@@ -761,7 +779,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         publishButton.disabled = false;
       } catch (error) {
-        publishFeedback.textContent = error instanceof Error ? error.message : "公開できませんでした。";
+        publishFeedback.textContent = caughtErrorMessage(error, "公開できませんでした。");
         publishFeedback.classList.add("warning");
         publishButton.disabled = false;
       }
@@ -830,11 +848,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           body: file
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "画像を保存できませんでした。");
+        if (!response.ok) throw new Error(apiErrorMessage(result, "画像を保存できませんでした。"));
         feedback.textContent = "保存しました。画面を更新します。";
         location.reload();
       } catch (error) {
-        feedback.textContent = error instanceof Error ? error.message : "画像を保存できませんでした。";
+        feedback.textContent = caughtErrorMessage(error, "画像を保存できませんでした。");
         feedback.classList.add("warning");
         setButtonBusy(submit, false);
       }
@@ -856,13 +874,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           headers: { "x-csrf-token": button.dataset.csrf || "" }
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error?.message || "削除できませんでした。");
+        if (!response.ok) throw new Error(apiErrorMessage(result, "削除できませんでした。"));
         const asset = button.closest("[data-asset]");
         if (feedback instanceof HTMLElement) feedback.textContent = "削除しました。";
         asset?.remove();
       } catch (error) {
         if (feedback instanceof HTMLElement) {
-          feedback.textContent = error instanceof Error ? error.message : "削除できませんでした。";
+          feedback.textContent = caughtErrorMessage(error, "削除できませんでした。");
           feedback.classList.add("warning");
         }
         button.textContent = originalLabel;

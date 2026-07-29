@@ -530,6 +530,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("URL.revokeObjectURL");
     expect(dashboardScriptText).toContain("setPreviewFocus");
     expect(dashboardScriptText).toContain("workspace-preview-focus");
+    expect(dashboardScriptText).toContain("const apiErrorMessage =");
+    expect(dashboardScriptText).toContain("別の画面またはAIから先に更新されました");
+    expect(dashboardScriptText).toContain("サーバーと通信できませんでした");
 
     const rejectedUpload = await requestProvider(
       provider,
