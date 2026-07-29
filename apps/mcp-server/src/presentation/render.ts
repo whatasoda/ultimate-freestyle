@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@20";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@21";
 
 function escapeHtml(value: string): string {
   return value
@@ -835,6 +835,7 @@ export function renderPresentationHtml(
     .controls { display: flex; align-items: center; gap: 6px; }
     button { min-width: 40px; min-height: 34px; border: 1px solid #3a485d; border-radius: 8px; background: #172131; color: #fff; cursor: pointer; }
     button:hover { border-color: var(--accent); }
+    button:disabled { cursor: not-allowed; opacity: .45; }
     button[aria-pressed="true"] { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 28%, #172131); }
     button:focus-visible, input:focus-visible { outline: .18rem solid color-mix(in srgb, var(--accent) 70%, white); outline-offset: .15rem; }
     label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
@@ -913,6 +914,8 @@ export function renderPresentationHtml(
     const volumeValue = document.querySelector('#volume-value');
     const speechButton = document.querySelector('#speech');
     const autoButton = document.querySelector('#auto');
+    const previousButton = document.querySelector('#prev');
+    const nextButton = document.querySelector('#next');
     const prelude = document.querySelector('[data-prelude]');
     const preludeStart = document.querySelector('[data-prelude-start]');
     const preludeProgress = document.querySelector('[data-prelude-progress]');
@@ -945,6 +948,12 @@ export function renderPresentationHtml(
       return previous + current.durationSeconds * fraction;
     };
     const narration = () => DECK.slides[slide].narration?.segments.find((item) => item.at === step) ?? null;
+    const updateControls = () => {
+      if (previousButton instanceof HTMLButtonElement) previousButton.disabled = !started || (slide === 0 && step === 0);
+      if (nextButton instanceof HTMLButtonElement) nextButton.disabled = !started;
+      if (speechButton instanceof HTMLButtonElement) speechButton.disabled = !started;
+      if (autoButton instanceof HTMLButtonElement) autoButton.disabled = !started;
+    };
     const syncUrl = () => history.pushState(null, '', '?slide=' + (slide + 1) + '&step=' + step);
     const setVoiceProgress = (percent) => {
       const numericValue = clamp(percent, 0, 100);
@@ -976,6 +985,7 @@ export function renderPresentationHtml(
       auto = false;
       autoButton.setAttribute('aria-pressed', 'false');
       autoButton.textContent = '自動 OFF';
+      if (nextButton instanceof HTMLButtonElement) nextButton.disabled = true;
       completion.hidden = false;
       if (restartButton instanceof HTMLButtonElement) restartButton.focus();
     };
@@ -1216,12 +1226,14 @@ export function renderPresentationHtml(
       progress.parentElement?.setAttribute('aria-valuenow', '0');
       elapsed.textContent = '00:00';
       expected.textContent = '00:00';
+      updateControls();
       if (push) history.pushState(null, '', '?slide=0');
       else history.replaceState(null, '', '?slide=0');
       return true;
     };
     const render = () => {
       if (completion instanceof HTMLElement) completion.hidden = true;
+      updateControls();
       stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
       slides[slide].querySelectorAll('[data-reveal]').forEach((item) => { const visible = Number(item.dataset.reveal) <= step; item.classList.toggle('is-visible', visible); item.setAttribute('aria-hidden', String(!visible)); });
       const segment = narration(); const narrationRegion = slides[slide].querySelector('.narration');
@@ -1341,7 +1353,8 @@ export function renderPresentationHtml(
     });
     dismissCompletionButton?.addEventListener('click', () => {
       if (completion instanceof HTMLElement) completion.hidden = true;
-      document.querySelector('#prev')?.focus();
+      updateControls();
+      previousButton?.focus();
     });
     addEventListener('message', (event) => {
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
