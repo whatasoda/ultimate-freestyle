@@ -404,7 +404,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=42"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=43"');
     expect(detailHtml).toContain("data-copy-public");
     expect(detailHtml).toContain('data-published-current="false"');
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
@@ -522,6 +522,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-slide-action="move"');
     expect(workspaceHtml).toContain('data-slide-action="delete"');
     expect(workspaceHtml).toContain("現在有効な設定");
+    expect(workspaceHtml).toContain("data-workspace-duration");
     expect(workspaceHtml).toContain("実験ノート");
     expect(workspaceHtml).toContain("サイエンス");
     expect(workspaceHtml).toContain("強調見出し");

@@ -186,6 +186,28 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         layoutStatus.dataset.level = "";
       }
     });
+    const durationInput = slideEditor.elements.namedItem("duration_seconds");
+    const durationStatus = document.querySelector("[data-workspace-duration]");
+    const durationLabel = durationStatus?.querySelector("[data-workspace-duration-label]");
+    if (
+      durationInput instanceof HTMLInputElement &&
+      durationStatus instanceof HTMLElement &&
+      durationLabel instanceof HTMLElement
+    ) {
+      const baseTotal = Number(durationStatus.dataset.totalDuration);
+      const baseSlide = Number(durationStatus.dataset.slideDuration);
+      const updateDurationStatus = () => {
+        const nextSlide = Number(durationInput.value);
+        if (!Number.isFinite(nextSlide)) return;
+        const total = Math.max(0, baseTotal - baseSlide + nextSlide);
+        const minutes = Math.floor(total / 60);
+        const seconds = String(Math.floor(total % 60)).padStart(2, "0");
+        const overLimit = total > 20 * 60;
+        durationStatus.dataset.state = overLimit ? "warning" : "ok";
+        durationLabel.textContent = minutes + "分" + seconds + "秒" + (overLimit ? " · 20分超過" : "");
+      };
+      durationInput.addEventListener("input", updateDurationStatus);
+    }
   }
   const syncTypographyDraft = () => {
     if (!(typographyEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;

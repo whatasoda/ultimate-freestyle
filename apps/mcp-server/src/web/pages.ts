@@ -117,7 +117,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=42";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=43";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -391,6 +391,7 @@ function shell(title: string, body: string): string {
       .setting-summary { display: flex; flex-wrap: wrap; gap: .45rem; margin: 0 0 1rem; }
       .setting-chip { display: inline-flex; gap: .35rem; align-items: center; padding: .38rem .58rem; border: 1px solid #52647c; border-radius: 999px; background: #0c1724; color: #d6dfeb; font-size: .75rem; }
       .setting-chip small { color: var(--muted); }
+      .setting-chip[data-state="warning"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
       .inspector-section { overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--panel); }
       .inspector-section > summary { display: flex; align-items: center; justify-content: space-between; gap: .7rem; padding: 1rem 1.15rem; cursor: pointer; font-weight: 820; }
       .inspector-section > summary::marker { color: var(--accent); }
@@ -1451,8 +1452,13 @@ export function slideWorkspacePage(options: {
           : []
       : [])
   ];
+  const workspaceTotalDurationSeconds = deck.slides.reduce(
+    (total, item) => total + item.duration_seconds,
+    0
+  );
   const effectiveSummary = `<div class="setting-summary" aria-label="現在有効な設定">
     <span class="setting-chip"><small>layout</small>${escapeHtml(deck.layout)}</span>
+    <span class="setting-chip" data-workspace-duration data-total-duration="${workspaceTotalDurationSeconds}" data-slide-duration="${slide.duration_seconds}" data-state="${workspaceTotalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? "warning" : "ok"}" role="status"><small>全体時間</small><span data-workspace-duration-label>${formatDuration(workspaceTotalDurationSeconds)}${workspaceTotalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</span></span>
     <span class="setting-chip"><small>template</small>${escapeHtml(activeTemplate?.name ?? "組み込み")}</span>
     <span class="setting-chip"><small>visual</small>${VISUAL_LABELS[visualPreset]}</span>
     <span class="setting-chip"><small>font</small>${FONT_LABELS[bodyFont]} / ${FONT_LABELS[headingFont]}</span>
