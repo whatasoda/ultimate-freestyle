@@ -91,7 +91,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=13";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=14";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1041,6 +1041,14 @@ export function slideWorkspacePage(options: {
     slide.typography,
     activeTemplate?.line_height ?? 1.5
   );
+  const typographyPreviewPresets = Object.fromEntries(
+    (Object.keys(SLIDE_TYPOGRAPHY_LABELS) as Array<keyof typeof SLIDE_TYPOGRAPHY_LABELS>).map(
+      (preset) => [
+        preset,
+        resolveSlideTypography({ preset }, activeTemplate?.line_height ?? 1.5)
+      ]
+    )
+  );
   const effectiveEnter = slide.enter_animation ?? activeTemplate?.enter_animation ?? "fade";
   const narrationDisplay =
     slide.narration?.display ?? deck.narration_defaults?.display ?? "commentary";
@@ -1096,7 +1104,7 @@ export function slideWorkspacePage(options: {
         <div class="actions"><button type="submit">templateを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
       </form>`
     : `<p class="mode-note">組み込みstyleを使用中です。templateを選ぶと色、font、密度、余白、動きを編集できます。</p>`;
-  const typographyEditor = `<form class="editor" data-typography-editor data-versioned-form action="${slidePath}/typography" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+  const typographyEditor = `<form class="editor" data-typography-editor data-versioned-form action="${slidePath}/typography" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-typography-presets="${escapeHtml(JSON.stringify(typographyPreviewPresets))}" data-csrf="${escapeHtml(options.csrfToken)}">
     <p class="inherit-note">定型flowの文章配分を一枚単位で調整します。未入力の項目は選択した組版presetを使います。</p>
     <div class="editor-grid"><label>組版preset<select name="preset">${Object.entries(SLIDE_TYPOGRAPHY_LABELS).map(([value, label]) => `<option value="${value}"${typography.preset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>段数<input name="columns" type="number" min="1" max="3" value="${slide.typography?.columns ?? ""}" placeholder="実効 ${typography.columns}"></label></div>
     <fieldset><legend>文字サイズと行送り</legend><div class="editor-grid"><label>本文倍率<input name="body_scale" type="number" min="0.5" max="1.4" step="0.05" value="${slide.typography?.body_scale ?? ""}" placeholder="実効 ${typography.body_scale}"></label><label>見出し倍率<input name="heading_scale" type="number" min="0.5" max="1.5" step="0.05" value="${slide.typography?.heading_scale ?? ""}" placeholder="実効 ${typography.heading_scale}"></label><label>行間<input name="typography_line_height" type="number" min="1" max="2" step="0.05" value="${slide.typography?.line_height ?? ""}" placeholder="実効 ${typography.line_height}"></label><label>段落間隔（em）<input name="paragraph_spacing_em" type="number" min="0" max="2" step="0.05" value="${slide.typography?.paragraph_spacing_em ?? ""}" placeholder="実効 ${typography.paragraph_spacing_em}"></label><label>段間隔（em）<input name="column_gap_em" type="number" min="0.5" max="5" step="0.1" value="${slide.typography?.column_gap_em ?? ""}" placeholder="実効 ${typography.column_gap_em}"></label></div></fieldset>

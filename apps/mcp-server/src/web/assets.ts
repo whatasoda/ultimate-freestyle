@@ -123,9 +123,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   const slideEditor = document.querySelector("[data-slide-editor]");
+  const typographyEditor = document.querySelector("[data-typography-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
   let draftFrameTimer;
+  let draftTypographyTimer;
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(slideEditor);
@@ -144,6 +146,45 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = "入力内容をプレビューへ反映しています…";
+        layoutStatus.dataset.level = "";
+      }
+    });
+  }
+  const syncTypographyDraft = () => {
+    if (!(typographyEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    const data = new FormData(typographyEditor);
+    let presets = {};
+    try { presets = JSON.parse(typographyEditor.dataset.typographyPresets || "{}"); } catch {}
+    const preset = String(data.get("preset") || "standard");
+    const typography = { ...(presets[preset] || {}), preset };
+    for (const [field, key] of [
+      ["columns", "columns"],
+      ["body_scale", "body_scale"],
+      ["heading_scale", "heading_scale"],
+      ["typography_line_height", "line_height"],
+      ["paragraph_spacing_em", "paragraph_spacing_em"],
+      ["column_gap_em", "column_gap_em"]
+    ]) {
+      const value = String(data.get(field) ?? "").trim();
+      if (value !== "" && Number.isFinite(Number(value))) typography[key] = Number(value);
+    }
+    for (const key of ["text_align", "vertical_align"]) {
+      const value = String(data.get(key) || "");
+      if (value) typography[key] = value;
+    }
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:preview-typography",
+      slide_id: typographyEditor.dataset.slideId || "",
+      typography
+    }, location.origin);
+  };
+  if (typographyEditor instanceof HTMLFormElement) {
+    typographyEditor.addEventListener("input", () => {
+      clearTimeout(draftTypographyTimer);
+      draftTypographyTimer = setTimeout(syncTypographyDraft, 120);
+      const layoutStatus = document.querySelector("[data-layout-status]");
+      if (layoutStatus instanceof HTMLElement) {
+        layoutStatus.textContent = "組版をプレビューへ反映しています…";
         layoutStatus.dataset.level = "";
       }
     });
@@ -419,6 +460,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       setFrameLoading(false);
       syncFramePosition();
       syncSlideDraft();
+      syncTypographyDraft();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");

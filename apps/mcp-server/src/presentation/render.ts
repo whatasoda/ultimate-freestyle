@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@15";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@16";
 
 function escapeHtml(value: string): string {
   return value
@@ -1144,6 +1144,23 @@ export function renderPresentationHtml(
       }
       scheduleFit();
     };
+    const previewTypography = (data) => {
+      const currentSlide = slides[slide];
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'flow' || data.slide_id !== DECK.slides[slide].id) return;
+      const typography = data.typography;
+      if (!typography || typeof typography !== 'object') return;
+      currentSlide.dataset.textPreset = String(typography.preset || 'standard');
+      currentSlide.dataset.textAlign = String(typography.text_align || 'start');
+      currentSlide.dataset.verticalAlign = String(typography.vertical_align || 'start');
+      currentSlide.style.setProperty('--slide-body-scale', String(typography.body_scale));
+      currentSlide.style.setProperty('--slide-heading-scale', String(typography.heading_scale));
+      currentSlide.style.setProperty('--body-line-height', String(typography.line_height));
+      currentSlide.style.setProperty('--slide-paragraph-spacing', String(typography.paragraph_spacing_em) + 'em');
+      currentSlide.style.setProperty('--slide-column-gap', String(typography.column_gap_em) + 'em');
+      const content = currentSlide.querySelector('[data-flow-content]');
+      if (content instanceof HTMLElement) content.dataset.columns = String(typography.columns);
+      scheduleFit();
+    };
     const setPosition = (nextSlide, nextStep, push) => {
       slide = clamp(Number(nextSlide) - 1, 0, slides.length - 1);
       step = clamp(Number(nextStep), 0, DECK.slides[slide].revealSteps);
@@ -1278,6 +1295,7 @@ export function renderPresentationHtml(
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
     });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
