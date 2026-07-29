@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@10";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@11";
 
 function escapeHtml(value: string): string {
   return value
@@ -792,6 +792,14 @@ export function renderPresentationHtml(
     .prelude-start:disabled { cursor: wait; opacity: .45; }
     .voice-unlock { position: absolute; z-index: 45; left: 50%; bottom: 4%; translate: -50% 0; min-width: 12em; padding: .75em 1.1em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: #101827ee; box-shadow: 0 1em 3em #0009; font-weight: 850; }
     .voice-unlock[hidden] { display: none; }
+    .completion { position: absolute; z-index: 50; inset: 0; display: grid; place-items: center; padding: 8%; background: #05080dcc; backdrop-filter: blur(.45cqw); }
+    .completion[hidden] { display: none; }
+    .completion-card { width: min(34em, 78%); padding: 2.4em; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff33); border-radius: 1.2em; background: #101827f2; box-shadow: 0 1.5em 5em #000b; text-align: center; }
+    .completion-card h2 { margin: 0 0 .35em; color: #fff; font-size: clamp(1.4rem, 3.2cqw, 2.7rem); }
+    .completion-card p { margin: 0 0 1.4em; color: #b7c2d2; }
+    .completion-actions { display: flex; justify-content: center; gap: .7em; }
+    .completion-actions button { padding: .65em 1em; }
+    .completion-actions .primary { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 32%, #172131); }
     .prelude[data-style="pulse"]::before { content: ""; position: absolute; width: 28cqw; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 36%, transparent), transparent 68%); animation: prelude-pulse 1.7s ease-in-out infinite alternate; }
     .prelude[data-style="orbit"]::before, .prelude[data-style="orbit"]::after { content: ""; position: absolute; width: 32cqw; aspect-ratio: 1; border: .12cqw solid #ffffff22; border-radius: 50%; animation: prelude-orbit 7s linear infinite; }
     .prelude[data-style="orbit"]::after { width: 21cqw; border-color: color-mix(in srgb, var(--accent) 55%, transparent); animation-direction: reverse; animation-duration: 4s; }
@@ -869,6 +877,13 @@ export function renderPresentationHtml(
       </section>
       ${slideHtml}
       <button class="voice-unlock" type="button" data-voice-unlock hidden>音声を開始</button>
+      <section class="completion" data-completion aria-live="polite" hidden>
+        <div class="completion-card">
+          <h2>発表はここまでです</h2>
+          <p>${deck.slides.length}枚・想定${formattedTotalDuration}</p>
+          <div class="completion-actions"><button class="primary" type="button" data-restart>最初から見る</button><button type="button" data-dismiss-completion>最後のスライドに戻る</button></div>
+        </div>
+      </section>
     </div></div>
     <footer>
       <span id="counter" aria-live="polite">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
@@ -901,6 +916,9 @@ export function renderPresentationHtml(
     const preludeStatus = document.querySelector('[data-prelude-status]');
     const stage = document.querySelector('.stage');
     const voiceUnlock = document.querySelector('[data-voice-unlock]');
+    const completion = document.querySelector('[data-completion]');
+    const restartButton = document.querySelector('[data-restart]');
+    const dismissCompletionButton = document.querySelector('[data-dismiss-completion]');
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -939,12 +957,20 @@ export function renderPresentationHtml(
       setVoiceProgress(0);
     };
     const finishVoice = () => { clearInterval(voiceTimer); setVoiceProgress(100); if (auto) autoTimer = setTimeout(advance, 350); };
+    const showCompletion = () => {
+      if (editorFrame || !(completion instanceof HTMLElement)) return;
+      auto = false;
+      autoButton.setAttribute('aria-pressed', 'false');
+      autoButton.textContent = '自動 OFF';
+      completion.hidden = false;
+      if (restartButton instanceof HTMLButtonElement) restartButton.focus();
+    };
     const advance = () => {
       if (!started) return false;
       const current = DECK.slides[slide];
       if (step < current.revealSteps) step += 1;
       else if (slide < slides.length - 1) { slide += 1; step = 0; }
-      else return false;
+      else { showCompletion(); return false; }
       syncUrl(); render(); return true;
     };
     const scheduleAutoAdvance = () => {
@@ -1070,6 +1096,7 @@ export function renderPresentationHtml(
       return true;
     };
     const render = () => {
+      if (completion instanceof HTMLElement) completion.hidden = true;
       stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
       slides[slide].querySelectorAll('[data-reveal]').forEach((item) => { const visible = Number(item.dataset.reveal) <= step; item.classList.toggle('is-visible', visible); item.setAttribute('aria-hidden', String(!visible)); });
       const segment = narration(); const narrationRegion = slides[slide].querySelector('.narration');
@@ -1157,6 +1184,17 @@ export function renderPresentationHtml(
       advance();
     });
     voiceUnlock?.addEventListener('click', () => { if (started) speak(); });
+    restartButton?.addEventListener('click', () => {
+      startedAt = Date.now();
+      slide = 0;
+      step = 0;
+      syncUrl();
+      render();
+    });
+    dismissCompletionButton?.addEventListener('click', () => {
+      if (completion instanceof HTMLElement) completion.hidden = true;
+      document.querySelector('#prev')?.focus();
+    });
     addEventListener('message', (event) => { if (!editorFrame || event.source !== parent || event.origin !== location.origin || event.data?.type !== 'ultimate-freestyle:set-position') return; setPosition(event.data.slide, event.data.step, false); });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));
