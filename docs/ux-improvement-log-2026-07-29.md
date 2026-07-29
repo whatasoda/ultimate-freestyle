@@ -214,3 +214,9 @@
 - templateの7色、visual、本文・見出しfont、文字weight、字間、余白、角丸、補足幅、領域配置、情報密度、動きを保存前に実表示へ反映するようにした。
 - template行間はスライド側で上書きしていない標準組版のときだけlive previewへ適用し、継承規則を崩さないようにした。
 - animation変更時は編集枠内で現在スライドの動きを再実行し、見た目だけでなく時間的な表現も確認できるようにした。
+
+## 改善ループ28
+
+- 音量sliderや操作buttonへfocus中に矢印・Space・Enterを押すと、意図せずスライドも進んでいたkeyboard競合を解消した。
+- 編集用iframe内では発表全体のshortcutを無効化し、一枚編集から別スライドへ迷い込まないようにした。
+- 発表枠をkeyboard focus可能なregionにし、focus位置をaccent色で明示してから矢印・Spaceで進行できるようにした。

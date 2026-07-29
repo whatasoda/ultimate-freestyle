@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@17";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@18";
 
 function escapeHtml(value: string): string {
   return value
@@ -569,6 +569,7 @@ export function renderPresentationHtml(
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
     .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; }
+    .stage:focus-visible { outline: .2rem solid var(--accent); outline-offset: .18rem; }
     body[data-editor-frame="true"] .stage { cursor: default; }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
     .slide::before, .slide::after { content: ""; position: absolute; z-index: 0; pointer-events: none; }
@@ -864,7 +865,7 @@ export function renderPresentationHtml(
 <body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在位置の目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span></header>
-    <div class="stage-wrap"><div class="stage" aria-label="${escapeHtml(project.document.title)}">
+    <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}">
       <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
@@ -1305,7 +1306,13 @@ export function renderPresentationHtml(
     volume.addEventListener('input', () => { showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
     showVolume();
-    addEventListener('keydown', (event) => { if (['ArrowRight', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); } else if (event.key === 'ArrowLeft') { document.querySelector('#prev').click(); } });
+    addEventListener('keydown', (event) => {
+      if (editorFrame) return;
+      const target = event.target;
+      if (target instanceof Element && target.closest('button, a, input, select, textarea')) return;
+      if (['ArrowRight', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); }
+      else if (event.key === 'ArrowLeft') { event.preventDefault(); document.querySelector('#prev').click(); }
+    });
     stage?.addEventListener('click', (event) => {
       if (!started || editorFrame || getSelection()?.toString()) return;
       if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
