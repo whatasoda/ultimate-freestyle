@@ -264,6 +264,12 @@ function shell(title: string, body: string): string {
       .character-count { justify-self: end; margin-top: -.2rem; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
       .character-count[data-near-limit="true"] { color: #ffd681; font-weight: 750; }
       .publish-state { display: grid; gap: .8rem; }
+      .preflight-list { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+      .preflight-item { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .65rem; align-items: start; padding: .65rem .7rem; border: 1px solid var(--line); border-radius: .65rem; background: #0a131f; color: #c7d3e1; font-size: .82rem; line-height: 1.55; }
+      .preflight-item::before { content: "✓"; display: grid; place-items: center; width: 1.35rem; height: 1.35rem; border-radius: 50%; background: #174d3a; color: #91efc4; font-weight: 900; }
+      .preflight-item[data-state="attention"]::before { content: "!"; background: #5a4618; color: #ffe29a; }
+      .preflight-item strong, .preflight-item small { display: block; }
+      .preflight-item small { margin-top: .12rem; color: var(--muted); }
       .status-row { display: flex; justify-content: space-between; gap: 1rem; padding: .65rem 0; border-top: 1px solid var(--line); }
       .status-row:first-of-type { border-top: 0; }
       .status-row span { color: var(--muted); }
@@ -590,6 +596,30 @@ export function projectDetailPage(options: {
     (document.question?.trim().length ?? 0) > 0 &&
     (document.method?.trim().length ?? 0) > 0;
   const slidesReady = slides.length > 0;
+  const totalDurationSeconds = slides.reduce(
+    (total, slide) => total + slide.duration_seconds,
+    0
+  );
+  const coverSlideCount = slides.filter((slide) => slide.role === "cover").length;
+  const narratedSlideCount = slides.filter(
+    (slide) => (slide.narration?.segments.length ?? 0) > 0
+  ).length;
+  const slidesWithMissingAlt = slides.filter((slide) => {
+    if (slide.composition?.mode === "canvas") {
+      return slide.composition.blocks.some(
+        (block) => block.kind === "image" && block.alt_text.trim() === ""
+      );
+    }
+    if (slide.composition?.mode === "scene") {
+      return slide.composition.nodes.some(
+        (node) => node.kind === "image" && node.alt_text.trim() === ""
+      );
+    }
+    return false;
+  }).length;
+  const assetsWithMissingAlt = options.assets.filter(
+    (asset) => asset.alt_text.trim() === ""
+  ).length;
   const journeySteps = [
     { label: "研究内容", detail: "問いと方法", complete: researchReady },
     { label: "発表構成", detail: `${slides.length}枚`, complete: slidesReady },
@@ -639,8 +669,50 @@ export function projectDetailPage(options: {
     : !previewRendererCurrent
       ? "表示エンジンが更新されたため、新しいプレビューの確認が必要です。"
       : "公開中の版は、下書きを編集しても自動では変わりません。";
+  const preflightItems = [
+    {
+      complete: researchReady,
+      label: "研究の問いと方法",
+      detail: researchReady ? "発表の前提を確認できます。" : "基本情報で問いと方法を入力してください。"
+    },
+    {
+      complete: coverSlideCount > 0,
+      label: "表紙スライド",
+      detail: coverSlideCount > 0 ? `${coverSlideCount}枚を表紙として設定済みです。` : "任意ですが、発表の題名と作者を伝えやすくなります。"
+    },
+    {
+      complete: slidesWithMissingAlt + assetsWithMissingAlt === 0,
+      label: "画像の説明",
+      detail: slidesWithMissingAlt + assetsWithMissingAlt === 0
+        ? "説明が必要な画像に未入力はありません。"
+        : `${slidesWithMissingAlt}枚のスライドと${assetsWithMissingAlt}件の素材に未入力があります。`
+    },
+    {
+      complete: slides.length > 0 && narratedSlideCount === slides.length,
+      label: "表示・読み上げ文",
+      detail: slides.length === 0
+        ? "スライドを作ると確認できます。"
+        : narratedSlideCount === slides.length
+          ? `全${slides.length}枚に読み上げ文があります。`
+          : `${narratedSlideCount}/${slides.length}枚に設定済みです。音声を使わない構成なら省略できます。`
+    },
+    {
+      complete: totalDurationSeconds > 0,
+      label: "想定発表時間",
+      detail: totalDurationSeconds > 0
+        ? `${Math.floor(totalDurationSeconds / 60)}分${String(totalDurationSeconds % 60).padStart(2, "0")}秒です。`
+        : "各スライドの想定秒数を確認してください。"
+    },
+    {
+      complete: previewCurrent,
+      label: "固定プレビュー",
+      detail: previewCurrent ? "現在の下書きと表示エンジンで作成済みです。" : "現在の下書きから作り、最後まで操作して確認してください。"
+    }
+  ];
+  const preflightChecklist = `<details${previewCurrent ? "" : " open"}><summary>公開前チェック · ${preflightItems.filter((item) => item.complete).length}/${preflightItems.length}</summary><ul class="preflight-list">${preflightItems.map((item) => `<li class="preflight-item" data-state="${item.complete ? "complete" : "attention"}"><span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.detail)}</small></span></li>`).join("")}</ul></details>`;
   const publicationPanel = `<section class="panel publish-state" id="publication" data-publication>
     <h2>プレビューと公開</h2>
+    ${preflightChecklist}
     <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
     <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
     <div class="status-row"><span>最新プレビュー</span><strong data-preview-status>${preview === null ? "未作成" : `v${preview.project_version} · ${escapeHtml(preview.renderer_version)}${previewCurrent ? "" : " · 要再生成"}`}</strong></div>

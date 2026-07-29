@@ -389,6 +389,13 @@ describe("Web dashboard", () => {
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
     expect(detailHtml).toContain('src="/assets/dashboard.js?v=6"');
+    expect(detailHtml).toContain("公開前チェック ·");
+    expect(detailHtml).toContain("研究の問いと方法");
+    expect(detailHtml).toContain("表紙スライド");
+    expect(detailHtml).toContain("画像の説明");
+    expect(detailHtml).toContain("表示・読み上げ文");
+    expect(detailHtml).toContain("想定発表時間");
+    expect(detailHtml).toContain("固定プレビュー");
     expect(detailHtml).toContain("基本情報を編集");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
