@@ -117,7 +117,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=39";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=40";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -351,6 +351,9 @@ function shell(title: string, body: string): string {
       body[data-preview-focus="true"] .filmstrip, body[data-preview-focus="true"] .inspector { display: none; }
       body[data-preview-focus="true"] .workspace-preview { width: min(100%, 96rem); margin: 0 auto; }
       .filmstrip, .inspector { display: grid; gap: .65rem; align-content: start; max-height: calc(100vh - 10rem); overflow: auto; }
+      .filmstrip-search { position: sticky; z-index: 2; top: 0; display: grid; gap: .3rem; padding-bottom: .35rem; background: linear-gradient(var(--bg) 80%, transparent); color: var(--muted); font-size: .72rem; font-weight: 700; }
+      .filmstrip-search input { min-height: 2.35rem; padding: .5rem .65rem; font-size: .8rem; }
+      .filmstrip-empty { margin: .4rem; color: var(--muted); font-size: .8rem; }
       .filmstrip-link { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .55rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; color: #bdc9d8; text-decoration: none; }
       .filmstrip-link span { color: var(--muted); font: 700 .76rem/1.3 ui-monospace, monospace; }
       .filmstrip-link strong { overflow-wrap: anywhere; font-size: .86rem; line-height: 1.35; }
@@ -1200,7 +1203,15 @@ export function slideWorkspacePage(options: {
   const slidePath = `${projectPath}/slides/${escapeHtml(slide.id)}`;
   const filmstrip = deck.slides
     .map(
-      (item, index) => `<a class="filmstrip-link" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}${item.role === "cover" ? '<small class="stage">表紙</small>' : ""}<small class="filmstrip-meta">${item.duration_seconds}秒 · ${item.reveal_steps + 1}段階 · ${escapeHtml(slideCompositionLabel(item))}</small></strong></a>`
+      (item, index) => {
+        const narrationSegments = item.narration?.segments ?? [];
+        const readyVoiceSegments = narrationSegments.filter((segment) => segment.audio_src).length;
+        const voiceStatus = narrationSegments.length === 0
+          ? "原稿なし"
+          : `音声 ${readyVoiceSegments}/${narrationSegments.length}`;
+        const searchText = `${item.title} ${item.role === "cover" ? "表紙" : "通常"} ${slideCompositionLabel(item)} ${voiceStatus}`.toLocaleLowerCase("ja");
+        return `<a class="filmstrip-link" data-filmstrip-slide data-search-text="${escapeHtml(searchText)}" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}${item.role === "cover" ? '<small class="stage">表紙</small>' : ""}<small class="filmstrip-meta">${item.duration_seconds}秒 · ${item.reveal_steps + 1}段階 · ${escapeHtml(slideCompositionLabel(item))}<br>${voiceStatus}</small></strong></a>`;
+      }
     )
     .join("");
   const componentOutline =
@@ -1444,7 +1455,7 @@ export function slideWorkspacePage(options: {
          <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a></div></div>
          ${effectiveSummary}
          <div class="slide-workspace">
-           <nav class="filmstrip" aria-label="スライド一覧">${filmstrip}</nav>
+           <nav class="filmstrip" aria-label="スライド一覧"><label class="filmstrip-search">${deck.slides.length}枚から検索<input type="search" data-filmstrip-search placeholder="タイトル・構成・音声状態" autocomplete="off"></label>${filmstrip}<p class="filmstrip-empty" data-filmstrip-empty hidden>一致するスライドはありません。</p></nav>
            <section class="panel workspace-preview">
              <div class="workspace-frame" style="--workspace-aspect:${(deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame data-aspect-ratio="${deck.aspect_ratio ?? "16:9"}"></iframe></div>
              <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output aria-live="polite">STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>

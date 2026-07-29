@@ -643,6 +643,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (activeFilmstripSlide instanceof HTMLElement) {
     activeFilmstripSlide.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
+  const filmstripSearch = document.querySelector("[data-filmstrip-search]");
+  if (filmstripSearch instanceof HTMLInputElement) {
+    const filmstripSlides = [...document.querySelectorAll("[data-filmstrip-slide]")];
+    const filmstripEmpty = document.querySelector("[data-filmstrip-empty]");
+    const filterFilmstrip = () => {
+      const query = filmstripSearch.value.trim().toLocaleLowerCase("ja");
+      let visible = 0;
+      for (const link of filmstripSlides) {
+        if (!(link instanceof HTMLElement)) continue;
+        const matches = query === "" || (link.dataset.searchText || "").includes(query);
+        link.hidden = !matches;
+        if (matches) visible += 1;
+      }
+      if (filmstripEmpty instanceof HTMLElement) filmstripEmpty.hidden = visible > 0;
+    };
+    filmstripSearch.addEventListener("input", filterFilmstrip);
+    filmstripSearch.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      filmstripSearch.value = "";
+      filterFilmstrip();
+      filmstripSearch.blur();
+    });
+  }
 
   const inspectorStateKey = "ultimate-freestyle:workspace-inspector";
   let inspectorState = {};
