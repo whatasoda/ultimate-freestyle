@@ -156,7 +156,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=45";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=46";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -331,6 +331,15 @@ function shell(title: string, body: string): string {
       .slide-row strong { overflow-wrap: anywhere; }
       .slide-quality-warning { display: inline-flex; margin-top: .32rem; padding: .16rem .42rem; border: 1px solid #826b30; border-radius: 999px; background: #2a210d; color: #ffe09a; font-size: .68rem; font-weight: 760; }
       .slide-list { max-height: 32rem; overflow: auto; overscroll-behavior: contain; }
+      .quality-sweep { display: grid; gap: .8rem; }
+      .quality-sweep-head { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
+      .quality-sweep-head progress { min-width: min(100%, 14rem); flex: 1; accent-color: #74e6b2; }
+      .quality-sweep-results { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+      .quality-sweep-results li { padding: .65rem .75rem; border: 1px solid var(--line); border-radius: .65rem; background: #08111b; color: #c7d3e1; line-height: 1.55; }
+      .quality-sweep-results a { color: #b9ddff; font-weight: 760; }
+      .quality-sweep-preview { width: min(100%, 48rem); aspect-ratio: var(--quality-sweep-aspect, 16 / 9); overflow: hidden; border: 1px solid #40516a; border-radius: .65rem; background: #05080d; }
+      .quality-sweep-preview[hidden] { display: none; }
+      .quality-sweep-preview iframe { display: block; width: 100%; height: 100%; border: 0; }
       .asset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .8rem; }
       .asset { overflow: hidden; border: 1px solid var(--line); border-radius: .8rem; background: #0b1420; }
       .asset img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #08101a; }
@@ -1039,6 +1048,15 @@ export function projectDetailPage(options: {
          <div class="actions"><button type="submit">発表画面を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
        </form>
      </div></details>`;
+  const qualitySweepSlides = slides.map((slide, index) => ({
+    id: slide.id,
+    title: slide.title,
+    number: index + 1,
+    href: `/dashboard/projects/${options.project.project_id}/slides/${slide.id}`
+  }));
+  const qualitySweepPanel = qualitySweepSlides.length === 0
+    ? ""
+    : `<details class="panel panel-disclosure"><summary>全スライドの実表示を一括確認</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で全${qualitySweepSlides.length}枚を順番に描画し、見切れと70%未満の自動縮小を探します。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`${qualitySweepSlides[0]?.href}/frame?slide=1&step=0`)}">一括チェックを開始</button><progress data-quality-sweep-progress max="${qualitySweepSlides.length}" value="0" hidden>0 / ${qualitySweepSlides.length}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">未実行</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="全スライドの表示確認"></iframe></div></div></details>`;
 
   return new Response(
     shell(
@@ -1069,6 +1087,7 @@ export function projectDetailPage(options: {
                </form>
              </div></details>
              ${presentationSettingsPanel}
+             ${qualitySweepPanel}
              <section class="panel" id="research-images"><h2>研究画像</h2>
                <form class="upload" action="/api/projects/${escapeHtml(options.project.project_id)}/images" data-image-upload data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>画像ファイル<input type="file" accept="image/jpeg,image/png,image/webp" required></label>

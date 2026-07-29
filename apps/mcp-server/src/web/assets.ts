@@ -94,6 +94,111 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     };
     projectSearch.addEventListener("input", filterProjects);
   }
+  const qualitySweepButton = document.querySelector("[data-quality-sweep]");
+  const qualitySweepFrame = document.querySelector("[data-quality-sweep-frame]");
+  if (qualitySweepButton instanceof HTMLButtonElement && qualitySweepFrame instanceof HTMLIFrameElement) {
+    const qualitySweepProgress = document.querySelector("[data-quality-sweep-progress]");
+    const qualitySweepStatus = document.querySelector("[data-quality-sweep-status]");
+    const qualitySweepResults = document.querySelector("[data-quality-sweep-results]");
+    const qualitySweepPreview = document.querySelector("[data-quality-sweep-preview]");
+    let slides = [];
+    try { slides = JSON.parse(qualitySweepButton.dataset.slides || "[]"); } catch {}
+    let sweepIndex = 0;
+    let sweepRunning = false;
+    let sweepIssueCount = 0;
+    let sweepTimer;
+    const appendSweepResult = (slide, message, warning = true) => {
+      if (!(qualitySweepResults instanceof HTMLOListElement)) return;
+      const item = document.createElement("li");
+      if (!warning) item.classList.add("success");
+      if (slide?.href) {
+        const link = document.createElement("a");
+        link.href = slide.href;
+        link.textContent = slide.number + ". " + slide.title;
+        item.append(link, document.createTextNode(" — " + message));
+      } else item.textContent = message;
+      qualitySweepResults.append(item);
+    };
+    const finishQualitySweep = () => {
+      sweepRunning = false;
+      clearTimeout(sweepTimer);
+      setButtonBusy(qualitySweepButton, false);
+      qualitySweepButton.textContent = "もう一度チェック";
+      if (qualitySweepStatus instanceof HTMLElement) {
+        qualitySweepStatus.textContent = sweepIssueCount
+          ? sweepIssueCount + "枚に確認事項があります。"
+          : "全" + slides.length + "枚が発表枠内に収まっています。";
+        qualitySweepStatus.classList.toggle("warning", sweepIssueCount > 0);
+        qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0);
+      }
+      if (sweepIssueCount === 0) appendSweepResult(null, "見切れや過剰な自動縮小は見つかりませんでした。", false);
+    };
+    const waitForSweepResult = () => {
+      clearTimeout(sweepTimer);
+      sweepTimer = setTimeout(() => {
+        if (!sweepRunning) return;
+        const slide = slides[sweepIndex];
+        sweepIssueCount += 1;
+        appendSweepResult(slide, "描画結果を取得できませんでした。個別画面で確認してください。");
+        if (qualitySweepProgress instanceof HTMLProgressElement) qualitySweepProgress.value = sweepIndex + 1;
+        sweepIndex += 1;
+        if (sweepIndex >= slides.length) finishQualitySweep();
+        else {
+          qualitySweepFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: sweepIndex + 1, step: 0 }, location.origin);
+          waitForSweepResult();
+        }
+      }, 5000);
+    };
+    addEventListener("message", (event) => {
+      if (!sweepRunning || event.origin !== location.origin || event.source !== qualitySweepFrame.contentWindow) return;
+      const data = event.data;
+      const slide = slides[sweepIndex];
+      if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || data.slide_id !== slide?.id) return;
+      clearTimeout(sweepTimer);
+      const overflows = Array.isArray(data.overflows) ? data.overflows : [];
+      const compressed = Array.isArray(data.fits)
+        ? data.fits.filter((item) => Number.isFinite(item?.fit_scale) && item.fit_scale < 0.7)
+        : [];
+      if (overflows.length || compressed.length) {
+        sweepIssueCount += 1;
+        const details = [
+          overflows.length ? "見切れ" + overflows.length + "か所" : "",
+          compressed.length ? "70%未満の縮小" + compressed.length + "か所" : ""
+        ].filter(Boolean).join("、");
+        appendSweepResult(slide, details + "。個別画面で組版と文章量を調整してください。");
+      }
+      if (qualitySweepProgress instanceof HTMLProgressElement) qualitySweepProgress.value = sweepIndex + 1;
+      if (qualitySweepStatus instanceof HTMLElement) qualitySweepStatus.textContent = (sweepIndex + 1) + " / " + slides.length + "枚を確認";
+      sweepIndex += 1;
+      if (sweepIndex >= slides.length) finishQualitySweep();
+      else {
+        qualitySweepFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: sweepIndex + 1, step: 0 }, location.origin);
+        waitForSweepResult();
+      }
+    });
+    qualitySweepButton.addEventListener("click", () => {
+      if (sweepRunning || slides.length === 0) return;
+      sweepRunning = true;
+      sweepIndex = 0;
+      sweepIssueCount = 0;
+      setButtonBusy(qualitySweepButton, true);
+      qualitySweepButton.textContent = "確認中…";
+      if (qualitySweepResults instanceof HTMLOListElement) qualitySweepResults.replaceChildren();
+      if (qualitySweepProgress instanceof HTMLProgressElement) {
+        qualitySweepProgress.hidden = false;
+        qualitySweepProgress.value = 0;
+      }
+      if (qualitySweepStatus instanceof HTMLElement) {
+        qualitySweepStatus.textContent = "発表枠を準備しています…";
+        qualitySweepStatus.classList.remove("warning", "success");
+      }
+      if (qualitySweepPreview instanceof HTMLElement) qualitySweepPreview.hidden = false;
+      const url = new URL(qualitySweepButton.dataset.frameUrl || "", location.origin);
+      url.searchParams.set("quality_run", String(Date.now()));
+      qualitySweepFrame.src = url.toString();
+      waitForSweepResult();
+    });
+  }
   const editor = document.querySelector("[data-project-editor]");
   if (editor instanceof HTMLFormElement) {
     const feedback = editor.querySelector("[data-editor-feedback]");
