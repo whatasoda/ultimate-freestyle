@@ -365,6 +365,10 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("viewer&lt;script&gt;");
     expect(dashboardHtml).not.toContain("viewer<script>");
     expect(dashboardHtml).toContain("1 / 20 件");
+    expect(dashboardHtml).toContain("data-project-search");
+    expect(dashboardHtml).toContain("タイトル・制作段階");
+    expect(dashboardHtml).toContain("data-project-card");
+    expect(dashboardHtml).toContain("data-project-search-empty");
     expect(dashboardHtml).toContain(
       'href="/dashboard/projects/10000000-0000-4000-8000-000000000001"'
     );
@@ -388,7 +392,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=6"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=7"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -514,6 +518,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('event.key.toLowerCase() !== "s"');
     expect(dashboardScriptText).toContain("form.requestSubmit()");
     expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
+    expect(dashboardScriptText).toContain("data-project-search-empty");
+    expect(dashboardScriptText).toContain("filterProjects");
 
     const rejectedUpload = await requestProvider(
       provider,

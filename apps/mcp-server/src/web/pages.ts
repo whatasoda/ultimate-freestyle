@@ -91,7 +91,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=6";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=7";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -182,6 +182,10 @@ function shell(title: string, body: string): string {
       .section-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1.25rem; }
       .section-head h1 { font-size: clamp(2rem, 5vw, 3.6rem); }
       .count { color: var(--muted); }
+      .dashboard-tools { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1rem; }
+      .dashboard-search { display: grid; gap: .35rem; width: min(100%, 28rem); color: #c9d5e4; font-size: .86rem; }
+      .dashboard-search input { width: 100%; min-height: 2.8rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: .7rem; background: #0a111b; color: var(--ink); font: inherit; }
+      .search-empty { margin: 1rem 0; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; color: var(--muted); text-align: center; }
       .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 1rem; }
       .card, .empty { border: 1px solid var(--line); border-radius: 1rem; background: linear-gradient(150deg, #182437e8, #101925e8); box-shadow: 0 1rem 3rem #0004; }
       .card-link { display: block; border-radius: 1rem; color: inherit; text-decoration: none; }
@@ -508,7 +512,7 @@ export function dashboardPage(options: {
 }): Response {
   const cards = options.projects
     .map(
-      (project) => `<a class="card-link" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
+      (project) => `<a class="card-link" data-project-card data-search-text="${escapeHtml(`${project.title} ${STAGE_LABELS[project.stage]}`.toLocaleLowerCase("ja"))}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
         <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
         <p class="meta">最終更新 ${escapeHtml(formatDate(project.updated_at))}</p>
@@ -517,7 +521,7 @@ export function dashboardPage(options: {
     .join("");
   const content =
     cards.length > 0
-      ? `<div class="grid">${cards}</div>`
+      ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search placeholder="タイトル・制作段階" autocomplete="off"></label><span class="count" data-project-count>${options.projects.length}件を表示</span></div><div class="grid">${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。別の言葉で試してください。</p>`
       : `<section class="empty"><h2>まだ研究がありません</h2><p>Codexなどの対応AIクライアントへ、下の文を貼り付けると最初の研究を始められます。</p><div class="copy-box"><code>最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。</code><div class="actions"><button type="button" data-copy-text="最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></section>`;
 
   return new Response(

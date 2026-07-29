@@ -30,6 +30,25 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       publishFeedback.classList.remove("success");
     }
   };
+  const projectSearch = document.querySelector("[data-project-search]");
+  if (projectSearch instanceof HTMLInputElement) {
+    const projectCards = [...document.querySelectorAll("[data-project-card]")];
+    const resultCount = document.querySelector("[data-project-count]");
+    const emptyResult = document.querySelector("[data-project-search-empty]");
+    const filterProjects = () => {
+      const query = projectSearch.value.trim().toLocaleLowerCase("ja");
+      let visible = 0;
+      for (const card of projectCards) {
+        if (!(card instanceof HTMLElement)) continue;
+        const matches = query === "" || (card.dataset.searchText || "").includes(query);
+        card.hidden = !matches;
+        if (matches) visible += 1;
+      }
+      if (resultCount instanceof HTMLElement) resultCount.textContent = visible + "件を表示";
+      if (emptyResult instanceof HTMLElement) emptyResult.hidden = visible > 0;
+    };
+    projectSearch.addEventListener("input", filterProjects);
+  }
   const editor = document.querySelector("[data-project-editor]");
   if (editor instanceof HTMLFormElement) {
     const feedback = editor.querySelector("[data-editor-feedback]");
