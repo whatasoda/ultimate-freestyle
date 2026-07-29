@@ -17,7 +17,7 @@ const content = `# 氷が溶ける速さと素材の関係
 今回の結果だけで素材一般の性質を断定することはできません。素材の厚さ、表面積、開始温度、溶けた水の残り方も結果へ影響するため、次の実験では表面温度を測り、氷の質量もそろえる必要があります。`;
 const presets = ["statement", "standard", "article", "columns", "dense"] as const;
 
-const createPreviewHtml = (aspectRatio: "16:9" | "4:3") => {
+const createPreviewHtml = (aspectRatio: "16:9" | "4:3", loadingEnabled: boolean) => {
   const document = createEmptyProject("文章主体スライドの組版確認");
   document.deck = {
     short_title: "文章組版",
@@ -28,11 +28,11 @@ const createPreviewHtml = (aspectRatio: "16:9" | "4:3") => {
     layout: "minimal",
     aspect_ratio: aspectRatio,
     loading_screen: {
-      enabled: false,
-      style: "minimal",
-      message: "",
-      show_progress: false,
-      minimum_duration_ms: 0
+      enabled: loadingEnabled,
+      style: "orbit",
+      message: "画像・音声・フォントを準備しています",
+      show_progress: true,
+      minimum_duration_ms: 500
     },
     narration_defaults: null,
     voicevox: null,
@@ -62,18 +62,23 @@ const createPreviewHtml = (aspectRatio: "16:9" | "4:3") => {
   );
 };
 
-const previews = {
-  "16:9": createPreviewHtml("16:9"),
-  "4:3": createPreviewHtml("4:3")
+const previews: Record<string, string> = {
+  "16:9:false": createPreviewHtml("16:9", false),
+  "16:9:true": createPreviewHtml("16:9", true),
+  "4:3:false": createPreviewHtml("4:3", false),
+  "4:3:true": createPreviewHtml("4:3", true)
 };
 const port = Number(process.env.TYPOGRAPHY_PREVIEW_PORT ?? 4319);
 
 Bun.serve({
   port,
   fetch: (request) => {
-    const ratio = new URL(request.url).searchParams.get("ratio") === "4:3" ? "4:3" : "16:9";
-    return new Response(previews[ratio], { headers: { "content-type": "text/html; charset=utf-8" } });
+    const search = new URL(request.url).searchParams;
+    const ratio = search.get("ratio") === "4:3" ? "4:3" : "16:9";
+    const loading = search.get("loading") === "1";
+    return new Response(previews[`${ratio}:${loading}`], { headers: { "content-type": "text/html; charset=utf-8" } });
   }
 });
 
 console.log(`Typography preview: http://127.0.0.1:${port}/?slide=3&step=0`);
+console.log(`Loading preview: http://127.0.0.1:${port}/?loading=1&slide=0`);
