@@ -492,6 +492,7 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain('data-voice-profile-tuning');
     expect(voicePageHtml).toContain("/voice/profile/tuning");
     expect(voicePageHtml).toContain('name="tuning_speedScale"');
+    expect(voicePageHtml).toContain("実効調声を確認");
     expect(voicePageHtml).toContain("data-voice-profile-tuning-preview");
     expect(voicePageHtml).toContain("data-voice-profile-tuning-reset");
     expect(voicePageHtml).toContain("VOICEVOX標準値へ戻す");

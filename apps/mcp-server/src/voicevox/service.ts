@@ -6,7 +6,10 @@ import {
   type VoiceGenerationInput
 } from "@ultimate-freestyle/research-schema/voice-generation";
 import { findVoicevoxCatalogProfile } from "@ultimate-freestyle/research-schema/voicevox-catalog";
-import type { VoicevoxTuning } from "@ultimate-freestyle/research-schema/voice";
+import {
+  mergeVoicevoxTuning,
+  type VoicevoxTuning
+} from "@ultimate-freestyle/research-schema/voice";
 import { z } from "zod";
 
 import { getProject, mutateProject } from "../projects/repository";
@@ -106,6 +109,7 @@ export type VoiceProjectStatus = {
     text: string;
     speaker: string | null;
     profile_label: string | null;
+    effective_tuning: VoicevoxTuning;
     status: "ready" | "needs_generation" | "queued" | "failed";
     audio_url: string | null;
   }>;
@@ -401,6 +405,7 @@ export async function getVoiceProjectStatus(
       text: segment.text,
       speaker: segment.speaker,
       profile_label: segment.profileLabel,
+      effective_tuning: segment.input.tuning,
       status,
       audio_url: segment.artifact
         ? `/api/projects/${projectId}/voice/audio/${segment.fingerprint}`
@@ -421,6 +426,9 @@ export async function getVoiceProjectStatus(
             deck.narration_defaults?.speaker ??
             null,
           profile_label: null,
+          effective_tuning: mergeVoicevoxTuning(
+            segment.voice_tuning ?? undefined
+          ),
           status: "needs_generation" as const,
           audio_url: null
         }))

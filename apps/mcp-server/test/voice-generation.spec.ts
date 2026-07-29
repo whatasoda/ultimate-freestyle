@@ -85,6 +85,7 @@ describe("VOICEVOX generation", () => {
           slide_id: "intro",
           text: "声を決める前にも原稿を確認できます。",
           profile_label: null,
+          effective_tuning: { speedScale: 1 },
           status: "needs_generation"
         }
       ]
@@ -221,6 +222,11 @@ describe("VOICEVOX generation", () => {
     });
     const status = await getVoiceProjectStatus(env.DB, userId, projectId);
     expect(status?.summary).toMatchObject({ total: 1, ready: 1, needs_generation: 0 });
+    expect(status?.segments[0]?.effective_tuning).toMatchObject({
+      speedScale: 1.05,
+      pitchScale: 0,
+      intonationScale: 1
+    });
     const storedProject = await getProject(env.DB, userId, projectId);
     expect(storedProject).not.toBeNull();
     const artifacts = await resolveVoiceArtifacts(
