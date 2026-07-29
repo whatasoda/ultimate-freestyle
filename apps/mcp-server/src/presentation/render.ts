@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@30";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@31";
 
 function escapeHtml(value: string): string {
   return value
@@ -1284,6 +1284,43 @@ export function renderPresentationHtml(
           const body = document.createElement('div');
           target.append(body);
           renderDraftMarkdown(body, component.markdown);
+        }
+      } else if (component.kind === 'bar_chart') {
+        target.replaceChildren();
+        const maximum = Math.max(Number(component.max_value) || 1, 0.000001);
+        for (const item of Array.isArray(component.items) ? component.items : []) {
+          const row = document.createElement('uf-bar-row');
+          row.className = 'reveal-block';
+          row.dataset.itemId = String(item.id || '');
+          row.dataset.reveal = String(item.at || 0);
+          row.dataset.revealAt = String(item.at || 0);
+          row.dataset.animation = 'rise';
+          const visible = Number(item.at || 0) <= step;
+          row.classList.toggle('is-visible', visible);
+          row.setAttribute('aria-hidden', String(!visible));
+          row.style.setProperty('--bar-width', clamp(Number(item.value) / maximum * 100, 0, 100) + '%');
+          row.style.setProperty('--bar-color', item.color || 'var(--accent)');
+          addText(row, 'span', '', item.label);
+          row.append(document.createElement('i'));
+          addText(row, 'strong', '', item.value);
+          target.append(row);
+        }
+      } else if (component.kind === 'timeline') {
+        target.replaceChildren();
+        for (const item of Array.isArray(component.items) ? component.items : []) {
+          const row = document.createElement('uf-timeline-item');
+          row.className = 'reveal-block';
+          row.dataset.itemId = String(item.id || '');
+          row.dataset.reveal = String(item.at || 0);
+          row.dataset.revealAt = String(item.at || 0);
+          row.dataset.animation = 'rise';
+          const visible = Number(item.at || 0) <= step;
+          row.classList.toggle('is-visible', visible);
+          row.setAttribute('aria-hidden', String(!visible));
+          addText(row, 'small', '', item.kicker);
+          addText(row, 'strong', '', item.heading);
+          addText(row, 'p', '', item.detail);
+          target.append(row);
         }
       }
       scheduleFit();

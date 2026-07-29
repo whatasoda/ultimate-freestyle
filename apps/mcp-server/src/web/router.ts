@@ -1235,6 +1235,37 @@ async function handleSceneComponentUpdate(
               markdown: component.markdown
             });
             break;
+          case "bar_chart":
+            if (existing.kind === "bar_chart") {
+              if (existing.items.length !== component.items.length || existing.items.some((item, itemIndex) => item.id !== component.items[itemIndex]?.id)) {
+                const error = new Error("Chart items cannot be added or reordered here.");
+                Object.assign(error, { code: "INVALID_FIELDS" });
+                throw error;
+              }
+              existing.max_value = component.max_value;
+              existing.items = existing.items.map((item, itemIndex) => ({
+                ...item,
+                label: component.items[itemIndex]!.label,
+                value: component.items[itemIndex]!.value,
+                color: component.items[itemIndex]!.color
+              }));
+            }
+            break;
+          case "timeline":
+            if (existing.kind === "timeline") {
+              if (existing.items.length !== component.items.length || existing.items.some((item, itemIndex) => item.id !== component.items[itemIndex]?.id)) {
+                const error = new Error("Timeline items cannot be added or reordered here.");
+                Object.assign(error, { code: "INVALID_FIELDS" });
+                throw error;
+              }
+              existing.items = existing.items.map((item, itemIndex) => ({
+                ...item,
+                kicker: component.items[itemIndex]!.kicker,
+                heading: component.items[itemIndex]!.heading,
+                detail: component.items[itemIndex]!.detail
+              }));
+            }
+            break;
           default: {
             const error = new Error("This component has no editable text fields.");
             Object.assign(error, { code: "INVALID_FIELDS" });

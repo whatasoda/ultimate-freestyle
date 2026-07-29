@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@30");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@31");
     expect(html).toContain('id="pace" data-state="remaining"');
     expect(html).toContain("pace.textContent = over ? '目安超過 '");
     expect(html).toContain('title="実経過時間 / 現在の区切り目安 / 想定合計時間"');
@@ -678,6 +678,10 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-scene-component-editor");
     expect(workspaceHtml).toContain("このcomponentを保存");
     expect(workspaceHtml).toContain("/components/headline");
+    expect(workspaceHtml).toContain("/components/comparison");
+    expect(workspaceHtml).toContain("グラフの最大値");
+    expect(workspaceHtml).toContain("項目1 · ラベル");
+    expect(workspaceHtml).toContain('data-component-path="items.0.value"');
     expect(workspaceHtml).toContain('class="component-step">STEP 1');
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain(">全文追従</span>");

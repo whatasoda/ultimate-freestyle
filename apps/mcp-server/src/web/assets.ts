@@ -352,7 +352,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     try { component = JSON.parse(form.dataset.component || "{}"); } catch {}
     for (const field of form.querySelectorAll("[data-component-field]")) {
       if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) continue;
-      component[field.name] = field.dataset.nullable === "true" && field.value.trim() === ""
+      const path = (field.dataset.componentPath || field.name).split(".");
+      let owner = component;
+      for (const segment of path.slice(0, -1)) {
+        if (!owner || typeof owner !== "object") break;
+        owner = owner[Number.isInteger(Number(segment)) ? Number(segment) : segment];
+      }
+      if (!owner || typeof owner !== "object") continue;
+      const key = path.at(-1);
+      if (key === undefined) continue;
+      owner[key] = field.dataset.componentNumber === "true"
+        ? Number(field.value)
+        : field.dataset.nullable === "true" && field.value.trim() === ""
         ? null
         : field.value;
     }

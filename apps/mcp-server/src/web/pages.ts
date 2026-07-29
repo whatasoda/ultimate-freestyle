@@ -116,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=29";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=30";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -523,11 +523,12 @@ function componentSettings(node: SlideSceneNode): string {
 type SceneTextField = {
   name: string;
   label: string;
-  value: string | null;
+  value: string | number | null;
   maxLength: number;
   multiline?: boolean;
   required?: boolean;
   nullable?: boolean;
+  number?: { min: number; max: number; step?: number };
 };
 
 function sceneTextFields(node: SlideSceneNode): SceneTextField[] {
@@ -569,6 +570,27 @@ function sceneTextFields(node: SlideSceneNode): SceneTextField[] {
         { name: "heading", label: "見出し", value: node.heading, maxLength: 500, required: true },
         { name: "markdown", label: "本文", value: node.markdown, maxLength: 4_000, multiline: true, nullable: true }
       ];
+    case "bar_chart":
+      return [
+        {
+          name: "max_value",
+          label: "グラフの最大値",
+          value: node.max_value,
+          maxLength: 20,
+          required: true,
+          number: { min: 0.000001, max: 1_000_000_000, step: 0.01 }
+        },
+        ...node.items.flatMap((item, index) => [
+          { name: `items.${index}.label`, label: `項目${index + 1} · ラベル`, value: item.label, maxLength: 120, required: true },
+          { name: `items.${index}.value`, label: `項目${index + 1} · 値`, value: item.value, maxLength: 20, required: true, number: { min: 0, max: 1_000_000_000, step: 0.01 } }
+        ])
+      ];
+    case "timeline":
+      return node.items.flatMap((item, index) => [
+        { name: `items.${index}.kicker`, label: `項目${index + 1} · 時期`, value: item.kicker, maxLength: 120, nullable: true },
+        { name: `items.${index}.heading`, label: `項目${index + 1} · 見出し`, value: item.heading, maxLength: 500, required: true },
+        { name: `items.${index}.detail`, label: `項目${index + 1} · 詳細`, value: item.detail, maxLength: 2_000, multiline: true, nullable: true }
+      ]);
     default:
       return [];
   }
@@ -1177,10 +1199,10 @@ export function slideWorkspacePage(options: {
           const fields = sceneTextFields(node);
           if (fields.length === 0) return "";
           const controls = fields.map((field) => {
-            const attributes = `name="${field.name}" data-component-field data-nullable="${String(field.nullable === true)}" maxlength="${field.maxLength}"${field.required ? " required" : ""}`;
+            const attributes = `name="${field.name}" data-component-field data-component-path="${field.name}" data-component-number="${String(field.number !== undefined)}" data-nullable="${String(field.nullable === true)}" maxlength="${field.maxLength}"${field.required ? " required" : ""}`;
             return field.multiline
-              ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(field.value ?? "")}</textarea></label>`
-              : `<label>${field.label}<input ${attributes} value="${escapeHtml(field.value ?? "")}"></label>`;
+              ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(String(field.value ?? ""))}</textarea></label>`
+              : `<label>${field.label}<input ${attributes}${field.number === undefined ? "" : ` type="number" min="${field.number.min}" max="${field.number.max}" step="${field.number.step ?? 1}"`} value="${escapeHtml(String(field.value ?? ""))}"></label>`;
           }).join("");
           return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の文言</summary><form class="editor" data-scene-component-editor data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}<div class="actions"><button type="submit">このcomponentを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
