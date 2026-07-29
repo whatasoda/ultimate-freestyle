@@ -273,6 +273,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
+        if (form.matches("[data-segment-editor]") && result.voice_generation_required) {
+          const audioState = form.querySelector(".audio-state");
+          if (audioState instanceof HTMLElement) {
+            audioState.textContent = "再生成が必要";
+            audioState.classList.remove("ready");
+          }
+          feedback.textContent = "v" + result.version + " として保存しました。VOICEVOX音声を再生成してください。";
+          feedback.classList.remove("success");
+          feedback.classList.add("warning");
+        }
         markDraftChanged();
         if (nextUrl) {
           location.href = nextUrl;

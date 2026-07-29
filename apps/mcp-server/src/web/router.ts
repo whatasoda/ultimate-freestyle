@@ -1439,6 +1439,7 @@ async function handleNarrationSegmentUpdate(
       422
     );
   }
+  let voiceGenerationRequired = false;
   try {
     const project = await mutateProject(env.DB, {
       ownerUserId: session.userId,
@@ -1477,6 +1478,7 @@ async function handleNarrationSegmentUpdate(
           (segment.voice_profile_id ?? null) !== parsed.data.voice_profile_id ||
           JSON.stringify(segment.voice_tuning ?? null) !==
             JSON.stringify(parsed.data.voice_tuning);
+        voiceGenerationRequired = invalidatesAudio || segment.audio_src === null;
         Object.assign(segment, {
           text: parsed.data.text,
           speaker: parsed.data.speaker,
@@ -1498,6 +1500,7 @@ async function handleNarrationSegmentUpdate(
       project_id: projectId,
       slide_id: slideId,
       at,
+      voice_generation_required: voiceGenerationRequired,
       version: project.version,
       updated_at: project.updated_at,
       error: null,

@@ -395,7 +395,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=9"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=10"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -535,6 +535,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("別の画面またはAIから先に更新されました");
     expect(dashboardScriptText).toContain("サーバーと通信できませんでした");
     expect(dashboardScriptText).toContain("publicLink.hidden = false");
+    expect(dashboardScriptText).toContain("result.voice_generation_required");
+    expect(dashboardScriptText).toContain("VOICEVOX音声を再生成してください");
 
     const rejectedUpload = await requestProvider(
       provider,
@@ -1095,6 +1097,7 @@ describe("Web dashboard", () => {
     expect(await narrationSegmentUpdate.json()).toMatchObject({
       ok: true,
       at: 0,
+      voice_generation_required: true,
       version: 7
     });
 
