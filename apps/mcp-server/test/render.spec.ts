@@ -605,10 +605,42 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('class="component-step">STEP 1');
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain(">全文追従</span>");
+    expect(workspaceHtml).toContain("スライド本文（Markdown対応）");
+    expect(workspaceHtml).toContain("補足欄（読み上げない情報）");
+    expect(workspaceHtml).toContain("標準（短文・箇条書き）");
     expect(workspaceHtml.indexOf(">root<")).toBeLessThan(
       workspaceHtml.indexOf(">headline<")
     );
     expect(workspaceHtml).not.toContain("parent: root");
+
+    const projectWithNextSlide = projectRecordSchema.parse({
+      ...project,
+      document: {
+        ...project.document,
+        deck: {
+          ...project.document.deck!,
+          slides: [
+            ...project.document.deck!.slides,
+            {
+              ...project.document.deck!.slides[0],
+              id: "conclusion",
+              title: "まとめ"
+            }
+          ]
+        }
+      }
+    });
+    const sequentialWorkspaceHtml = await slideWorkspacePage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project: projectWithNextSlide,
+      slideId: "rich-result"
+    }).text();
+    expect(sequentialWorkspaceHtml).toContain("保存して次へ");
+    expect(sequentialWorkspaceHtml).toContain(
+      'data-save-next="/dashboard/projects/63ab1ec4-20a0-4cf6-a1a0-f74ced56778a/slides/conclusion"'
+    );
+    expect(sequentialWorkspaceHtml).toContain("次のスライド →");
   });
 
   it("maps every safe visual and font preset and renders bounded narration variants", () => {

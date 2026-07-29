@@ -70,11 +70,11 @@ const DENSITY_LABELS = {
 } as const;
 
 const SLIDE_TYPOGRAPHY_LABELS = {
-  statement: "一言を強調",
-  standard: "標準",
-  article: "読み物",
-  columns: "2段組み",
-  dense: "高密度"
+  statement: "一言を大きく",
+  standard: "標準（短文・箇条書き）",
+  article: "読み物（長文）",
+  columns: "2段組み（長文）",
+  dense: "高密度（最終調整）"
 } as const;
 
 const MOTION_LABELS = {
@@ -271,7 +271,7 @@ function shell(title: string, body: string): string {
       main.workspace-main { width: min(96vw, 100rem); padding-top: 1rem; }
       .workspace-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
       .workspace-head h1 { font-size: clamp(1.65rem, 3vw, 2.8rem); }
-      .workspace-version { display: flex; align-items: center; gap: .75rem; color: var(--muted); }
+      .workspace-version { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .55rem; color: var(--muted); }
       .slide-workspace { display: grid; grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr) minmax(17rem, 22rem); gap: 1rem; align-items: start; }
       .filmstrip, .inspector { display: grid; gap: .65rem; align-content: start; max-height: calc(100vh - 10rem); overflow: auto; }
       .filmstrip-link { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .55rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; color: #bdc9d8; text-decoration: none; }
@@ -892,6 +892,18 @@ export function slideWorkspacePage(options: {
   if (deck === null || slideIndex === -1) return projectNotFoundPage();
   const slide = deck.slides[slideIndex];
   if (slide === undefined) return projectNotFoundPage();
+  const previousSlide = deck.slides[slideIndex - 1];
+  const nextSlide = deck.slides[slideIndex + 1];
+  const slideDashboardPath = `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/`;
+  const previousSlideLink = previousSlide === undefined
+    ? ""
+    : `<a class="button ghost" href="${slideDashboardPath}${escapeHtml(previousSlide.id)}" aria-label="前のスライド: ${escapeHtml(previousSlide.title)}">← 前のスライド</a>`;
+  const nextSlideLink = nextSlide === undefined
+    ? ""
+    : `<a class="button ghost" href="${slideDashboardPath}${escapeHtml(nextSlide.id)}" aria-label="次のスライド: ${escapeHtml(nextSlide.title)}">次のスライド →</a>`;
+  const nextSlidePath = nextSlide === undefined
+    ? null
+    : `${slideDashboardPath}${escapeHtml(nextSlide.id)}`;
   const projectPath = `/api/projects/${escapeHtml(options.project.project_id)}`;
   const slidePath = `${projectPath}/slides/${escapeHtml(slide.id)}`;
   const filmstrip = deck.slides
@@ -1074,7 +1086,7 @@ export function slideWorkspacePage(options: {
       `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main class="workspace-main">
          <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
-         <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span data-workspace-version>v${options.project.version}</span><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">大きく開く</a></div></div>
+         <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">大きく開く</a></div></div>
          ${effectiveSummary}
          <div class="slide-workspace">
            <nav class="filmstrip" aria-label="スライド一覧">${filmstrip}</nav>
@@ -1088,9 +1100,9 @@ export function slideWorkspacePage(options: {
                <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
                  <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"></label>
-                 <label>定型本文／fallback<textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea></label>
-                 <label>補足欄<textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea></label>
-                 <div class="actions"><button type="submit">内容を保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
+                 <label>スライド本文（Markdown対応）<textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">見出しは #、箇条書きは - で始めます。自由配置・リッチ構成では代替表示にも使います。</small></label>
+                 <label>補足欄（読み上げない情報）<textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea><small class="inherit-note">作者コメント、出典、追加データなど、音声に含めない情報を置けます。</small></label>
+                 <div class="actions"><button type="submit">内容を保存</button>${nextSlidePath === null ? "" : `<button class="ghost" type="submit" data-save-next="${nextSlidePath}">保存して次へ</button>`}<span class="version" data-version-label>v${options.project.version}</span></div>
                  <p class="feedback" data-form-feedback aria-live="polite"></p>
                </form>
              </div></details>

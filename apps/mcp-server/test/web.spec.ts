@@ -1190,7 +1190,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     const typographyWorkspaceHtml = await typographyWorkspace.text();
-    expect(typographyWorkspaceHtml).toContain("2段組み · 3段");
+    expect(typographyWorkspaceHtml).toContain("2段組み（長文） · 3段");
     expect(typographyWorkspaceHtml).toContain('data-typography-editor');
     expect(typographyWorkspaceHtml).toContain('name="body_scale"');
 

@@ -201,9 +201,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const feedback = form.querySelector("[data-form-feedback]");
-      const submit = form.querySelector('button[type="submit"]');
+      const submitButtons = [...form.querySelectorAll('button[type="submit"]')];
+      const nextUrl = event.submitter instanceof HTMLButtonElement
+        ? event.submitter.dataset.saveNext
+        : undefined;
       if (!(feedback instanceof HTMLElement)) return;
-      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      for (const button of submitButtons) {
+        if (button instanceof HTMLButtonElement) button.disabled = true;
+      }
       feedback.textContent = "変更を保存しています…";
       feedback.classList.remove("success", "warning");
       try {
@@ -226,14 +231,25 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
         markDraftChanged();
+        if (nextUrl) {
+          location.href = nextUrl;
+          return;
+        }
         refreshSlideFrame(result.version);
       } catch (error) {
         feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
         feedback.classList.add("warning");
       } finally {
-        if (submit instanceof HTMLButtonElement) submit.disabled = false;
+        for (const button of submitButtons) {
+          if (button instanceof HTMLButtonElement) button.disabled = false;
+        }
       }
     });
+  }
+
+  const activeFilmstripSlide = document.querySelector('.filmstrip-link[data-active="true"]');
+  if (activeFilmstripSlide instanceof HTMLElement) {
+    activeFilmstripSlide.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   const stepOutput = document.querySelector("[data-step-output]");
