@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@19";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@20";
 
 function escapeHtml(value: string): string {
   return value
@@ -871,7 +871,7 @@ export function renderPresentationHtml(
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
           <h1>${escapeHtml(project.document.title)}</h1>
           <p class="prelude-message">${escapeHtml(loadingScreen.message)}</p>
-          <div class="prelude-meter"${loadingScreen.show_progress ? "" : " hidden"} aria-hidden="true"><i data-prelude-progress></i></div>
+          <div class="prelude-meter"${loadingScreen.show_progress ? "" : " hidden"} role="progressbar" aria-label="素材の準備" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-prelude-progress></i></div>
           <p class="prelude-status" data-prelude-status aria-live="polite">コンテンツを確認しています…</p>
           <button class="prelude-start" type="button" data-prelude-start disabled>発表を始める</button>
           <p class="prelude-help">スライドをクリック、または → / Space で進みます</p>
@@ -888,8 +888,8 @@ export function renderPresentationHtml(
       </section>
     </div></div>
     <footer>
-      <span id="counter" aria-live="polite">1 / ${deck.slides.length}</span><div class="progress"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
-      <div class="voice-progress" title="読み上げ進捗"><i id="voice-progress"></i></div>
+      <span id="counter" aria-live="polite">1 / ${deck.slides.length}</span><div class="progress" role="progressbar" aria-label="発表の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
+      <div class="voice-progress" title="読み上げ進捗" role="progressbar" aria-label="読み上げ進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="voice-progress"></i></div>
       <div class="controls">
         <button id="prev" aria-label="前へ">←</button><button id="next" aria-label="次へ">→</button>
         <button id="speech" aria-pressed="true" title="ページ移動時の自動読み上げ">音声 ON</button>
@@ -916,6 +916,7 @@ export function renderPresentationHtml(
     const prelude = document.querySelector('[data-prelude]');
     const preludeStart = document.querySelector('[data-prelude-start]');
     const preludeProgress = document.querySelector('[data-prelude-progress]');
+    const preludeMeter = preludeProgress?.parentElement;
     const preludeStatus = document.querySelector('[data-prelude-status]');
     const stage = document.querySelector('.stage');
     const voiceUnlock = document.querySelector('[data-voice-unlock]');
@@ -946,8 +947,10 @@ export function renderPresentationHtml(
     const narration = () => DECK.slides[slide].narration?.segments.find((item) => item.at === step) ?? null;
     const syncUrl = () => history.pushState(null, '', '?slide=' + (slide + 1) + '&step=' + step);
     const setVoiceProgress = (percent) => {
-      const value = clamp(percent, 0, 100) + '%';
+      const numericValue = clamp(percent, 0, 100);
+      const value = numericValue + '%';
       voiceProgress.style.width = value;
+      voiceProgress.parentElement?.setAttribute('aria-valuenow', String(Math.round(numericValue)));
       const localProgress = slides[slide]?.querySelector('.narration-inline-progress');
       if (localProgress instanceof HTMLElement) localProgress.style.width = value;
     };
@@ -1210,6 +1213,7 @@ export function renderPresentationHtml(
       slides.forEach((item) => { item.hidden = true; item.dataset.state = 'inactive'; });
       counter.textContent = '0 / ' + slides.length;
       progress.style.width = '0%';
+      progress.parentElement?.setAttribute('aria-valuenow', '0');
       elapsed.textContent = '00:00';
       expected.textContent = '00:00';
       if (push) history.pushState(null, '', '?slide=0');
@@ -1236,7 +1240,9 @@ export function renderPresentationHtml(
         if (textRegion) textRegion.textContent = segment?.text ?? '';
       }
       counter.textContent = (slide + 1) + ' / ' + slides.length + ' · STEP ' + step;
-      progress.style.width = (currentUnit() / units * 100) + '%';
+      const progressPercent = currentUnit() / units * 100;
+      progress.style.width = progressPercent + '%';
+      progress.parentElement?.setAttribute('aria-valuenow', String(Math.round(progressPercent)));
       expected.textContent = format(expectedElapsed());
       scheduleFit(); speak();
     };
@@ -1252,6 +1258,7 @@ export function renderPresentationHtml(
     const markPreloadProgress = (completed, total, failed = 0) => {
       const percent = total === 0 ? 100 : completed / total * 100;
       if (preludeProgress) preludeProgress.style.width = percent + '%';
+      if (preludeMeter) preludeMeter.setAttribute('aria-valuenow', String(Math.round(percent)));
       if (preludeStatus) preludeStatus.textContent = completed < total
         ? completed + ' / ' + total + ' 件を準備中'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
