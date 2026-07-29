@@ -169,6 +169,8 @@ describe("Twitch OAuth proxy", () => {
     expect(csrfToken).toBeTruthy();
     expect(consentHtml).toContain("id=\"authorize-feedback\"");
     expect(consentHtml).toContain("Twitchへの接続を準備しています");
+    expect(consentHtml).toContain("研究を確認する");
+    expect(consentHtml).toContain("自分の研究、スライド、画像、音声の状態を読み取ります");
     expect(consentHtml).toContain("requestAnimationFrame");
     expect(consent.headers.get("content-security-policy")).toContain(
       "script-src 'nonce-"

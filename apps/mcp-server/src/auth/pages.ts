@@ -68,6 +68,10 @@ function layout(title: string, body: string, head = ""): string {
       button[aria-busy="true"] .spinner { display: inline-block; }
       .success-mark { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; margin-bottom: 1.25rem; border-radius: 50%; background: #34d39922; border: 1px solid #34d39977; color: #6ee7b7; font-size: 2rem; font-weight: 900; }
       .english { padding-top: 1rem; border-top: 1px solid #344258; color: #aebdd0; }
+      .scope-list { display: grid; gap: .65rem; padding: 0; list-style: none; }
+      .scope-list li { display: grid; gap: .2rem; padding: .75rem; border: 1px solid #344258; border-radius: .65rem; background: #101824; }
+      .scope-list strong { color: #f3f6fb; }
+      .scope-list small { color: #9babc0; }
       [hidden] { display: none !important; }
       @keyframes spin { to { transform: rotate(360deg); } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
@@ -85,8 +89,25 @@ export function consentPage(options: {
 }): Response {
   const scriptNonce = crypto.randomUUID();
   const clientName = escapeHtml(options.client.clientName ?? "MCPクライアント");
+  const scopeDescriptions: Record<string, { label: string; detail: string }> = {
+    "research:read": {
+      label: "研究を確認する",
+      detail: "自分の研究、スライド、画像、音声の状態を読み取ります。"
+    },
+    "research:write": {
+      label: "研究を編集する",
+      detail: "研究内容、スライド、見た目、読み上げ設定を変更します。"
+    },
+    "research:publish": {
+      label: "発表を公開する",
+      detail: "固定プレビューを作成し、確認した版を公開します。"
+    }
+  };
   const scopes = options.scopes
-    .map((scope) => `<li><code>${escapeHtml(scope)}</code></li>`)
+    .map((scope) => {
+      const description = scopeDescriptions[scope];
+      return `<li><strong>${escapeHtml(description?.label ?? "追加の権限")}</strong><small>${escapeHtml(description?.detail ?? "接続元が要求している権限です。")}</small><code>${escapeHtml(scope)}</code></li>`;
+    })
     .join("");
   return new Response(
     layout(
@@ -94,7 +115,7 @@ export function consentPage(options: {
       `<p class="eyebrow">Secure connection</p>
        <h1>最自由研究への接続</h1>
        <p><strong>${clientName}</strong> が次の権限を要求しています。</p>
-       <ul>${scopes}</ul>
+       <ul class="scope-list">${scopes}</ul>
        <p>Twitchで本人確認し、対象チャンネルのフォロー期間またはサブスク状態を確認します。TwitchトークンがMCPクライアントへ渡ることはありません。</p>
        <form id="authorize-form" method="post">
          <input type="hidden" name="csrf_token" value="${escapeHtml(options.csrfToken)}">
