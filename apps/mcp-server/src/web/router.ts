@@ -91,7 +91,9 @@ const projectFieldsRequestSchema = z.object({
   summary: z.string().max(2_000),
   question: z.string().max(2_000),
   hypothesis: z.string().max(4_000),
-  method: z.string().max(20_000)
+  method: z.string().max(20_000),
+  findings: z.array(z.string().min(1).max(4_000)).max(100).optional(),
+  limitations: z.array(z.string().min(1).max(4_000)).max(100).optional()
 });
 
 const previewRequestSchema = z.object({

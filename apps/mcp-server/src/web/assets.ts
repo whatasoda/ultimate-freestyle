@@ -37,6 +37,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       feedback.textContent = "変更を保存しています…";
       const data = new FormData(editor);
       const nullableText = (name) => String(data.get(name) || "");
+      const textList = (name) => String(data.get(name) || "")
+        .split(/\n+/)
+        .map((value) => value.trim())
+        .filter(Boolean);
       try {
         const response = await fetch(editor.action, {
           method: "PATCH",
@@ -51,7 +55,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             summary: nullableText("summary"),
             question: nullableText("question"),
             hypothesis: nullableText("hypothesis"),
-            method: nullableText("method")
+            method: nullableText("method"),
+            findings: textList("findings"),
+            limitations: textList("limitations")
           })
         });
         const result = await response.json();
@@ -62,6 +68,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.textContent = "v" + result.version + " として保存しました。";
         feedback.classList.add("success");
         markDraftChanged();
+        setTimeout(() => location.reload(), 500);
       } catch (error) {
         feedback.textContent = error instanceof Error ? error.message : "保存できませんでした。";
         feedback.classList.remove("success");

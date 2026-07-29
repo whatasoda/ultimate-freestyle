@@ -548,7 +548,9 @@ describe("Web dashboard", () => {
             summary: "Webから保存した概要",
             question: "微調整後の問い？",
             hypothesis: "",
-            method: ""
+            method: "",
+            findings: ["Webで整理した結果"],
+            limitations: ["追加の測定が必要"]
           })
         }
       ),

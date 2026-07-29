@@ -218,6 +218,10 @@ function shell(title: string, body: string): string {
       .detail-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr); gap: 1rem; margin-top: 1.5rem; }
       .detail-column { display: grid; align-content: start; gap: 1rem; }
       .panel { padding: 1.25rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--panel); }
+      .panel-disclosure { padding: 0; }
+      .panel-disclosure > summary { padding: 1.15rem 1.25rem; cursor: pointer; font-weight: 820; }
+      .panel-disclosure[open] > summary { border-bottom: 1px solid var(--line); }
+      .disclosure-body { padding: 1.25rem; }
       .panel h2 { margin: 0 0 .8rem; font-size: 1.05rem; }
       .panel h3 { margin: 1rem 0 .35rem; font-size: .95rem; }
       .panel p, .panel li { color: #bdc9d8; line-height: 1.75; }
@@ -237,6 +241,7 @@ function shell(title: string, body: string): string {
       .slide-row:first-of-type { border-top: 0; }
       .slide-row span { color: var(--muted); font-size: .85rem; }
       .slide-row strong { overflow-wrap: anywhere; }
+      .slide-list { max-height: 32rem; overflow: auto; overscroll-behavior: contain; }
       .asset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .8rem; }
       .asset { overflow: hidden; border: 1px solid var(--line); border-radius: .8rem; background: #0b1420; }
       .asset img { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #08101a; }
@@ -406,19 +411,6 @@ function accountHeader(twitchLogin: string, csrfToken: string): string {
       <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="${escapeHtml(csrfToken)}"><button class="ghost" type="submit">ログアウト</button></form>
     </div>
   </header>`;
-}
-
-function textPanel(title: string, value: string | null): string {
-  return `<section class="panel"><h2>${escapeHtml(title)}</h2><p class="prose">${escapeHtml(value?.trim() || "未記入")}</p></section>`;
-}
-
-function listPanel(title: string, values: string[]): string {
-  const limited = values.slice(0, 20);
-  const items = limited.length
-    ? `<ul class="plain-list">${limited.map((value) => `<li>${escapeHtml(value)}</li>`).join("")}</ul>`
-    : `<p class="prose">未記入</p>`;
-  const remaining = values.length - limited.length;
-  return `<section class="panel"><h2>${escapeHtml(title)}</h2>${items}${remaining > 0 ? `<p class="meta">ほか ${remaining} 件</p>` : ""}</section>`;
 }
 
 function slideCompositionLabel(
@@ -660,7 +652,7 @@ export function projectDetailPage(options: {
   </section>`;
   const presentationSettingsPanel = deck === null
     ? ""
-    : `<section class="panel"><h2>発表画面と0ページ目</h2>
+    : `<details class="panel panel-disclosure"><summary>発表画面と0ページ目</summary><div class="disclosure-body">
        <form class="editor" data-deck-editor data-versioned-form action="/api/projects/${escapeHtml(options.project.project_id)}/presentation/settings" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
          <fieldset><legend>スライド比率</legend><div class="ratio-options">
            <label class="ratio-option"><input type="radio" name="aspect_ratio" value="16:9"${(deck.aspect_ratio ?? "16:9") === "16:9" ? " checked" : ""}><span class="ratio-preview wide"></span><span><strong>ワイド 16:9</strong><small>PC・配信向け</small></span></label>
@@ -675,7 +667,7 @@ export function projectDetailPage(options: {
          </fieldset>
          <div class="actions"><button type="submit">発表画面を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
        </form>
-     </section>`;
+     </div></details>`;
 
   return new Response(
     shell(
@@ -689,7 +681,7 @@ export function projectDetailPage(options: {
          ${workflowPanel}
          <div class="detail-grid">
            <div class="detail-column">
-             <section class="panel" id="basic-information"><h2>基本情報を編集</h2>
+             <details class="panel panel-disclosure" id="basic-information"${researchReady ? "" : " open"}><summary>研究内容を編集</summary><div class="disclosure-body">
                <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <div class="editor-grid">
                    <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label>
@@ -698,17 +690,14 @@ export function projectDetailPage(options: {
                    <label class="wide">研究の問い<textarea name="question" maxlength="2000">${escapeHtml(document.question ?? "")}</textarea></label>
                    <label class="wide">仮説<textarea name="hypothesis" maxlength="4000">${escapeHtml(document.hypothesis ?? "")}</textarea></label>
                    <label class="wide">方法<textarea name="method" maxlength="20000">${escapeHtml(document.method ?? "")}</textarea></label>
+                   <label class="wide">わかったこと<textarea name="findings" maxlength="20000" placeholder="1行に1件">${escapeHtml(document.findings.join("\n"))}</textarea><small class="inherit-note">1行を1件として保存します。</small></label>
+                   <label class="wide">限界・今後の課題<textarea name="limitations" maxlength="20000" placeholder="1行に1件">${escapeHtml(document.limitations.join("\n"))}</textarea><small class="inherit-note">1行を1件として保存します。</small></label>
                  </div>
                  <div class="actions"><button type="submit">変更を保存</button><span class="version" data-editor-version>v${options.project.version}</span></div>
                  <p class="feedback" data-editor-feedback aria-live="polite"></p>
                </form>
-             </section>
+             </div></details>
              ${presentationSettingsPanel}
-             ${textPanel("研究の問い", document.question)}
-             ${textPanel("仮説", document.hypothesis)}
-             ${textPanel("方法", document.method)}
-             ${listPanel("わかったこと", document.findings)}
-             ${listPanel("限界・今後の課題", document.limitations)}
              <section class="panel"><h2>研究画像</h2>
                <form class="upload" action="/api/projects/${escapeHtml(options.project.project_id)}/images" data-image-upload data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>画像ファイル<input type="file" accept="image/jpeg,image/png,image/webp" required></label>
@@ -728,7 +717,7 @@ export function projectDetailPage(options: {
                <dt>ログ</dt><dd>${document.logs.length}件</dd>
                <dt>スライド</dt><dd>${slides.length}枚</dd>
              </dl></section>
-             <section class="panel"><h2>発表構成</h2>${slideRows}</section>
+             <section class="panel"><h2>発表構成</h2><div class="slide-list">${slideRows}</div></section>
              ${voicePanel}
              ${publicationPanel}
              <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>
