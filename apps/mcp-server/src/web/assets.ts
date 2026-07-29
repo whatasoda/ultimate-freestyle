@@ -931,6 +931,36 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  const syncPicker = (form, selector, datasetKey, selected) => {
+    for (const item of form.querySelectorAll(selector)) {
+      if (!(item instanceof HTMLButtonElement)) continue;
+      item.setAttribute("aria-pressed", String((item.dataset[datasetKey] || "") === selected));
+    }
+  };
+  for (const form of document.querySelectorAll("form")) {
+    if (!(form instanceof HTMLFormElement)) continue;
+    form.addEventListener("change", (event) => {
+      const field = event.target;
+      if (!(field instanceof HTMLSelectElement)) return;
+      if (field.name === "visual_preset") {
+        syncPicker(form, "[data-visual-pick]", "visualPick", field.value);
+      } else if (field.name === "cover_layout") {
+        syncPicker(form, "[data-cover-pick]", "coverPick", field.value);
+      } else if (field.name === "display") {
+        syncPicker(form, "[data-narration-display-pick]", "narrationDisplayPick", field.value);
+      } else if (field.name === "region_layout") {
+        syncPicker(form, "[data-region-pick]", "regionPick", field.value);
+      } else if (field.name === "body_font" || field.name === "heading_font") {
+        const body = form.elements.namedItem("body_font");
+        const heading = form.elements.namedItem("heading_font");
+        const selected = body instanceof HTMLSelectElement && heading instanceof HTMLSelectElement && body.value === heading.value
+          ? body.value
+          : "";
+        syncPicker(form, "[data-font-pick]", "fontPick", selected);
+      }
+    });
+  }
+
   const activeFilmstripSlide = document.querySelector('.filmstrip-link[data-active="true"]');
   if (activeFilmstripSlide instanceof HTMLElement) {
     activeFilmstripSlide.scrollIntoView({ block: "nearest", inline: "nearest" });
