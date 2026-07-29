@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@26");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@27");
     expect(html).toContain('title="実経過時間 / 現在位置の目安 / 想定合計時間"');
     expect(html).toContain('class="time-total"> / 全01:00</span>');
     expect(html).toContain("const expectedElapsed = () =>");
@@ -217,6 +217,12 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("ultimate-freestyle:preview-narration-segment");
     expect(html).toContain("const previewNarrationSettings =");
     expect(html).toContain("発表はここまでです");
+    expect(html).toContain('role="dialog" aria-modal="true"');
+    expect(html).toContain("const hideCompletion = () =>");
+    expect(html).toContain("'ArrowDown', 'PageDown'");
+    expect(html).toContain("'ArrowUp', 'PageUp'");
+    expect(html).toContain("event.key === 'Home'");
+    expect(html).toContain("event.key === 'End'");
     expect(html).toContain("data-restart");
     expect(html).toContain("else { showCompletion(); return false; }");
     expect(html).toContain('id="volume-value"');

@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@26";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@27";
 
 function escapeHtml(value: string): string {
   return value
@@ -890,9 +890,9 @@ export function renderPresentationHtml(
       </section>
       ${slideHtml}
       <button class="voice-unlock" type="button" data-voice-unlock hidden>音声を開始</button>
-      <section class="completion" data-completion aria-live="polite" hidden>
+      <section class="completion" data-completion role="dialog" aria-modal="true" aria-labelledby="completion-title" aria-live="polite" hidden>
         <div class="completion-card">
-          <h2>発表はここまでです</h2>
+          <h2 id="completion-title">発表はここまでです</h2>
           <p>${deck.slides.length}枚・想定${formattedTotalDuration}</p>
           <div class="completion-actions"><button class="primary" type="button" data-restart>最初から見る</button><button type="button" data-dismiss-completion>最後のスライドに戻る</button></div>
         </div>
@@ -1003,6 +1003,13 @@ export function renderPresentationHtml(
       if (nextButton instanceof HTMLButtonElement) nextButton.disabled = true;
       completion.hidden = false;
       if (restartButton instanceof HTMLButtonElement) restartButton.focus();
+    };
+    const hideCompletion = () => {
+      if (!(completion instanceof HTMLElement) || completion.hidden) return false;
+      completion.hidden = true;
+      updateControls();
+      stage?.focus();
+      return true;
     };
     const advance = () => {
       if (!started) return false;
@@ -1505,10 +1512,13 @@ export function renderPresentationHtml(
     showVolume();
     addEventListener('keydown', (event) => {
       if (editorFrame) return;
+      if (event.key === 'Escape' && hideCompletion()) { event.preventDefault(); return; }
       const target = event.target;
       if (target instanceof Element && target.closest('button, a, input, select, textarea')) return;
-      if (['ArrowRight', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); }
-      else if (event.key === 'ArrowLeft') { event.preventDefault(); document.querySelector('#prev').click(); }
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); }
+      else if (['ArrowLeft', 'ArrowUp', 'PageUp'].includes(event.key)) { event.preventDefault(); document.querySelector('#prev').click(); }
+      else if (event.key === 'Home') { event.preventDefault(); slide = 0; step = 0; syncUrl(); render(); }
+      else if (event.key === 'End') { event.preventDefault(); slide = slides.length - 1; step = DECK.slides[slide].revealSteps; syncUrl(); render(); }
     });
     stage?.addEventListener('click', (event) => {
       if (!started || editorFrame || getSelection()?.toString()) return;
@@ -1525,9 +1535,7 @@ export function renderPresentationHtml(
       render();
     });
     dismissCompletionButton?.addEventListener('click', () => {
-      if (completion instanceof HTMLElement) completion.hidden = true;
-      updateControls();
-      previousButton?.focus();
+      hideCompletion();
     });
     addEventListener('message', (event) => {
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;

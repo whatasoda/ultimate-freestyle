@@ -347,3 +347,8 @@
 
 - scene componentの未保存文言も中央iframeへ即時反映し、flow・sceneどちらでも保存前に実表示を確認できるようにした。
 - HTML文字列は受け取らず、component種別ごとの安全なDOM再構築と既存Markdown rendererだけでpreviewを更新する。
+
+## 改善ループ52
+
+- 発表終了画面をdialogとして通知し、表示時は「最初から見る」、閉じた後はスライド枠へfocusを移すようにした。
+- Escapeで終了画面を閉じ、PageUp / PageDown、上下矢印、Home / Endでも発表を操作できるようにした。
