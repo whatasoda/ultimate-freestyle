@@ -409,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=61"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=62"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -536,6 +536,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("プレビューを読み込み中…");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-speech-preview");
+    expect(workspaceHtml).toContain("data-segment-duration");
+    expect(workspaceHtml).toContain("STEP目安");
     expect(workspaceHtml).toContain("data-narration-segment-delete");
     expect(workspaceHtml).toContain('data-inspector-section="design"');
     expect(workspaceHtml).toContain('data-inspector-section="narration"');
@@ -658,7 +660,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("読み上げ枠をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("説明を保存しています");
     expect(dashboardScriptText).toContain("SpeechSynthesisUtterance");
-    expect(dashboardScriptText).toContain('tuningValue("speedScale"');
+    expect(dashboardScriptText).toContain('segmentTuningValue(form, "speedScale"');
+    expect(dashboardScriptText).toContain("updateSegmentDuration(form)");
     expect(dashboardScriptText).toContain("workspace-inspector");
     expect(dashboardScriptText).toContain("data-scene-component-editor");
     expect(dashboardScriptText).toContain("data-component-field");

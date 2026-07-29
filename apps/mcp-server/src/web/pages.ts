@@ -178,7 +178,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=61";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=62";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -586,7 +586,9 @@ function shell(title: string, body: string): string {
       .component-detail > summary { padding: .55rem; cursor: pointer; color: #dce6f3; }
       .component-detail .setting-table { padding: 0 .65rem .7rem; }
       .voice-segment { display: grid; gap: .75rem; padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; background: #08111b66; }
-      .voice-segment-head { display: flex; justify-content: space-between; gap: .65rem; align-items: center; }
+      .voice-segment-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .65rem; align-items: center; }
+      .voice-timing { color: var(--muted); font-size: .72rem; font-variant-numeric: tabular-nums; }
+      .voice-timing[data-state="warning"] { color: #ffcb78; font-weight: 750; }
       .audio-state { color: #ffd681; font-size: .75rem; }
       .audio-state.ready { color: #74e6b2; }
       .tuning-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
@@ -1663,14 +1665,19 @@ export function slideWorkspacePage(options: {
             profile?.tuning ?? undefined,
             segment.voice_tuning ?? undefined
           );
+          const stepDuration = slide.duration_seconds / (slide.reveal_steps + 1);
+          const estimatedDuration = Math.max(
+            1.5,
+            segment.text.length / (7 * effectiveTuning.speedScale)
+          );
           const profileOptions = [
             `<option value=""${segment.voice_profile_id === null || segment.voice_profile_id === undefined ? " selected" : ""}>deck既定${defaultProfile ? `（${escapeHtml(defaultProfile.label)}）` : ""}</option>`,
             ...profiles.map(
               (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
             )
           ].join("");
-          return `<form class="voice-segment editor" data-segment-editor data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-csrf="${escapeHtml(options.csrfToken)}">
-            <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
+          return `<form class="voice-segment editor" data-segment-editor data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
+            <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="voice-timing" data-segment-duration data-state="${estimatedDuration > stepDuration * 1.15 ? "warning" : "ok"}">概算 ${estimatedDuration.toFixed(1)}秒 / STEP目安 ${stepDuration.toFixed(1)}秒</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
             <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
             <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOX profile<select name="voice_profile_id">${profileOptions}</select></label></div>
             <p class="inherit-note">実効profile: ${escapeHtml(profile ? `${profile.label} / ${profile.speaker_name} ${profile.style_name}` : "未設定（Web Speech）")}。空欄の調声値はprofileまたはVOICEVOX標準値を継承します。</p>
@@ -1772,7 +1779,7 @@ export function slideWorkspacePage(options: {
              <details class="inspector-section" data-inspector-section="content" open><summary>内容</summary><div class="inspector-body">
                <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-max-step="${slide.reveal_steps}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
-                 <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"></label>
+                 <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"><small class="inherit-note">読み上げを含むスライド全体の目安です。${slide.reveal_steps + 1}段階では1段階あたり約${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒です。</small></label>
                  <label>スライド本文（Markdown対応）<span class="markdown-toolbar" role="toolbar" aria-label="スライド本文の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="content_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="content_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="number" data-markdown-target="content_markdown">番号</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="content_markdown">強調</button><button class="ghost" type="button" data-markdown-action="table" data-markdown-target="content_markdown">比較表</button></span><textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">定型flowでは入力中も実表示へ反映し、自由配置・リッチ構成では代替表示に使います。</small></label>
                  <label>補足欄（読み上げない情報）<span class="markdown-toolbar" role="toolbar" aria-label="補足欄の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="sidebar_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="sidebar_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="sidebar_markdown">強調</button><button class="ghost" type="button" data-markdown-action="table" data-markdown-target="sidebar_markdown">比較表</button></span><textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea><small class="inherit-note">作者コメント、出典、追加データなど、音声に含めない情報を置けます。</small></label>
                  <div class="actions"><button type="submit">内容を保存</button>${nextSlidePath === null ? "" : `<button class="ghost" type="submit" data-save-next="${nextSlidePath}">保存して次へ</button>`}<span class="version" data-version-label>v${options.project.version}</span></div>

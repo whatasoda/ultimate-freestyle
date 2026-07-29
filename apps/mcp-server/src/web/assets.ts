@@ -1366,6 +1366,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   });
   syncSaveState();
 
+  const segmentTuningValue = (form, name) => {
+    let effective = {};
+    try { effective = JSON.parse(form.dataset.effectiveTuning || "{}"); } catch {}
+    const field = form.elements.namedItem("tuning_" + name);
+    const value = field instanceof HTMLInputElement ? field.value.trim() : "";
+    const fallback = effective[name] ?? (name === "speedScale" ? 1 : 0);
+    return value === "" || !Number.isFinite(Number(value)) ? Number(fallback) : Number(value);
+  };
+  const updateSegmentDuration = (form) => {
+    const output = form.querySelector("[data-segment-duration]");
+    const text = form.elements.namedItem("text");
+    if (!(output instanceof HTMLElement) || !(text instanceof HTMLTextAreaElement)) return;
+    const stepDuration = Number(form.dataset.stepDuration || 0);
+    const estimated = Math.max(1.5, text.value.length / (7 * segmentTuningValue(form, "speedScale")));
+    output.textContent = "概算 " + estimated.toFixed(1) + "秒 / STEP目安 " + stepDuration.toFixed(1) + "秒";
+    output.dataset.state = estimated > stepDuration * 1.15 ? "warning" : "ok";
+  };
+  for (const form of document.querySelectorAll("[data-segment-editor]")) {
+    if (!(form instanceof HTMLFormElement)) continue;
+    updateSegmentDuration(form);
+    form.addEventListener("input", () => updateSegmentDuration(form));
+  }
+
   for (const button of document.querySelectorAll("[data-segment-speech-preview]")) {
     if (!(button instanceof HTMLButtonElement)) continue;
     button.addEventListener("click", () => {
@@ -1390,17 +1413,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const form = button.closest("[data-segment-editor]");
       if (!(form instanceof HTMLFormElement)) return;
       const data = new FormData(form);
-      let effective = {};
-      try { effective = JSON.parse(form.dataset.effectiveTuning || "{}"); } catch {}
-      const tuningValue = (name, fallback) => {
-        const value = String(data.get("tuning_" + name) ?? "").trim();
-        return value === "" || !Number.isFinite(Number(value)) ? Number(fallback) : Number(value);
-      };
       const utterance = new SpeechSynthesisUtterance(String(data.get("text") || ""));
       utterance.lang = "ja-JP";
-      utterance.rate = Math.min(2, Math.max(0.5, tuningValue("speedScale", effective.speedScale ?? 1)));
-      utterance.pitch = Math.min(2, Math.max(0.5, 1 + tuningValue("pitchScale", effective.pitchScale ?? 0) * 2));
-      utterance.volume = Math.min(1, Math.max(0, tuningValue("volumeScale", effective.volumeScale ?? 1)));
+      utterance.rate = Math.min(2, Math.max(0.5, segmentTuningValue(form, "speedScale")));
+      utterance.pitch = Math.min(2, Math.max(0.5, 1 + segmentTuningValue(form, "pitchScale") * 2));
+      utterance.volume = Math.min(1, Math.max(0, segmentTuningValue(form, "volumeScale")));
       const japaneseVoice = speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("ja"));
       if (japaneseVoice) utterance.voice = japaneseVoice;
       const finish = () => {
