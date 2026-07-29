@@ -873,6 +873,22 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       select.dispatchEvent(new Event("change", { bubbles: true }));
     });
   }
+  for (const button of document.querySelectorAll("[data-font-pick]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      const value = button.dataset.fontPick || "";
+      if (!(form instanceof HTMLFormElement) || value === "") return;
+      for (const name of ["body_font", "heading_font"]) {
+        const select = form.elements.namedItem(name);
+        if (select instanceof HTMLSelectElement) select.value = value;
+      }
+      for (const item of form.querySelectorAll("[data-font-pick]")) {
+        if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
+      }
+      form.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   const activeFilmstripSlide = document.querySelector('.filmstrip-link[data-active="true"]');
   if (activeFilmstripSlide instanceof HTMLElement) {
