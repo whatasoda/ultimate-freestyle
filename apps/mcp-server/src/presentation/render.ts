@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@40";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@41";
 
 function escapeHtml(value: string): string {
   return value
@@ -1643,9 +1643,9 @@ export function renderPresentationHtml(
     };
     const preloadResource = (url, kind) => new Promise((resolve) => {
       const media = kind === 'image' ? new Image() : new Audio();
-      media.addEventListener(kind === 'image' ? 'load' : 'loadedmetadata', () => resolve({ url, ok: true }), { once: true });
+      media.addEventListener(kind === 'image' ? 'load' : 'canplay', () => resolve({ url, ok: true }), { once: true });
       media.addEventListener('error', () => resolve({ url, ok: false }), { once: true });
-      if (kind === 'audio') media.preload = 'metadata';
+      if (kind === 'audio') media.preload = 'auto';
       media.src = url;
       if (kind === 'audio') media.load();
     });
@@ -1672,16 +1672,17 @@ export function renderPresentationHtml(
       let completed = 0, failed = 0;
       markPreloadProgress(completed, resources.length, failed);
       const startedLoadingAt = performance.now();
-      await Promise.race([
-        preloadResources(resources, (succeeded) => { completed += 1; if (!succeeded) failed += 1; markPreloadProgress(completed, resources.length, failed); }),
-        new Promise((resolve) => setTimeout(resolve, 10_000))
-      ]);
+      let loadingSettled = false;
+      const loadingTask = preloadResources(resources, (succeeded) => { completed += 1; if (!succeeded) failed += 1; markPreloadProgress(completed, resources.length, failed); })
+        .finally(() => { loadingSettled = true; });
       const remaining = Math.max(0, Number(DECK.loadingScreen.minimum_duration_ms) - (performance.now() - startedLoadingAt));
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+      if (preludeStart) preludeStart.disabled = false;
+      if (!loadingSettled && preludeStatus) preludeStatus.textContent = completed + ' / ' + resources.length + ' 件を準備中 · 先に開始できます';
+      await Promise.race([loadingTask, new Promise((resolve) => setTimeout(resolve, 10_000))]);
       if (preludeStatus) preludeStatus.textContent = completed < resources.length
         ? '一部を読み込みながら開始できます'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
-      if (preludeStart) preludeStart.disabled = false;
     };
     document.querySelector('#next').addEventListener('click', () => { if (started) advance(); });
     document.querySelector('#prev').addEventListener('click', () => { if (!started) return; if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
