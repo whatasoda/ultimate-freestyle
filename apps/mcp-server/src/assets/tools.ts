@@ -10,13 +10,14 @@ import {
 } from "../projects/tools";
 import { listProjectAssets } from "./repository";
 import { projectAssetSchema } from "./schema";
-import { removeProjectImage } from "./service";
+import { AssetServiceError, removeProjectImage } from "./service";
 
 const assetErrorSchema = z.object({
   code: z.enum([
     "AUTH_REQUIRED",
     "SCOPE_REQUIRED",
     "PROJECT_NOT_FOUND",
+    "ASSET_IN_USE",
     "INTERNAL_ERROR"
   ]),
   message: z.string()
@@ -34,6 +35,9 @@ function assetToolError(error: unknown): {
         ? error.code
         : "INTERNAL_ERROR";
     return { code, message: error.message };
+  }
+  if (error instanceof AssetServiceError && error.code === "ASSET_IN_USE") {
+    return { code: error.code, message: error.message };
   }
   console.error(
     JSON.stringify({
@@ -108,7 +112,7 @@ export function registerAssetTools(
     {
       title: "研究画像を削除",
       description:
-        "自分が所有する画像をprivate storageとmetadataから削除します。存在しない画像の再削除も成功として扱います。",
+        "自分が所有する未使用画像をprivate storageとmetadataから削除します。スライドで参照中ならASSET_IN_USEを返し、存在しない画像の再削除は成功として扱います。",
       inputSchema: { asset_id: z.string().uuid() },
       outputSchema: {
         ok: z.boolean(),

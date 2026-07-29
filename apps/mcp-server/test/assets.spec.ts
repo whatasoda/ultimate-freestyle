@@ -116,4 +116,54 @@ describe("project image service", () => {
     ).rejects.toMatchObject({ code: "IMAGE_TYPE_UNSUPPORTED" });
     expect(await listProjectAssets(env.DB, OWNER_ID, PROJECT_ID)).toEqual([]);
   });
+
+  it("keeps an image while the project document references it", async () => {
+    const bytes = onePixelPng();
+    const asset = await uploadProjectImage(
+      new Request("https://example.test/upload", {
+        method: "POST",
+        headers: { "content-type": "image/png" },
+        body: bytes
+      }),
+      env,
+      {
+        ownerUserId: OWNER_ID,
+        projectId: PROJECT_ID,
+        filename: "used.png",
+        altText: "使用中の画像"
+      }
+    );
+    const referenced = createEmptyProject("画像テスト") as unknown as Record<
+      string,
+      unknown
+    >;
+    referenced.deck = {
+      slides: [
+        {
+          composition: {
+            mode: "scene",
+            nodes: [{ kind: "image", asset_id: asset.asset_id }]
+          }
+        }
+      ]
+    };
+    await env.DB.prepare(
+      "UPDATE research_projects SET document_json = ? WHERE id = ?"
+    )
+      .bind(JSON.stringify(referenced), PROJECT_ID)
+      .run();
+
+    await expect(
+      removeProjectImage(env, OWNER_ID, asset.asset_id)
+    ).rejects.toMatchObject({ code: "ASSET_IN_USE" });
+    const stored = await getProjectAsset(env.DB, OWNER_ID, asset.asset_id);
+    expect(await env.MEDIA_BUCKET.get(stored?.object_key ?? "missing")).not.toBeNull();
+
+    await env.DB.prepare(
+      "UPDATE research_projects SET document_json = ? WHERE id = ?"
+    )
+      .bind(JSON.stringify(createEmptyProject("画像テスト")), PROJECT_ID)
+      .run();
+    expect(await removeProjectImage(env, OWNER_ID, asset.asset_id)).toBe(true);
+  });
 });

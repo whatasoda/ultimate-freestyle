@@ -395,7 +395,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=11"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=12"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -539,6 +539,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("VOICEVOX音声を再生成してください");
     expect(dashboardScriptText).toContain("結果を反映しています");
     expect(dashboardScriptText).toContain('job.status === "completed" ? 800 : 1200');
+    expect(dashboardScriptText).toContain("この画像はスライドで使用中です");
 
     const rejectedUpload = await requestProvider(
       provider,

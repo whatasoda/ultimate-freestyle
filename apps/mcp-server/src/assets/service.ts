@@ -16,6 +16,7 @@ import {
 } from "./schema";
 
 export type AssetServiceErrorCode =
+  | "ASSET_IN_USE"
   | "IMAGE_EMPTY"
   | "IMAGE_INPUT_TOO_LARGE"
   | "IMAGE_TYPE_UNSUPPORTED"
@@ -138,6 +139,24 @@ export async function removeProjectImage(
   const asset = await getProjectAsset(env.DB, ownerUserId, assetId);
   if (asset === null) {
     return false;
+  }
+  const row = await env.DB.prepare(
+    "SELECT document_json FROM research_projects WHERE id = ? AND owner_user_id = ?"
+  )
+    .bind(asset.project_id, ownerUserId)
+    .first<{ document_json: string }>();
+  const referencesAsset = (value: unknown): boolean => {
+    if (Array.isArray(value)) return value.some(referencesAsset);
+    if (value === null || typeof value !== "object") return false;
+    const record = value as Record<string, unknown>;
+    if (record.asset_id === assetId) return true;
+    return Object.values(record).some(referencesAsset);
+  };
+  if (row !== null && referencesAsset(JSON.parse(row.document_json))) {
+    throw new AssetServiceError(
+      "ASSET_IN_USE",
+      "この画像はスライドで使用中です。スライドから外してから削除してください。"
+    );
   }
   await env.MEDIA_BUCKET.delete(asset.object_key);
   return (await deleteProjectAsset(env.DB, ownerUserId, assetId)) !== null;

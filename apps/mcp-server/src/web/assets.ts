@@ -7,7 +7,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       SLIDE_NOT_FOUND: "スライドが見つかりません。画面を再読み込みしてください。",
       TEMPLATE_NOT_FOUND: "templateが見つかりません。画面を再読み込みしてください。",
       VOICE_PROFILE_NOT_FOUND: "選んだ声が見つかりません。声を選び直してください。",
-      VOICE_JOB_NOT_FOUND: "音声生成の状況が見つかりません。音声仕上げ画面を再読み込みしてください。"
+      VOICE_JOB_NOT_FOUND: "音声生成の状況が見つかりません。音声仕上げ画面を再読み込みしてください。",
+      ASSET_IN_USE: "この画像はスライドで使用中です。スライドから外してから削除してください。"
     };
     const code = result?.error?.code;
     return (code && messages[code]) || result?.error?.message || fallback;
