@@ -31,6 +31,45 @@ function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, "0")}秒`;
 }
 
+type ProjectSlide = NonNullable<ProjectRecord["document"]["deck"]>["slides"][number];
+
+function staticSlideQuality(
+  slide: ProjectSlide,
+  aspectRatio: "16:9" | "4:3"
+): string[] {
+  const warnings: string[] = [];
+  if (slide.composition === null || slide.composition === undefined) {
+    const bodyLimit = aspectRatio === "4:3" ? 460 : 600;
+    const adjustedBodyLimit = slide.sidebar_markdown === null ? bodyLimit : Math.round(bodyLimit * 0.78);
+    if (slide.content_markdown.length > adjustedBodyLimit) {
+      warnings.push(
+        `本文が${slide.content_markdown.length}文字あります。実表示の自動縮小と段組みを確認してください。`
+      );
+    }
+    if ((slide.sidebar_markdown?.length ?? 0) > (aspectRatio === "4:3" ? 220 : 300)) {
+      warnings.push("補足欄の文章量が多いため、本文との配分を確認してください。");
+    }
+    const tableLines = slide.content_markdown
+      .split("\n")
+      .filter((line) => /^\s*\|.*\|\s*$/.test(line));
+    const tableColumns = Math.max(
+      0,
+      ...tableLines.map((line) => line.split("|").slice(1, -1).length)
+    );
+    if (tableColumns > (aspectRatio === "4:3" ? 3 : 4) || tableLines.length > 8) {
+      warnings.push("比較表が密です。列数・行数またはスライド分割を確認してください。");
+    }
+  }
+  const narrationAppearance = slide.narration?.appearance;
+  const narrationLimit = slide.narration?.display === "inline"
+    ? 500
+    : Math.max(90, (narrationAppearance?.max_lines ?? 4) * 45);
+  if ((slide.narration?.segments ?? []).some((segment) => segment.text.length > narrationLimit)) {
+    warnings.push("一度に表示する読み上げ文が長いため、区間分割または表示形式を確認してください。");
+  }
+  return warnings;
+}
+
 const TONE_LABELS = {
   dark: "ダーク",
   light: "ライト",
@@ -290,6 +329,7 @@ function shell(title: string, body: string): string {
       .slide-row:first-of-type { border-top: 0; }
       .slide-row span { color: var(--muted); font-size: .85rem; }
       .slide-row strong { overflow-wrap: anywhere; }
+      .slide-quality-warning { display: inline-flex; margin-top: .32rem; padding: .16rem .42rem; border: 1px solid #826b30; border-radius: 999px; background: #2a210d; color: #ffe09a; font-size: .68rem; font-weight: 760; }
       .slide-list { max-height: 32rem; overflow: auto; overscroll-behavior: contain; }
       .asset-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .8rem; }
       .asset { overflow: hidden; border: 1px solid var(--line); border-radius: .8rem; background: #0b1420; }
@@ -731,7 +771,8 @@ export function projectDetailPage(options: {
           const voiceLabel = narration.length === 0
             ? "原稿なし"
             : `音声 ${readyVoice}/${narration.length}`;
-          return `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${slide.role === "cover" ? "表紙 · " : ""}${escapeHtml(slideCompositionLabel(slide))}</small></strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階<small class="stage">${voiceLabel}</small></span></a>`;
+          const qualityWarnings = staticSlideQuality(slide, deck?.aspect_ratio ?? "16:9");
+          return `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${slide.role === "cover" ? "表紙 · " : ""}${escapeHtml(slideCompositionLabel(slide))}</small>${qualityWarnings.length ? `<small class="slide-quality-warning">要確認 ${qualityWarnings.length}</small>` : ""}</strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階<small class="stage">${voiceLabel}</small></span></a>`;
         })
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
@@ -818,6 +859,10 @@ export function projectDetailPage(options: {
   const firstSlideWithoutNarration = slides.find(
     (slide) => (slide.narration?.segments.length ?? 0) === 0
   );
+  const slidesWithStaticQualityWarnings = slides.filter(
+    (slide) => staticSlideQuality(slide, deck?.aspect_ratio ?? "16:9").length > 0
+  );
+  const firstSlideWithStaticQualityWarning = slidesWithStaticQualityWarnings[0];
   const firstSlidePath = slides[0] === undefined
     ? "#presentation-structure"
     : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slides[0].id)}`;
@@ -916,6 +961,19 @@ export function projectDetailPage(options: {
       href: firstSlideWithoutNarration === undefined
         ? `/dashboard/projects/${escapeHtml(options.project.project_id)}/voice`
         : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithoutNarration.id)}`
+    },
+    {
+      complete: slides.length > 0 && slidesWithStaticQualityWarnings.length === 0,
+      recommended: true,
+      label: "文字量と表示枠",
+      detail: slides.length === 0
+        ? "スライドを作ると確認できます。"
+        : slidesWithStaticQualityWarnings.length === 0
+          ? `全${slides.length}枚で文章量の事前警告はありません。`
+          : `${slidesWithStaticQualityWarnings.length}/${slides.length}枚で文章量、表、読み上げ枠の確認をおすすめします。`,
+      href: firstSlideWithStaticQualityWarning === undefined
+        ? firstSlidePath
+        : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithStaticQualityWarning.id)}`
     },
     {
       complete: durationWithinLimit,
@@ -1457,7 +1515,7 @@ export function slideWorkspacePage(options: {
   const needsReadingLayout =
     slide.content_markdown.length > 550 ||
     (headingCount >= 2 && paragraphCount >= 3);
-  const qualityItems = [
+  const qualityItems = [...new Set([
     ...(missingAlt > 0 ? [`説明のない画像が${missingAlt}件あります。`] : []),
     ...(missingAudio > 0
       ? [`${missingAudio}区間はVOICEVOX音声が未生成です。編集画面ではブラウザ音声で仮試聴できます。`]
@@ -1479,8 +1537,9 @@ export function slideWorkspacePage(options: {
           : typography.columns > 1 && headingCount === 0 && slide.content_markdown.length > 320
             ? ["段組みの文章に見出しがありません。段の切り替わりを追いやすいよう、小見出しの追加を検討してください。"]
           : []
-      : [])
-  ];
+      : []),
+    ...staticSlideQuality(slide, deck.aspect_ratio ?? "16:9")
+  ])];
   const workspaceTotalDurationSeconds = deck.slides.reduce(
     (total, item) => total + item.duration_seconds,
     0
