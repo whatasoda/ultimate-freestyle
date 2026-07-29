@@ -79,6 +79,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (projectSearch instanceof HTMLInputElement) {
     const projectCards = [...document.querySelectorAll("[data-project-card]")];
     const projectFilters = [...document.querySelectorAll("[data-project-filter]")];
+    const projectSort = document.querySelector("[data-project-sort]");
+    const projectGrid = document.querySelector("[data-project-grid]");
     const resultCount = document.querySelector("[data-project-count]");
     const emptyResult = document.querySelector("[data-project-search-empty]");
     let activeFilter = "all";
@@ -105,6 +107,24 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
         }
         filterProjects();
+      });
+    }
+    if (projectSort instanceof HTMLSelectElement && projectGrid instanceof HTMLElement) {
+      projectSort.addEventListener("change", () => {
+        const mode = projectSort.value;
+        const sorted = [...projectCards].sort((first, second) => {
+          if (!(first instanceof HTMLElement) || !(second instanceof HTMLElement)) return 0;
+          if (mode === "title") return (first.dataset.title || "").localeCompare(second.dataset.title || "", "ja");
+          if (mode === "duration") {
+            const durationDifference = Number(second.dataset.duration || 0) - Number(first.dataset.duration || 0);
+            if (durationDifference !== 0) return durationDifference;
+          } else {
+            const updatedDifference = (second.dataset.updated || "").localeCompare(first.dataset.updated || "");
+            if (updatedDifference !== 0) return updatedDifference;
+          }
+          return (first.dataset.title || "").localeCompare(second.dataset.title || "", "ja");
+        });
+        projectGrid.append(...sorted);
       });
     }
   }

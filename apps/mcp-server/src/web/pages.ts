@@ -156,7 +156,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=48";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=49";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -260,6 +260,8 @@ function shell(title: string, body: string): string {
       .dashboard-filter { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
       .dashboard-filter button { min-height: 2.35rem; padding: .45rem .65rem; font-size: .78rem; }
       .dashboard-filter button[aria-pressed="true"] { border-color: #9d7bff; background: #8062df30; color: white; }
+      .dashboard-sort { display: flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .78rem; }
+      .dashboard-sort select { min-height: 2.35rem; padding: .4rem .55rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; }
       .search-empty { margin: 1rem 0; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; color: var(--muted); text-align: center; }
       .connection-guide { margin-top: 1.25rem; border: 1px solid #52647c; border-radius: 1rem; background: #101b2aee; }
       .connection-guide > summary { padding: 1rem 1.2rem; cursor: pointer; font-weight: 820; }
@@ -725,7 +727,7 @@ export function dashboardPage(options: {
 }): Response {
   const cards = options.projects
     .map(
-      (project) => `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-search-text="${escapeHtml(`${project.title} ${STAGE_LABELS[project.stage]}`.toLocaleLowerCase("ja"))}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
+      (project) => `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-title="${escapeHtml(project.title)}" data-updated="${escapeHtml(project.updated_at)}" data-duration="${project.total_duration_seconds}" data-search-text="${escapeHtml(`${project.title} ${STAGE_LABELS[project.stage]}`.toLocaleLowerCase("ja"))}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
         <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
         <p class="meta">${project.has_presentation ? `発表 ${project.slide_count}枚 · ${formatDuration(project.total_duration_seconds)}` : "発表は未構成"}</p>
@@ -735,7 +737,7 @@ export function dashboardPage(options: {
     .join("");
   const content =
     cards.length > 0
-      ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search placeholder="タイトル・制作段階" autocomplete="off"></label><div class="dashboard-filter" role="group" aria-label="発表構成で絞り込む"><button class="ghost" type="button" data-project-filter="all" aria-pressed="true">すべて</button><button class="ghost" type="button" data-project-filter="ready" aria-pressed="false">発表あり</button><button class="ghost" type="button" data-project-filter="missing" aria-pressed="false">未構成</button><span class="count" data-project-count>${options.projects.length}件を表示</span></div></div><div class="grid">${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。検索語または絞り込みを変えてください。</p>`
+      ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search placeholder="タイトル・制作段階" autocomplete="off"></label><div class="dashboard-filter" role="group" aria-label="研究一覧の表示設定"><button class="ghost" type="button" data-project-filter="all" aria-pressed="true">すべて</button><button class="ghost" type="button" data-project-filter="ready" aria-pressed="false">発表あり</button><button class="ghost" type="button" data-project-filter="missing" aria-pressed="false">未構成</button><label class="dashboard-sort">並び順<select data-project-sort><option value="updated">更新が新しい順</option><option value="title">題名順</option><option value="duration">発表時間が長い順</option></select></label><span class="count" data-project-count>${options.projects.length}件を表示</span></div></div><div class="grid" data-project-grid>${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。検索語または絞り込みを変えてください。</p>`
       : `<section class="empty"><h2>まだ研究がありません</h2><p>Codexなどの対応AIクライアントへ、下の文を貼り付けると最初の研究を始められます。</p><div class="copy-box"><code>最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。</code><div class="actions"><button type="button" data-copy-text="最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></section>`;
   const connectionGuide = `<details class="connection-guide"${options.projects.length === 0 ? " open" : ""}><summary>AIクライアントとの接続方法</summary><div class="connection-body"><p>Remote MCPに対応したCodex、ChatGPT、Claudeなどから接続します。アプリによって設定画面の名前は「MCP」「コネクタ」「連携」など異なります。</p><ol class="setup-steps"><li>AIクライアントの連携設定で、下のMCP URLを追加します。</li><li>開いた画面でTwitchログインを完了します。</li><li>AIへ「最自由研究MCPを使いたい」と伝えます。</li></ol><div class="endpoint-box"><code>https://saijiyu-kenkyu.2764.moe/mcp</code><button type="button" data-copy-text="https://saijiyu-kenkyu.2764.moe/mcp" data-copy-success="MCP URLをコピーしました。">MCP URLをコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div><p class="inherit-note">TwitchのパスワードやtokenをAIへ貼る必要はありません。認証はTwitchの画面で行います。</p></div></details>`;
 

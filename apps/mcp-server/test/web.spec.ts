@@ -381,6 +381,8 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("data-project-search-empty");
     expect(dashboardHtml).toContain('data-project-filter="ready"');
     expect(dashboardHtml).toContain('data-project-filter="missing"');
+    expect(dashboardHtml).toContain("data-project-sort");
+    expect(dashboardHtml).toContain("発表時間が長い順");
     expect(dashboardHtml).toContain("AIクライアントとの接続方法");
     expect(dashboardHtml).toContain("https://saijiyu-kenkyu.2764.moe/mcp");
     expect(dashboardHtml).toContain("TwitchのパスワードやtokenをAIへ貼る必要はありません");
@@ -407,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=48"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=49"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("全スライドの実表示を一括確認");
