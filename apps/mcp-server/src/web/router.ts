@@ -164,6 +164,7 @@ const templateCreateRequestSchema = z.object({
   template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
   name: z.string().min(1).max(80),
   visual_preset: visualPresetSchema,
+  source_template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
   make_default: z.boolean()
 });
 
@@ -1480,11 +1481,22 @@ async function handleTemplateCreate(
           Object.assign(error, { code: "TEMPLATE_EXISTS" });
           throw error;
         }
+        const sourceTemplate = parsed.data.source_template_id === null || parsed.data.source_template_id === undefined
+          ? undefined
+          : deck.templates.find((template) => template.id === parsed.data.source_template_id);
+        if (parsed.data.source_template_id !== null && parsed.data.source_template_id !== undefined && sourceTemplate === undefined) {
+          const error = new Error("The source presentation template does not exist.");
+          Object.assign(error, { code: "TEMPLATE_NOT_FOUND" });
+          throw error;
+        }
+        const sourceFields = sourceTemplate === undefined
+          ? TEMPLATE_PRESET_DEFAULTS[parsed.data.visual_preset]
+          : Object.fromEntries(Object.entries(sourceTemplate).filter(([key]) => key !== "id" && key !== "name"));
         deck.templates.push(
           presentationTemplateSchema.parse({
             id: parsed.data.template_id,
             name: parsed.data.name,
-            ...TEMPLATE_PRESET_DEFAULTS[parsed.data.visual_preset]
+            ...sourceFields
           })
         );
         if (parsed.data.make_default) {
@@ -1499,6 +1511,7 @@ async function handleTemplateCreate(
       details: {
         project_id: projectId,
         template_id: parsed.data.template_id,
+        source_template_id: parsed.data.source_template_id ?? null,
         version: project.version
       },
       createdAt: new Date().toISOString()

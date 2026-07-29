@@ -455,6 +455,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       template_id: String(data.get("template_id") || ""),
       name: String(data.get("name") || ""),
       visual_preset: String(data.get("visual_preset") || "studio"),
+      source_template_id: String(data.get("source_template_id") || "") || null,
       make_default: data.has("make_default")
     });
     if (form.matches("[data-narration-settings-editor]")) Object.assign(body, {

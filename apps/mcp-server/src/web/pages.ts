@@ -116,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=33";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=34";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1319,7 +1319,7 @@ export function slideWorkspacePage(options: {
       ([value, label]) => `<option value="${value}"${slide.enter_animation === value ? " selected" : ""}>${escapeHtml(label)}</option>`
     )
     .join("");
-  const templateCreator = `<details class="component-detail"${activeTemplate === undefined ? " open" : ""}><summary>編集できるtemplateを追加</summary><form class="editor" data-template-create data-versioned-form data-method="POST" action="${projectPath}/templates" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>template名<input name="name" maxlength="80" required value="自分のスタイル"></label><label>ID<input name="template_id" pattern="[a-z0-9][a-z0-9-]{0,63}" required value="style-${options.project.version}"></label><label>元にする見た目<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label></div><label class="check-label"><input type="checkbox" name="make_default" checked>発表全体の既定templateにする</label><div class="actions"><button type="submit">templateを追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+  const templateCreator = `<details class="component-detail"${activeTemplate === undefined ? " open" : ""}><summary>編集できるtemplateを追加</summary><form class="editor" data-template-create data-versioned-form data-method="POST" action="${projectPath}/templates" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>template名<input name="name" maxlength="80" required value="自分のスタイル"></label><label>ID<input name="template_id" pattern="[a-z0-9][a-z0-9-]{0,63}" required value="style-${options.project.version}"></label><label>複製元（任意）<select name="source_template_id"><option value="">見た目presetから開始</option>${(deck.templates ?? []).map((template) => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}</option>`).join("")}</select></label><label>複製元なしの場合<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label></div><p class="inherit-note">複製元を選ぶと、そのtemplateの色、font、余白、animationを引き継ぎます。追加後に派生版だけを調整できます。</p><label class="check-label"><input type="checkbox" name="make_default" checked>発表全体の既定templateにする</label><div class="actions"><button type="submit">templateを追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
   const templateEditor = activeTemplate
     ? `<form class="editor" data-template-editor data-versioned-form action="${projectPath}/templates/${escapeHtml(activeTemplate.id)}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}">
         <p class="inherit-note">このtemplateを使う全スライドへ反映されます。</p>

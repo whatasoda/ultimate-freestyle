@@ -404,7 +404,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=33"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=34"');
     expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
@@ -1254,9 +1254,10 @@ describe("Web dashboard", () => {
           },
           body: JSON.stringify({
             expected_version: 8,
-            template_id: "web-neon",
-            name: "Webで作るネオン",
+            template_id: "web-variant",
+            name: "実験ノートの派生",
             visual_preset: "neon",
+            source_template_id: "lab",
             make_default: false
           })
         }
@@ -1266,8 +1267,20 @@ describe("Web dashboard", () => {
     expect(templateCreate.status).toBe(201);
     expect(await templateCreate.json()).toMatchObject({
       ok: true,
-      template_id: "web-neon",
+      template_id: "web-variant",
       version: 9
+    });
+    const templateDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const clonedTemplate = JSON.parse(templateDocument!.document_json).deck.templates.find(
+      (template: { id: string }) => template.id === "web-variant"
+    );
+    expect(clonedTemplate).toMatchObject({
+      name: "実験ノートの派生",
+      visual_preset: "editorial",
+      background: "#102030",
+      body_font: "mincho"
     });
 
     const typographyUpdate = await requestProvider(
