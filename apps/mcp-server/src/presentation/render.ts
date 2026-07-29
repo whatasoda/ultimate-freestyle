@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@16";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@17";
 
 function escapeHtml(value: string): string {
   return value
@@ -1161,6 +1161,39 @@ export function renderPresentationHtml(
       if (content instanceof HTMLElement) content.dataset.columns = String(typography.columns);
       scheduleFit();
     };
+    const previewTemplate = (data) => {
+      const currentSlide = slides[slide];
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id || !data.template || typeof data.template !== 'object') return;
+      const template = data.template;
+      currentSlide.dataset.regionLayout = String(template.region_layout);
+      currentSlide.dataset.visualPreset = String(template.visual_preset);
+      currentSlide.dataset.bodyFont = String(template.body_font);
+      currentSlide.dataset.headingFont = String(template.heading_font);
+      currentSlide.dataset.density = String(template.density);
+      currentSlide.dataset.motionStyle = String(template.motion_style);
+      currentSlide.dataset.animation = String(template.enter_animation);
+      for (const [property, value] of Object.entries({
+        '--template-background': template.background,
+        '--template-surface': template.surface,
+        '--template-foreground': template.foreground,
+        '--template-muted': template.muted,
+        '--template-accent': template.accent,
+        '--template-accent-secondary': template.accent_secondary,
+        '--template-border': template.border,
+        '--template-radius': Number(template.corner_radius_px) / 16 + 'cqw',
+        '--template-spacing': template.spacing_scale,
+        '--template-font-scale': template.font_scale,
+        '--template-sidebar-width': template.sidebar_width_percent + '%',
+        '--body-weight': template.body_weight,
+        '--heading-weight': template.heading_weight,
+        '--body-letter-spacing': template.letter_spacing_em + 'em'
+      })) currentSlide.style.setProperty(property, String(value));
+      if (template.apply_line_height) currentSlide.style.setProperty('--body-line-height', String(template.line_height));
+      currentSlide.style.animation = 'none';
+      currentSlide.getBoundingClientRect();
+      currentSlide.style.removeProperty('animation');
+      scheduleFit();
+    };
     const setPosition = (nextSlide, nextStep, push) => {
       slide = clamp(Number(nextSlide) - 1, 0, slides.length - 1);
       step = clamp(Number(nextStep), 0, DECK.slides[slide].revealSteps);
@@ -1296,6 +1329,7 @@ export function renderPresentationHtml(
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-template') previewTemplate(event.data);
     });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));

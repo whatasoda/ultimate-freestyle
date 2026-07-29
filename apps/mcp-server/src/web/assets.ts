@@ -124,10 +124,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
 
   const slideEditor = document.querySelector("[data-slide-editor]");
   const typographyEditor = document.querySelector("[data-typography-editor]");
+  const templateEditor = document.querySelector("[data-template-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
   let draftFrameTimer;
   let draftTypographyTimer;
+  let draftTemplateTimer;
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(slideEditor);
@@ -185,6 +187,51 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = "組版をプレビューへ反映しています…";
+        layoutStatus.dataset.level = "";
+      }
+    });
+  }
+  const syncTemplateDraft = () => {
+    if (!(templateEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    const data = new FormData(templateEditor);
+    const typographyData = typographyEditor instanceof HTMLFormElement ? new FormData(typographyEditor) : null;
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:preview-template",
+      slide_id: templateEditor.dataset.slideId || "",
+      template: {
+        region_layout: String(data.get("region_layout") || "sidebar-right"),
+        sidebar_width_percent: Number(data.get("sidebar_width_percent")),
+        background: String(data.get("background") || "#111827"),
+        surface: String(data.get("surface") || "#05080d"),
+        foreground: String(data.get("foreground") || "#f8fafc"),
+        muted: String(data.get("muted") || "#a9b5c7"),
+        accent: String(data.get("accent") || "#ffcf32"),
+        accent_secondary: String(data.get("accent_secondary") || "#ffcf32"),
+        border: String(data.get("border") || "#334155"),
+        corner_radius_px: Number(data.get("corner_radius_px")),
+        spacing_scale: Number(data.get("spacing_scale")),
+        font_scale: Number(data.get("font_scale")),
+        enter_animation: String(data.get("enter_animation") || "fade"),
+        visual_preset: String(data.get("visual_preset") || "studio"),
+        body_font: String(data.get("body_font") || "system-sans"),
+        heading_font: String(data.get("heading_font") || "system-sans"),
+        density: String(data.get("density") || "comfortable"),
+        motion_style: String(data.get("motion_style") || "calm"),
+        body_weight: Number(data.get("body_weight")),
+        heading_weight: Number(data.get("heading_weight")),
+        line_height: Number(data.get("line_height")),
+        letter_spacing_em: Number(data.get("letter_spacing_em")),
+        apply_line_height: typographyData?.get("preset") === "standard" && String(typographyData.get("typography_line_height") || "") === ""
+      }
+    }, location.origin);
+  };
+  if (templateEditor instanceof HTMLFormElement) {
+    templateEditor.addEventListener("input", () => {
+      clearTimeout(draftTemplateTimer);
+      draftTemplateTimer = setTimeout(syncTemplateDraft, 120);
+      const layoutStatus = document.querySelector("[data-layout-status]");
+      if (layoutStatus instanceof HTMLElement) {
+        layoutStatus.textContent = "templateをプレビューへ反映しています…";
         layoutStatus.dataset.level = "";
       }
     });
@@ -461,6 +508,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncFramePosition();
       syncSlideDraft();
       syncTypographyDraft();
+      syncTemplateDraft();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");
