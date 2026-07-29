@@ -1800,7 +1800,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         if (!("speechSynthesis" in window)) { stopPreview("このブラウザでは音声の仮試聴を利用できません。"); return; }
         const utterance = new SpeechSynthesisUtterance(button.dataset.voiceText || "");
+        let tuning = {};
+        try { tuning = JSON.parse(button.dataset.effectiveTuning || "{}"); } catch {}
         utterance.lang = "ja-JP";
+        utterance.rate = Math.min(2, Math.max(0.5, Number(tuning.speedScale ?? 1)));
+        utterance.pitch = Math.min(2, Math.max(0.5, 1 + Number(tuning.pitchScale ?? 0) * 2));
+        utterance.volume = Math.min(1, Math.max(0, Number(tuning.volumeScale ?? 1)));
+        if (activePreviewFeedback instanceof HTMLElement) activePreviewFeedback.textContent = "話速・高さ・音量を近似して再生しています…";
         utterance.onend = () => stopPreview("仮試聴が終わりました。");
         utterance.onerror = () => stopPreview("ブラウザ音声を再生できませんでした。");
         speechSynthesis.speak(utterance);
