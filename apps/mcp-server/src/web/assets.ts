@@ -16,6 +16,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const caughtErrorMessage = (error, fallback) => error instanceof TypeError
     ? "サーバーと通信できませんでした。接続を確認して、もう一度お試しください。"
     : error instanceof Error ? error.message : fallback;
+  const colorContrast = (first, second) => {
+    const luminance = (hex) => {
+      const channels = [1, 3, 5].map((index) => {
+        const value = Number.parseInt(hex.slice(index, index + 2), 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      });
+      return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+    };
+    const values = [luminance(first), luminance(second)];
+    return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
+  };
   const setButtonBusy = (button, busy) => {
     if (!(button instanceof HTMLButtonElement)) return;
     button.disabled = busy;
@@ -195,6 +206,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(templateEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(templateEditor);
     const typographyData = typographyEditor instanceof HTMLFormElement ? new FormData(typographyEditor) : null;
+    const mainContrast = colorContrast(String(data.get("background")), String(data.get("foreground")));
+    const sidebarContrast = colorContrast(String(data.get("surface")), String(data.get("muted")));
+    const contrastStatus = templateEditor.querySelector("[data-contrast-status]");
+    if (contrastStatus instanceof HTMLElement) {
+      const readable = mainContrast >= 4.5 && sidebarContrast >= 4.5;
+      contrastStatus.textContent = "本文 " + mainContrast.toFixed(1) + ":1 · 補足 " + sidebarContrast.toFixed(1) + ":1" + (readable ? " — 標準文字の目安4.5:1以上です。" : " — 4.5:1未満の組み合わせを見直してください。");
+      contrastStatus.dataset.level = readable ? "ok" : "warning";
+    }
     slideFrame.contentWindow?.postMessage({
       type: "ultimate-freestyle:preview-template",
       slide_id: templateEditor.dataset.slideId || "",

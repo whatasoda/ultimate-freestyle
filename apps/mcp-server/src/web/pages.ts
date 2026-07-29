@@ -83,6 +83,25 @@ const MOTION_LABELS = {
   dramatic: "ドラマチック"
 } as const;
 
+function colorLuminance(hex: string): number {
+  const channels = [1, 3, 5].map((index) => {
+    const value = Number.parseInt(hex.slice(index, index + 2), 16) / 255;
+    return value <= 0.04045
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+}
+
+function colorContrast(first: string, second: string): number {
+  const firstLuminance = colorLuminance(first);
+  const secondLuminance = colorLuminance(second);
+  return (
+    (Math.max(firstLuminance, secondLuminance) + 0.05) /
+    (Math.min(firstLuminance, secondLuminance) + 0.05)
+  );
+}
+
 const NARRATION_DISPLAY_LABELS = {
   dialogue: "ADV会話枠",
   commentary: "実況字幕",
@@ -91,7 +110,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=15";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=16";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1049,6 +1068,12 @@ export function slideWorkspacePage(options: {
       ]
     )
   );
+  const mainContrast = activeTemplate === undefined
+    ? null
+    : colorContrast(activeTemplate.background, activeTemplate.foreground);
+  const sidebarContrast = activeTemplate === undefined
+    ? null
+    : colorContrast(activeTemplate.surface, activeTemplate.muted);
   const effectiveEnter = slide.enter_animation ?? activeTemplate?.enter_animation ?? "fade";
   const narrationDisplay =
     slide.narration?.display ?? deck.narration_defaults?.display ?? "commentary";
@@ -1098,7 +1123,7 @@ export function slideWorkspacePage(options: {
         <label>template名<input name="name" maxlength="80" required value="${escapeHtml(activeTemplate.name)}"></label>
         <div class="editor-grid"><label>visual<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}"${visualPreset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>情報密度<select name="density">${Object.entries(DENSITY_LABELS).map(([value, label]) => `<option value="${value}"${density === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div>
         <fieldset><legend>領域</legend><div class="editor-grid"><label>配置<select name="region_layout">${[["single", "単一"], ["sidebar-right", "右補足"], ["sidebar-left", "左補足"], ["lower-third", "下段補足"], ["split", "左右均等"], ["top-band", "上段補足"], ["focus", "中央集中"]].map(([value, label]) => `<option value="${value}"${activeTemplate.region_layout === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>補足幅（%）<input name="sidebar_width_percent" type="number" min="20" max="45" value="${activeTemplate.sidebar_width_percent}" required></label></div><div class="editor-grid"><label>角の丸み<input name="corner_radius_px" type="number" min="0" max="48" value="${activeTemplate.corner_radius_px}" required></label><label>余白倍率<input name="spacing_scale" type="number" min="0.75" max="1.5" step="0.05" value="${activeTemplate.spacing_scale}" required></label></div></fieldset>
-        <fieldset><legend>色</legend><div class="editor-grid">${[["background", "背景", activeTemplate.background], ["surface", "補足面", activeTemplate.surface], ["foreground", "本文", activeTemplate.foreground], ["muted", "補助文字", activeTemplate.muted], ["accent", "アクセント", activeTemplate.accent], ["accent_secondary", "第2アクセント", activeTemplate.accent_secondary ?? activeTemplate.accent], ["border", "境界線", activeTemplate.border ?? activeTemplate.muted]].map(([name, label, value]) => `<label>${label}<input name="${name}" type="color" value="${escapeHtml(String(value))}"></label>`).join("")}</div></fieldset>
+        <fieldset><legend>色</legend><div class="editor-grid">${[["background", "背景", activeTemplate.background], ["surface", "補足面", activeTemplate.surface], ["foreground", "本文", activeTemplate.foreground], ["muted", "補助文字", activeTemplate.muted], ["accent", "アクセント", activeTemplate.accent], ["accent_secondary", "第2アクセント", activeTemplate.accent_secondary ?? activeTemplate.accent], ["border", "境界線", activeTemplate.border ?? activeTemplate.muted]].map(([name, label, value]) => `<label>${label}<input name="${name}" type="color" value="${escapeHtml(String(value))}"></label>`).join("")}</div><p class="quality-status" data-contrast-status data-level="${mainContrast !== null && sidebarContrast !== null && mainContrast >= 4.5 && sidebarContrast >= 4.5 ? "ok" : "warning"}">本文 ${mainContrast?.toFixed(1)}:1 · 補足 ${sidebarContrast?.toFixed(1)}:1${mainContrast !== null && sidebarContrast !== null && mainContrast >= 4.5 && sidebarContrast >= 4.5 ? " — 標準文字の目安4.5:1以上です。" : " — 4.5:1未満の組み合わせを見直してください。"}</p></fieldset>
         <fieldset><legend>文字</legend><div class="editor-grid"><label>本文font<select name="body_font">${Object.entries(FONT_LABELS).map(([value, label]) => `<option value="${value}"${bodyFont === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>見出しfont<select name="heading_font">${Object.entries(FONT_LABELS).map(([value, label]) => `<option value="${value}"${headingFont === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>本文weight<input name="body_weight" type="number" min="300" max="900" step="100" value="${activeTemplate.body_weight ?? 400}"></label><label>見出しweight<input name="heading_weight" type="number" min="300" max="900" step="100" value="${activeTemplate.heading_weight ?? 800}"></label><label>文字倍率<input name="font_scale" type="number" min="0.75" max="1.3" step="0.05" value="${activeTemplate.font_scale}"></label><label>行間<input name="line_height" type="number" min="1" max="2" step="0.05" value="${activeTemplate.line_height ?? 1.5}"></label><label>字間（em）<input name="letter_spacing_em" type="number" min="-0.08" max="0.2" step="0.01" value="${activeTemplate.letter_spacing_em ?? 0}"></label></div></fieldset>
         <fieldset><legend>動き</legend><div class="editor-grid"><label>motion<select name="motion_style">${Object.entries(MOTION_LABELS).map(([value, label]) => `<option value="${value}"${motion === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示animation<select name="enter_animation">${Object.entries(ANIMATION_LABELS).map(([value, label]) => `<option value="${value}"${activeTemplate.enter_animation === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>段階animation<select name="reveal_animation">${Object.entries(ANIMATION_LABELS).map(([value, label]) => `<option value="${value}"${activeTemplate.reveal_animation === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div></fieldset>
         <div class="actions"><button type="submit">templateを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
@@ -1167,6 +1192,12 @@ export function slideWorkspacePage(options: {
       : []),
     ...(slide.composition?.clip_content
       ? ["枠外を隠す設定です。実表示の見切れ診断を確認してください。"]
+      : []),
+    ...(mainContrast !== null && mainContrast < 4.5
+      ? [`本文と背景のコントラストが${mainContrast.toFixed(1)}:1です。標準文字は4.5:1以上を目安にしてください。`]
+      : []),
+    ...(sidebarContrast !== null && sidebarContrast < 4.5
+      ? [`補助文字と補足面のコントラストが${sidebarContrast.toFixed(1)}:1です。標準文字は4.5:1以上を目安にしてください。`]
       : []),
     ...(slide.composition === null || slide.composition === undefined
       ? needsReadingLayout && ["statement", "standard"].includes(typography.preset)
