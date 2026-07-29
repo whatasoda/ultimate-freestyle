@@ -178,7 +178,10 @@ const sceneComponentRequestSchema = z.object({
 
 const templateFieldsRequestSchema = presentationTemplateSchema
   .omit({ id: true })
-  .extend({ expected_version: z.number().int().positive() });
+  .extend({
+    expected_version: z.number().int().positive(),
+    make_default: z.boolean().optional()
+  });
 
 const templateCreateRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -1678,7 +1681,7 @@ async function handleTemplateFieldsUpdate(
     );
   }
   try {
-    const { expected_version, ...fields } = parsed.data;
+    const { expected_version, make_default, ...fields } = parsed.data;
     const project = await mutateProject(env.DB, {
       ownerUserId: session.userId,
       projectId,
@@ -1693,13 +1696,17 @@ async function handleTemplateFieldsUpdate(
           throw error;
         }
         Object.assign(template, fields);
+        if (make_default === true) document.deck!.default_template_id = templateId;
+        else if (make_default === false && document.deck!.default_template_id === templateId) {
+          document.deck!.default_template_id = null;
+        }
       }
     });
     await recordWebAudit(env.DB, {
       userId: session.userId,
       eventType: "project.presentation_template_updated",
       outcome: "succeeded",
-      details: { project_id: projectId, template_id: templateId, version: project.version },
+      details: { project_id: projectId, template_id: templateId, make_default: make_default ?? null, version: project.version },
       createdAt: new Date().toISOString()
     });
     return jsonResponse({

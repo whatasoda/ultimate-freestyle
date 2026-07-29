@@ -653,7 +653,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       body_weight: numberValue(data, "body_weight"),
       heading_weight: numberValue(data, "heading_weight"),
       line_height: numberValue(data, "line_height"),
-      letter_spacing_em: numberValue(data, "letter_spacing_em")
+      letter_spacing_em: numberValue(data, "letter_spacing_em"),
+      make_default: data.has("make_default")
     });
     if (form.matches("[data-template-create]")) Object.assign(body, {
       template_id: String(data.get("template_id") || ""),

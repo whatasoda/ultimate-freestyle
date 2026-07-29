@@ -744,3 +744,9 @@
 - 削除したtemplateを直接使っていたスライドはdeck既定へ戻し、deck既定自身を削除した場合は組み込みstyleへ戻す契約にした。
 - Web UIでは未保存入力の破棄と影響範囲を確認してから削除し、audit logへ対象templateと変更後versionを記録する。
 - MCPは環境互換性のため38 tool上限を維持し、削除専用toolは追加しない判断をcontract testで固定した。
+
+## 改善ループ121
+
+- 既存custom templateを編集画面から発表全体の既定へ切り替え、または既定を解除できるようにした。
+- template部分更新APIへ任意の`make_default`だけを加え、専用endpointやMCP toolを増やさず既存version競合検出とaudit logを再利用した。
+- 現在のdeck既定とcheckboxを同期し、保存時に全スライドの継承先が変わる設定を画面上で確認できるようにした。
