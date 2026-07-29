@@ -1041,41 +1041,47 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     let activePlayer = null;
     let activePreviewButton = null;
-    const stopPreview = () => {
+    let activePreviewFeedback = null;
+    const stopPreview = (message = "") => {
       if (activePlayer) { activePlayer.pause(); activePlayer.removeAttribute("src"); activePlayer.load(); activePlayer = null; }
       if ("speechSynthesis" in window) speechSynthesis.cancel();
       if (activePreviewButton instanceof HTMLButtonElement) {
         activePreviewButton.setAttribute("aria-pressed", "false");
         activePreviewButton.textContent = activePreviewButton.dataset.audioUrl ? "生成音声を試聴" : "ブラウザ音声で仮試聴";
       }
+      if (activePreviewFeedback instanceof HTMLElement) activePreviewFeedback.textContent = message;
       activePreviewButton = null;
+      activePreviewFeedback = null;
     };
     for (const button of voicePage.querySelectorAll("[data-voice-preview]")) {
       if (!(button instanceof HTMLButtonElement)) continue;
       button.addEventListener("click", () => {
-        if (activePreviewButton === button) { stopPreview(); return; }
+        if (activePreviewButton === button) { stopPreview("試聴を停止しました。"); return; }
         stopPreview();
         activePreviewButton = button;
+        activePreviewFeedback = button.closest("[data-voice-segment]")?.querySelector("[data-voice-preview-feedback]") || null;
+        if (activePreviewFeedback instanceof HTMLElement) activePreviewFeedback.textContent = "再生しています…";
         button.setAttribute("aria-pressed", "true");
         button.textContent = "停止";
         const audioUrl = safeStatusUrl(button.dataset.audioUrl || "");
         if (audioUrl !== null && button.dataset.audioUrl) {
           const player = new Audio(audioUrl);
           activePlayer = player;
-          player.addEventListener("ended", stopPreview, { once: true });
-          player.addEventListener("error", stopPreview, { once: true });
-          player.play().catch(stopPreview);
+          player.addEventListener("ended", () => stopPreview("試聴が終わりました。"), { once: true });
+          player.addEventListener("error", () => stopPreview("生成音声を再生できませんでした。ページを再読み込みしてお試しください。"), { once: true });
+          player.play().catch(() => stopPreview("ブラウザが音声再生を許可しませんでした。もう一度ボタンを押してください。"));
           return;
         }
-        if (!("speechSynthesis" in window)) { stopPreview(); return; }
+        if (!("speechSynthesis" in window)) { stopPreview("このブラウザでは音声の仮試聴を利用できません。"); return; }
         const utterance = new SpeechSynthesisUtterance(button.dataset.voiceText || "");
         utterance.lang = "ja-JP";
-        utterance.onend = stopPreview;
-        utterance.onerror = stopPreview;
+        utterance.onend = () => stopPreview("仮試聴が終わりました。");
+        utterance.onerror = () => stopPreview("ブラウザ音声を再生できませんでした。");
         speechSynthesis.speak(utterance);
       });
     }
     const segmentFilters = [...voicePage.querySelectorAll("[data-voice-filter]")];
+    const voiceFilterEmpty = voicePage.querySelector("[data-voice-filter-empty]");
     for (const filterButton of segmentFilters) {
       if (!(filterButton instanceof HTMLButtonElement)) continue;
       filterButton.addEventListener("click", () => {
@@ -1083,16 +1089,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         for (const button of segmentFilters) {
           if (button instanceof HTMLButtonElement) button.setAttribute("aria-pressed", String(button === filterButton));
         }
+        let visible = 0;
         for (const segment of voicePage.querySelectorAll("[data-voice-segment]")) {
           if (!(segment instanceof HTMLElement)) continue;
           const state = segment.dataset.state || "";
           const matches = filter === "all" || state === filter ||
             (filter === "needs_generation" && ["queued", "running", "generating"].includes(state));
           segment.hidden = !matches;
+          if (matches) visible += 1;
         }
+        if (voiceFilterEmpty instanceof HTMLElement) voiceFilterEmpty.hidden = visible > 0;
       });
     }
-    addEventListener("pagehide", stopPreview, { once: true });
+    addEventListener("pagehide", () => stopPreview(), { once: true });
   }
 
   const previewButton = document.querySelector("[data-create-preview]");
