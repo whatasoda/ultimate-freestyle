@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@45";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@46";
 
 function escapeHtml(value: string): string {
   return value
@@ -609,12 +609,12 @@ export function renderPresentationHtml(
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; overflow: hidden; background: #090d14; color: #f8fafc; }
     button, input { font: inherit; }
-    .app { width: 100%; height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; padding: 12px; }
+    .app { width: 100%; min-width: 0; height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; padding: 12px; }
     body[data-editor-frame="true"] .app { grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0; }
     body[data-editor-frame="true"] header, body[data-editor-frame="true"] footer { display: none; }
     body[data-editor-frame="true"] .stage-wrap { grid-row: 1; }
     body[data-editor-frame="true"] .stage { width: 100%; height: 100%; border: 0; box-shadow: none; }
-    header, footer { display: flex; align-items: center; gap: 12px; min-height: 36px; color: #a9b5c7; }
+    header, footer { display: flex; min-width: 0; align-items: center; gap: 12px; min-height: 36px; color: #a9b5c7; }
     header strong { min-width: 0; overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
     header .time { display: flex; gap: .45em; margin-left: auto; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .timer-toggle { min-height: 28px; padding: .3em .65em; border-radius: 999px; color: #dce5f2; font-size: 11px; white-space: nowrap; }
@@ -622,7 +622,7 @@ export function renderPresentationHtml(
     .pace[data-state="over"] { border-color: #b55d38; background: #6b291d66; color: #ffd1b8; }
     .time-part { display: inline-flex; gap: .2em; }
     .time-label { color: #718096; font-size: .78em; }
-    .stage-wrap { min-height: 0; display: grid; place-items: center; }
+    .stage-wrap { min-width: 0; min-height: 0; display: grid; place-items: center; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
     .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; touch-action: pan-y; }
     .stage:focus-visible { outline: .2rem solid var(--accent); outline-offset: .18rem; }
@@ -933,8 +933,9 @@ export function renderPresentationHtml(
       .controls input[type="range"] { width: min(100%, 110px); }
     }
     @media (max-width: 430px) {
-      .controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-      .controls button { padding-inline: 4px; font-size: 12px; }
+      header .time { min-width: 0; overflow: hidden; }
+      .controls { min-width: 0; max-width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .controls button { width: 100%; min-width: 0; padding-inline: 4px; font-size: 12px; }
       .controls label { grid-column: 1 / -1; justify-content: center; min-height: 32px; }
       .controls input[type="range"] { width: min(100%, 220px); }
     }
