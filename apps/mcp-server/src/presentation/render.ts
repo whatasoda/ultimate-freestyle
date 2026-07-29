@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@7";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@8";
 
 function escapeHtml(value: string): string {
   return value
@@ -557,7 +557,7 @@ export function renderPresentationHtml(
     body[data-editor-frame="true"] .stage-wrap { grid-row: 1; }
     body[data-editor-frame="true"] .stage { width: 100%; height: 100%; border: 0; box-shadow: none; }
     header, footer { display: flex; align-items: center; gap: 12px; min-height: 36px; color: #a9b5c7; }
-    header strong { color: #fff; }
+    header strong { min-width: 0; overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; }
     header .time { margin-left: auto; font-variant-numeric: tabular-nums; }
     .stage-wrap { min-height: 0; display: grid; place-items: center; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
@@ -821,7 +821,23 @@ export function renderPresentationHtml(
     button:focus-visible, input:focus-visible { outline: .18rem solid color-mix(in srgb, var(--accent) 70%, white); outline-offset: .15rem; }
     label { display: flex; align-items: center; gap: 5px; font-size: 12px; }
     input[type="range"] { width: 80px; accent-color: var(--accent); }
-    @media (max-width: 680px) { .app { padding: 6px; } header .meta { display: none; } .voice-progress { width: 70px; } }
+    @media (max-width: 680px) {
+      .app { gap: 6px; padding: 6px; }
+      header { gap: 7px; min-height: 30px; font-size: 12px; }
+      header .meta, .voice-credit { display: none; }
+      footer { display: grid; grid-template-columns: auto minmax(3rem, 1fr) auto; gap: 6px 8px; min-height: 76px; }
+      footer .progress { width: 100%; }
+      .voice-progress { width: 64px; }
+      .controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(44px, auto)) minmax(8rem, 1fr); width: 100%; }
+      .controls button { min-height: 42px; }
+      .controls label { justify-content: end; }
+      .controls input[type="range"] { width: min(100%, 110px); }
+    }
+    @media (max-width: 430px) {
+      .controls { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .controls label { grid-column: 1 / -1; justify-content: center; min-height: 32px; }
+      .controls input[type="range"] { width: min(100%, 220px); }
+    }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; } }
   </style>
 </head>

@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@7");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@8");
     expect(html).toContain('title="実経過時間 / 想定経過時間"');
     expect(html).toContain("const expectedElapsed = () =>");
     expect(html).toContain("const scheduleAutoAdvance = () =>");
@@ -177,6 +177,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("スライドをクリック、または → / Space で進みます");
     expect(html).toContain(">音声 ON</button>");
     expect(html).toContain(">自動 OFF</button>");
+    expect(html).toContain("grid-template-columns: repeat(4, minmax(44px, auto))");
+    expect(html).toContain("@media (max-width: 430px)");
+    expect(html).toContain("min-height: 42px");
     expect(html).toContain("step / current.revealSteps");
     expect(html).toContain('data-aspect-ratio="4:3"');
     expect(html).toContain('data-style="orbit"');
