@@ -1009,7 +1009,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const button of document.querySelectorAll("[data-image-delete]")) {
     if (!(button instanceof HTMLButtonElement)) continue;
     button.addEventListener("click", async () => {
-      if (!confirm("この画像を削除しますか？")) return;
+      if (!confirm("「" + (button.dataset.imageLabel || "この画像") + "」を削除しますか？")) return;
       const originalLabel = button.textContent;
       const feedback = button.parentElement?.querySelector("[data-delete-feedback]");
       setButtonBusy(button, true);
@@ -1023,8 +1023,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "削除できませんでした。"));
         const asset = button.closest("[data-asset]");
+        const assetGrid = asset?.parentElement;
         if (feedback instanceof HTMLElement) feedback.textContent = "削除しました。";
         asset?.remove();
+        if (assetGrid instanceof HTMLElement && !assetGrid.querySelector("[data-asset]")) {
+          const empty = document.createElement("p");
+          empty.className = "prose";
+          empty.textContent = "まだ画像がありません。";
+          assetGrid.replaceWith(empty);
+        }
       } catch (error) {
         if (feedback instanceof HTMLElement) {
           feedback.textContent = caughtErrorMessage(error, "削除できませんでした。");

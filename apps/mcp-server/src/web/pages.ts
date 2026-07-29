@@ -110,7 +110,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=17";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=18";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -627,7 +627,7 @@ export function projectDetailPage(options: {
   const assetCards = options.assets.length
     ? `<div class="asset-grid">${options.assets
         .map(
-          (asset) => `<article class="asset" data-asset><img src="${escapeHtml(asset.content_url)}" alt="${escapeHtml(asset.alt_text)}" loading="lazy"><div class="asset-body"><p>${escapeHtml(asset.alt_text || "装飾画像")}</p><p class="meta">${asset.width}×${asset.height} · ${Math.ceil(asset.byte_size / 1024)} KiB</p><button class="ghost" type="button" data-image-delete="/api/images/${escapeHtml(asset.asset_id)}" data-csrf="${escapeHtml(options.csrfToken)}">削除</button><span class="feedback" data-delete-feedback aria-live="polite"></span></div></article>`
+          (asset) => `<article class="asset" data-asset><img src="${escapeHtml(asset.content_url)}" alt="${escapeHtml(asset.alt_text)}" loading="lazy"><div class="asset-body"><p>${escapeHtml(asset.alt_text || "装飾画像")}</p><p class="meta">${asset.width}×${asset.height} · ${Math.ceil(asset.byte_size / 1024)} KiB</p><button class="ghost" type="button" data-image-delete="/api/images/${escapeHtml(asset.asset_id)}" data-image-label="${escapeHtml(asset.alt_text || asset.original_filename)}" data-csrf="${escapeHtml(options.csrfToken)}">削除</button><span class="feedback" data-delete-feedback aria-live="polite"></span></div></article>`
         )
         .join("")}</div>`
     : `<p class="prose">まだ画像がありません。</p>`;

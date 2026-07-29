@@ -401,7 +401,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=17"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=18"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -427,6 +427,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("data-upload-preview");
     expect(detailHtml).toContain("保存時にWeb向けへ圧縮");
     expect(detailHtml).toContain("data-delete-feedback");
+    expect(detailHtml).toContain("data-image-label");
     expect(detailHtml).toContain("自由配置 1 block");
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
@@ -558,6 +559,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("const colorContrast =");
     expect(dashboardScriptText).toContain("4.5:1未満の組み合わせを見直してください");
     expect(dashboardScriptText).toContain("button.dataset.copySuccess");
+    expect(dashboardScriptText).toContain("まだ画像がありません");
 
     const rejectedUpload = await requestProvider(
       provider,
