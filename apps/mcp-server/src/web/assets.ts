@@ -1027,6 +1027,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (voicePage instanceof HTMLElement) {
     const csrf = voicePage.dataset.csrf || "";
     const setupButton = voicePage.querySelector("[data-voice-setup]");
+    const speakerSelect = voicePage.querySelector("[data-voice-speaker]");
     const profileSelect = voicePage.querySelector("[data-voice-profile]");
     const setupFeedback = voicePage.querySelector("[data-voice-setup-feedback]");
     const profileTuningForm = voicePage.querySelector("[data-voice-profile-tuning]");
@@ -1034,6 +1035,42 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const generateFeedback = voicePage.querySelector("[data-voice-generate-feedback]");
     const jobCard = voicePage.querySelector("[data-voice-job]");
     const terminalStatuses = new Set(["completed", "partially_failed", "failed", "cancelled"]);
+    let voiceCatalog = [];
+    if (profileSelect instanceof HTMLSelectElement) {
+      try { voiceCatalog = JSON.parse(profileSelect.dataset.voiceCatalog || "[]"); } catch {}
+    }
+    const rebuildVoiceStyles = (selectedId) => {
+      if (!(speakerSelect instanceof HTMLSelectElement) || !(profileSelect instanceof HTMLSelectElement)) return;
+      const profiles = voiceCatalog.filter((profile) => profile.speakerName === speakerSelect.value);
+      profileSelect.replaceChildren(...profiles.map((profile) => {
+        const option = document.createElement("option");
+        option.value = profile.id;
+        option.textContent = profile.styleName;
+        return option;
+      }));
+      if (selectedId && profiles.some((profile) => profile.id === selectedId)) profileSelect.value = selectedId;
+    };
+    if (speakerSelect instanceof HTMLSelectElement) {
+      speakerSelect.addEventListener("change", () => {
+        rebuildVoiceStyles();
+        const style = profileSelect instanceof HTMLSelectElement
+          ? profileSelect.selectedOptions[0]?.textContent || "スタイル"
+          : "スタイル";
+        if (setupFeedback instanceof HTMLElement) {
+          setupFeedback.textContent = speakerSelect.value + "・" + style + "を選択しました。保存すると発表全体へ適用されます。";
+          setupFeedback.classList.remove("success", "warning");
+        }
+      });
+    }
+    if (profileSelect instanceof HTMLSelectElement) {
+      profileSelect.addEventListener("change", () => {
+        const selected = voiceCatalog.find((profile) => profile.id === profileSelect.value);
+        if (setupFeedback instanceof HTMLElement && selected) {
+          setupFeedback.textContent = selected.label + "を選択しました。保存すると発表全体へ適用されます。";
+          setupFeedback.classList.remove("success", "warning");
+        }
+      });
+    }
     const jobLabels = {
       queued: "生成待ち",
       starting: "音声エンジン準備中",
@@ -1133,8 +1170,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (setupButton instanceof HTMLButtonElement) {
       const initialProfileId = profileSelect instanceof HTMLSelectElement ? profileSelect.value : "";
       setupButton.addEventListener("click", async () => {
-        const selectedLabel = profileSelect instanceof HTMLSelectElement
-          ? profileSelect.selectedOptions[0]?.textContent || "選択した声"
+        const selectedLabel = speakerSelect instanceof HTMLSelectElement && profileSelect instanceof HTMLSelectElement
+          ? speakerSelect.value + "・" + (profileSelect.selectedOptions[0]?.textContent || "選択した声")
           : "選択した声";
         const changingConfiguredVoice = voicePage.dataset.voiceConfigured === "true" &&
           profileSelect instanceof HTMLSelectElement && profileSelect.value !== initialProfileId;
@@ -1237,10 +1274,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
     }
     for (const button of voicePage.querySelectorAll("[data-voice-pick]")) {
-      if (!(button instanceof HTMLButtonElement) || !(profileSelect instanceof HTMLSelectElement)) continue;
+      if (!(button instanceof HTMLButtonElement) || !(profileSelect instanceof HTMLSelectElement) || !(speakerSelect instanceof HTMLSelectElement)) continue;
       button.addEventListener("click", () => {
-        profileSelect.value = button.dataset.voicePick || "voicevox-style-3";
-        const selected = profileSelect.selectedOptions[0]?.textContent || "選択した声";
+        const profileId = button.dataset.voicePick || "voicevox-style-3";
+        const profile = voiceCatalog.find((item) => item.id === profileId);
+        if (!profile) return;
+        speakerSelect.value = profile.speakerName;
+        rebuildVoiceStyles(profileId);
+        const selected = profile.label || (profile.speakerName + "・" + profile.styleName);
         if (setupFeedback instanceof HTMLElement) {
           setupFeedback.textContent = selected + "を選択しました。保存すると発表全体へ適用されます。";
           setupFeedback.classList.remove("success", "warning");

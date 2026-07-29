@@ -404,7 +404,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=43"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=44"');
     expect(detailHtml).toContain("data-copy-public");
     expect(detailHtml).toContain('data-published-current="false"');
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
@@ -469,7 +469,9 @@ describe("Web dashboard", () => {
     expect(voicePage.status).toBe(200);
     expect(voicePageHtml).toContain("40話者・118種類");
     expect(voicePageHtml).toContain('value="voicevox-style-3" selected');
-    expect(voicePageHtml).toContain('label="四国めたん"');
+    expect(voicePageHtml).toContain('data-voice-speaker');
+    expect(voicePageHtml).toContain('value="四国めたん"');
+    expect(voicePageHtml).toContain('data-voice-catalog');
     expect(voicePageHtml).toContain("7種の調声値");
     expect(voicePageHtml).toContain("既定のトーンを細かく調整");
     expect(voicePageHtml).toContain('data-voice-profile-tuning');
@@ -479,6 +481,7 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("抑揚・間・前後無音はVOICEVOX生成後");
     expect(DASHBOARD_SCRIPT).toContain("既定のトーンを保存しています");
     expect(DASHBOARD_SCRIPT).toContain("これは最自由研究の読み上げテストです");
+    expect(DASHBOARD_SCRIPT).toContain("rebuildVoiceStyles");
     expect(voicePageHtml).toContain("おすすめの声");
     expect(voicePageHtml).toContain('data-voice-configured="true"');
     expect(voicePageHtml).toContain("該当区間の再生成が必要になります");

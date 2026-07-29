@@ -117,7 +117,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=43";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=44";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -444,6 +444,7 @@ function shell(title: string, body: string): string {
       .voice-character { display: grid; place-items: center; width: 3.2rem; height: 3.2rem; border: 2px solid #b6ef78; border-radius: 48% 52% 45% 55%; background: #6bbd45; color: #10230d; font-size: 1.4rem; box-shadow: inset 0 0 0 .35rem #d6f6a8; }
       .voice-preset strong, .voice-preset small { display: block; }
       .voice-preset label { display: grid; gap: .35rem; min-width: 0; }
+      .voice-preset-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .65rem; min-width: 0; }
       .voice-preset select { width: 100%; padding: .65rem; border: 1px solid #52647c; border-radius: .55rem; background: #08111b; color: var(--ink); font: inherit; }
       .voice-preset small { margin-top: .25rem; color: var(--muted); line-height: 1.5; }
       .voice-preset .stage { justify-self: end; }
@@ -484,7 +485,7 @@ function shell(title: string, body: string): string {
       .voice-next li + li { margin-top: .35rem; }
       form { margin: 0; }
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
-      @media (max-width: 48rem) { .hero, .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next, .setup-steps { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
+      @media (max-width: 48rem) { .hero, .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next, .setup-steps, .voice-preset-fields { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
     </style>
@@ -1120,17 +1121,31 @@ export function voiceFinishPage(options: {
     entries.push(profile);
     profileGroups.set(profile.speakerName, entries);
   }
-  const profileOptions = [...profileGroups.entries()]
+  const selectedCatalogProfile =
+    VOICEVOX_CATALOG.find(
+      (profile) =>
+        options.voice.default_profile?.id === profile.id ||
+        options.voice.default_profile?.label === profile.label
+    ) ??
+    VOICEVOX_CATALOG.find((profile) => profile.styleId === 3)!;
+  const speakerOptions = [...profileGroups.keys()]
     .map(
-      ([speakerName, profiles]) =>
-        `<optgroup label="${escapeHtml(speakerName)}">${profiles
-          .map(
-            (profile) =>
-              `<option value="${escapeHtml(profile.id)}"${options.voice.default_profile?.id === profile.id || options.voice.default_profile?.label === profile.label || (!options.voice.configured && profile.styleId === 3) ? " selected" : ""}>${escapeHtml(profile.styleName)}</option>`
-          )
-          .join("")}</optgroup>`
+      (speakerName) =>
+        `<option value="${escapeHtml(speakerName)}"${speakerName === selectedCatalogProfile.speakerName ? " selected" : ""}>${escapeHtml(speakerName)}</option>`
     )
     .join("");
+  const profileOptions = (profileGroups.get(selectedCatalogProfile.speakerName) ?? [])
+    .map(
+      (profile) =>
+        `<option value="${escapeHtml(profile.id)}"${profile.id === selectedCatalogProfile.id ? " selected" : ""}>${escapeHtml(profile.styleName)}</option>`
+    )
+    .join("");
+  const voiceCatalogData = VOICEVOX_CATALOG.map((profile) => ({
+    id: profile.id,
+    label: profile.label,
+    speakerName: profile.speakerName,
+    styleName: profile.styleName
+  }));
   const quickProfiles = [3, 2, 8]
     .map((styleId) => VOICEVOX_CATALOG.find((profile) => profile.styleId === styleId))
     .filter((profile): profile is typeof VOICEVOX_CATALOG[number] => profile !== undefined);
@@ -1163,7 +1178,7 @@ export function voiceFinishPage(options: {
            <div class="voice-column">
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">1</span><div><h2>声を決める</h2><p>40話者・118種類のトークスタイルから発表全体の既定音声を選べます。最初は「ずんだもん・ノーマル」がおすすめです。</p></div></div>
                <div class="voice-quick" aria-label="おすすめの声">${quickProfiles.map((profile) => `<button class="ghost" type="button" data-voice-pick="${escapeHtml(profile.id)}">${escapeHtml(profile.label)}</button>`).join("")}</div>
-               <div class="voice-preset"><span class="voice-character" aria-hidden="true">声</span><label><strong>既定の話者・スタイル</strong><select data-voice-profile>${profileOptions}</select><small>区間ごとのprofileと7種の調声値は、各スライドの読み上げ設定で変更できます。</small></label><span class="stage">${options.voice.configured ? "設定済み" : "おすすめ"}</span></div>
+               <div class="voice-preset"><span class="voice-character" aria-hidden="true">声</span><div><strong>既定の話者・スタイル</strong><div class="voice-preset-fields"><label>話者<select data-voice-speaker>${speakerOptions}</select></label><label>スタイル<select data-voice-profile data-voice-catalog="${escapeHtml(JSON.stringify(voiceCatalogData))}">${profileOptions}</select></label></div><small>区間ごとのprofileと7種の調声値は、各スライドの読み上げ設定で変更できます。</small></div><span class="stage">${options.voice.configured ? "設定済み" : "おすすめ"}</span></div>
                <div class="actions"><button type="button" data-voice-setup="/api/projects/${projectId}/voice/profile"${jobActive ? " disabled" : ""}>${options.voice.configured ? "選択した声へ変更" : "この声を使う"}</button></div><p class="feedback${options.voice.configured ? " success" : ""}" data-voice-setup-feedback aria-live="polite">${options.voice.configured ? `現在の既定音声は「${escapeHtml(defaultProfileLabel)}」です。声を変えると該当区間の再生成が必要になります。` : "設定するとprofile未指定の読み上げ区間へ自動的に適用されます。"}</p>
                ${options.voice.configured ? `<details class="component-detail"><summary>既定のトーンを細かく調整</summary><form class="editor" data-voice-profile-tuning action="/api/projects/${projectId}/voice/profile/tuning"><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" required value="${defaultProfileTuning[key]}"></label>`).join("")}</div><p class="inherit-note">profile未指定の区間へ共通で適用されます。保存すると、この声を使う生成済み音声は再生成が必要です。ブラウザ仮試聴は話速・高さ・音量の近似で、抑揚・間・前後無音はVOICEVOX生成後に確認します。</p><div class="actions"><button class="ghost" type="button" data-voice-profile-tuning-preview aria-pressed="false">ブラウザで仮試聴</button><button type="submit"${jobActive ? " disabled" : ""}>既定のトーンを保存</button></div><p class="feedback" data-voice-profile-tuning-feedback aria-live="polite"></p></form></details>` : ""}
              </section>
