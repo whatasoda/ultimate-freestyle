@@ -409,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=66"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=67"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -539,6 +539,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-speech-preview");
     expect(workspaceHtml).toContain("data-segment-duration");
+    expect(workspaceHtml).toContain("data-profile-tunings");
     expect(workspaceHtml).toContain("STEP目安");
     expect(workspaceHtml).toContain("data-narration-segment-delete");
     expect(workspaceHtml).toContain('data-inspector-section="design"');
@@ -664,6 +665,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("SpeechSynthesisUtterance");
     expect(dashboardScriptText).toContain('segmentTuningValue(form, "speedScale"');
     expect(dashboardScriptText).toContain("updateSegmentDuration(form)");
+    expect(dashboardScriptText).toContain("profileTunings[profileSelect.value]");
     expect(dashboardScriptText).toContain("button.dataset.effectiveTuning");
     expect(dashboardScriptText).toContain("workspace-inspector");
     expect(dashboardScriptText).toContain("data-scene-component-editor");

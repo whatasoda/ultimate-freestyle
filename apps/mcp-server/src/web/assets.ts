@@ -1380,9 +1380,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const segmentTuningValue = (form, name) => {
     let effective = {};
     try { effective = JSON.parse(form.dataset.effectiveTuning || "{}"); } catch {}
+    let profileTunings = {};
+    try { profileTunings = JSON.parse(form.dataset.profileTunings || "{}"); } catch {}
+    const profileSelect = form.elements.namedItem("voice_profile_id");
+    const inherited = profileSelect instanceof HTMLSelectElement
+      ? profileTunings[profileSelect.value] || effective
+      : effective;
     const field = form.elements.namedItem("tuning_" + name);
     const value = field instanceof HTMLInputElement ? field.value.trim() : "";
-    const fallback = effective[name] ?? (name === "speedScale" ? 1 : 0);
+    const fallback = inherited[name] ?? (name === "speedScale" ? 1 : 0);
     return value === "" || !Number.isFinite(Number(value)) ? Number(fallback) : Number(value);
   };
   const updateSegmentDuration = (form) => {

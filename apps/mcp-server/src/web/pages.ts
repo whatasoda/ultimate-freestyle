@@ -187,7 +187,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=66";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=67";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1678,6 +1678,13 @@ export function slideWorkspacePage(options: {
   const defaultNarrationTuning = mergeVoicevoxTuning(
     defaultProfile?.tuning ?? undefined
   );
+  const profileTunings = Object.fromEntries([
+    ["", defaultNarrationTuning],
+    ...profiles.map((profile) => [
+      profile.id,
+      mergeVoicevoxTuning(profile.tuning ?? undefined)
+    ])
+  ]);
   const voiceSegments = slide.narration?.segments.length
     ? slide.narration.segments
         .map((segment) => {
@@ -1700,7 +1707,7 @@ export function slideWorkspacePage(options: {
               (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
             )
           ].join("");
-          return `<form class="voice-segment editor" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
+          return `<form class="voice-segment editor" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-profile-tunings="${escapeHtml(JSON.stringify(profileTunings))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
             <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="voice-timing" data-segment-duration data-state="${estimatedDuration > stepDuration * 1.15 ? "warning" : "ok"}">概算 ${estimatedDuration.toFixed(1)}秒 / STEP目安 ${stepDuration.toFixed(1)}秒</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
             <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
             <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOX profile<select name="voice_profile_id">${profileOptions}</select></label></div>
