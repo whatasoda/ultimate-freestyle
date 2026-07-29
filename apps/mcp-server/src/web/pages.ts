@@ -117,7 +117,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=41";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=42";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -346,6 +346,7 @@ function shell(title: string, body: string): string {
       .slide-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
       .slide-actions button { min-height: 2.2rem; padding: .45rem .62rem; }
       .slide-actions .danger { border-color: #7e3b49; color: #ffb8c3; }
+      .actions .danger { border-color: #7e3b49; color: #ffb8c3; }
       .save-state { padding: .28rem .55rem; border: 1px solid #36785b; border-radius: 999px; background: #15312566; color: #9be8c1; font-size: .75rem; font-weight: 760; white-space: nowrap; }
       .save-state[data-state="dirty"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
       .save-state[data-state="saving"] { border-color: #35506a; background: #0a1b29; color: #bfe6f7; }
@@ -1389,11 +1390,21 @@ export function slideWorkspacePage(options: {
             <p class="inherit-note">実効profile: ${escapeHtml(profile ? `${profile.label} / ${profile.speaker_name} ${profile.style_name}` : "未設定（Web Speech）")}。空欄の調声値はprofileまたはVOICEVOX標準値を継承します。</p>
             <fieldset><legend>調声（空欄で継承）</legend><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" value="${segment.voice_tuning?.[key] ?? ""}" placeholder="実効 ${effectiveTuning[key]}"></label>`).join("")}</div></fieldset>
             <p class="inherit-note">ブラウザ仮試聴では速度・高さ・音量を近似します。抑揚、間、前後の無音はVOICEVOX生成後に確認してください。</p>
-            <div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false">ブラウザで仮試聴</button><button type="submit">この区間を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
+            <div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false">ブラウザで仮試聴</button><button type="submit">この区間を保存</button><button type="button" class="ghost danger" data-narration-segment-delete data-delete-url="${slidePath}/narration/segments/${segment.at}" data-csrf="${escapeHtml(options.csrfToken)}">区間を削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
           </form>`;
         })
         .join("")
-    : `<p class="prose">読み上げ区間はまだありません。構成の追加はAIクライアントから行えます。</p>`;
+    : `<p class="prose">読み上げ区間はまだありません。「読み上げ区間を追加」から最初の原稿を入力できます。</p>`;
+  const usedNarrationSteps = new Set(
+    slide.narration?.segments.map((segment) => segment.at) ?? []
+  );
+  const availableNarrationSteps = Array.from(
+    { length: slide.reveal_steps + 1 },
+    (_, index) => index
+  ).filter((step) => !usedNarrationSteps.has(step));
+  const narrationSegmentCreator = availableNarrationSteps.length
+    ? `<details class="component-detail"><summary>読み上げ区間を追加</summary><form class="editor" data-narration-segment-create data-versioned-form data-method="POST" action="${slidePath}/narration/segments" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>表示する段階<select name="at">${availableNarrationSteps.map((step) => `<option value="${step}">STEP ${step}</option>`).join("")}</select></label><label>表示・読み上げ文<textarea name="text" maxlength="2000" required placeholder="この段階で読み上げる文"></textarea></label><div class="actions"><button type="submit">区間を追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
+    : `<p class="inherit-note">STEP 0〜${slide.reveal_steps}にはすべて読み上げ区間があります。</p>`;
   const missingAlt =
     slide.composition?.mode === "canvas"
       ? slide.composition.blocks.filter(
@@ -1484,7 +1495,7 @@ export function slideWorkspacePage(options: {
              </div></details>
              <details class="inspector-section" data-inspector-section="narration"><summary>読み上げ</summary><div class="inspector-body">
                <form class="editor" data-narration-settings-editor data-versioned-form action="${slidePath}/narration/settings" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>表示形式<select name="display">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<option value="${value}"${narrationDisplay === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>スライド話者名<input name="speaker" maxlength="80" value="${escapeHtml(slide.narration?.speaker ?? "")}" placeholder="deck既定: ${escapeHtml(deck.narration_defaults?.speaker ?? "なし")}"></label></div><fieldset><legend>読み上げ枠</legend><div class="editor-grid"><label>配置<select name="placement">${[["bottom", "下部"], ["overlay-bottom", "下部に重ねる"], ["sidebar", "補足欄"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.placement === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>大きさ<select name="size">${[["compact", "小"], ["normal", "標準"], ["large", "大"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.size === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>文字揃え<select name="text_align"><option value="start"${narrationAppearance.text_align === "start" ? " selected" : ""}>左</option><option value="center"${narrationAppearance.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>文字倍率<input name="text_scale" type="number" min="0.75" max="1.5" step="0.05" value="${narrationAppearance.text_scale}"></label><label>最大行数<input name="max_lines" type="number" min="2" max="8" value="${narrationAppearance.max_lines}"></label></div><label class="check-label"><input name="speaker_visible" type="checkbox"${narrationAppearance.speaker_visible ? " checked" : ""}>話者名を表示</label><label class="check-label"><input name="progress_visible" type="checkbox"${narrationAppearance.progress_visible ? " checked" : ""}>読み上げ進捗を表示</label></fieldset><p class="inherit-note">話者の実効値: ${escapeHtml(effectiveSpeaker ?? "なし")}。この欄で保存するとslide設定として上書きします。</p><div class="actions"><button type="submit">読み上げ枠を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
-               ${voiceSegments}
+               ${narrationSegmentCreator}${voiceSegments}
              </div></details>
              <details class="inspector-section" data-inspector-section="structure"><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${sceneComponentEditors}${componentOutline}</div></details>
              <details class="inspector-section" data-inspector-section="quality" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-base-count="${qualityItems.length}" data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>

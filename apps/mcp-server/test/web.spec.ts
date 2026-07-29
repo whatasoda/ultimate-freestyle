@@ -404,7 +404,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=41"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=42"');
     expect(detailHtml).toContain("data-copy-public");
     expect(detailHtml).toContain('data-published-current="false"');
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
@@ -511,6 +511,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("プレビューを読み込み中…");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-speech-preview");
+    expect(workspaceHtml).toContain("data-narration-segment-delete");
     expect(workspaceHtml).toContain('data-inspector-section="design"');
     expect(workspaceHtml).toContain('data-inspector-section="narration"');
     expect(workspaceHtml).toContain("ブラウザ仮試聴では速度・高さ・音量を近似");
@@ -1525,6 +1526,56 @@ describe("Web dashboard", () => {
     expect(await deleteLastSlide.json()).toMatchObject({
       error: { code: "LAST_SLIDE_REQUIRED" }
     });
+
+    const deleteNarrationSegment = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/narration/segments/0",
+        {
+          method: "DELETE",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 14 })
+        }
+      ),
+      authEnv
+    );
+    expect(deleteNarrationSegment.status).toBe(200);
+    expect(await deleteNarrationSegment.json()).toMatchObject({ version: 15, at: 0 });
+    const workspaceWithoutNarration = await requestProvider(
+      provider,
+      new Request(workspaceUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const workspaceWithoutNarrationHtml = await workspaceWithoutNarration.text();
+    expect(workspaceWithoutNarrationHtml).toContain("data-narration-segment-create");
+    expect(workspaceWithoutNarrationHtml).toContain("最初の原稿を入力できます");
+
+    const createNarrationSegment = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/narration/segments",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 15,
+            at: 0,
+            text: "Webから追加した読み上げ文"
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(createNarrationSegment.status).toBe(200);
+    expect(await createNarrationSegment.json()).toMatchObject({ version: 16, at: 0 });
 
     const unsupportedUpload = await requestProvider(
       provider,

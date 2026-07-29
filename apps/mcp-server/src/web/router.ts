@@ -201,6 +201,16 @@ const narrationSegmentRequestSchema = narrationSegmentSchema
   .required({ speaker: true, voice_profile_id: true, voice_tuning: true })
   .extend({ expected_version: z.number().int().positive() });
 
+const narrationSegmentCreateRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  at: z.number().int().nonnegative().max(100),
+  text: z.string().trim().min(1).max(2_000)
+});
+
+const narrationSegmentDeleteRequestSchema = z.object({
+  expected_version: z.number().int().positive()
+});
+
 const slideNarrationRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   segments: z
@@ -1526,6 +1536,8 @@ function projectMutationErrorResponse(
     DECK_REQUIRED: "発表スライドを先に作成してください。",
     NARRATION_NOT_FOUND: "このスライドには読み上げがありません。",
     NARRATION_SEGMENT_NOT_FOUND: "読み上げ区間が見つかりません。",
+    NARRATION_SEGMENT_EXISTS: "このSTEPにはすでに読み上げ区間があります。",
+    INVALID_NARRATION_STEP: "表示段階の範囲内からSTEPを選んでください。",
     VOICE_PROFILE_NOT_FOUND: "VOICEVOX profileが見つかりません。",
     COMPONENT_NOT_FOUND: "componentが見つかりません。",
     INVALID_COMPOSITION_MODE: "このスライドはcomponent sceneではありません。",
@@ -1546,9 +1558,10 @@ function projectMutationErrorResponse(
           code === "TEMPLATE_EXISTS" ||
           code === "DECK_REQUIRED" ||
           code === "INVALID_COMPOSITION_MODE" ||
+          code === "NARRATION_SEGMENT_EXISTS" ||
           code === "LAST_SLIDE_REQUIRED"
         ? 409
-        : code === "INVALID_FIELDS"
+        : code === "INVALID_FIELDS" || code === "INVALID_NARRATION_STEP"
           ? 422
           : 500;
   return jsonResponse(
@@ -1919,6 +1932,159 @@ async function handleNarrationSegmentUpdate(
     });
   } catch (error) {
     return projectMutationErrorResponse(error, "読み上げ区間を保存できませんでした。");
+  }
+}
+
+async function handleNarrationSegmentCreate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = narrationSegmentCreateRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      { ok: false, error: { code: "INVALID_NARRATION_SEGMENT", message: "読み上げ区間のSTEPと文を確認してください。" }, request_id: crypto.randomUUID() },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const deck = document.deck;
+        const slide = deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined || deck === null) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (parsed.data.at > slide.reveal_steps) {
+          const error = new Error("The narration step exceeds the slide steps.");
+          Object.assign(error, { code: "INVALID_NARRATION_STEP" });
+          throw error;
+        }
+        slide.narration ??= {
+          display: deck.narration_defaults?.display ?? "dialogue",
+          speaker: deck.narration_defaults?.speaker ?? null,
+          segments: []
+        };
+        if (slide.narration.segments.some((segment) => segment.at === parsed.data.at)) {
+          const error = new Error("The narration step already exists.");
+          Object.assign(error, { code: "NARRATION_SEGMENT_EXISTS" });
+          throw error;
+        }
+        slide.narration.segments.push({
+          at: parsed.data.at,
+          text: parsed.data.text,
+          audio_src: null,
+          speaker: null,
+          voice_profile_id: null,
+          voice_tuning: null
+        });
+        slide.narration.segments.sort((first, second) => first.at - second.at);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.narration_segment_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, at: parsed.data.at, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      at: parsed.data.at,
+      version: project.version,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "読み上げ区間を追加できませんでした。");
+  }
+}
+
+async function handleNarrationSegmentDelete(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string,
+  at: number
+): Promise<Response> {
+  if (request.method !== "DELETE") {
+    return new Response(null, { status: 405, headers: { allow: "DELETE" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = narrationSegmentDeleteRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      { ok: false, error: { code: "INVALID_NARRATION_SEGMENT", message: "読み上げ区間を確認してください。" }, request_id: crypto.randomUUID() },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        const index = slide?.narration?.segments.findIndex((segment) => segment.at === at) ?? -1;
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (index === -1 || slide.narration === null) {
+          const error = new Error("The narration segment does not exist.");
+          Object.assign(error, { code: "NARRATION_SEGMENT_NOT_FOUND" });
+          throw error;
+        }
+        slide.narration.segments.splice(index, 1);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.narration_segment_deleted",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, at, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      at,
+      version: project.version,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "読み上げ区間を削除できませんでした。");
   }
 }
 
@@ -2696,12 +2862,34 @@ export async function handleWebRequest(
     narrationSegmentMatch[2] !== undefined &&
     narrationSegmentMatch[3] !== undefined
   ) {
-    return handleNarrationSegmentUpdate(
+    return request.method === "DELETE"
+      ? handleNarrationSegmentDelete(
+          request,
+          env,
+          narrationSegmentMatch[1],
+          narrationSegmentMatch[2],
+          Number(narrationSegmentMatch[3])
+        )
+      : handleNarrationSegmentUpdate(
+          request,
+          env,
+          narrationSegmentMatch[1],
+          narrationSegmentMatch[2],
+          Number(narrationSegmentMatch[3])
+        );
+  }
+  const narrationSegmentsMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/narration/segments$`)
+  );
+  if (
+    narrationSegmentsMatch?.[1] !== undefined &&
+    narrationSegmentsMatch[2] !== undefined
+  ) {
+    return handleNarrationSegmentCreate(
       request,
       env,
-      narrationSegmentMatch[1],
-      narrationSegmentMatch[2],
-      Number(narrationSegmentMatch[3])
+      narrationSegmentsMatch[1],
+      narrationSegmentsMatch[2]
     );
   }
   const slideNarrationMatch = path.match(

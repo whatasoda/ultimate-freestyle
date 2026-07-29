@@ -475,6 +475,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         max_lines: numberValue(data, "max_lines")
       }
     });
+    if (form.matches("[data-narration-segment-create]")) Object.assign(body, {
+      at: numberValue(data, "at"),
+      text: String(data.get("text") || "")
+    });
     if (form.matches("[data-segment-editor]")) {
       const tuning = {};
       for (const key of ["speedScale", "pitchScale", "intonationScale", "volumeScale", "pauseLengthScale", "prePhonemeLength", "postPhonemeLength"]) {
@@ -520,7 +524,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!response.ok) throw new Error(apiErrorMessage(result, "保存できませんでした。"));
         syncPageVersion(result.version);
         form.dataset.dirty = "false";
-        if (form.matches("[data-template-create]")) {
+        if (form.matches("[data-template-create], [data-narration-segment-create]")) {
           location.reload();
           return;
         }
@@ -550,6 +554,39 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           setButtonBusy(button, false);
         }
         syncSaveState();
+      }
+    });
+  }
+
+  for (const button of document.querySelectorAll("[data-narration-segment-delete]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", async () => {
+      const form = button.closest("form");
+      const feedback = form?.querySelector("[data-form-feedback]");
+      if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) return;
+      if (!confirm("この読み上げ区間を削除しますか？生成済み音声も発表から外れます。")) return;
+      setButtonBusy(button, true);
+      feedback.textContent = "読み上げ区間を削除しています…";
+      feedback.classList.remove("success", "warning");
+      try {
+        const response = await fetch(button.dataset.deleteUrl || "", {
+          method: "DELETE",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": button.dataset.csrf || ""
+          },
+          body: JSON.stringify({ expected_version: Number(form.dataset.version) })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "読み上げ区間を削除できませんでした。"));
+        form.dataset.dirty = "false";
+        feedback.textContent = "読み上げ区間を削除しました。画面を更新します…";
+        feedback.classList.add("success");
+        location.reload();
+      } catch (error) {
+        feedback.textContent = caughtErrorMessage(error, "読み上げ区間を削除できませんでした。");
+        feedback.classList.add("warning");
+        setButtonBusy(button, false);
       }
     });
   }
