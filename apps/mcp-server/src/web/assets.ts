@@ -713,6 +713,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const previewStatus = document.querySelector("[data-preview-status]");
   const publishedStatus = document.querySelector("[data-published-status]");
   const previewLink = document.querySelector("[data-preview-link]");
+  const publicLink = document.querySelector("[data-public-link]");
   if (previewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     previewButton.addEventListener("click", async () => {
       previewButton.disabled = true;
@@ -776,6 +777,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.classList.add("success");
         if (publishedStatus instanceof HTMLElement && result.publication?.published) {
           publishedStatus.textContent = "v" + result.publication.published.project_version + " · " + result.publication.published.renderer_version;
+        }
+        if (publicLink instanceof HTMLAnchorElement && result.public_url) {
+          publicLink.href = result.public_url;
+          publicLink.hidden = false;
         }
         publishButton.disabled = false;
       } catch (error) {

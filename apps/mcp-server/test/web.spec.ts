@@ -395,7 +395,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=8"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=9"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -414,6 +414,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("VOICEVOX音声は 0 / 1 区間まで生成済みです");
     expect(detailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
+    expect(detailHtml).toContain("data-public-link");
     expect(detailHtml).toContain("data-upload-preview");
     expect(detailHtml).toContain("保存時にWeb向けへ圧縮");
     expect(detailHtml).toContain("data-delete-feedback");
@@ -533,6 +534,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("const apiErrorMessage =");
     expect(dashboardScriptText).toContain("別の画面またはAIから先に更新されました");
     expect(dashboardScriptText).toContain("サーバーと通信できませんでした");
+    expect(dashboardScriptText).toContain("publicLink.hidden = false");
 
     const rejectedUpload = await requestProvider(
       provider,
