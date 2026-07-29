@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@31";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@32";
 
 function escapeHtml(value: string): string {
   return value
@@ -814,6 +814,15 @@ export function renderPresentationHtml(
     .completion-actions { display: flex; justify-content: center; gap: .7em; }
     .completion-actions button { padding: .65em 1em; }
     .completion-actions .primary { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 32%, #172131); }
+    .shortcuts { position: absolute; z-index: 55; inset: 0; display: grid; place-items: center; padding: 6%; background: #05080ddd; backdrop-filter: blur(.45cqw); }
+    .shortcuts[hidden] { display: none; }
+    .shortcuts-card { width: min(42em, 90%); max-height: 88%; overflow: auto; padding: 2em; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff33); border-radius: 1.2em; background: #101827f5; box-shadow: 0 1.5em 5em #000b; }
+    .shortcuts-card h2 { margin: 0; color: #fff; font-size: clamp(1.35rem, 2.8cqw, 2.4rem); }
+    .shortcut-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55em 1.4em; margin: 1.2em 0; }
+    .shortcut-grid div { display: flex; align-items: center; justify-content: space-between; gap: 1em; padding: .55em 0; border-bottom: 1px solid #ffffff16; }
+    .shortcut-grid dt { color: #dbe5f1; }
+    .shortcut-grid dd { display: flex; gap: .3em; margin: 0; }
+    kbd { min-width: 2em; padding: .2em .45em; border: 1px solid #52647c; border-bottom-width: 3px; border-radius: .35em; background: #192536; color: #fff; font: 750 .82em/1.4 ui-monospace, monospace; text-align: center; }
     .prelude[data-style="pulse"]::before { content: ""; position: absolute; width: 28cqw; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--accent) 36%, transparent), transparent 68%); animation: prelude-pulse 1.7s ease-in-out infinite alternate; }
     .prelude[data-style="orbit"]::before, .prelude[data-style="orbit"]::after { content: ""; position: absolute; width: 32cqw; aspect-ratio: 1; border: .12cqw solid #ffffff22; border-radius: 50%; animation: prelude-orbit 7s linear infinite; }
     .prelude[data-style="orbit"]::after { width: 21cqw; border-color: color-mix(in srgb, var(--accent) 55%, transparent); animation-direction: reverse; animation-duration: 4s; }
@@ -864,13 +873,13 @@ export function renderPresentationHtml(
       footer { display: grid; grid-template-columns: auto minmax(3rem, 1fr) auto; gap: 6px 8px; min-height: 76px; }
       footer .progress { width: 100%; }
       .voice-progress { width: 64px; }
-      .controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(44px, auto)) minmax(8rem, 1fr); width: 100%; }
+      .controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(5, minmax(44px, auto)); width: 100%; }
       .controls button { min-height: 42px; }
-      .controls label { justify-content: end; }
+      .controls label { grid-column: 1 / -1; justify-content: center; }
       .controls input[type="range"] { width: min(100%, 110px); }
     }
     @media (max-width: 430px) {
-      .controls { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .controls { grid-template-columns: repeat(5, minmax(0, 1fr)); }
       .controls label { grid-column: 1 / -1; justify-content: center; min-height: 32px; }
       .controls input[type="range"] { width: min(100%, 220px); }
     }
@@ -901,6 +910,20 @@ export function renderPresentationHtml(
           <div class="completion-actions"><button class="primary" type="button" data-restart>最初から見る</button><button type="button" data-dismiss-completion>最後のスライドに戻る</button></div>
         </div>
       </section>
+      <section class="shortcuts" data-shortcuts role="dialog" aria-modal="true" aria-labelledby="shortcuts-title" hidden>
+        <div class="shortcuts-card">
+          <h2 id="shortcuts-title">発表の操作</h2>
+          <dl class="shortcut-grid">
+            <div><dt>次へ</dt><dd><kbd>→</kbd><kbd>Space</kbd></dd></div>
+            <div><dt>前へ</dt><dd><kbd>←</kbd><kbd>PageUp</kbd></dd></div>
+            <div><dt>最初／最後</dt><dd><kbd>Home</kbd><kbd>End</kbd></dd></div>
+            <div><dt>音声</dt><dd><kbd>M</kbd></dd></div>
+            <div><dt>自動送り</dt><dd><kbd>A</kbd></dd></div>
+            <div><dt>時間計測</dt><dd><kbd>T</kbd></dd></div>
+          </dl>
+          <button type="button" data-dismiss-shortcuts>ガイドを閉じる</button>
+        </div>
+      </section>
     </div></div>
     <footer>
       <span id="counter" aria-live="polite">1 / ${deck.slides.length}</span><div class="progress" role="progressbar" aria-label="発表の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
@@ -909,6 +932,7 @@ export function renderPresentationHtml(
         <button id="prev" aria-label="前へ" aria-keyshortcuts="ArrowLeft ArrowUp PageUp Backspace" title="前へ（← / PageUp）">←</button><button id="next" aria-label="次へ" aria-keyshortcuts="ArrowRight ArrowDown PageDown Space Enter" title="次へ（→ / Space / PageDown）">→</button>
         <button id="speech" aria-pressed="true" aria-keyshortcuts="M" title="ページ移動時の自動読み上げ（M）">音声 ON</button>
         <button id="auto" aria-pressed="false" aria-keyshortcuts="A" title="読み上げ後、または想定時間後に自動で進む（A）">自動 OFF</button>
+        <button id="help" aria-haspopup="dialog" aria-keyshortcuts="?" title="操作ガイドを開く（?）">操作</button>
         <label>音量 <input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-describedby="volume-value"><output class="volume-value" id="volume-value" for="volume">100%</output></label>
       </div>
     </footer>
@@ -930,6 +954,7 @@ export function renderPresentationHtml(
     const speechButton = document.querySelector('#speech');
     const autoButton = document.querySelector('#auto');
     const timerButton = document.querySelector('#timer-toggle');
+    const helpButton = document.querySelector('#help');
     const previousButton = document.querySelector('#prev');
     const nextButton = document.querySelector('#next');
     const prelude = document.querySelector('[data-prelude]');
@@ -942,6 +967,8 @@ export function renderPresentationHtml(
     const completion = document.querySelector('[data-completion]');
     const restartButton = document.querySelector('[data-restart]');
     const dismissCompletionButton = document.querySelector('[data-dismiss-completion]');
+    const shortcuts = document.querySelector('[data-shortcuts]');
+    const dismissShortcutsButton = document.querySelector('[data-dismiss-shortcuts]');
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1040,6 +1067,17 @@ export function renderPresentationHtml(
       completion.hidden = true;
       updateControls();
       stage?.focus();
+      return true;
+    };
+    const showShortcuts = () => {
+      if (!(shortcuts instanceof HTMLElement) || editorFrame) return;
+      shortcuts.hidden = false;
+      if (dismissShortcutsButton instanceof HTMLButtonElement) dismissShortcutsButton.focus();
+    };
+    const hideShortcuts = () => {
+      if (!(shortcuts instanceof HTMLElement) || shortcuts.hidden) return false;
+      shortcuts.hidden = true;
+      if (helpButton instanceof HTMLButtonElement) helpButton.focus();
       return true;
     };
     const advance = () => {
@@ -1581,11 +1619,15 @@ export function renderPresentationHtml(
     });
     volume.addEventListener('input', () => { showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
     timerButton?.addEventListener('click', () => { if (started) setTimerRunning(!timerRunning); });
+    helpButton?.addEventListener('click', showShortcuts);
+    dismissShortcutsButton?.addEventListener('click', hideShortcuts);
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
     showVolume();
     addEventListener('keydown', (event) => {
       if (editorFrame) return;
+      if (event.key === 'Escape' && hideShortcuts()) { event.preventDefault(); return; }
       if (event.key === 'Escape' && hideCompletion()) { event.preventDefault(); return; }
+      if (shortcuts instanceof HTMLElement && !shortcuts.hidden) return;
       const target = event.target;
       if (target instanceof Element && target.closest('button, a, input, select, textarea')) return;
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); }
@@ -1595,9 +1637,10 @@ export function renderPresentationHtml(
       else if (event.key.toLowerCase() === 'm') { event.preventDefault(); speechButton.click(); }
       else if (event.key.toLowerCase() === 'a') { event.preventDefault(); autoButton.click(); }
       else if (event.key.toLowerCase() === 't') { event.preventDefault(); timerButton.click(); }
+      else if (event.key === '?') { event.preventDefault(); showShortcuts(); }
     });
     stage?.addEventListener('click', (event) => {
-      if (!started || editorFrame || getSelection()?.toString()) return;
+      if (!started || editorFrame || getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
       if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
       if (voiceUnlock instanceof HTMLButtonElement && !voiceUnlock.hidden) { speak(); return; }
       advance();
