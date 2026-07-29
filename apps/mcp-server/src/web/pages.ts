@@ -632,7 +632,7 @@ function shell(title: string, body: string): string {
       .voice-preset .stage { justify-self: end; }
       .voice-quick { display: flex; flex-wrap: wrap; gap: .45rem; }
       .voice-quick button { min-height: 2.2rem; padding: .45rem .7rem; font-size: .78rem; }
-      .voice-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
+      .voice-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr)); gap: .55rem; }
       .voice-stat { padding: .75rem; border: 1px solid var(--line); border-radius: .7rem; background: #08111b88; }
       .voice-stat span, .voice-stat strong { display: block; }
       .voice-stat span { color: var(--muted); font-size: .72rem; }
@@ -1416,6 +1416,15 @@ export function voiceFinishPage(options: {
   const attentionSegmentIndex = options.voice.segments.findIndex(
     (segment) => segment.status !== "ready"
   );
+  const estimatedNarrationSeconds = Math.ceil(
+    options.voice.segments.reduce(
+      (total, segment) => total + Math.max(
+        1.5,
+        segment.text.length / (7 * segment.effective_tuning.speedScale)
+      ),
+      0
+    )
+  );
   const segmentList = options.voice.segments.length
     ? options.voice.segments
         .map((segment, index) => {
@@ -1450,7 +1459,7 @@ export function voiceFinishPage(options: {
                ${options.voice.configured ? `<details class="component-detail"><summary>既定のトーンを細かく調整</summary><form class="editor" data-voice-profile-tuning data-default-tuning="${escapeHtml(JSON.stringify(DEFAULT_VOICEVOX_TUNING))}" action="/api/projects/${projectId}/voice/profile/tuning"><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" required value="${defaultProfileTuning[key]}"></label>`).join("")}</div><p class="inherit-note">profile未指定の区間へ共通で適用されます。保存すると、この声を使う生成済み音声は再生成が必要です。ブラウザ仮試聴は話速・高さ・音量の近似で、抑揚・間・前後無音はVOICEVOX生成後に確認します。</p><div class="actions"><button class="ghost" type="button" data-voice-profile-tuning-preview aria-pressed="false">ブラウザで仮試聴</button><button class="ghost" type="button" data-voice-profile-tuning-reset>VOICEVOX標準値へ戻す</button><button type="submit"${jobActive ? " disabled" : ""}>既定のトーンを保存</button></div><p class="feedback" data-voice-profile-tuning-feedback aria-live="polite"></p></form></details>` : ""}
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">2</span><div><h2>不足分を生成する</h2><p>設定や原稿が変わった区間だけを生成します。生成済みの音声は再利用します。</p></div></div>
-               <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成<small>失敗含む</small></span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>
+               <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat"><span>音声概算</span><strong>${formatDuration(estimatedNarrationSeconds)}</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成<small>失敗含む</small></span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>
                <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.total === 0 ? "読み上げ原稿がありません" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.total === 0 ? "各スライドへ読み上げ原稿を追加すると生成できます。" : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : "生成中もこの画面を閉じて構いません。"}</p>
                ${voiceJobCard(currentJob)}
              </section>
