@@ -83,7 +83,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const projectGrid = document.querySelector("[data-project-grid]");
     const resultCount = document.querySelector("[data-project-count]");
     const emptyResult = document.querySelector("[data-project-search-empty]");
-    let activeFilter = "all";
+    const projectViewKey = "ultimate-freestyle:project-view";
+    let savedProjectView = {};
+    try { savedProjectView = JSON.parse(localStorage.getItem(projectViewKey) || "{}"); } catch {}
+    if (!savedProjectView || typeof savedProjectView !== "object" || Array.isArray(savedProjectView)) savedProjectView = {};
+    let activeFilter = ["all", "ready", "missing"].includes(savedProjectView.filter) ? savedProjectView.filter : "all";
     const filterProjects = () => {
       const query = projectSearch.value.trim().toLocaleLowerCase("ja");
       let visible = 0;
@@ -99,18 +103,27 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (emptyResult instanceof HTMLElement) emptyResult.hidden = visible > 0;
     };
     projectSearch.addEventListener("input", filterProjects);
+    projectSearch.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      projectSearch.value = "";
+      filterProjects();
+      projectSearch.blur();
+    });
     for (const button of projectFilters) {
       if (!(button instanceof HTMLButtonElement)) continue;
+      button.setAttribute("aria-pressed", String(button.dataset.projectFilter === activeFilter));
       button.addEventListener("click", () => {
         activeFilter = button.dataset.projectFilter || "all";
         for (const item of projectFilters) {
           if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
         }
+        try { localStorage.setItem(projectViewKey, JSON.stringify({ ...savedProjectView, filter: activeFilter })); } catch {}
+        savedProjectView.filter = activeFilter;
         filterProjects();
       });
     }
     if (projectSort instanceof HTMLSelectElement && projectGrid instanceof HTMLElement) {
-      projectSort.addEventListener("change", () => {
+      const sortProjects = () => {
         const mode = projectSort.value;
         const sorted = [...projectCards].sort((first, second) => {
           if (!(first instanceof HTMLElement) || !(second instanceof HTMLElement)) return 0;
@@ -125,8 +138,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           return (first.dataset.title || "").localeCompare(second.dataset.title || "", "ja");
         });
         projectGrid.append(...sorted);
+      };
+      if (["updated", "title", "duration"].includes(savedProjectView.sort)) projectSort.value = savedProjectView.sort;
+      sortProjects();
+      projectSort.addEventListener("change", () => {
+        savedProjectView.sort = projectSort.value;
+        try { localStorage.setItem(projectViewKey, JSON.stringify(savedProjectView)); } catch {}
+        sortProjects();
       });
     }
+    filterProjects();
   }
   const qualitySweepButton = document.querySelector("[data-quality-sweep]");
   const qualitySweepFrame = document.querySelector("[data-quality-sweep-frame]");
