@@ -1031,6 +1031,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (!file) {
         if (preview instanceof HTMLElement) preview.hidden = true;
         fileInput.setCustomValidity("");
+        if (submit instanceof HTMLButtonElement) submit.disabled = false;
         return;
       }
       const error = !acceptedImageTypes.has(file.type)
@@ -1043,12 +1044,41 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       feedback.classList.toggle("warning", error !== "");
       if (error) {
         if (preview instanceof HTMLElement) preview.hidden = true;
+        if (submit instanceof HTMLButtonElement) submit.disabled = true;
         return;
       }
       previewObjectUrl = URL.createObjectURL(file);
-      if (previewImage instanceof HTMLImageElement) previewImage.src = previewObjectUrl;
+      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+      feedback.textContent = "画像の解像度を確認しています…";
+      if (previewImage instanceof HTMLImageElement) {
+        const objectUrl = previewObjectUrl;
+        previewImage.onload = () => {
+          if (previewObjectUrl !== objectUrl) return;
+          const width = previewImage.naturalWidth;
+          const height = previewImage.naturalHeight;
+          const megapixels = width * height / 1_000_000;
+          const dimensionError = width > 10_000 || height > 10_000 || width * height > 40_000_000
+            ? "画像の解像度が上限を超えています。最大40メガピクセル・一辺10000pxです。"
+            : "";
+          fileInput.setCustomValidity(dimensionError);
+          feedback.textContent = dimensionError;
+          feedback.classList.toggle("warning", dimensionError !== "");
+          if (previewMeta instanceof HTMLElement) {
+            previewMeta.textContent = width + " × " + height + "px · " + megapixels.toFixed(1) + "MP · " + (file.size / 1024 / 1024).toFixed(2) + "MiB · 保存時に最大2560pxへ圧縮";
+          }
+          if (submit instanceof HTMLButtonElement) submit.disabled = dimensionError !== "";
+        };
+        previewImage.onerror = () => {
+          if (previewObjectUrl !== objectUrl) return;
+          fileInput.setCustomValidity("画像を読み込めませんでした。破損していないファイルを選んでください。");
+          feedback.textContent = fileInput.validationMessage;
+          feedback.classList.add("warning");
+          if (submit instanceof HTMLButtonElement) submit.disabled = true;
+        };
+        previewImage.src = objectUrl;
+      }
       if (previewName instanceof HTMLElement) previewName.textContent = file.name;
-      if (previewMeta instanceof HTMLElement) previewMeta.textContent = (file.size / 1024 / 1024).toFixed(2) + " MiB · 保存時にWeb向けへ圧縮";
+      if (previewMeta instanceof HTMLElement) previewMeta.textContent = (file.size / 1024 / 1024).toFixed(2) + "MiB · 解像度を確認中";
       if (preview instanceof HTMLElement) preview.hidden = false;
     };
     if (fileInput instanceof HTMLInputElement) fileInput.addEventListener("change", updateImagePreview);
@@ -1057,7 +1087,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       event.preventDefault();
       const file = fileInput instanceof HTMLInputElement ? fileInput.files?.[0] : null;
       if (!file || !(altInput instanceof HTMLInputElement) || !(feedback instanceof HTMLElement)) return;
-      if (!acceptedImageTypes.has(file.type) || file.size > 10 * 1024 * 1024) return;
+      if (!acceptedImageTypes.has(file.type) || file.size > 10 * 1024 * 1024 || !fileInput.checkValidity()) {
+        fileInput.reportValidity();
+        return;
+      }
       setButtonBusy(submit, true);
       feedback.textContent = "画像を圧縮して保存しています…";
       try {

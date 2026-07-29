@@ -110,7 +110,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=20";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=21";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -843,7 +843,7 @@ export function projectDetailPage(options: {
                  <label>画像ファイル<input type="file" accept="image/jpeg,image/png,image/webp" required></label>
                  <div class="upload-preview" data-upload-preview hidden><img data-upload-preview-image alt="選択した画像の確認"><p><strong data-upload-preview-name></strong><small data-upload-preview-meta></small></p></div>
                  <label>画像の説明<input name="alt_text" maxlength="500" placeholder="写真や図が何を示しているか"><small class="inherit-note">発表内容を伝える画像には説明を付けます。純粋な装飾なら空欄にできます。</small></label>
-                 <div class="upload-actions"><button type="submit">画像を追加</button><span class="meta">JPEG / PNG / 静止WebP、10MiBまで · 保存時にWeb向けへ圧縮</span></div>
+                 <div class="upload-actions"><button type="submit">画像を追加</button><span class="meta">JPEG / PNG / 静止WebP、10MiB・40MP・一辺10000pxまで · 保存時に最大2560pxのWebPへ圧縮</span></div>
                  <p class="feedback" data-feedback aria-live="polite"></p>
                </form>
                ${assetCards}

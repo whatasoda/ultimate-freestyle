@@ -401,7 +401,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=20"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=21"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -428,7 +428,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("data-public-link");
     expect(detailHtml).toContain("data-upload-preview");
-    expect(detailHtml).toContain("保存時にWeb向けへ圧縮");
+    expect(detailHtml).toContain("保存時に最大2560pxのWebPへ圧縮");
     expect(detailHtml).toContain("data-delete-feedback");
     expect(detailHtml).toContain("data-image-label");
     expect(detailHtml).toContain("自由配置 1 block");
@@ -542,6 +542,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("filterProjects");
     expect(dashboardScriptText).toContain("updateImagePreview");
     expect(dashboardScriptText).toContain("URL.revokeObjectURL");
+    expect(dashboardScriptText).toContain("画像の解像度を確認しています");
+    expect(dashboardScriptText).toContain("width * height > 40_000_000");
     expect(dashboardScriptText).toContain("setPreviewFocus");
     expect(dashboardScriptText).toContain("workspace-preview-focus");
     expect(dashboardScriptText).toContain("const apiErrorMessage =");
