@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@41";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@42";
 
 function escapeHtml(value: string): string {
   return value
@@ -1724,7 +1724,11 @@ export function renderPresentationHtml(
       const interactive = target instanceof Element ? target.closest('button, a, input, select, textarea') : null;
       if (interactive instanceof HTMLInputElement || interactive instanceof HTMLSelectElement || interactive instanceof HTMLTextAreaElement) return;
       if (interactive instanceof HTMLElement && [' ', 'Enter'].includes(event.key)) return;
-      if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(event.key)) { event.preventDefault(); advance(); }
+      if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(event.key)) {
+        event.preventDefault();
+        if (!started && preludeStart instanceof HTMLButtonElement && !preludeStart.disabled) preludeStart.click();
+        else advance();
+      }
       else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(event.key)) { event.preventDefault(); document.querySelector('#prev').click(); }
       else if (event.key === 'Home') { event.preventDefault(); slide = 0; step = 0; syncUrl(); render(); }
       else if (event.key === 'End') { event.preventDefault(); slide = slides.length - 1; step = DECK.slides[slide].revealSteps; syncUrl(); render(); }
@@ -1756,8 +1760,12 @@ export function renderPresentationHtml(
     stage?.addEventListener('pointercancel', () => { swipeStart = null; });
     stage?.addEventListener('click', (event) => {
       if (suppressStageClick) { suppressStageClick = false; return; }
-      if (!started || editorFrame || getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
+      if (editorFrame || getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
       if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
+      if (!started) {
+        if (preludeStart instanceof HTMLButtonElement && !preludeStart.disabled) preludeStart.click();
+        return;
+      }
       if (voiceUnlock instanceof HTMLButtonElement && !voiceUnlock.hidden) { speak(); return; }
       advance();
     });
