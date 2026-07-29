@@ -110,7 +110,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=16";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=17";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -571,7 +571,7 @@ export function dashboardPage(options: {
     cards.length > 0
       ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search placeholder="タイトル・制作段階" autocomplete="off"></label><span class="count" data-project-count>${options.projects.length}件を表示</span></div><div class="grid">${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。別の言葉で試してください。</p>`
       : `<section class="empty"><h2>まだ研究がありません</h2><p>Codexなどの対応AIクライアントへ、下の文を貼り付けると最初の研究を始められます。</p><div class="copy-box"><code>最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。</code><div class="actions"><button type="button" data-copy-text="最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></section>`;
-  const connectionGuide = `<details class="connection-guide"${options.projects.length === 0 ? " open" : ""}><summary>AIクライアントとの接続方法</summary><div class="connection-body"><p>Remote MCPに対応したCodex、ChatGPT、Claudeなどから接続します。アプリによって設定画面の名前は「MCP」「コネクタ」「連携」など異なります。</p><ol class="setup-steps"><li>AIクライアントの連携設定で、下のMCP URLを追加します。</li><li>開いた画面でTwitchログインを完了します。</li><li>AIへ「最自由研究MCPを使いたい」と伝えます。</li></ol><div class="endpoint-box"><code>https://saijiyu-kenkyu.2764.moe/mcp</code><button type="button" data-copy-text="https://saijiyu-kenkyu.2764.moe/mcp">MCP URLをコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div><p class="inherit-note">TwitchのパスワードやtokenをAIへ貼る必要はありません。認証はTwitchの画面で行います。</p></div></details>`;
+  const connectionGuide = `<details class="connection-guide"${options.projects.length === 0 ? " open" : ""}><summary>AIクライアントとの接続方法</summary><div class="connection-body"><p>Remote MCPに対応したCodex、ChatGPT、Claudeなどから接続します。アプリによって設定画面の名前は「MCP」「コネクタ」「連携」など異なります。</p><ol class="setup-steps"><li>AIクライアントの連携設定で、下のMCP URLを追加します。</li><li>開いた画面でTwitchログインを完了します。</li><li>AIへ「最自由研究MCPを使いたい」と伝えます。</li></ol><div class="endpoint-box"><code>https://saijiyu-kenkyu.2764.moe/mcp</code><button type="button" data-copy-text="https://saijiyu-kenkyu.2764.moe/mcp" data-copy-success="MCP URLをコピーしました。">MCP URLをコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div><p class="inherit-note">TwitchのパスワードやtokenをAIへ貼る必要はありません。認証はTwitchの画面で行います。</p></div></details>`;
 
   return new Response(
     shell(

@@ -590,7 +590,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const feedback = button.parentElement?.querySelector("[data-copy-feedback]");
       try {
         await navigator.clipboard.writeText(button.dataset.copyText || "");
-        if (feedback instanceof HTMLElement) feedback.textContent = "AIに貼り付ける文をコピーしました。";
+        if (feedback instanceof HTMLElement) feedback.textContent = button.dataset.copySuccess || "AIに貼り付ける文をコピーしました。";
       } catch {
         if (feedback instanceof HTMLElement) feedback.textContent = "コピーできませんでした。文を選択してコピーしてください。";
       }
