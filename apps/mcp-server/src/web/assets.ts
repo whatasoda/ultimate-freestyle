@@ -866,8 +866,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const select = form?.elements.namedItem("visual_preset");
       if (!(select instanceof HTMLSelectElement)) return;
       select.value = button.dataset.visualPick || select.value;
-      for (const item of form.querySelectorAll("[data-visual-pick]")) {
-        if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
+      let palette = {};
+      try { palette = JSON.parse(button.dataset.visualPalette || "{}"); } catch {}
+      for (const [name, value] of Object.entries(palette)) {
+        const input = form.elements.namedItem(name);
+        if (input instanceof HTMLInputElement && input.type === "color" && typeof value === "string") input.value = value;
       }
       select.dispatchEvent(new Event("input", { bubbles: true }));
       select.dispatchEvent(new Event("change", { bubbles: true }));

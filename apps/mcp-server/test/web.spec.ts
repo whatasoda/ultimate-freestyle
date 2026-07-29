@@ -547,9 +547,12 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("強調見出し");
     expect(workspaceHtml).toContain("data-template-editor");
     expect(workspaceHtml).toContain('data-visual-pick="neon"');
-    expect(workspaceHtml).toContain("見た目presetを選ぶ");
+    expect(workspaceHtml).toContain("配色presetを選ぶ");
+    expect(workspaceHtml).toContain("data-visual-palette=");
     expect(workspaceHtml).toContain('data-font-pick="mincho"');
     expect(workspaceHtml).toContain("本文と見出しのfontをまとめて選ぶ");
+    expect(workspaceHtml).toContain('data-animation-pick="wipe"');
+    expect(workspaceHtml).toContain("動きをもう一度見る");
     expect(workspaceHtml).toContain('data-cover-pick="statement"');
     expect(workspaceHtml).toContain("表紙レイアウトを選ぶ");
     expect(workspaceHtml).toContain('data-narration-display-pick="inline"');

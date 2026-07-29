@@ -17,6 +17,7 @@ import {
 } from "../publications/service";
 import { VOICEVOX_CATALOG } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import { resolveSlideTypography } from "../projects/typography";
+import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   discovery: "発見",
@@ -1533,7 +1534,19 @@ export function slideWorkspacePage(options: {
       ([value, label]) => `<option value="${value}"${slide.enter_animation === value ? " selected" : ""}>${escapeHtml(label)}</option>`
     )
     .join("");
-  const visualPresetPicker = (selected: string) => `<div class="visual-picker" role="group" aria-label="見た目presetを選ぶ">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<button class="visual-pick" type="button" data-visual-pick="${value}" aria-pressed="${String(value === selected)}"><span class="visual-swatch" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
+  const visualPresetPicker = (selected: string) => `<div class="visual-picker" role="group" aria-label="配色presetを選ぶ">${Object.entries(VISUAL_LABELS).map(([value, label]) => {
+    const preset = TEMPLATE_PRESET_DEFAULTS[value as keyof typeof TEMPLATE_PRESET_DEFAULTS];
+    const palette = {
+      background: preset.background,
+      surface: preset.surface,
+      foreground: preset.foreground,
+      muted: preset.muted,
+      accent: preset.accent,
+      accent_secondary: preset.accent_secondary ?? preset.accent,
+      border: preset.border ?? preset.muted
+    };
+    return `<button class="visual-pick" type="button" data-visual-pick="${value}" data-visual-palette="${escapeHtml(JSON.stringify(palette))}" aria-pressed="${String(value === selected)}"><span class="visual-swatch" aria-hidden="true"></span><span>${label}</span></button>`;
+  }).join("")}</div><p class="inherit-note">選ぶと配色一式を適用します。下の色はその後も個別に調整できます。</p>`;
   const fontPresetPicker = (selected: string) => `<div class="font-picker" role="group" aria-label="本文と見出しのfontをまとめて選ぶ">${Object.entries(FONT_LABELS).map(([value, label]) => `<button class="font-pick" type="button" data-font-pick="${value}" aria-pressed="${String(value === selected)}"><span>最自由研究 Aa</span><small>${label}</small></button>`).join("")}</div>`;
   const coverLayoutPicker = `<div class="cover-picker" role="group" aria-label="表紙レイアウトを選ぶ">${[["center", "中央"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言強調"]].map(([value, label]) => `<button class="cover-pick" type="button" data-cover-pick="${value}" aria-pressed="${String((slide.cover_layout ?? "center") === value)}"><span class="cover-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const narrationDisplayPicker = `<div class="narration-picker" role="group" aria-label="読み上げ文の表示形式を選ぶ">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<button class="narration-display-pick" type="button" data-narration-display-pick="${value}" aria-pressed="${String(narrationDisplay === value)}"><span class="narration-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
