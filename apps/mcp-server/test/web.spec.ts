@@ -409,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=56"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=58"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("全スライドの実表示を一括確認");
@@ -491,6 +491,8 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("/voice/profile/tuning");
     expect(voicePageHtml).toContain('name="tuning_speedScale"');
     expect(voicePageHtml).toContain("data-voice-profile-tuning-preview");
+    expect(voicePageHtml).toContain("data-voice-profile-tuning-reset");
+    expect(voicePageHtml).toContain("VOICEVOX標準値へ戻す");
     expect(voicePageHtml).toContain("抑揚・間・前後無音はVOICEVOX生成後");
     expect(DASHBOARD_SCRIPT).toContain("既定のトーンを保存しています");
     expect(DASHBOARD_SCRIPT).toContain("これは最自由研究の読み上げテストです");

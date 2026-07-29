@@ -1551,7 +1551,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const tuningFeedback = profileTuningForm.querySelector("[data-voice-profile-tuning-feedback]");
       const tuningSubmit = profileTuningForm.querySelector('button[type="submit"]');
       const tuningPreview = profileTuningForm.querySelector("[data-voice-profile-tuning-preview]");
+      const tuningReset = profileTuningForm.querySelector("[data-voice-profile-tuning-reset]");
       profileTuningForm.addEventListener("input", () => { profileTuningForm.dataset.dirty = "true"; });
+      if (tuningReset instanceof HTMLButtonElement) {
+        tuningReset.addEventListener("click", () => {
+          let defaults = {};
+          try { defaults = JSON.parse(profileTuningForm.dataset.defaultTuning || "{}"); } catch {}
+          for (const [key, value] of Object.entries(defaults)) {
+            const input = profileTuningForm.elements.namedItem("tuning_" + key);
+            if (input instanceof HTMLInputElement) input.value = String(value);
+          }
+          profileTuningForm.dispatchEvent(new Event("input", { bubbles: true }));
+          if (tuningFeedback instanceof HTMLElement) {
+            tuningFeedback.textContent = "VOICEVOX標準値へ戻しました。仮試聴してから保存してください。";
+            tuningFeedback.classList.remove("warning", "success");
+          }
+        });
+      }
       if (tuningPreview instanceof HTMLButtonElement) {
         tuningPreview.addEventListener("click", () => {
           if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
