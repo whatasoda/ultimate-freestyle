@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@12";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@13";
 
 function escapeHtml(value: string): string {
   return value
@@ -372,7 +372,7 @@ export function renderPresentationHtml(
           ) ?? []
       )
     )
-  ].slice(0, 2);
+  ];
   const voiceCredits = [
     ...new Set(
       deck.slides.flatMap(
@@ -1151,21 +1151,29 @@ export function renderPresentationHtml(
       media.src = url;
       if (kind === 'audio') media.load();
     });
+    const preloadResources = async (resources, onComplete) => {
+      let cursor = 0;
+      const worker = async () => {
+        while (cursor < resources.length) {
+          const [url, kind] = resources[cursor++];
+          const task = kind === 'font' ? (document.fonts?.ready ?? Promise.resolve()) : preloadResource(url, kind);
+          try { await task; } finally { onComplete(); }
+        }
+      };
+      const workerCount = Math.min(4, resources.length);
+      await Promise.allSettled(Array.from({ length: workerCount }, worker));
+    };
     const preparePrelude = async () => {
       const resources = [
+        ['fonts', 'font'],
         ...DECK.preload.images.map((url) => [url, 'image']),
-        ...DECK.preload.audio.map((url) => [url, 'audio']),
-        ['fonts', 'font']
+        ...DECK.preload.audio.map((url) => [url, 'audio'])
       ];
       let completed = 0;
       markPreloadProgress(completed, resources.length);
       const startedLoadingAt = performance.now();
-      const tasks = resources.map(([url, kind]) => {
-        const task = kind === 'font' ? (document.fonts?.ready ?? Promise.resolve()) : preloadResource(url, kind);
-        return Promise.resolve(task).finally(() => { completed += 1; markPreloadProgress(completed, resources.length); });
-      });
       await Promise.race([
-        Promise.allSettled(tasks),
+        preloadResources(resources, () => { completed += 1; markPreloadProgress(completed, resources.length); }),
         new Promise((resolve) => setTimeout(resolve, 10_000))
       ]);
       const remaining = Math.max(0, Number(DECK.loadingScreen.minimum_duration_ms) - (performance.now() - startedLoadingAt));

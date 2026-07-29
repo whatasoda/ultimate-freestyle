@@ -168,7 +168,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@12");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@13");
     expect(html).toContain('title="実経過時間 / 現在位置の目安 / 想定合計時間"');
     expect(html).toContain('class="time-total"> / 全01:00</span>');
     expect(html).toContain("const expectedElapsed = () =>");
@@ -205,7 +205,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('--template-border: #334155');
     expect(html).toContain('"/presentation-assets/revision/image"');
     expect(html).toContain('"/audio/result-0.mp3"');
-    expect(html).toContain("Promise.allSettled(tasks)");
+    expect(html).toContain("const preloadResources = async");
+    expect(html).toContain("Math.min(4, resources.length)");
+    expect(html).not.toContain("].slice(0, 2)");
     expect(html).toContain("history.pushState(null, '', '?slide=1&step=0')");
     expect(html).toContain('data-template-id="my-biim"');
     expect(html).toContain('data-region="sidebar"');
