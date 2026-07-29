@@ -39,6 +39,17 @@ function staticSlideQuality(
   aspectRatio: "16:9" | "4:3"
 ): string[] {
   const warnings: string[] = [];
+  const titleLimit = slide.role === "cover"
+    ? aspectRatio === "4:3" ? 22 : 30
+    : aspectRatio === "4:3" ? 34 : 44;
+  if (slide.title.length > titleLimit) {
+    warnings.push(
+      `タイトルが${slide.title.length}文字あります。改行位置と見出しの自動縮小を確認してください。`
+    );
+  }
+  if (slide.title.split(/\s+/).some((word) => /^[\x20-\x7e]+$/.test(word) && word.length > 24)) {
+    warnings.push("タイトルに長い英数字の語があります。空白または改行を入れて見切れを防いでください。");
+  }
   if (slide.composition === null || slide.composition === undefined) {
     const bodyLimit = aspectRatio === "4:3" ? 460 : 600;
     const adjustedBodyLimit = slide.sidebar_markdown === null ? bodyLimit : Math.round(bodyLimit * 0.78);
