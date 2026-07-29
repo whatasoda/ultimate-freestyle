@@ -1391,6 +1391,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(output instanceof HTMLElement) || !(text instanceof HTMLTextAreaElement)) return;
     const stepDuration = Number(form.dataset.stepDuration || 0);
     const estimated = Math.max(1.5, text.value.length / (7 * segmentTuningValue(form, "speedScale")));
+    const previewButton = form.querySelector("[data-segment-speech-preview]");
+    if (previewButton instanceof HTMLButtonElement) previewButton.disabled = text.value.trim() === "";
     output.textContent = "概算 " + estimated.toFixed(1) + "秒 / STEP目安 " + stepDuration.toFixed(1) + "秒";
     output.dataset.state = estimated > stepDuration * 1.15 ? "warning" : "ok";
   };

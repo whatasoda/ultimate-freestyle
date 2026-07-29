@@ -409,7 +409,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=65"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=66"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -1604,6 +1604,7 @@ describe("Web dashboard", () => {
     expect(workspaceWithoutNarrationHtml).toContain("data-segment-preview");
     expect(workspaceWithoutNarrationHtml).toContain('data-slide-id="intro"');
     expect(workspaceWithoutNarrationHtml).toContain("data-segment-speech-preview");
+    expect(workspaceWithoutNarrationHtml).toContain('data-segment-speech-preview aria-pressed="false" disabled');
     expect(workspaceWithoutNarrationHtml).toContain("data-duration-breakdown");
     expect(workspaceWithoutNarrationHtml).toContain("同じSTEPへ移動します");
     expect(workspaceWithoutNarrationHtml).toContain("最初の原稿を入力できます");
