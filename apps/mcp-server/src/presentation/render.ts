@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@38";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@39";
 
 function escapeHtml(value: string): string {
   return value
@@ -1197,7 +1197,9 @@ export function renderPresentationHtml(
       speechSynthesis.speak(utterance);
     };
     const speak = () => {
-      stopVoice(); const segment = narration();
+      stopVoice();
+      if (editorFrame) { hideVoiceUnlock(); setVoiceProgress(0); return; }
+      const segment = narration();
       if (!started) return;
       if (!speech || !segment) { hideVoiceUnlock(); scheduleAutoAdvance(); return; }
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
