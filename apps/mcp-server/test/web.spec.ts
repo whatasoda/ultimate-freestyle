@@ -369,6 +369,9 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("タイトル・制作段階");
     expect(dashboardHtml).toContain("data-project-card");
     expect(dashboardHtml).toContain("data-project-search-empty");
+    expect(dashboardHtml).toContain("AIクライアントとの接続方法");
+    expect(dashboardHtml).toContain("https://saijiyu-kenkyu.2764.moe/mcp");
+    expect(dashboardHtml).toContain("TwitchのパスワードやtokenをAIへ貼る必要はありません");
     expect(dashboardHtml).toContain(
       'href="/dashboard/projects/10000000-0000-4000-8000-000000000001"'
     );

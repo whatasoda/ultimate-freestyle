@@ -120,4 +120,11 @@
 - preset作成と部分更新で代替できる大きな`upsert_presentation_template`を削除し、tool数と一度に渡す引数を減らした。
 - 全データ取得と評価は標準MCP resourceへ移し、一枚取得用の`research://projects/{id}/slides/{slideId}`も追加した。
 - `create_project`は空の研究全体ではなくsummaryだけを返すようにし、`tools/list`の実測JSONを338,689 byteから157,045 byteへ削減した。
+
+## 改善ループ13
+
+- 研究一覧に、対応AIクライアントへRemote MCPを登録する3段階の案内を追加した。
+- 本番MCP URLをワンクリックでコピーでき、研究がまだない利用者には案内を最初から開いて表示する。
+- クライアントごとに設定名称が異なることを伝え、Codex、ChatGPT、Claudeのいずれにも通じる説明にした。
+- TwitchのパスワードやtokenをAIへ貼らず、認証画面でログインすることを明記した。
 - 今後の機能追加では、既存toolの部分更新で表現できないかを先に検討し、引数とtool一覧の再肥大化をテストで検知できるようにした。

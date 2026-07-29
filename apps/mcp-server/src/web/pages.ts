@@ -186,6 +186,16 @@ function shell(title: string, body: string): string {
       .dashboard-search { display: grid; gap: .35rem; width: min(100%, 28rem); color: #c9d5e4; font-size: .86rem; }
       .dashboard-search input { width: 100%; min-height: 2.8rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: .7rem; background: #0a111b; color: var(--ink); font: inherit; }
       .search-empty { margin: 1rem 0; padding: 1rem; border: 1px dashed #52647c; border-radius: .8rem; color: var(--muted); text-align: center; }
+      .connection-guide { margin-top: 1.25rem; border: 1px solid #52647c; border-radius: 1rem; background: #101b2aee; }
+      .connection-guide > summary { padding: 1rem 1.2rem; cursor: pointer; font-weight: 820; }
+      .connection-guide[open] > summary { border-bottom: 1px solid var(--line); }
+      .connection-body { display: grid; gap: 1rem; padding: 1.2rem; }
+      .connection-body > p { margin: 0; color: var(--muted); line-height: 1.7; }
+      .setup-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .7rem; margin: 0; padding: 0; list-style: none; counter-reset: setup; }
+      .setup-steps li { padding: .85rem; border: 1px solid var(--line); border-radius: .75rem; background: #08111b; color: #c9d5e4; line-height: 1.6; counter-increment: setup; }
+      .setup-steps li::before { content: counter(setup); display: grid; place-items: center; width: 1.55rem; height: 1.55rem; margin-bottom: .55rem; border-radius: 50%; background: var(--accent); color: white; font-weight: 850; }
+      .endpoint-box { display: flex; align-items: center; flex-wrap: wrap; gap: .65rem; padding: .75rem; border: 1px dashed #52647c; border-radius: .7rem; background: #07101a; }
+      .endpoint-box code { min-width: 0; flex: 1; color: #91ddff; overflow-wrap: anywhere; }
       .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: 1rem; }
       .card, .empty { border: 1px solid var(--line); border-radius: 1rem; background: linear-gradient(150deg, #182437e8, #101925e8); box-shadow: 0 1rem 3rem #0004; }
       .card-link { display: block; border-radius: 1rem; color: inherit; text-decoration: none; }
@@ -417,7 +427,7 @@ function shell(title: string, body: string): string {
       .voice-next li + li { margin-top: .35rem; }
       form { margin: 0; }
       @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } }
-      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
+      @media (max-width: 48rem) { .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next, .setup-steps { grid-template-columns: 1fr; } .editor label.wide { grid-column: auto; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } }
       @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }
     </style>
@@ -531,6 +541,7 @@ export function dashboardPage(options: {
     cards.length > 0
       ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search placeholder="タイトル・制作段階" autocomplete="off"></label><span class="count" data-project-count>${options.projects.length}件を表示</span></div><div class="grid">${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。別の言葉で試してください。</p>`
       : `<section class="empty"><h2>まだ研究がありません</h2><p>Codexなどの対応AIクライアントへ、下の文を貼り付けると最初の研究を始められます。</p><div class="copy-box"><code>最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。</code><div class="actions"><button type="button" data-copy-text="最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></section>`;
+  const connectionGuide = `<details class="connection-guide"${options.projects.length === 0 ? " open" : ""}><summary>AIクライアントとの接続方法</summary><div class="connection-body"><p>Remote MCPに対応したCodex、ChatGPT、Claudeなどから接続します。アプリによって設定画面の名前は「MCP」「コネクタ」「連携」など異なります。</p><ol class="setup-steps"><li>AIクライアントの連携設定で、下のMCP URLを追加します。</li><li>開いた画面でTwitchログインを完了します。</li><li>AIへ「最自由研究MCPを使いたい」と伝えます。</li></ol><div class="endpoint-box"><code>https://saijiyu-kenkyu.2764.moe/mcp</code><button type="button" data-copy-text="https://saijiyu-kenkyu.2764.moe/mcp">MCP URLをコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div><p class="inherit-note">TwitchのパスワードやtokenをAIへ貼る必要はありません。認証はTwitchの画面で行います。</p></div></details>`;
 
   return new Response(
     shell(
@@ -539,6 +550,7 @@ export function dashboardPage(options: {
        <main>
          <div class="section-head"><div><p class="eyebrow">My research</p><h1>自分の研究</h1></div><span class="count">${options.projects.length} / 20 件</span></div>
          ${content}
+         ${connectionGuide}
          <p class="hint">研究を開くと、内容確認、文言の微調整、発表プレビュー、公開操作を行えます。大きな構成変更は接続したAIクライアントから進めます。</p>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
