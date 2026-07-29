@@ -403,7 +403,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=23"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=24"');
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
@@ -483,6 +483,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("プレビューを読み込み中…");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-speech-preview");
+    expect(workspaceHtml).toContain('data-inspector-section="design"');
+    expect(workspaceHtml).toContain('data-inspector-section="narration"');
     expect(workspaceHtml).toContain("ブラウザ仮試聴では速度・高さ・音量を近似");
     expect(workspaceHtml).toContain("この区間を保存");
     expect(workspaceHtml).toContain("最初の読み上げ文");
@@ -582,6 +584,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("説明を保存しています");
     expect(dashboardScriptText).toContain("SpeechSynthesisUtterance");
     expect(dashboardScriptText).toContain('tuningValue("speedScale"');
+    expect(dashboardScriptText).toContain("workspace-inspector");
 
     const rejectedUpload = await requestProvider(
       provider,

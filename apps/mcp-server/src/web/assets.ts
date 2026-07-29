@@ -536,6 +536,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     activeFilmstripSlide.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
+  const inspectorStateKey = "ultimate-freestyle:workspace-inspector";
+  let inspectorState = {};
+  try { inspectorState = JSON.parse(localStorage.getItem(inspectorStateKey) || "{}"); } catch {}
+  for (const details of document.querySelectorAll("[data-inspector-section]")) {
+    if (!(details instanceof HTMLDetailsElement)) continue;
+    const section = details.dataset.inspectorSection || "";
+    if (typeof inspectorState[section] === "boolean") details.open = inspectorState[section];
+    details.addEventListener("toggle", () => {
+      inspectorState[section] = details.open;
+      try { localStorage.setItem(inspectorStateKey, JSON.stringify(inspectorState)); } catch {}
+    });
+  }
+
   const previewFocusButton = document.querySelector("[data-preview-focus]");
   if (previewFocusButton instanceof HTMLButtonElement) {
     const previewFocusKey = "ultimate-freestyle:workspace-preview-focus";
