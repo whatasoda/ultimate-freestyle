@@ -1,5 +1,5 @@
 import { escapeHtml } from "../auth/pages";
-import type { ProjectAsset } from "../assets/schema";
+import { PROJECT_IMAGE_LIMIT, type ProjectAsset } from "../assets/schema";
 import type {
   ProjectRecord,
   ProjectSummary,
@@ -913,6 +913,10 @@ export function projectDetailPage(options: {
         )
         .join("")}</div>`
     : `<p class="prose">まだ画像がありません。</p>`;
+  const assetTotalBytes = options.assets.reduce((total, asset) => total + asset.byte_size, 0);
+  const assetTotalSize = assetTotalBytes < 1024 * 1024
+    ? `${Math.ceil(assetTotalBytes / 1024)} KiB`
+    : `${(assetTotalBytes / 1024 / 1024).toFixed(1)} MiB`;
   const narrationSegments = slides.flatMap(
     (slide) => slide.narration?.segments ?? []
   );
@@ -1205,7 +1209,7 @@ export function projectDetailPage(options: {
              </div></details>
              ${presentationSettingsPanel}
              ${qualitySweepPanel}
-             <section class="panel" id="research-images"><h2>研究画像</h2>
+             <section class="panel" id="research-images"><h2>研究画像</h2><p class="meta">${options.assets.length} / ${PROJECT_IMAGE_LIMIT}件 · 圧縮後 ${assetTotalSize} を保存中</p>
                <form class="upload" action="/api/projects/${escapeHtml(options.project.project_id)}/images" data-image-upload data-csrf="${escapeHtml(options.csrfToken)}">
                  <label class="upload-dropzone" data-upload-dropzone><span>画像を選択、またはここへドロップ</span><small>JPEG / PNG / 静止WebP</small><input type="file" accept="image/jpeg,image/png,image/webp" required></label>
                  <div class="upload-preview" data-upload-preview hidden><img data-upload-preview-image alt="選択した画像の確認"><p><strong data-upload-preview-name></strong><small data-upload-preview-meta></small></p></div>
@@ -1214,6 +1218,7 @@ export function projectDetailPage(options: {
                  <p class="feedback" data-feedback aria-live="polite"></p>
                </form>
                ${assetCards}
+               <p class="inherit-note">固定プレビューで実際に使う画像は30件・合計30MiBまでです。未使用画像は公開版へ複製されません。</p>
                <div class="copy-box"><code>接続したAIは画像本体を引数へ含めず、asset IDと説明の一覧を取得できます。</code><div class="actions"><button class="ghost" type="button" data-copy-text="${escapeHtml(imageAiPrompt)}">画像の使い方をAIへ相談</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div>
              </section>
              <section class="panel"><h2>研究ログ</h2>${logs}${document.logs.length > recentLogs.length ? `<p class="meta">最新20件を表示 · 全${document.logs.length}件</p>` : ""}</section>
