@@ -124,7 +124,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.11.0",
+        version: "0.12.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -175,6 +175,16 @@ describe("MCP contract", () => {
           uri: "research://guide/overview",
           mimeType: "text/markdown",
           text: expect.stringContaining("最自由研究 制作ガイド")
+        })
+      );
+      expect(result.contents).toContainEqual(
+        expect.objectContaining({
+          text: expect.stringContaining("3. `list_projects`で本人の研究一覧を取得する")
+        })
+      );
+      expect(result.contents).toContainEqual(
+        expect.objectContaining({
+          text: expect.not.stringContaining("保存機能はまだありません")
         })
       );
 
