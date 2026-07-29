@@ -532,13 +532,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
       }, location.origin);
     }
-    for (const form of document.querySelectorAll("[data-segment-editor]")) {
+    for (const form of document.querySelectorAll("[data-segment-preview]")) {
       if (!(form instanceof HTMLFormElement)) continue;
       const data = new FormData(form);
       slideFrame.contentWindow?.postMessage({
         type: "ultimate-freestyle:preview-narration-segment",
         slide_id: form.dataset.slideId || "",
-        at: Number(form.dataset.segmentAt || 0),
+        at: Number(data.has("at") ? data.get("at") : form.dataset.segmentAt || 0),
         text: String(data.get("text") || ""),
         speaker: String(data.get("speaker") || "")
       }, location.origin);
@@ -554,7 +554,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
   };
   narrationSettingsEditor?.addEventListener("input", scheduleNarrationDraft);
-  for (const form of document.querySelectorAll("[data-segment-editor]")) form.addEventListener("input", scheduleNarrationDraft);
+  for (const form of document.querySelectorAll("[data-segment-preview]")) form.addEventListener("input", scheduleNarrationDraft);
   const setFrameLoading = (loading) => {
     if (frameLoading instanceof HTMLElement) frameLoading.hidden = !loading;
   };

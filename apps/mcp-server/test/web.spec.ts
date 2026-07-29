@@ -1599,6 +1599,7 @@ describe("Web dashboard", () => {
     const workspaceWithoutNarrationHtml = await workspaceWithoutNarration.text();
     expect(workspaceWithoutNarrationHtml).toContain("data-narration-segment-create");
     expect(workspaceWithoutNarrationHtml).toContain("data-segment-preview");
+    expect(workspaceWithoutNarrationHtml).toContain('data-slide-id="intro"');
     expect(workspaceWithoutNarrationHtml).toContain("data-segment-speech-preview");
     expect(workspaceWithoutNarrationHtml).toContain("data-duration-breakdown");
     expect(workspaceWithoutNarrationHtml).toContain("最初の原稿を入力できます");

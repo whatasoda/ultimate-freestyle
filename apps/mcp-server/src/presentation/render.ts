@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@44";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@45";
 
 function escapeHtml(value: string): string {
   return value
@@ -1601,14 +1601,24 @@ export function renderPresentationHtml(
       const region = currentSlide.querySelector('.narration');
       if (!(region instanceof HTMLElement)) return;
       if (region.dataset.display === 'inline') {
-        const item = region.querySelector('[data-narration-at="' + Number(data.at) + '"]');
-        if (item instanceof HTMLElement) item.textContent = String(data.text || '');
+        let item = region.querySelector('[data-narration-at="' + Number(data.at) + '"]');
+        if (!(item instanceof HTMLElement)) {
+          item = document.createElement('span');
+          item.className = 'narration-segment';
+          item.dataset.narrationAt = String(Number(data.at));
+          region.querySelector('.narration-track')?.append(item);
+        }
+        item.textContent = String(data.text || '');
+        item.classList.toggle('is-current', Number(data.at) === step);
+        item.toggleAttribute('aria-current', Number(data.at) === step);
+        region.dataset.active = 'true';
       } else if (Number(data.at) === step) {
         const item = region.querySelector('.narration-text');
         if (item instanceof HTMLElement) item.textContent = String(data.text || '');
         const speaker = region.querySelector('.narration-speaker');
         const speakerText = String(data.speaker || DECK.slides[slide].narration?.speaker || '');
         if (speaker instanceof HTMLElement) { speaker.textContent = speakerText; speaker.hidden = speakerText === ''; }
+        region.dataset.active = String(String(data.text || '').trim() !== '');
       }
       scheduleFit();
     };
