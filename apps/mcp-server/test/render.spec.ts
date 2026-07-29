@@ -676,6 +676,7 @@ describe("presentation artifact renderer", () => {
     }).text();
     expect(workspaceHtml).toContain('class="component-outline-row"');
     expect(workspaceHtml).toContain("data-scene-component-editor");
+    expect(workspaceHtml).toContain('data-save-state data-state="saved"');
     expect(workspaceHtml).toContain("このcomponentを保存");
     expect(workspaceHtml).toContain("/components/headline");
     expect(workspaceHtml).toContain("/components/comparison");

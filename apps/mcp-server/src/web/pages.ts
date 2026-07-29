@@ -116,7 +116,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=30";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=31";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -338,6 +338,9 @@ function shell(title: string, body: string): string {
       .workspace-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
       .workspace-head h1 { font-size: clamp(1.65rem, 3vw, 2.8rem); }
       .workspace-version { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .55rem; color: var(--muted); }
+      .save-state { padding: .28rem .55rem; border: 1px solid #36785b; border-radius: 999px; background: #15312566; color: #9be8c1; font-size: .75rem; font-weight: 760; white-space: nowrap; }
+      .save-state[data-state="dirty"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
+      .save-state[data-state="saving"] { border-color: #35506a; background: #0a1b29; color: #bfe6f7; }
       .slide-workspace { display: grid; grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr) minmax(17rem, 22rem); gap: 1rem; align-items: start; }
       body[data-preview-focus="true"] .slide-workspace { grid-template-columns: minmax(0, 1fr); }
       body[data-preview-focus="true"] .filmstrip, body[data-preview-focus="true"] .inspector { display: none; }
@@ -1415,7 +1418,7 @@ export function slideWorkspacePage(options: {
       `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main class="workspace-main">
          <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
-         <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a></div></div>
+         <div class="workspace-head"><div><p class="eyebrow">Slide workspace · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a></div></div>
          ${effectiveSummary}
          <div class="slide-workspace">
            <nav class="filmstrip" aria-label="スライド一覧">${filmstrip}</nav>

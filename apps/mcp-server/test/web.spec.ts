@@ -404,7 +404,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=30"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=31"');
+    expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
     expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");
     expect(detailHtml).toContain("公開前チェック ·");

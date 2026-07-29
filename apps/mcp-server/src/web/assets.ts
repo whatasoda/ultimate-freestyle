@@ -34,6 +34,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (busy) button.setAttribute("aria-busy", "true");
     else button.removeAttribute("aria-busy");
   };
+  const saveState = document.querySelector("[data-save-state]");
+  const syncSaveState = () => {
+    if (!(saveState instanceof HTMLElement)) return;
+    const dirtyCount = document.querySelectorAll('[data-dirty="true"]').length;
+    saveState.dataset.state = dirtyCount > 0 ? "dirty" : "saved";
+    saveState.textContent = dirtyCount > 0 ? "未保存 " + dirtyCount + "件" : "保存済み";
+  };
+  const showSavingState = () => {
+    if (!(saveState instanceof HTMLElement)) return;
+    saveState.dataset.state = "saving";
+    saveState.textContent = "保存中…";
+  };
   const syncPageVersion = (version) => {
     const value = String(version);
     for (const form of document.querySelectorAll("[data-versioned-form], [data-project-editor]")) {
@@ -83,11 +95,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const feedback = editor.querySelector("[data-editor-feedback]");
     const versionLabel = editor.querySelector("[data-editor-version]");
     const submit = editor.querySelector('button[type="submit"]');
-    editor.addEventListener("input", () => { editor.dataset.dirty = "true"; });
+    editor.addEventListener("input", () => { editor.dataset.dirty = "true"; syncSaveState(); });
     editor.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (!(feedback instanceof HTMLElement)) return;
       setButtonBusy(submit, true);
+      showSavingState();
       feedback.textContent = "変更を保存しています…";
       feedback.classList.remove("success", "warning");
       const data = new FormData(editor);
@@ -130,6 +143,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.classList.add("warning");
       } finally {
         setButtonBusy(submit, false);
+        syncSaveState();
       }
     });
   }
@@ -473,7 +487,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   };
   for (const form of document.querySelectorAll("[data-versioned-form]")) {
     if (!(form instanceof HTMLFormElement)) continue;
-    form.addEventListener("input", () => { form.dataset.dirty = "true"; });
+    form.addEventListener("input", () => { form.dataset.dirty = "true"; syncSaveState(); });
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const feedback = form.querySelector("[data-form-feedback]");
@@ -485,6 +499,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       for (const button of submitButtons) {
         setButtonBusy(button, true);
       }
+      showSavingState();
       feedback.textContent = "変更を保存しています…";
       feedback.classList.remove("success", "warning");
       try {
@@ -529,6 +544,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         for (const button of submitButtons) {
           setButtonBusy(button, false);
         }
+        syncSaveState();
       }
     });
   }
@@ -744,6 +760,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     event.preventDefault();
     event.returnValue = "";
   });
+  syncSaveState();
 
   for (const button of document.querySelectorAll("[data-segment-speech-preview]")) {
     if (!(button instanceof HTMLButtonElement)) continue;
