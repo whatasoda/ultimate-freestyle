@@ -124,7 +124,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.12.0",
+        version: "0.13.0",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -377,6 +377,9 @@ describe("MCP contract", () => {
           project_id: firstProject.project_id,
           version: 2,
           has_deck: false,
+          aspect_ratio: null,
+          total_duration_seconds: 0,
+          within_submission_limit: false,
           slides: []
         }
       });
@@ -548,6 +551,28 @@ describe("MCP contract", () => {
         }
       });
       expect(narration.structuredContent).toMatchObject({ ok: true, version: 8 });
+      const presentationOutline = await client.callTool({
+        name: "get_project_outline",
+        arguments: { project_id: firstProject.project_id }
+      });
+      expect(presentationOutline.structuredContent).toMatchObject({
+        ok: true,
+        outline: {
+          aspect_ratio: "16:9",
+          total_duration_seconds: 60,
+          within_submission_limit: true,
+          slides: [
+            {
+              id: "question",
+              role: "content",
+              duration_seconds: 60,
+              reveal_steps: 1,
+              composition_mode: "flow",
+              narration_segments: 1
+            }
+          ]
+        }
+      });
       const granularProject = await readJsonResource(
         client,
         `research://projects/${firstProject.project_id}`

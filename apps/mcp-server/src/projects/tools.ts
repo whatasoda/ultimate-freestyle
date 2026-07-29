@@ -164,7 +164,7 @@ export function registerProjectTools(
     {
       title: "研究の概要と構成を取得",
       description:
-        "編集前に使う軽量な読み取りです。本文全体ではなく、version、基本情報、templateとslideの識別子を返します。",
+        "編集前に使う軽量な読み取りです。本文全体ではなく、version、基本情報、20分判定、templateと各slideの時間・構成を返します。",
       inputSchema: { project_id: z.string().uuid() },
       outputSchema: {
         ok: z.boolean(),
@@ -177,13 +177,21 @@ export function registerProjectTools(
             title: z.string(),
             stage: z.string(),
             has_deck: z.boolean(),
+            aspect_ratio: z.enum(["16:9", "4:3"]).nullable(),
+            total_duration_seconds: z.number().int().nonnegative(),
+            within_submission_limit: z.boolean(),
             template_ids: z.array(z.string()),
             slides: z.array(
               z.object({
                 id: z.string(),
                 title: z.string(),
                 position: z.number().int().nonnegative(),
-                template_id: z.string().nullable()
+                template_id: z.string().nullable(),
+                role: z.enum(["content", "cover"]),
+                duration_seconds: z.number().int().positive(),
+                reveal_steps: z.number().int().nonnegative(),
+                composition_mode: z.enum(["flow", "canvas", "scene"]),
+                narration_segments: z.number().int().nonnegative()
               })
             )
           })
@@ -208,6 +216,11 @@ export function registerProjectTools(
             "The project does not exist."
           );
         }
+        const deck = project.document.deck;
+        const totalDurationSeconds = deck?.slides.reduce(
+          (total, slide) => total + slide.duration_seconds,
+          0
+        ) ?? 0;
         return toolResult({
           ok: true,
           request_id: requestId,
@@ -217,15 +230,24 @@ export function registerProjectTools(
             updated_at: project.updated_at,
             title: project.document.title,
             stage: project.document.stage,
-            has_deck: project.document.deck !== null,
+            has_deck: deck !== null,
+            aspect_ratio: deck?.aspect_ratio ?? null,
+            total_duration_seconds: totalDurationSeconds,
+            within_submission_limit:
+              (deck?.slides.length ?? 0) > 0 && totalDurationSeconds <= 20 * 60,
             template_ids:
-              project.document.deck?.templates?.map((template) => template.id) ?? [],
+              deck?.templates?.map((template) => template.id) ?? [],
             slides:
-              project.document.deck?.slides.map((slide, position) => ({
+              deck?.slides.map((slide, position) => ({
                 id: slide.id,
                 title: slide.title,
                 position,
-                template_id: slide.template_id ?? null
+                template_id: slide.template_id ?? null,
+                role: slide.role,
+                duration_seconds: slide.duration_seconds,
+                reveal_steps: slide.reveal_steps,
+                composition_mode: slide.composition?.mode ?? "flow",
+                narration_segments: slide.narration?.segments.length ?? 0
               })) ?? []
           },
           error: null
