@@ -15,6 +15,82 @@ import {
 } from "../src/voicevox/service";
 
 describe("VOICEVOX generation", () => {
+  it("shows narration segments before a VOICEVOX profile is configured", async () => {
+    const userId = "51000000-0000-4000-8000-000000000005";
+    const projectId = "61000000-0000-4000-8000-000000000006";
+    const now = "2026-07-29T00:00:00.000Z";
+    const document = createEmptyProject("音声設定前テスト");
+    document.deck = {
+      short_title: "設定前テスト",
+      description: "",
+      author: "tester",
+      year: 2026,
+      accent: "#8bd450",
+      layout: "minimal",
+      narration_defaults: null,
+      voicevox: null,
+      slides: [
+        {
+          id: "intro",
+          title: "設定前でも見える原稿",
+          duration_seconds: 10,
+          reveal_steps: 0,
+          tone: "dark",
+          content_markdown: "# 音声設定前テスト",
+          reveal_blocks: [],
+          sidebar_markdown: null,
+          narration: {
+            display: "commentary",
+            speaker: null,
+            segments: [
+              {
+                at: 0,
+                text: "声を決める前にも原稿を確認できます。",
+                audio_src: null
+              }
+            ]
+          }
+        }
+      ]
+    };
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO users (id, twitch_user_id, twitch_login, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(userId, "voice-unconfigured-user", "voice-unconfigured", now, now),
+      env.DB.prepare(
+        `INSERT INTO research_projects (
+           id, owner_user_id, title, stage, document_json, version,
+           idempotency_key, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      ).bind(
+        projectId,
+        userId,
+        document.title,
+        document.stage,
+        JSON.stringify(document),
+        "voice-unconfigured-test",
+        now,
+        now
+      )
+    ]);
+
+    const status = await getVoiceProjectStatus(env.DB, userId, projectId);
+
+    expect(status).toMatchObject({
+      configured: false,
+      default_profile: null,
+      summary: { total: 1, ready: 0, needs_generation: 1 },
+      segments: [
+        {
+          slide_id: "intro",
+          text: "声を決める前にも原稿を確認できます。",
+          profile_label: null,
+          status: "needs_generation"
+        }
+      ]
+    });
+  });
+
   it("generates, stores, and hydrates an MP3 narration segment", async () => {
     const userId = "50000000-0000-4000-8000-000000000005";
     const projectId = "60000000-0000-4000-8000-000000000006";

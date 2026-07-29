@@ -103,7 +103,7 @@ export type VoiceProjectStatus = {
     at: number;
     text: string;
     speaker: string | null;
-    profile_label: string;
+    profile_label: string | null;
     status: "ready" | "needs_generation" | "queued" | "failed";
     audio_url: string | null;
   }>;
@@ -364,7 +364,13 @@ export async function getVoiceProjectStatus(
 ): Promise<VoiceProjectStatus | null> {
   const project = await getProject(db, ownerUserId, projectId);
   if (project === null) return null;
-  const plan = await buildVoicePlan(db, ownerUserId, project);
+  const deck = project.document.deck;
+  const defaultProfile = deck?.voicevox?.profiles.find(
+    (profile) => profile.id === deck.voicevox?.default_profile_id
+  );
+  const plan = defaultProfile
+    ? await buildVoicePlan(db, ownerUserId, project)
+    : [];
   const latestJob = await findLatestJob(db, ownerUserId, projectId);
   const jobStates = new Map<string, string>();
   if (latestJob !== null) {
@@ -377,7 +383,7 @@ export async function getVoiceProjectStatus(
       .all<{ fingerprint: string; status: string }>();
     for (const row of rows.results) jobStates.set(row.fingerprint, row.status);
   }
-  const segments = plan.map((segment) => {
+  const configuredSegments = plan.map((segment) => {
     const jobState = jobStates.get(segment.fingerprint);
     const status = segment.artifact
       ? "ready"
@@ -399,10 +405,24 @@ export async function getVoiceProjectStatus(
         : null
     } as const;
   });
-  const deck = project.document.deck;
-  const defaultProfile = deck?.voicevox?.profiles.find(
-    (profile) => profile.id === deck.voicevox?.default_profile_id
-  );
+  const segments = defaultProfile
+    ? configuredSegments
+    : (deck?.slides.flatMap((slide) =>
+        (slide.narration?.segments ?? []).map((segment) => ({
+          slide_id: slide.id,
+          slide_title: slide.title,
+          at: segment.at,
+          text: segment.text,
+          speaker:
+            segment.speaker ??
+            slide.narration?.speaker ??
+            deck.narration_defaults?.speaker ??
+            null,
+          profile_label: null,
+          status: "needs_generation" as const,
+          audio_url: null
+        }))
+      ) ?? []);
   return {
     project_id: projectId,
     version: project.version,
