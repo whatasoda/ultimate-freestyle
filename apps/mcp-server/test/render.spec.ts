@@ -116,7 +116,7 @@ describe("presentation artifact renderer", () => {
                 text_align: "start",
                 vertical_align: "start"
               },
-              content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A\n1. 手順A\n2. 手順B",
+              content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A\n1. 手順A\n2. 手順B\n\n| 比較 | **値** |\n| --- | :---: |\n| 安全 | <table-script> |",
               reveal_blocks: [
                 { at: 1, markdown: "追加で見せる証拠" }
               ],
@@ -168,7 +168,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@33");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@34");
+    expect(html).toContain("<table><thead><tr>");
+    expect(html).toContain('<th class="align-center"><strong>値</strong></th>');
+    expect(html).toContain("&lt;table-script&gt;");
     expect(html).toContain('data-shortcuts role="dialog"');
     expect(html).toContain('id="help" aria-haspopup="dialog"');
     expect(html).toContain("event.key === '?'" );

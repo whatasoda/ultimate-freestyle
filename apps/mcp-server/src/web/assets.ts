@@ -678,6 +678,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         replacement = "**" + content + "**";
         selectionStart = start + 2;
         selectionEnd = selectionStart + content.length;
+      } else if (action === "table") {
+        replacement = "| 比較項目 | 条件A | 条件B |\n| --- | --- | --- |\n| 結果 |  |  |";
+        selectionStart = start + replacement.indexOf("結果");
+        selectionEnd = selectionStart + 2;
       } else {
         const prefix = action === "heading" ? "## " : action === "number" ? "1. " : "- ";
         const lineStart = field.value.lastIndexOf("\n", Math.max(0, start - 1)) + 1;

@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@33";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@34";
 
 function escapeHtml(value: string): string {
   return value
@@ -35,8 +35,44 @@ function renderTextBlocks(markdown: string): string {
     list = [];
   };
 
-  for (const line of lines) {
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex] ?? "";
     const trimmed = line.trim();
+    const nextLine = lines[lineIndex + 1]?.trim() ?? "";
+    const tableCells = (value: string) => {
+      const withoutEdges = value.replace(/^\s*\|/, "").replace(/\|\s*$/, "");
+      return withoutEdges.split("|").map((cell) => cell.trim());
+    };
+    const headerCells = tableCells(trimmed);
+    const separatorCells = tableCells(nextLine);
+    if (
+      trimmed.includes("|") &&
+      nextLine.includes("|") &&
+      headerCells.length === separatorCells.length &&
+      separatorCells.every((cell) => /^:?-{3,}:?$/.test(cell))
+    ) {
+      flushList();
+      const alignments = separatorCells.map((cell) =>
+        cell.startsWith(":") && cell.endsWith(":")
+          ? "center"
+          : cell.endsWith(":")
+            ? "right"
+            : "start"
+      );
+      const rows: string[][] = [];
+      lineIndex += 2;
+      while (lineIndex < lines.length) {
+        const row = (lines[lineIndex] ?? "").trim();
+        if (row.length === 0 || !row.includes("|")) break;
+        const cells = tableCells(row);
+        rows.push(headerCells.map((_, index) => cells[index] ?? ""));
+        lineIndex += 1;
+      }
+      lineIndex -= 1;
+      const cellClass = (index: number) => ` class="align-${alignments[index] ?? "start"}"`;
+      blocks.push(`<table><thead><tr>${headerCells.map((cell, index) => `<th${cellClass(index)}>${renderInlineText(cell)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((cell, index) => `<td${cellClass(index)}>${renderInlineText(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
     if (trimmed.startsWith("- ")) {
       if (list.length > 0 && listTag !== "ul") flushList();
       listTag = "ul";
@@ -655,6 +691,11 @@ export function renderPresentationHtml(
     .slide[data-slide-role="cover"][data-cover-layout="minimal"] .slide-content h2:first-child { font-size: calc(5.7cqw * var(--template-font-scale) * var(--fit-scale)); font-weight: 600; letter-spacing: -.035em; }
     .slide[data-slide-role="cover"][data-cover-layout="statement"] .slide-main { display: grid; align-content: center; padding: 6%; }
     .slide[data-slide-role="cover"][data-cover-layout="statement"] .slide-content h2:first-child { max-width: 18ch; font-size: calc(8.2cqw * var(--template-font-scale) * var(--fit-scale)); color: var(--accent); }
+    :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: calc(1.35cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); line-height: 1.4; }
+    :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) :is(th,td) { padding: .55em .7em; border: max(1px, .06cqw) solid var(--theme-border); overflow-wrap: anywhere; vertical-align: top; }
+    :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) th { background: color-mix(in srgb, var(--accent) 18%, var(--theme-surface)); color: var(--theme-foreground); font-weight: 850; }
+    :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) .align-center { text-align: center; }
+    :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) .align-right { text-align: right; }
     .slide[data-composition="canvas"], .slide[data-composition="scene"] { --slide-base: var(--canvas-background); grid-template: minmax(0, 1fr) auto / 1fr; overflow: var(--canvas-overflow); }
     .slide-canvas { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; overflow: var(--canvas-overflow); }
     .slide-scene { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; padding: calc(6% * var(--density-scale)); overflow: var(--canvas-overflow); }
