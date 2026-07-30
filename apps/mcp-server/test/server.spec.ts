@@ -288,7 +288,7 @@ describe("MCP contract", () => {
       expect(editContract.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "text/markdown",
-          text: expect.stringContaining("古い入力をそのまま再送せず")
+          text: expect.stringContaining("storage.usage_percent")
         })
       );
       const voiceCatalog = await readJsonResource(

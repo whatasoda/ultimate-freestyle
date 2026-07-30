@@ -180,7 +180,7 @@ export function registerProjectTools(
     {
       title: "研究の概要と構成を取得",
       description:
-        "編集前に使う軽量な読み取りです。本文全体ではなく、version、基本情報、20分判定、templateと各slideの時間・構成を返します。",
+        "編集前に使う軽量な読み取りです。本文全体ではなく、version、保存容量、20分判定、templateと各slideの時間・構成を返します。",
       inputSchema: { project_id: z.string().uuid() },
       outputSchema: {
         ok: z.boolean(),

@@ -127,12 +127,13 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 const EDIT_CONTRACT_GUIDE = `# 最自由研究 部分編集契約
 
 1. 最初に \`get_project_outline\` で対象と現在versionを読む。
-2. 研究本文はresearch://projects/{id}/research、発見・限界・ログはそのpage resource、スライドはslide resource、scene/canvasの一件はelement resourceを読み、変更対象と現在値を特定する。
-3. 一回のtool callでは一つの意図だけを変更し、成功応答のversionを次の \`expected_version\` へ渡す。
-4. \`PROJECT_VERSION_CONFLICT\` では古い入力をそのまま再送せず、resourceを読み直して利用者または別Agentの変更を残した差分を作り直す。
-5. 研究本文は \`update_project_fields.text_edits\`、スライド長文は \`update_slide_fields.body_edits\` の \`replace_once\` と \`old_text\` を使う。scene本文は \`update_slide_component_content\`、グラフ・timelineの一件は \`edit_slide_data_item\` を使い、長文・デッキ・scene全体を再送しない。
-6. delete toolと \`edit_slide_data_item.action: delete\` は情報を取り除く。対象resourceを直前に確認し、利用者の意図に含まれる場合だけ実行する。
-7. Web UIの未保存入力はMCPから見えない。公開前に利用者へ保存と実表示診断を案内する。
+2. outlineの\`storage.usage_percent\`が75%以上なら、長いスライド・component・ログの複製を避け、既存項目の置換または不要項目の整理を優先する。90%以上では追加前に利用者へ容量と整理候補を伝える。
+3. 研究本文はresearch://projects/{id}/research、発見・限界・ログはそのpage resource、スライドはslide resource、scene/canvasの一件はelement resourceを読み、変更対象と現在値を特定する。
+4. 一回のtool callでは一つの意図だけを変更し、成功応答のversionを次の \`expected_version\` へ渡す。
+5. \`PROJECT_VERSION_CONFLICT\` では古い入力をそのまま再送せず、resourceを読み直して利用者または別Agentの変更を残した差分を作り直す。
+6. 研究本文は \`update_project_fields.text_edits\`、スライド長文は \`update_slide_fields.body_edits\` の \`replace_once\` と \`old_text\` を使う。scene本文は \`update_slide_component_content\`、グラフ・timelineの一件は \`edit_slide_data_item\` を使い、長文・デッキ・scene全体を再送しない。
+7. delete toolと \`edit_slide_data_item.action: delete\` は情報を取り除く。対象resourceを直前に確認し、利用者の意図に含まれる場合だけ実行する。
+8. Web UIの未保存入力はMCPから見えない。公開前に利用者へ保存と実表示診断を案内する。
 
 復元は \`research://projects/{id}/revisions\` の \`selection_workflow\` に従い、候補の詳細と必要な一枚を比較してから \`restore_draft_revision\` を使う。`;
 
