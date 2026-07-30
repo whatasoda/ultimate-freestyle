@@ -1508,6 +1508,7 @@ async function handleSceneComponentUpdate(
               existing.max_value = component.max_value;
               existing.items = existing.items.map((item, itemIndex) => ({
                 ...item,
+                at: component.items[itemIndex]!.at,
                 label: component.items[itemIndex]!.label,
                 value: component.items[itemIndex]!.value,
                 color: component.items[itemIndex]!.color
@@ -1523,6 +1524,7 @@ async function handleSceneComponentUpdate(
               }
               existing.items = existing.items.map((item, itemIndex) => ({
                 ...item,
+                at: component.items[itemIndex]!.at,
                 kicker: component.items[itemIndex]!.kicker,
                 heading: component.items[itemIndex]!.heading,
                 detail: component.items[itemIndex]!.detail

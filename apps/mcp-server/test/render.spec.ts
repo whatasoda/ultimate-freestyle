@@ -727,6 +727,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("グラフの最大値");
     expect(workspaceHtml).toContain("項目1 · ラベル");
     expect(workspaceHtml).toContain('data-component-path="items.0.value"');
+    expect(workspaceHtml).toContain('data-component-path="items.0.at"');
+    expect(workspaceHtml).toContain('data-component-path="items.0.color"');
     expect(workspaceHtml).toContain('class="component-step">STEP 1');
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain(">全文追従</span>");
