@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@108";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@109";
 
 function escapeHtml(value: string): string {
   return value
@@ -1152,10 +1152,14 @@ export function renderPresentationHtml(
     const announceEditor = (message) => {
       if (editorAnnouncer instanceof HTMLElement) editorAnnouncer.textContent = message;
     };
+    const isEditorTargetVisible = (item) => item instanceof HTMLElement
+      && item.closest('.slide') === slides[slide]
+      && item.closest('.reveal-block[aria-hidden="true"]') === null
+      && item.offsetParent !== null;
     const syncEditorTabStops = () => {
       if (!editorFrame) return;
       const targets = [...document.querySelectorAll('[data-block-id], [data-node-id]')].filter((item) => item instanceof HTMLElement);
-      const visible = targets.filter((item) => item.closest('.slide') === slides[slide] && item.getAttribute('aria-hidden') !== 'true' && item.offsetParent !== null);
+      const visible = targets.filter(isEditorTargetVisible);
       const active = visible.find((item) => item.dataset.editorSelected === 'true') || visible[0] || null;
       for (const item of targets) item.tabIndex = item === active ? 0 : -1;
     };
@@ -1170,7 +1174,7 @@ export function renderPresentationHtml(
       return target;
     };
     const selectEditorTarget = (target) => {
-      if (!editorFrame || !(target instanceof HTMLElement)) return;
+      if (!editorFrame || !isEditorTargetVisible(target)) return;
       const id = target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '';
       setEditorSelection(id);
       target.focus({ preventScroll: true });

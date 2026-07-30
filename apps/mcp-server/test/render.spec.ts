@@ -184,7 +184,12 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@108");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@109");
+    expect(html).toContain("const isEditorTargetVisible = (item)");
+    expect(html).toContain(
+      "item.closest('.reveal-block[aria-hidden=\"true\"]') === null"
+    );
+    expect(html).toContain("const visible = targets.filter(isEditorTargetVisible)");
     expect(html).toContain("effectiveOpacity *=");
     expect(html).toContain("background.complex || effectiveOpacity < .99");
     expect(html).toContain('--aspect-font-scale: 1;');
