@@ -894,7 +894,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const target = document.querySelector('[data-setting-value="' + name + '"]');
     if (target instanceof HTMLElement && value) target.textContent = value;
   };
-  const syncSavedWorkspaceMetadata = (form) => {
+  const syncSavedWorkspaceMetadata = (form, result = {}) => {
     const activeFilmstrip = document.querySelector('.filmstrip-link[data-active="true"]');
     if (form.matches("[data-slide-editor]")) {
       const titleField = form.elements.namedItem("title");
@@ -967,6 +967,36 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       setSettingValue("typography", selectedOptionLabel(form, "preset") + " · " + Number(currentPreviewTypography.columns || 1) + "段");
     }
     if (form.matches("[data-narration-settings-editor]")) setSettingValue("narration", selectedOptionLabel(form, "display"));
+    if (form.matches("[data-template-editor]") && result.template) {
+      const templateId = String(result.template_id || form.dataset.templateId || "");
+      const templateName = String(result.template.name || "");
+      const isDefault = result.default_template_id === templateId;
+      for (const option of document.querySelectorAll('select[name="template_id"] option[value="' + CSS.escape(templateId) + '"], select[name="source_template_id"] option[value="' + CSS.escape(templateId) + '"]')) {
+        if (option instanceof HTMLOptionElement) option.textContent = templateName + (isDefault ? " · 発表全体の既定" : "");
+      }
+      for (const option of document.querySelectorAll('select[name="template_id"] option, select[name="source_template_id"] option')) {
+        if (!(option instanceof HTMLOptionElement) || option.value === "") continue;
+        const plain = option.textContent?.replace(/ · 発表全体の既定$/, "") || "";
+        option.textContent = plain + (result.default_template_id === option.value ? " · 発表全体の既定" : "");
+      }
+      const deleteButton = form.querySelector("[data-template-delete]");
+      if (deleteButton instanceof HTMLButtonElement) deleteButton.dataset.templateName = templateName;
+      if (appearanceEditor instanceof HTMLFormElement) {
+        let templates = {};
+        try { templates = JSON.parse(appearanceEditor.dataset.previewTemplates || "{}"); } catch {}
+        templates[templateId] = {
+          ...(templates[templateId] || {}),
+          template_name: templateName,
+          enter_animation: result.template.enter_animation
+        };
+        appearanceEditor.dataset.previewTemplates = JSON.stringify(templates);
+      }
+      setSettingValue("template", templateName);
+      const impact = form.querySelector("[data-template-impact]");
+      if (impact instanceof HTMLElement && result.affected_slides) {
+        impact.textContent = "保存すると現在" + result.affected_slides.total + "枚へ反映されます（直接指定 " + result.affected_slides.direct + "枚・既定を継承 " + result.affected_slides.inherited + "枚）。";
+      }
+    }
   };
   const postEditorSaveStatus = (form, message) => {
     if (!form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) return;
@@ -1047,7 +1077,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         form.dataset.dirty = "false";
         removeDraft();
         syncPageVersion(result.version);
-        syncSavedWorkspaceMetadata(form);
+        syncSavedWorkspaceMetadata(form, result);
         if (form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) {
           form.dataset.component = JSON.stringify(sceneComponentFromForm(form));
         }

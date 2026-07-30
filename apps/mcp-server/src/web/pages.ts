@@ -2056,6 +2056,12 @@ export function slideWorkspacePage(options: {
   const headingFont = activeTemplate?.heading_font ?? "system-sans";
   const density = activeTemplate?.density ?? "comfortable";
   const motion = activeTemplate?.motion_style ?? "calm";
+  const directTemplateSlides = activeTemplate === undefined
+    ? 0
+    : deck.slides.filter((item) => item.template_id === activeTemplate.id).length;
+  const inheritedTemplateSlides = activeTemplate !== undefined && deck.default_template_id === activeTemplate.id
+    ? deck.slides.filter((item) => item.template_id === null || item.template_id === undefined).length
+    : 0;
   const typography = resolveSlideTypography(
     slide.typography,
     activeTemplate?.line_height ?? 1.5
@@ -2177,8 +2183,8 @@ export function slideWorkspacePage(options: {
   const tonePicker = `<div class="tone-picker" role="group" aria-label="スライドの色調を選ぶ">${Object.entries(TONE_LABELS).map(([value, label]) => `<button class="tone-pick" type="button" data-tone-pick="${value}" aria-pressed="${String(slide.tone === value)}"><span class="tone-swatch" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const templateCreator = `<details class="component-detail"${activeTemplate === undefined ? " open" : ""}><summary>編集できるテンプレートを追加</summary><form class="editor" data-template-create data-versioned-form data-method="POST" action="${projectPath}/templates" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>テンプレート名<input name="name" maxlength="80" required value="自分のスタイル"></label><label>ID<input name="template_id" pattern="[a-z0-9][a-z0-9-]{0,63}" required value="style-${options.project.version}"></label><label>複製元（任意）<select name="source_template_id"><option value="">見た目プリセットから開始</option>${(deck.templates ?? []).map((template) => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}${deck.default_template_id === template.id ? " · 発表全体の既定" : ""}</option>`).join("")}</select></label><label>複製元なしの場合<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label></div><p class="inherit-note">複製元を選ぶと、そのテンプレートの色、フォント、余白、アニメーションを引き継ぎます。追加後に派生版だけを調整できます。</p><label class="check-label"><input type="checkbox" name="make_default" checked>発表全体の既定テンプレートにする</label><div class="actions"><button type="submit">テンプレートを追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
   const templateEditor = activeTemplate
-    ? `<form class="editor" data-template-editor data-versioned-form action="${projectPath}/templates/${escapeHtml(activeTemplate.id)}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}">
-        <p class="inherit-note">このテンプレートを使う全スライドへ反映されます。</p>
+    ? `<form class="editor" data-template-editor data-versioned-form action="${projectPath}/templates/${escapeHtml(activeTemplate.id)}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-template-id="${escapeHtml(activeTemplate.id)}" data-csrf="${escapeHtml(options.csrfToken)}">
+        <p class="inherit-note" data-template-impact>保存すると現在${directTemplateSlides + inheritedTemplateSlides}枚へ反映されます（直接指定 ${directTemplateSlides}枚・既定を継承 ${inheritedTemplateSlides}枚）。</p>
         <label>テンプレート名<input name="name" maxlength="80" required value="${escapeHtml(activeTemplate.name)}"></label>
         <div class="editor-grid"><label>見た目のプリセット<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}"${visualPreset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>情報密度<select name="density">${Object.entries(DENSITY_LABELS).map(([value, label]) => `<option value="${value}"${density === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div>
         ${visualPresetPicker(visualPreset)}

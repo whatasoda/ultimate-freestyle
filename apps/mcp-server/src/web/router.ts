@@ -2888,10 +2888,23 @@ async function handleTemplateFieldsUpdate(
       details: { project_id: projectId, template_id: templateId, make_default: make_default ?? null, version: project.version },
       createdAt: new Date().toISOString()
     });
+    const deck = project.document.deck!;
+    const template = deck.templates?.find((item) => item.id === templateId)!;
+    const directSlideCount = deck.slides.filter((slide) => slide.template_id === templateId).length;
+    const inheritedSlideCount = deck.default_template_id === templateId
+      ? deck.slides.filter((slide) => slide.template_id === null || slide.template_id === undefined).length
+      : 0;
     return jsonResponse({
       ok: true,
       project_id: projectId,
       template_id: templateId,
+      template,
+      default_template_id: deck.default_template_id ?? null,
+      affected_slides: {
+        direct: directSlideCount,
+        inherited: inheritedSlideCount,
+        total: directSlideCount + inheritedSlideCount
+      },
       version: project.version,
       updated_at: project.updated_at,
       error: null,

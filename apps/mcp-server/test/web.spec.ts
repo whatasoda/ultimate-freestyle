@@ -459,6 +459,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("大きな画像を圧縮しています");
     expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
     expect(DASHBOARD_SCRIPT).toContain("templates[templateId]?.template_name");
+    expect(DASHBOARD_SCRIPT).toContain("result.affected_slides.total");
+    expect(DASHBOARD_SCRIPT).toContain("appearanceEditor.dataset.previewTemplates = JSON.stringify(templates)");
     expect(DASHBOARD_SCRIPT).toContain("activeFilmstrip.dataset.roleLabel = nextRole");
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
@@ -1535,6 +1537,12 @@ describe("Web dashboard", () => {
     expect(await templateUpdate.json()).toMatchObject({
       ok: true,
       template_id: "lab",
+      template: {
+        name: "読みやすい実験ノート",
+        enter_animation: "slide-left"
+      },
+      default_template_id: "lab",
+      affected_slides: { direct: 1, inherited: 0, total: 1 },
       version: 5
     });
 
@@ -1702,6 +1710,8 @@ describe("Web dashboard", () => {
     const fourThreeWorkspaceHtml = await fourThreeWorkspace.text();
     expect(fourThreeWorkspaceHtml).toContain('data-aspect-ratio="4:3"');
     expect(fourThreeWorkspaceHtml).toContain("--workspace-aspect:4 / 3");
+    expect(fourThreeWorkspaceHtml).toContain("data-template-impact");
+    expect(fourThreeWorkspaceHtml).toContain("直接指定 1枚・既定を継承 0枚");
 
     const templateCreate = await requestProvider(
       provider,
