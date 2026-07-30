@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@81";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@82";
 
 function escapeHtml(value: string): string {
   return value
@@ -641,9 +641,9 @@ export function renderPresentationHtml(
     .pace[data-state="over"] { border-color: #b55d38; background: #6b291d66; color: #ffd1b8; }
     .time-part { display: inline-flex; gap: .2em; }
     .time-label { color: #718096; font-size: .78em; }
-    .stage-wrap { min-width: 0; min-height: 0; display: grid; place-items: center; }
+    .stage-wrap { min-width: 0; min-height: 0; width: 100%; height: 100%; display: grid; place-items: center; container: presentation-space / size; }
     body[data-aspect-ratio="4:3"] { --stage-ratio: 4 / 3; --stage-width: 4; --stage-height: 3; }
-    .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; touch-action: pan-y; }
+    .stage { position: relative; width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height))); max-width: 100%; max-height: 100%; aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; touch-action: pan-y; }
     .stage:focus-visible { outline: .2rem solid var(--accent); outline-offset: .18rem; }
     body[data-editor-frame="true"] .stage { cursor: default; }
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node[data-positioned="true"]) { cursor: move; touch-action: none; user-select: none; }
