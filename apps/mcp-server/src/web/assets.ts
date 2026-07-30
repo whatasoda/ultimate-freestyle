@@ -618,7 +618,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           speaker_visible: data.has("speaker_visible"),
           progress_visible: data.has("progress_visible"),
           text_scale: Number(data.get("text_scale")),
-          max_lines: Number(data.get("max_lines"))
+          max_lines: Number(data.get("max_lines")),
+          background: String(data.get("appearance_background") || "") || undefined,
+          foreground: String(data.get("appearance_foreground") || "") || undefined,
+          border_color: String(data.get("appearance_border_color") || "") || undefined,
+          accent: String(data.get("appearance_accent") || "") || undefined,
+          corner_radius_px: optionalNumberValue(data, "appearance_corner_radius_px")
         }
       }, location.origin);
     }
@@ -786,7 +791,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         speaker_visible: data.has("speaker_visible"),
         progress_visible: data.has("progress_visible"),
         text_scale: numberValue(data, "text_scale"),
-        max_lines: numberValue(data, "max_lines")
+        max_lines: numberValue(data, "max_lines"),
+        background: String(data.get("appearance_background") || "") || undefined,
+        foreground: String(data.get("appearance_foreground") || "") || undefined,
+        border_color: String(data.get("appearance_border_color") || "") || undefined,
+        accent: String(data.get("appearance_accent") || "") || undefined,
+        corner_radius_px: optionalNumberValue(data, "appearance_corner_radius_px")
       }
     });
     if (form.matches("[data-narration-segment-create]")) Object.assign(body, {
@@ -1068,8 +1078,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (/^#[0-9a-f]{6}$/i.test(text.value)) color.value = text.value;
     });
   }
+  for (const color of document.querySelectorAll("[data-narration-color-preview]")) {
+    if (!(color instanceof HTMLInputElement) || color.type !== "color") continue;
+    const form = color.closest("form");
+    const text = form?.elements.namedItem(color.dataset.narrationColorPreview || "");
+    if (!(form instanceof HTMLFormElement) || !(text instanceof HTMLInputElement)) continue;
+    color.addEventListener("input", () => {
+      text.value = color.value;
+      text.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    text.addEventListener("input", () => {
+      if (/^#[0-9a-f]{6}$/i.test(text.value)) color.value = text.value;
+    });
+  }
 
-  for (const field of document.querySelectorAll('textarea[maxlength], input[maxlength]:not([type]):not([data-component-color-hex]), input[type="text"][maxlength]:not([data-color-text]):not([data-component-color-hex])')) {
+  for (const field of document.querySelectorAll('textarea[maxlength], input[maxlength]:not([type]):not([data-component-color-hex]), input[type="text"][maxlength]:not([data-color-text]):not([data-component-color-hex]):not([data-narration-color-text])')) {
     if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement)) continue;
     const counter = document.createElement("span");
     counter.className = "character-count";
@@ -1536,8 +1559,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       row.append(document.createTextNode(message));
       const { section, target } = diagnosticTarget(item.id, preferredPath);
       if (section instanceof HTMLDetailsElement && target instanceof HTMLElement) {
+        const fallbackFieldName = item.id === "narration" ? "appearance_foreground" : item.id === "flow:sidebar" ? "muted" : "foreground";
         const preferredField = preferredPath
-          ? target.querySelector('[data-component-path="' + preferredPath + '"]') || (target instanceof HTMLFormElement ? target.elements.namedItem(item.id === "flow:sidebar" ? "muted" : "foreground") : null)
+          ? target.querySelector('[data-component-path="' + preferredPath + '"]') || (target instanceof HTMLFormElement ? target.elements.namedItem(fallbackFieldName) : null)
           : null;
         const button = document.createElement("button");
         button.type = "button";

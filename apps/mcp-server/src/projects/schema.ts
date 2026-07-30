@@ -124,7 +124,12 @@ export const narrationAppearanceSchema = z.object({
   speaker_visible: z.boolean().optional(),
   progress_visible: z.boolean().optional(),
   text_scale: z.number().min(0.75).max(1.5).multipleOf(0.05).optional(),
-  max_lines: z.number().int().min(2).max(8).optional()
+  max_lines: z.number().int().min(2).max(8).optional(),
+  background: hexColorSchema.optional(),
+  foreground: hexColorSchema.optional(),
+  border_color: hexColorSchema.optional(),
+  accent: hexColorSchema.optional(),
+  corner_radius_px: z.number().int().min(0).max(64).optional()
 });
 
 const slideBlockFrameSchema = z.object({

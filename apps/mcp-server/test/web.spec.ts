@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=73"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=75"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -566,6 +566,9 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("data-frame-loading");
     expect(workspaceHtml).toContain("プレビューを読み込み中…");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
+    expect(workspaceHtml).toContain("読み上げ枠の色");
+    expect(workspaceHtml).toContain('name="appearance_background"');
+    expect(workspaceHtml).toContain("話者・進捗色");
     expect(workspaceHtml).toContain("data-segment-speech-preview");
     expect(workspaceHtml).toContain("data-segment-duration");
     expect(workspaceHtml).toContain("data-profile-tunings");
@@ -698,6 +701,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("button.dataset.copySuccess");
     expect(dashboardScriptText).toContain("まだ画像がありません");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-narration-settings");
+    expect(dashboardScriptText).toContain("data-narration-color-preview");
+    expect(dashboardScriptText).toContain('item.id === "narration" ? "appearance_foreground"');
     expect(dashboardScriptText).toContain("読み上げ枠をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("説明を保存しています");
     expect(dashboardScriptText).toContain("SpeechSynthesisUtterance");
@@ -1274,7 +1279,12 @@ describe("Web dashboard", () => {
               speaker_visible: true,
               progress_visible: false,
               text_scale: 1.1,
-              max_lines: 4
+              max_lines: 4,
+              background: "#102030",
+              foreground: "#f8fafc",
+              border_color: "#91ddff",
+              accent: "#ffcf32",
+              corner_radius_px: 18
             }
           })
         }
@@ -1286,6 +1296,16 @@ describe("Web dashboard", () => {
       ok: true,
       slide_id: "intro",
       version: 6
+    });
+    const narrationAppearanceDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    expect(JSON.parse(narrationAppearanceDocument!.document_json).deck.slides[0].narration.appearance).toMatchObject({
+      background: "#102030",
+      foreground: "#f8fafc",
+      border_color: "#91ddff",
+      accent: "#ffcf32",
+      corner_radius_px: 18
     });
 
     const invalidProfileUpdate = await requestProvider(

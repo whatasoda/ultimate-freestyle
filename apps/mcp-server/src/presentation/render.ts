@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@58";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@59";
 
 function escapeHtml(value: string): string {
   return value
@@ -167,6 +167,11 @@ function narrationAppearance(
   progress_visible: boolean;
   text_scale: number;
   max_lines: number;
+  background?: string;
+  foreground?: string;
+  border_color?: string;
+  accent?: string;
+  corner_radius_px?: number;
 } {
   const defaults = {
     placement: "bottom" as const,
@@ -551,6 +556,13 @@ export function renderPresentationHtml(
         deck.narration_defaults?.appearance,
         slide.narration?.appearance
       );
+      const narrationVariables = [
+        narrationStyle.background ? `--narration-custom-background:${narrationStyle.background}` : "",
+        narrationStyle.foreground ? `--narration-custom-foreground:${narrationStyle.foreground}` : "",
+        narrationStyle.border_color ? `--narration-custom-border:${narrationStyle.border_color}` : "",
+        narrationStyle.accent ? `--narration-custom-accent:${narrationStyle.accent}` : "",
+        narrationStyle.corner_radius_px !== undefined ? `--narration-custom-radius:${stageLength(narrationStyle.corner_radius_px)}` : ""
+      ].filter(Boolean).join(";");
       const initialNarrationSegment = slide.narration?.segments.find(
         (segment) => segment.at === 0
       );
@@ -581,7 +593,7 @@ export function renderPresentationHtml(
   </aside>`;
       return `<article class="slide tone-${slide.tone}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em" hidden>
   ${content}
-  <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" style="--narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines}" aria-live="polite">
+  <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" style="--narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines};${narrationVariables}" aria-live="polite">
     <span class="narration-speaker"${narrationSpeaker === "" ? " hidden" : ""}>${escapeHtml(narrationSpeaker)}</span>
     <div class="narration-track">${narrationDisplay === "inline" ? inlineNarration : `<p class="narration-text">${escapeHtml(initialNarrationSegment?.text ?? "")}</p>`}</div>
     <span class="narration-inline-progress" aria-hidden="true"></span>
@@ -795,24 +807,24 @@ export function renderPresentationHtml(
     .slide-sidebar { --fit-scale: 1; min-width: 0; min-height: 0; padding: calc(9% * var(--density-scale)) calc(8% * var(--density-scale)); border-left: max(1px, .07cqw) solid var(--theme-border); background: var(--theme-surface); color: var(--theme-muted); overflow: hidden; }
     .slide-sidebar[hidden] { display: none; }
     .slide:has(.slide-sidebar[hidden]) { grid-template-columns: 1fr; }
-    .narration { --fit-scale: 1; grid-column: 1 / -1; display: grid; grid-template: auto 1fr auto / minmax(0, 1fr); gap: .55cqh; min-width: 0; min-height: 0; max-height: 29cqh; padding: calc(1.8cqh * var(--density-scale)) 5%; border-top: max(1px, .07cqw) solid var(--theme-border); background: color-mix(in srgb, var(--theme-surface) 94%, transparent); color: var(--theme-foreground); font-size: calc(1.75cqw * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); line-height: 1.45; text-align: start; overflow: hidden; }
+    .narration { --fit-scale: 1; grid-column: 1 / -1; display: grid; grid-template: auto 1fr auto / minmax(0, 1fr); gap: .55cqh; min-width: 0; min-height: 0; max-height: 29cqh; padding: calc(1.8cqh * var(--density-scale)) 5%; border-top: max(1px, .07cqw) solid var(--narration-custom-border, var(--theme-border)); border-radius: var(--narration-custom-radius, 0); background: var(--narration-custom-background, color-mix(in srgb, var(--theme-surface) 94%, transparent)); color: var(--narration-custom-foreground, var(--theme-foreground)); font-size: calc(1.75cqw * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); line-height: 1.45; text-align: start; overflow: hidden; }
     .narration[data-active="false"]:not([data-display="inline"]) { display: none; }
     .narration[data-size="compact"] { max-height: 15cqh; padding-block: 1.05cqh; font-size: calc(1.35cqw * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
     .narration[data-size="large"] { max-height: 34cqh; padding-block: 2.2cqh; font-size: calc(2.15cqw * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
     .narration[data-text-align="center"] { text-align: center; }
     .narration[data-placement="overlay-bottom"] { position: absolute; z-index: 30; right: 4%; bottom: 3%; left: 4%; width: auto; max-height: 30%; border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.2cqw; box-shadow: 0 1.1cqw 3cqw #0008; }
     .narration[data-placement="sidebar"] { position: absolute; z-index: 30; top: 5%; right: 3%; bottom: 5%; width: min(36%, 34cqw); max-height: none; border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.1cqw; }
-    .narration-speaker { justify-self: start; max-width: 80%; padding: .35cqh .8cqw; border-radius: .4cqw; background: var(--accent); color: #10131a; font-size: .68em; font-weight: 850; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .narration-speaker { justify-self: start; max-width: 80%; padding: .35cqh .8cqw; border-radius: .4cqw; background: var(--narration-custom-accent, var(--accent)); color: #10131a; font-size: .68em; font-weight: 850; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .narration[data-speaker-visible="false"] .narration-speaker, .narration-speaker[hidden] { display: none; }
     .narration-track { min-width: 0; min-height: 0; overflow: hidden; }
     .narration-text { display: -webkit-box; margin: 0; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: var(--narration-max-lines); }
-    .narration-inline-progress { align-self: end; display: block; width: 0; height: .32cqh; border-radius: 99px; background: var(--accent); transition: width .15s linear; }
+    .narration-inline-progress { align-self: end; display: block; width: 0; height: .32cqh; border-radius: 99px; background: var(--narration-custom-accent, var(--accent)); transition: width .15s linear; }
     .narration[data-progress-visible="false"] .narration-inline-progress { display: none; }
-    .narration[data-display="dialogue"] { margin: 0 4% 3%; border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.1cqw; background: linear-gradient(135deg, color-mix(in srgb, var(--theme-surface) 96%, #08111f), var(--theme-surface)); box-shadow: 0 .8cqw 2.3cqw #0007, inset 0 1px #ffffff16; }
+    .narration[data-display="dialogue"] { margin: 0 4% 3%; border: max(1px, .07cqw) solid var(--narration-custom-border, var(--theme-border)); border-radius: var(--narration-custom-radius, 1.1cqw); background: var(--narration-custom-background, linear-gradient(135deg, color-mix(in srgb, var(--theme-surface) 96%, #08111f), var(--theme-surface))); box-shadow: 0 .8cqw 2.3cqw #0007, inset 0 1px #ffffff16; }
     .narration[data-display="commentary"] { max-height: 19cqh; padding-block: 1.35cqh; border-top-color: color-mix(in srgb, var(--accent) 45%, transparent); text-align: center; font-weight: 800; text-shadow: 0 .15cqw .7cqw #000; }
-    .narration[data-display="subtitle"] { max-height: 16cqh; margin: 0 9% 2.5%; border: 0; border-radius: .6cqw; background: #000c; text-align: center; font-weight: 750; text-shadow: 0 .12cqw .45cqw #000; }
-    .narration[data-display="minimal"] { justify-self: center; width: fit-content; max-width: 82%; max-height: 13cqh; margin-bottom: 2.5%; padding: .8cqh 1.4cqw; border: 0; border-radius: 99px; background: #000a; text-align: center; }
-    .narration[data-display="inline"] { max-height: 25cqh; padding-block: 1.1cqh; border-top-color: #cbd5e1; background: #f8fafcee; color: #172033; font-size: calc(1.1cqw * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
+    .narration[data-display="subtitle"] { max-height: 16cqh; margin: 0 9% 2.5%; border: 0; border-radius: var(--narration-custom-radius, .6cqw); background: var(--narration-custom-background, #000c); text-align: center; font-weight: 750; text-shadow: 0 .12cqw .45cqw #000; }
+    .narration[data-display="minimal"] { justify-self: center; width: fit-content; max-width: 82%; max-height: 13cqh; margin-bottom: 2.5%; padding: .8cqh 1.4cqw; border: 0; border-radius: var(--narration-custom-radius, 99px); background: var(--narration-custom-background, #000a); text-align: center; }
+    .narration[data-display="inline"] { max-height: 25cqh; padding-block: 1.1cqh; border-top-color: var(--narration-custom-border, #cbd5e1); background: var(--narration-custom-background, #f8fafcee); color: var(--narration-custom-foreground, #172033); font-size: calc(1.1cqw * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
     .narration[data-display="inline"] .narration-track { display: grid; gap: .32em; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
     .narration-segment { opacity: .34; transition: opacity var(--motion-duration) var(--motion-ease), translate var(--motion-duration) var(--motion-ease); overflow-wrap: anywhere; }
     .narration-segment.is-current { opacity: 1; translate: .35em 0; font-weight: 800; }
@@ -1669,6 +1681,13 @@ export function renderPresentationHtml(
       region.dataset.progressVisible = String(data.appearance.progress_visible);
       region.style.setProperty('--narration-text-scale', String(data.appearance.text_scale));
       region.style.setProperty('--narration-max-lines', String(data.appearance.max_lines));
+      for (const [field, property] of [['background', '--narration-custom-background'], ['foreground', '--narration-custom-foreground'], ['border_color', '--narration-custom-border'], ['accent', '--narration-custom-accent']]) {
+        const value = data.appearance[field];
+        if (/^#[0-9a-f]{6}$/i.test(String(value || ''))) region.style.setProperty(property, String(value));
+        else region.style.removeProperty(property);
+      }
+      if (Number.isFinite(data.appearance.corner_radius_px)) region.style.setProperty('--narration-custom-radius', previewLength(data.appearance.corner_radius_px));
+      else region.style.removeProperty('--narration-custom-radius');
       const speaker = region.querySelector('.narration-speaker');
       const speakerText = String(data.speaker || DECK.slides[slide].narration?.speaker || '');
       if (speaker instanceof HTMLElement) { speaker.textContent = speakerText; speaker.hidden = speakerText === ''; }
