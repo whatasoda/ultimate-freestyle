@@ -31,6 +31,7 @@ import {
 } from "./repository";
 import { RUBRIC_MARKDOWN } from "./rubric";
 import { staticSlideQuality } from "./quality";
+import { getRenderedQualityReport } from "./quality-reports";
 
 const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 
@@ -824,6 +825,9 @@ export function registerResearchGuides(
       const project = !("error" in auth) && typeof id === "string"
         ? await getProject(db, auth.ownerUserId, id)
         : null;
+      const renderedReport = project === null || "error" in auth
+        ? null
+        : await getRenderedQualityReport(db, auth.ownerUserId, project.project_id);
       const deck = project?.document.deck ?? null;
       const slides = deck?.slides.map((slide, index) => ({
         slide_id: slide.id,
@@ -849,13 +853,27 @@ export function registerResearchGuides(
               },
               rendered_checks: {
                 required: true,
-                available_in_mcp: false,
+                available_in_mcp: renderedReport !== null,
+                current: renderedReport !== null &&
+                  renderedReport.project_version === project.version &&
+                  renderedReport.renderer_version === PRESENTATION_RENDERER_VERSION &&
+                  renderedReport.status === "completed",
                 checks: ["見切れ", "自動縮小率", "文字コントラスト", "読み上げ文の省略", "実文字サイズ", "表示パーツの重なり"],
                 reason: "DOMの実寸、font、画像、アニメーションを含む検査は保存データだけでは確定できません。",
+                latest_report: renderedReport,
                 web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${project.project_id}`,
                 requires_session: true
               },
-              next_action: warningCount > 0 ? "fix_static_warnings" : "run_rendered_quality_sweep"
+              next_action: warningCount > 0
+                ? "fix_static_warnings"
+                : renderedReport === null ||
+                    renderedReport.project_version !== project.version ||
+                    renderedReport.renderer_version !== PRESENTATION_RENDERER_VERSION ||
+                    renderedReport.status !== "completed"
+                  ? "run_rendered_quality_sweep"
+                  : renderedReport.issue_count > 0
+                    ? "fix_rendered_warnings"
+                    : "quality_review_complete"
             };
       return {
         contents: [{

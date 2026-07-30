@@ -263,7 +263,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       qualitySweepResults.append(item);
     };
     const appendSweepResult = (slide, message, warning = true) => {
-      const result = { href: slide?.href || "", label: slide?.href ? slide.number + ". " + slide.title : "", message, warning };
+      const result = { slide_id: slide?.id || "__all__", href: slide?.href || "", label: slide?.href ? slide.number + ". " + slide.title : "", message, warning };
       sweepResults.push(result);
       renderSweepResult(result);
     };
@@ -271,6 +271,42 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       try {
         sessionStorage.setItem(sweepStorageKey, JSON.stringify({ state, completed_checkpoints: completedCheckpoints, total_checkpoints: totalCheckpoints, issue_count: sweepIssueCount, results: sweepResults }));
       } catch {}
+    };
+    const saveQualitySweep = async (state) => {
+      try {
+        const response = await fetch(qualitySweepButton.dataset.reportUrl || "", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": qualitySweepButton.dataset.csrf || ""
+          },
+          body: JSON.stringify({
+            project_version: Number(qualitySweepButton.dataset.projectVersion),
+            renderer_version: qualitySweepButton.dataset.rendererVersion || "",
+            status: state,
+            completed_checkpoints: completedCheckpoints,
+            total_checkpoints: totalCheckpoints,
+            issue_count: sweepIssueCount,
+            results: sweepResults
+              .filter((result) => result.warning && result.slide_id)
+              .slice(0, 60)
+              .map((result) => ({
+                slide_id: String(result.slide_id).slice(0, 64),
+                message: String(result.message).slice(0, 300),
+                warning: true
+              }))
+          })
+        });
+        if (!response.ok && qualitySweepStatus instanceof HTMLElement) {
+          qualitySweepStatus.textContent += " 結果を共有保存できませんでした。";
+          qualitySweepStatus.classList.add("warning");
+        }
+      } catch {
+        if (qualitySweepStatus instanceof HTMLElement) {
+          qualitySweepStatus.textContent += " 結果を共有保存できませんでした。";
+          qualitySweepStatus.classList.add("warning");
+        }
+      }
     };
     const finishQualitySweep = () => {
       sweepRunning = false;
@@ -287,6 +323,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
       if (sweepIssueCount === 0) appendSweepResult(null, "全段階で見切れ、過剰な自動縮小、文字コントラスト不足は見つかりませんでした。", false);
       persistQualitySweep("completed");
+      void saveQualitySweep("completed");
     };
     const requestSweepPosition = () => {
       const slide = slides[sweepIndex];
@@ -425,6 +462,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           qualitySweepStatus.classList.remove("success", "warning");
         }
         persistQualitySweep("cancelled");
+        void saveQualitySweep("cancelled");
       });
     }
     try {

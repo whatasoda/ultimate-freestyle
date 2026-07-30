@@ -5,6 +5,8 @@ import { describe, expect, it } from "vitest";
 
 import { createServer } from "../src/server";
 import { createProjectAsset } from "../src/assets/repository";
+import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
+import { saveRenderedQualityReport } from "../src/projects/quality-reports";
 import { projectSummarySchema } from "../src/projects/schema";
 
 async function readJsonResource(client: Client, uri: string): Promise<unknown> {
@@ -631,6 +633,37 @@ describe("MCP contract", () => {
           requires_session: true
         },
         next_action: "run_rendered_quality_sweep"
+      });
+      await saveRenderedQualityReport(
+        env.DB,
+        subjectId,
+        firstProject.project_id,
+        {
+          project_version: 2,
+          renderer_version: PRESENTATION_RENDERER_VERSION,
+          status: "completed",
+          completed_checkpoints: 1,
+          total_checkpoints: 1,
+          issue_count: 0,
+          results: []
+        },
+        "2026-07-30T08:00:00.000Z"
+      );
+      const checkedQualityResource = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/quality`
+      );
+      expect(checkedQualityResource).toMatchObject({
+        rendered_checks: {
+          available_in_mcp: true,
+          current: true,
+          latest_report: {
+            project_version: 2,
+            status: "completed",
+            issue_count: 0
+          }
+        },
+        next_action: "quality_review_complete"
       });
       const revisionResource = await readJsonResource(
         client,

@@ -22,7 +22,10 @@ import {
   readWebSession
 } from "../auth/web-session";
 import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
-import { renderPresentationHtml } from "../presentation/render";
+import {
+  PRESENTATION_RENDERER_VERSION,
+  renderPresentationHtml
+} from "../presentation/render";
 import {
   getProjectDraftRevision,
   getProject,
@@ -32,6 +35,10 @@ import {
   restoreProjectDraftRevision
 } from "../projects/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
+import {
+  renderedQualityReportInputSchema,
+  saveRenderedQualityReport
+} from "../projects/quality-reports";
 import { invalidateVoiceProfileAudio } from "../projects/voice-audio";
 import {
   animationSchema,
@@ -1270,6 +1277,83 @@ async function handleProjectFieldsUpdate(
       status
     );
   }
+}
+
+async function handleRenderedQualityReportSave(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = renderedQualityReportInputSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      { ok: false, error: { code: "INVALID_QUALITY_REPORT", message: "表示確認結果を保存できませんでした。" }, request_id: crypto.randomUUID() },
+      422
+    );
+  }
+  const project = await getProject(env.DB, session.userId, projectId);
+  if (project === null) {
+    return jsonResponse(
+      { ok: false, error: { code: "PROJECT_NOT_FOUND", message: "研究が見つかりません。" }, request_id: crypto.randomUUID() },
+      404
+    );
+  }
+  if (
+    project.version !== parsed.data.project_version ||
+    parsed.data.renderer_version !== PRESENTATION_RENDERER_VERSION
+  ) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "QUALITY_REPORT_STALE", message: "研究または表示エンジンが更新されています。もう一度確認してください。" },
+        current_version: project.version,
+        renderer_version: PRESENTATION_RENDERER_VERSION,
+        request_id: crypto.randomUUID()
+      },
+      409
+    );
+  }
+  const report = await saveRenderedQualityReport(
+    env.DB,
+    session.userId,
+    projectId,
+    parsed.data
+  );
+  await recordWebAudit(env.DB, {
+    userId: session.userId,
+    eventType: "project.rendered_quality_checked",
+    outcome: "succeeded",
+    details: {
+      project_id: projectId,
+      version: report.project_version,
+      status: report.status,
+      issue_count: report.issue_count
+    },
+    createdAt: report.created_at
+  });
+  return jsonResponse({
+    ok: true,
+    project_id: projectId,
+    project_version: report.project_version,
+    renderer_version: report.renderer_version,
+    status: report.status,
+    issue_count: report.issue_count,
+    saved_at: report.created_at,
+    error: null,
+    request_id: crypto.randomUUID()
+  });
 }
 
 async function handleDeckSettingsUpdate(
@@ -4207,6 +4291,12 @@ export async function handleWebRequest(
   );
   if (projectFieldsMatch?.[1] !== undefined) {
     return handleProjectFieldsUpdate(request, env, projectFieldsMatch[1]);
+  }
+  const qualityReportMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/quality-report$`, "i")
+  );
+  if (qualityReportMatch?.[1] !== undefined) {
+    return handleRenderedQualityReportSave(request, env, qualityReportMatch[1]);
   }
   const draftRestoreMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/revisions/(\\d{1,9})/restore$`, "i")

@@ -185,6 +185,7 @@ describe("Web dashboard", () => {
     const sessionCookie = cookiePair(setCookie, "__Host-SAIJIYU_SESSION");
     const csrfCookie = cookiePair(setCookie, "__Host-SAIJIYU_WEB_CSRF");
     const browserCookies = `${sessionCookie}; ${csrfCookie}`;
+    const cookieCsrfToken = csrfCookie.split("=").slice(1).join("=");
 
     const sessionWithoutCsrf = await requestProvider(
       provider,
@@ -438,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=116"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=117"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -447,6 +448,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("0ページ目と全スライドの実表示を一括確認");
     expect(detailHtml).toContain('&quot;id&quot;:&quot;__prelude__&quot;');
     expect(detailHtml).toContain("data-quality-sweep");
+    expect(detailHtml).toContain('data-report-url="/api/projects/10000000-0000-4000-8000-000000000001/quality-report"');
+    expect(detailHtml).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
     expect(detailHtml).toContain('data-project-version="1"');
     expect(detailHtml).toContain("段階を順番に描画");
     expect(DASHBOARD_SCRIPT).toContain("advanceQualitySweep");
@@ -533,6 +536,48 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("自由配置 1パーツ");
     expect(detailHtml).toContain("/revisions/1\">内容を確認");
     expect(detailHtml).toContain("直近10版を必ず残し、最大50版・合計8MiB");
+
+    const qualityReport = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/quality-report",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": cookieCsrfToken
+          },
+          body: JSON.stringify({
+            project_version: 1,
+            renderer_version: PRESENTATION_RENDERER_VERSION,
+            status: "completed",
+            completed_checkpoints: 2,
+            total_checkpoints: 2,
+            issue_count: 1,
+            results: [{
+              slide_id: "intro",
+              message: "STEP 1: 小さすぎる文字1か所",
+              warning: true
+            }]
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(qualityReport.status).toBe(200);
+    expect(await qualityReport.json()).toMatchObject({
+      ok: true,
+      project_version: 1,
+      status: "completed",
+      issue_count: 1
+    });
+    expect(await env.DB.prepare(
+      "SELECT issue_count, results_json FROM project_quality_reports WHERE project_id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first()).toMatchObject({
+      issue_count: 1,
+      results_json: expect.stringContaining("小さすぎる文字")
+    });
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
     );
@@ -822,6 +867,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('voicevoxSampleButton.textContent = "準備を中止"');
     expect(dashboardScriptText).toContain('response.headers.get("x-voicevox-cache")');
     expect(dashboardScriptText).toContain('persistQualitySweep("completed")');
+    expect(dashboardScriptText).toContain('void saveQualitySweep("completed")');
     expect(dashboardScriptText).toContain("前回の確認結果：");
     expect(dashboardScriptText).toContain('card.dataset.needsAttention === "true"');
     expect(dashboardScriptText).toContain("updateImagePreview");
