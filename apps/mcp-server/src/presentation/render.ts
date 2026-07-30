@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@90";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@91";
 
 function escapeHtml(value: string): string {
   return value
@@ -883,7 +883,9 @@ export function renderPresentationHtml(
     .reveal-block[data-animation="blur"].is-visible { filter: blur(0); }
     .reveal-block[data-animation="wipe"] { clip-path: inset(0 100% 0 0); translate: none; }
     .reveal-block[data-animation="wipe"].is-visible { clip-path: inset(0); }
-    .stage[data-measuring="true"] .reveal-block { translate: 0 0 !important; scale: 1 !important; filter: none !important; clip-path: inset(0) !important; }
+    .stage[data-measuring="true"] .reveal-block { transition: none !important; translate: 0 0 !important; scale: 1 !important; filter: none !important; clip-path: inset(0) !important; }
+    .stage[data-measuring="true"] .reveal-block.is-visible { opacity: 1 !important; }
+    .stage[data-measuring="true"] .reveal-block:not(.is-visible) { opacity: 0 !important; }
     .reveal-block p, .reveal-block li { font-size: calc(1.65cqw * var(--template-font-scale) * var(--slide-body-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
     .slide-sidebar h2, .slide-sidebar h3, .slide-sidebar h4 { color: var(--accent); }
     .slide-sidebar p, .slide-sidebar li { font-size: calc(1.1cqw * var(--template-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
@@ -1232,9 +1234,12 @@ export function renderPresentationHtml(
       if (voiceAnnouncer instanceof HTMLElement && ['blocked', 'failed', 'fallback'].includes(state) && voiceAnnouncer.textContent !== label) voiceAnnouncer.textContent = label;
     };
     const showVoiceUnlock = () => {
-      if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = false;
+      if (voiceUnlock instanceof HTMLButtonElement) {
+        voiceUnlock.hidden = false;
+        voiceUnlock.focus({ preventScroll: true });
+      }
       stage?.setAttribute('data-voice-blocked', 'true');
-      setVoiceStatus('blocked', '音声開始待ち · 画面を操作');
+      setVoiceStatus('blocked', '音声開始待ち · 「音声を開始」を押す');
     };
     const hideVoiceUnlock = () => {
       if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = true;
@@ -1270,6 +1275,7 @@ export function renderPresentationHtml(
     };
     const showCompletion = () => {
       if (editorFrame || !(completion instanceof HTMLElement)) return;
+      stopVoice();
       auto = false;
       autoButton.setAttribute('aria-pressed', 'false');
       autoButton.textContent = '自動 OFF';
@@ -2341,8 +2347,13 @@ export function renderPresentationHtml(
         return;
       }
       if (presentationResume instanceof HTMLButtonElement && !presentationResume.hidden) return;
+      if (voiceUnlock instanceof HTMLButtonElement && !voiceUnlock.hidden && [' ', 'Enter'].includes(event.key)) {
+        event.preventDefault();
+        voiceUnlock.click();
+        return;
+      }
       const target = event.target;
-      const interactive = target instanceof Element ? target.closest('button, a, input, select, textarea') : null;
+      const interactive = target instanceof Element ? target.closest('button, a, input, select, textarea, summary, details') : null;
       if (interactive instanceof HTMLInputElement || interactive instanceof HTMLSelectElement || interactive instanceof HTMLTextAreaElement) return;
       if (interactive instanceof HTMLElement && [' ', 'Enter'].includes(event.key)) return;
       if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter'].includes(event.key)) {
@@ -2441,7 +2452,8 @@ export function renderPresentationHtml(
         return;
       }
       if (getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
-      if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
+      if (completion instanceof HTMLElement && !completion.hidden) return;
+      if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea, summary, details')) return;
       if (!started) {
         if (preludeStart instanceof HTMLButtonElement && !preludeStart.disabled) preludeStart.click();
         return;

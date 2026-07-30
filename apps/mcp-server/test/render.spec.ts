@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@90");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@91");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
@@ -259,6 +259,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain(">音声を開始</button>");
     expect(html).toContain("error.name === 'NotAllowedError'");
     expect(html).toContain("showVoiceUnlock()");
+    expect(html).toContain("voiceUnlock.focus({ preventScroll: true })");
+    expect(html).toContain("音声開始待ち · 「音声を開始」を押す");
     expect(html).toContain("if (run !== voiceRun) return;");
     expect(html).toContain("if (run !== voiceRun || activeAudio !== player) return;");
     expect(html).toContain("activeAudio = null;\n        finishVoice();");
@@ -329,6 +331,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("event.key.toLowerCase() === 't'");
     expect(html).toContain("data-restart");
     expect(html).toContain("else { showCompletion(); return false; }");
+    expect(html).toContain('.stage[data-measuring="true"] .reveal-block.is-visible { opacity: 1 !important; }');
+    expect(html).toContain("if (completion instanceof HTMLElement && !completion.hidden) return;");
+    expect(html).toContain("textarea, summary, details");
     expect(html).toContain('id="volume-value"');
     expect(html).toContain("const normalizeVolume = (value)");
     expect(html).toContain("Math.round(value * 100) + '%'");
