@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@107");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@108");
     expect(html).toContain("effectiveOpacity *=");
     expect(html).toContain("background.complex || effectiveOpacity < .99");
     expect(html).toContain('--aspect-font-scale: 1;');
@@ -403,6 +403,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("segment?.speaker || DECK.slides[slide].narration?.speaker");
     expect(html).toContain("ultimate-freestyle:render-diagnostics");
     expect(html).toContain("step, overflows: diagnostics, fits, contrasts");
+    expect(html).toContain("const collectFontFallbacks = (slideElement)");
+    expect(html).toContain("occlusions, fonts }");
+    expect(html).toContain('"handwritten":["Klee"');
     expect(html).toContain("const collectContrast = (target, slideElement)");
     expect(html).not.toContain("background.complex && ratio >= 2");
     expect(html).toContain("suggested_foreground");

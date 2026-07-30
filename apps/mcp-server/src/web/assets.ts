@@ -409,14 +409,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const occlusions = Array.isArray(data.occlusions)
         ? data.occlusions.filter((item) => typeof item?.id === "string" && typeof item?.other_id === "string" && Number.isFinite(item?.overlap_ratio) && item.overlap_ratio >= 0.2)
         : [];
-      if (overflows.length || compressed.length || contrasts.length || clamps.length || readability.length || occlusions.length) {
+      const fonts = Array.isArray(data.fonts)
+        ? data.fonts.filter((item) => typeof item?.role === "string" && typeof item?.preset === "string" && Array.isArray(item?.candidates))
+        : [];
+      if (overflows.length || compressed.length || contrasts.length || clamps.length || readability.length || occlusions.length || fonts.length) {
         const details = [
           overflows.length ? "見切れ" + overflows.length + "か所" : "",
           compressed.length ? "70%未満の縮小" + compressed.length + "か所" : "",
           contrasts.length ? "文字コントラスト不足" + contrasts.length + "か所" : "",
           clamps.length ? "読み上げ文の省略" + clamps.length + "か所" : "",
           readability.length ? "小さすぎる文字" + readability.length + "か所" : "",
-          occlusions.length ? "表示パーツの重なり" + occlusions.length + "組" : ""
+          occlusions.length ? "表示パーツの重なり" + occlusions.length + "組" : "",
+          fonts.length ? "指定フォントの代替表示" + fonts.length + "件" : ""
         ].filter(Boolean).join("、");
         currentSlideFindings.push("STEP " + sweepStep + ": " + details);
       }
@@ -2432,7 +2436,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (section instanceof HTMLDetailsElement && target instanceof HTMLElement) {
         const fallbackFieldName = item.id === "narration" ? "appearance_foreground" : item.id === "flow:sidebar" ? "muted" : "foreground";
         const preferredField = preferredPath
-          ? target.querySelector('[data-component-path="' + preferredPath + '"]') || (target instanceof HTMLFormElement ? target.elements.namedItem(fallbackFieldName) : null)
+          ? target.querySelector('[data-component-path="' + preferredPath + '"]') || (target instanceof HTMLFormElement ? target.elements.namedItem(preferredPath) || target.elements.namedItem(fallbackFieldName) : null)
           : null;
         const button = document.createElement("button");
         button.type = "button";
@@ -2551,6 +2555,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const occlusions = Array.isArray(data.occlusions)
         ? data.occlusions.filter((item) => item && typeof item.id === "string" && typeof item.other_id === "string" && Number.isFinite(item.overlap_ratio) && item.overlap_ratio >= 0.2)
         : [];
+      const fonts = Array.isArray(data.fonts)
+        ? data.fonts.filter((item) => item && typeof item.id === "string" && typeof item.role === "string" && typeof item.preset === "string" && typeof item.field === "string" && Array.isArray(item.candidates))
+        : [];
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = overflows.length
           ? overflows.length + "か所で文字が収まりません。品質確認から対象を確認してください。"
@@ -2564,8 +2571,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             ? readability.length + "か所で文字が小さすぎます。自動縮小、文字倍率、枠の大きさを見直してください。"
           : occlusions.length
             ? occlusions.length + "組の文字表示が重なっています。読み上げ枠または自由配置の位置と大きさを確認してください。"
+          : fonts.length
+            ? fonts.length + "件の指定フォントがこの端末になく、代替フォントで表示されています。フォント設定または実際の改行を確認してください。"
           : "このSTEPの文字は" + (slideFrame.dataset.aspectRatio || "16:9") + "の枠内に収まっています。";
-        layoutStatus.dataset.level = overflows.length || compressed.length || contrasts.length || clamps.length || readability.length || occlusions.length ? "warning" : "ok";
+        layoutStatus.dataset.level = overflows.length || compressed.length || contrasts.length || clamps.length || readability.length || occlusions.length || fonts.length ? "warning" : "ok";
       }
       if (qualityList instanceof HTMLElement) {
         qualityList.querySelectorAll("[data-layout-warning]").forEach((item) => item.remove());
@@ -2587,10 +2596,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         for (const item of occlusions) {
           appendDiagnostic(item, item.region + "「" + item.id + "」と" + item.other_region + "「" + item.other_id + "」が" + Math.round(item.overlap_ratio * 100) + "%重なっています。");
         }
+        for (const item of fonts) {
+          appendDiagnostic(item, item.role + "の「" + item.preset + "」はこの端末で候補フォント（" + item.candidates.join("、") + "）を確認できず、代替表示です。", item.field);
+        }
       }
       if (qualitySummary instanceof HTMLElement) {
         const baseCount = Number(qualitySummary.dataset.baseCount || 0);
-        const total = baseCount + overflows.length + compressed.length + contrasts.length + clamps.length + readability.length + occlusions.length;
+        const total = baseCount + overflows.length + compressed.length + contrasts.length + clamps.length + readability.length + occlusions.length + fonts.length;
         qualitySummary.dataset.level = total ? "warning" : "ok";
         qualitySummary.textContent = overflows.length
           ? total + "件の確認事項があります（うち見切れ" + overflows.length + "件）。"
@@ -2604,6 +2616,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             ? total + "件の確認事項があります（うち小さすぎる文字" + readability.length + "件）。"
           : occlusions.length
             ? total + "件の確認事項があります（うち表示パーツの重なり" + occlusions.length + "件）。"
+          : fonts.length
+            ? total + "件の確認事項があります（うち指定フォントの代替表示" + fonts.length + "件）。"
           : baseCount
             ? baseCount + "件の確認事項があります。"
             : "保存データ上の確認事項はありません。";

@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@107";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@108";
 
 function escapeHtml(value: string): string {
   return value
@@ -138,7 +138,23 @@ type FontPreset =
   | "mincho"
   | "serif"
   | "monospace"
-  | "display";
+  | "display"
+  | "textbook"
+  | "handwritten"
+  | "condensed";
+
+const FONT_CANDIDATES: Record<FontPreset, string[]> = {
+  "system-sans": [],
+  gothic: ["BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN"],
+  rounded: ["M PLUS Rounded 1c", "Hiragino Maru Gothic ProN"],
+  mincho: ["Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN"],
+  serif: ["Georgia", "Noto Serif JP", "Yu Mincho"],
+  monospace: ["BIZ UDGothic", "SFMono-Regular", "Consolas"],
+  display: ["Arial Black", "Hiragino Kaku Gothic StdN", "Yu Gothic"],
+  textbook: ["UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN"],
+  handwritten: ["Klee", "Hannotate SC", "YuKyokasho"],
+  condensed: ["Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN"]
+};
 type DensityPreset = "spacious" | "comfortable" | "compact";
 type MotionStyle = "calm" | "snappy" | "dramatic";
 
@@ -1083,6 +1099,7 @@ export function renderPresentationHtml(
     </footer>
   </main>
   <script nonce="saijiyu-static">const DECK=${safeJson(runtimeDeck)};
+  const FONT_CANDIDATES=${safeJson(FONT_CANDIDATES)};
   for (const name of ['uf-layer','uf-stack','uf-grid','uf-hero','uf-markdown','uf-image','uf-shape','uf-card','uf-metric','uf-quote','uf-callout','uf-bar-chart','uf-timeline','uf-bar-row','uf-timeline-item']) {
     if (!customElements.get(name)) customElements.define(name, class extends HTMLElement { connectedCallback() { this.dataset.upgraded = 'true'; } });
   }
@@ -1587,6 +1604,36 @@ export function renderPresentationHtml(
       }
       return smallest;
     };
+    const fontProbeContext = editorFrame ? document.createElement('canvas').getContext('2d') : null;
+    const fontProbeText = 'mmmmmmmmmmlli最自由研究Aa';
+    const genericFontFamilies = ['monospace', 'sans-serif', 'serif'];
+    const genericFontWidths = fontProbeContext ? genericFontFamilies.map((family) => {
+      fontProbeContext.font = '72px ' + family;
+      return fontProbeContext.measureText(fontProbeText).width;
+    }) : [];
+    const fontAvailability = new Map();
+    const localFontAvailable = (family) => {
+      if (!fontProbeContext) return true;
+      if (fontAvailability.has(family)) return fontAvailability.get(family);
+      const safeFamily = String(family).replaceAll('"', '');
+      const available = genericFontFamilies.some((generic, index) => {
+        fontProbeContext.font = '72px "' + safeFamily + '", ' + generic;
+        return Math.abs(fontProbeContext.measureText(fontProbeText).width - genericFontWidths[index]) > .1;
+      });
+      fontAvailability.set(family, available);
+      return available;
+    };
+    const collectFontFallbacks = (slideElement) => {
+      if (!editorFrame || !(slideElement instanceof HTMLElement)) return [];
+      return [
+        { role: '本文', field: 'body_font', preset: slideElement.dataset.bodyFont },
+        { role: '見出し', field: 'heading_font', preset: slideElement.dataset.headingFont }
+      ].flatMap((selection) => {
+        const candidates = FONT_CANDIDATES[selection.preset] || [];
+        if (candidates.length === 0 || candidates.some(localFontAvailable)) return [];
+        return [{ id: 'flow:main', region: selection.role + 'フォント', role: selection.role, field: selection.field, preset: selection.preset, candidates }];
+      });
+    };
     const collectOcclusions = (slideElement) => {
       const candidates = [...slideElement.querySelectorAll('.slide-main[data-fit-content], .slide-sidebar[data-fit-content], .canvas-block[data-fit-content], .scene-node[data-positioned="true"][data-fit-content], .narration[data-active="true"][data-fit-content]:is([data-placement="overlay-bottom"],[data-placement="sidebar"])')]
         .filter((item) => item instanceof HTMLElement && item.offsetParent !== null && item.textContent?.trim() && Number(getComputedStyle(item).opacity) > .1);
@@ -1738,7 +1785,8 @@ export function renderPresentationHtml(
         contrasts: contrast ? [{ id: 'prelude', region: '0ページ目', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground }] : [],
         clamps: [],
         readability: smallText ? [{ id: 'prelude', region: '0ページ目', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px }] : [],
-        occlusions: []
+        occlusions: [],
+        fonts: collectFontFallbacks(prelude)
       }, location.origin);
     };
     const schedulePreludeFit = () => requestAnimationFrame(() => requestAnimationFrame(fitPrelude));
@@ -1776,8 +1824,9 @@ export function renderPresentationHtml(
       const narrationClamp = editorFrame ? collectNarrationClamp(currentSlide) : null;
       if (narrationClamp) clamps.push(narrationClamp);
       const occlusions = editorFrame ? collectOcclusions(currentSlide) : [];
+      const fonts = editorFrame ? collectFontFallbacks(currentSlide) : [];
       if (stage instanceof HTMLElement) delete stage.dataset.measuring;
-      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps, readability, occlusions }, location.origin);
+      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps, readability, occlusions, fonts }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
     const appendDraftInline = (target, text) => {
