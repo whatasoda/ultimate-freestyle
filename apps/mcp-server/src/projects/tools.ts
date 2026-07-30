@@ -358,7 +358,7 @@ export function registerProjectTools(
     {
       title: "過去の下書きを新しい版として復元",
       description:
-        "research://projects/{id}/revisionsで確認した過去版を、現在の下書きを消さず新しいversionとして復元します。",
+        "research://projects/{id}/revisionsで候補を選び、revisions/{version}と必要なslides/{slideId}で現在版との差を確認した過去版を、現在の下書きを消さず新しいversionとして復元します。expected_versionには確認した現在版を指定します。",
       inputSchema: {
         project_id: z.string().uuid(),
         expected_version: z.number().int().positive(),

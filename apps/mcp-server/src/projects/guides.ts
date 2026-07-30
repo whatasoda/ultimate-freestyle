@@ -311,7 +311,7 @@ export function registerResearchGuides(
     {
       title: "研究の下書き履歴",
       description:
-        "復元前に確認する、認証中の利用者が所有する研究の直近20版です。",
+        "復元前に確認する、認証中の利用者が所有する研究の保存対象全50版です。一版resourceと一枚resourceで差を確認してから復元します。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -330,12 +330,14 @@ export function registerResearchGuides(
                 ok: true,
                 project_id: project.project_id,
                 current_version: project.version,
-                revisions: await listProjectDraftRevisions(
-                  db,
-                  auth.ownerUserId,
-                  project.project_id,
-                  20
-                )
+                retained_limit: 50,
+                selection_workflow: {
+                  revision_detail_uri_template: `research://projects/${project.project_id}/revisions/{version}`,
+                  revision_slide_uri_template: `research://projects/${project.project_id}/revisions/{version}/slides/{slideId}`,
+                  current_project_uri: `research://projects/${project.project_id}`,
+                  restore_tool: "restore_draft_revision"
+                },
+                revisions: await listProjectDraftRevisions(db, auth.ownerUserId, project.project_id, 50)
               };
       return {
         contents: [

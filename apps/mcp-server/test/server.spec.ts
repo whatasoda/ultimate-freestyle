@@ -1079,6 +1079,11 @@ describe("MCP contract", () => {
       expect(revisions).toMatchObject({
         ok: true,
         current_version: 19,
+        retained_limit: 50,
+        selection_workflow: {
+          restore_tool: "restore_draft_revision",
+          current_project_uri: `research://projects/${firstProject.project_id}`
+        },
         revisions: expect.arrayContaining([
           expect.objectContaining({ version: 19, source: "edit" }),
           expect.objectContaining({ version: 18, source: "edit" })
