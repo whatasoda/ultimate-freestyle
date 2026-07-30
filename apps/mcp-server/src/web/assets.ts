@@ -1,12 +1,39 @@
-export const DASHBOARD_ASSET_VERSION = "143";
+export const DASHBOARD_ASSET_VERSION = "144";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
-  for (const link of document.querySelectorAll(".project-section-nav a[href^='#']")) {
+  const projectSectionLinks = [...document.querySelectorAll(".project-section-nav a[href^='#']")];
+  const setCurrentProjectSection = (id) => {
+    for (const link of projectSectionLinks) {
+      if (!(link instanceof HTMLAnchorElement)) continue;
+      if (link.hash === "#" + id) link.setAttribute("aria-current", "location");
+      else link.removeAttribute("aria-current");
+    }
+  };
+  for (const link of projectSectionLinks) {
     if (!(link instanceof HTMLAnchorElement)) continue;
     link.addEventListener("click", () => {
       const target = document.querySelector(link.hash);
-      if (target instanceof HTMLElement) requestAnimationFrame(() => target.focus({ preventScroll: true }));
+      if (target instanceof HTMLElement) requestAnimationFrame(() => {
+        setCurrentProjectSection(target.id);
+        target.focus({ preventScroll: true });
+      });
     });
+  }
+  if (projectSectionLinks.length > 0 && "IntersectionObserver" in window) {
+    const visibleSections = new Map();
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) visibleSections.set(entry.target.id, entry.boundingClientRect.top);
+        else visibleSections.delete(entry.target.id);
+      }
+      const current = [...visibleSections].sort((first, second) => Math.abs(first[1]) - Math.abs(second[1]))[0];
+      if (current) setCurrentProjectSection(current[0]);
+    }, { rootMargin: "-15% 0px -70% 0px" });
+    for (const link of projectSectionLinks) {
+      if (!(link instanceof HTMLAnchorElement)) continue;
+      const target = document.querySelector(link.hash);
+      if (target instanceof HTMLElement) observer.observe(target);
+    }
   }
   const apiErrorMessage = (result, fallback) => {
     const messages = {
