@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@63";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@64";
 
 function escapeHtml(value: string): string {
   return value
@@ -1971,7 +1971,43 @@ export function renderPresentationHtml(
     try { volume.value = localStorage.getItem(volumeKey) ?? '1'; } catch {}
     showVolume();
     addEventListener('keydown', (event) => {
-      if (editorFrame) return;
+      if (editorFrame) {
+        if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
+        const target = document.querySelector('[data-editor-selected="true"]');
+        const boundary = target instanceof HTMLElement ? target.offsetParent : null;
+        if (!(target instanceof HTMLElement) || !(boundary instanceof HTMLElement)) return;
+        const targetRect = target.getBoundingClientRect();
+        const boundaryRect = boundary.getBoundingClientRect();
+        if (boundaryRect.width <= 0 || boundaryRect.height <= 0) return;
+        const amount = event.shiftKey ? 5 : 1;
+        let x = (targetRect.left - boundaryRect.left) / boundaryRect.width * 100;
+        let y = (targetRect.top - boundaryRect.top) / boundaryRect.height * 100;
+        let width = targetRect.width / boundaryRect.width * 100;
+        let height = targetRect.height / boundaryRect.height * 100;
+        if (event.altKey) {
+          if (event.key === 'ArrowLeft') width = clamp(width - amount, 5, 100 - x);
+          if (event.key === 'ArrowRight') width = clamp(width + amount, 5, 100 - x);
+          if (event.key === 'ArrowUp') height = clamp(height - amount, 5, 100 - y);
+          if (event.key === 'ArrowDown') height = clamp(height + amount, 5, 100 - y);
+        } else {
+          if (event.key === 'ArrowLeft') x = clamp(x - amount, 0, 100 - width);
+          if (event.key === 'ArrowRight') x = clamp(x + amount, 0, 100 - width);
+          if (event.key === 'ArrowUp') y = clamp(y - amount, 0, 100 - height);
+          if (event.key === 'ArrowDown') y = clamp(y + amount, 0, 100 - height);
+        }
+        target.style.left = x + '%';
+        target.style.top = y + '%';
+        target.style.width = width + '%';
+        target.style.height = height + '%';
+        parent.postMessage({
+          type: 'ultimate-freestyle:move-component',
+          component_type: target.hasAttribute('data-node-id') ? 'scene' : 'canvas',
+          component_id: target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '',
+          frame: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, width: Math.round(width * 10) / 10, height: Math.round(height * 10) / 10 }
+        }, location.origin);
+        event.preventDefault();
+        return;
+      }
       if (event.key === 'Escape' && hideShortcuts()) { event.preventDefault(); return; }
       if (event.key === 'Escape' && hideCompletion()) { event.preventDefault(); return; }
       if (shortcuts instanceof HTMLElement && !shortcuts.hidden) return;
@@ -2072,6 +2108,8 @@ export function renderPresentationHtml(
         if (!(target instanceof HTMLElement)) return;
         document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
         target.dataset.editorSelected = 'true';
+        target.tabIndex = 0;
+        target.focus({ preventScroll: true });
         parent.postMessage({
           type: 'ultimate-freestyle:select-component',
           component_type: target.hasAttribute('data-node-id') ? 'scene' : 'canvas',

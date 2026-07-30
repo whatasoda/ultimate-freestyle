@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@63");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@64");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -228,7 +228,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const previewAppearance =");
     expect(html).toContain('role="region" tabindex="0"');
     expect(html).toContain("target.closest('button, a, input, select, textarea')");
-    expect(html).toContain("if (editorFrame) return;");
+    expect(html).toContain("if (editorFrame) {");
     expect(html).toContain("failed + '件は開始後に読み込みます'");
     expect(html).toContain("resolve({ url, ok: false })");
     expect(html).toContain('aria-label="発表の進捗"');
@@ -710,6 +710,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("let editorDrag = null");
     expect(html).toContain("mode: target.dataset.editorSelected");
     expect(html).toContain("cursor: nwse-resize");
+    expect(html).toContain("if (event.altKey)");
+    expect(html).toContain("target.focus({ preventScroll: true })");
     expect(html).toContain('data-editor-selected="true"');
     expect(html).not.toContain(">fallback<");
 
@@ -723,7 +725,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('class="filmstrip-meta"');
     expect(workspaceHtml).toContain("60秒 · 3段階 · リッチ構成 6パーツ");
     expect(workspaceHtml).toContain("data-scene-component-editor");
-    expect(workspaceHtml).toContain("プレビュー内の表示パーツをクリック");
+    expect(workspaceHtml).toContain("パーツをクリックすると編集欄を開きます");
+    expect(workspaceHtml).toContain("Alt＋矢印で大きさを調整");
     expect(workspaceHtml).toContain("data-composition-editor");
     expect(workspaceHtml).toContain('name="composition_background"');
     expect(workspaceHtml).toContain("構成全体を保存");

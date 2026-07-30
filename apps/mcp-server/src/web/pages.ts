@@ -2097,7 +2097,7 @@ export function slideWorkspacePage(options: {
            <section class="panel workspace-preview">
              <div class="workspace-frame" style="--workspace-aspect:${(deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame data-aspect-ratio="${deck.aspect_ratio ?? "16:9"}"></iframe></div>
              <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output aria-live="polite">STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>
-             ${slide.composition?.mode === "scene" || slide.composition?.mode === "canvas" ? '<p class="inherit-note">プレビュー内の表示パーツをクリックすると、対応する編集欄を開きます。</p>' : ""}
+             ${slide.composition?.mode === "scene" || slide.composition?.mode === "canvas" ? '<p class="inherit-note">パーツをクリックすると編集欄を開きます。自由配置はドラッグで移動、右下でリサイズ、矢印キーで1%移動（Shiftで5%）、Alt＋矢印で大きさを調整できます。</p>' : ""}
              <p class="quality-status" data-layout-status role="status" aria-live="polite">実表示の文字収まりを確認しています…</p>
            </section>
            <aside class="inspector">
