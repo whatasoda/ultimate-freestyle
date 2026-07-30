@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=103"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=104"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -2383,6 +2383,105 @@ describe("Web dashboard", () => {
     expect(restoredDetailHtml).toContain("復元");
     expect(DASHBOARD_SCRIPT).toContain("data-draft-restore");
     expect(DASHBOARD_SCRIPT).toContain("現在の保存済み下書きも履歴に残ります");
+
+    const createLongSlide = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 36,
+            title: "長文を分ける",
+            position: 1,
+            template: "flow"
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(createLongSlide.status).toBe(200);
+    const longSlideResult = await createLongSlide.json() as {
+      slide_id: string;
+      version: number;
+    };
+    expect(longSlideResult.version).toBe(37);
+    const longSlideWorkspace = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/${longSlideResult.slide_id}`,
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const longSlideWorkspaceHtml = await longSlideWorkspace.text();
+    expect(longSlideWorkspaceHtml).toContain("カーソル位置で2枚に分割");
+    expect(longSlideWorkspaceHtml).toContain("data-slide-split");
+    const splitContent = "## 前半\n\n観察した条件を詳しく説明します。\n\n## 後半\n\n結果と考察を詳しく説明します。";
+    const splitOffset = splitContent.indexOf("## 後半");
+    const splitLongSlide = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/${longSlideResult.slide_id}/split`,
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 37,
+            split_offset: splitOffset,
+            title: "長文を分ける",
+            duration_seconds: 60,
+            content_markdown: splitContent,
+            sidebar_markdown: "前半だけの補足"
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(splitLongSlide.status).toBe(200);
+    const splitResult = await splitLongSlide.json() as {
+      version: number;
+      next_slide_id: string;
+    };
+    expect(splitResult.version).toBe(38);
+    const splitDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{
+      document_json: string;
+    }>();
+    const splitSlides = JSON.parse(splitDocument!.document_json).deck.slides;
+    const splitBefore = splitSlides.find(
+      (item: { id: string }) => item.id === longSlideResult.slide_id
+    );
+    const splitAfter = splitSlides.find(
+      (item: { id: string }) => item.id === splitResult.next_slide_id
+    );
+    expect(splitBefore).toMatchObject({
+      title: "長文を分ける",
+      content_markdown: "## 前半\n\n観察した条件を詳しく説明します。",
+      sidebar_markdown: "前半だけの補足",
+      narration: null
+    });
+    expect(splitAfter).toMatchObject({
+      title: "長文を分ける（続き）",
+      content_markdown: "## 後半\n\n結果と考察を詳しく説明します。",
+      sidebar_markdown: null,
+      narration: null,
+      composition: null
+    });
+    expect(splitBefore.duration_seconds + splitAfter.duration_seconds).toBe(60);
+    expect(DASHBOARD_SCRIPT).toContain("本文の先頭と末尾以外へカーソルを置いてください");
+    expect(DASHBOARD_SCRIPT).toContain("内容以外の未保存設定を先に保存してください");
+    expect(DASHBOARD_SCRIPT).toContain("sessionStorage.removeItem(form.dataset.draftKey)");
 
     const unsupportedUpload = await requestProvider(
       provider,

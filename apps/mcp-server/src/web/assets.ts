@@ -871,6 +871,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const [formIndex, form] of versionedForms.entries()) {
     if (!(form instanceof HTMLFormElement)) continue;
     const draftKey = "ultimate-freestyle:form-draft:" + location.pathname + ":" + new URL(form.action).pathname + ":" + formIndex;
+    form.dataset.draftKey = draftKey;
     let draftTimer;
     const draftFields = () => [...form.elements].flatMap((field) => {
       if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) || !field.name || ["submit", "button", "file", "hidden"].includes(field.type)) return [];
@@ -1588,6 +1589,79 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       filmstripSearch.value = "";
       filterFilmstrip();
       filmstripSearch.blur();
+    });
+  }
+
+  const splitSlideButton = document.querySelector("[data-slide-split]");
+  if (splitSlideButton instanceof HTMLButtonElement) {
+    splitSlideButton.addEventListener("click", async () => {
+      const form = splitSlideButton.closest("form");
+      const feedback = form?.querySelector("[data-form-feedback]");
+      const content = form?.elements.namedItem("content_markdown");
+      if (
+        !(form instanceof HTMLFormElement) ||
+        !(feedback instanceof HTMLElement) ||
+        !(content instanceof HTMLTextAreaElement)
+      ) return;
+      const splitOffset = content.selectionStart;
+      const before = content.value.slice(0, splitOffset).trim();
+      const after = content.value.slice(splitOffset).trim();
+      const otherDirtyForm = Array.from(document.querySelectorAll('[data-dirty="true"]'))
+        .some((candidate) => candidate !== form);
+      if (otherDirtyForm) {
+        feedback.textContent = "内容以外の未保存設定を先に保存してください。";
+        feedback.classList.add("warning");
+        return;
+      }
+      const durationSeconds = numberValue(new FormData(form), "duration_seconds");
+      if (durationSeconds < 2) {
+        feedback.textContent = "分割するには想定時間を2秒以上にしてください。";
+        feedback.classList.add("warning");
+        return;
+      }
+      if (before.length === 0 || after.length === 0) {
+        feedback.textContent = "本文の先頭と末尾以外へカーソルを置いてください。段落間の空行がおすすめです。";
+        feedback.classList.add("warning");
+        content.focus();
+        return;
+      }
+      if (!confirm("カーソル位置で本文を2枚へ分けますか？ 見た目は引き継ぎ、読み上げと補足欄は前のスライドに残ります。")) return;
+      setButtonBusy(splitSlideButton, true);
+      showSavingState();
+      feedback.textContent = "本文を2枚のスライドへ分けています…";
+      feedback.classList.remove("warning", "success");
+      const data = new FormData(form);
+      try {
+        const response = await fetch(splitSlideButton.dataset.slideSplit || "", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": splitSlideButton.dataset.csrf || ""
+          },
+          body: JSON.stringify({
+            expected_version: Number(form.dataset.version),
+            split_offset: splitOffset,
+            title: String(data.get("title") || ""),
+            duration_seconds: durationSeconds,
+            content_markdown: content.value,
+            sidebar_markdown: String(data.get("sidebar_markdown") || "")
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(apiErrorMessage(result, "スライドを分割できませんでした。"));
+        }
+        form.dataset.dirty = "false";
+        if (form.dataset.draftKey) sessionStorage.removeItem(form.dataset.draftKey);
+        feedback.textContent = "2枚へ分割しました。続きのスライドへ移動します…";
+        feedback.classList.add("success");
+        location.href = result.next_url;
+      } catch (error) {
+        feedback.textContent = caughtErrorMessage(error, "スライドを分割できませんでした。");
+        feedback.classList.add("warning");
+        setButtonBusy(splitSlideButton, false);
+        syncSaveState();
+      }
     });
   }
 

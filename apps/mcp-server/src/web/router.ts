@@ -190,6 +190,14 @@ const slideCreateRequestSchema = z.object({
   position: z.number().int().nonnegative().max(99),
   template: z.enum(["flow", "cover", "canvas", "scene"])
 });
+const slideSplitRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  split_offset: z.number().int().positive().max(19_999),
+  title: z.string().min(1).max(120),
+  duration_seconds: z.number().int().min(2).max(1_200),
+  content_markdown: z.string().min(3).max(20_000),
+  sidebar_markdown: z.string().max(10_000)
+});
 const slideCompositionCreateRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   mode: z.enum(["canvas", "scene"])
@@ -1424,6 +1432,137 @@ async function handleSlideCreate(
     return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, version: project.version, next_url: `/dashboard/projects/${projectId}/slides/${slideId}`, error: null, request_id: crypto.randomUUID() });
   } catch (error) {
     return projectMutationErrorResponse(error, "スライドを追加できませんでした。");
+  }
+}
+
+async function handleSlideSplit(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = slideSplitRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: {
+          code: "INVALID_FIELDS",
+          message: "本文と分割位置を確認してください。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  const nextSlideId = `slide-${crypto.randomUUID()}`;
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const deck = document.deck;
+        const slideIndex = deck?.slides.findIndex((slide) => slide.id === slideId) ?? -1;
+        const slide = slideIndex === -1 ? undefined : deck?.slides[slideIndex];
+        if (deck === null || deck === undefined || slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition !== null && slide.composition !== undefined) {
+          const error = new Error("Only flow slides can be split.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        if (slide.role === "cover" || deck.slides.length >= 100) {
+          const error = new Error("The slide cannot be split.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        const before = parsed.data.content_markdown
+          .slice(0, parsed.data.split_offset)
+          .trim();
+        const after = parsed.data.content_markdown
+          .slice(parsed.data.split_offset)
+          .trim();
+        if (before.length === 0 || after.length === 0) {
+          const error = new Error("Both split slides require content.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        const beforeRatio = before.length / (before.length + after.length);
+        const beforeDuration = Math.min(
+          parsed.data.duration_seconds - 1,
+          Math.max(1, Math.round(parsed.data.duration_seconds * beforeRatio))
+        );
+        const afterDuration = Math.max(
+          1,
+          parsed.data.duration_seconds - beforeDuration
+        );
+        slide.title = parsed.data.title;
+        slide.content_markdown = before;
+        slide.sidebar_markdown = parsed.data.sidebar_markdown.trim() || null;
+        slide.duration_seconds = beforeDuration;
+        const suffix = "（続き）";
+        const nextTitle = `${parsed.data.title.slice(0, 120 - suffix.length)}${suffix}`;
+        const nextSlide = projectSlideSchema.parse({
+          ...slide,
+          id: nextSlideId,
+          title: nextTitle,
+          duration_seconds: afterDuration,
+          reveal_steps: 0,
+          role: "content",
+          cover_layout: "center",
+          content_markdown: after,
+          reveal_blocks: [],
+          sidebar_markdown: null,
+          narration: null,
+          composition: null
+        });
+        deck.slides.splice(slideIndex + 1, 0, nextSlide);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_split",
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        slide_id: slideId,
+        next_slide_id: nextSlideId,
+        version: project.version
+      },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      slide_id: slideId,
+      next_slide_id: nextSlideId,
+      version: project.version,
+      next_url: `/dashboard/projects/${projectId}/slides/${nextSlideId}`,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "スライドを分割できませんでした。");
   }
 }
 
@@ -3903,6 +4042,19 @@ export async function handleWebRequest(
   );
   if (slideCreateMatch?.[1] !== undefined) {
     return handleSlideCreate(request, env, slideCreateMatch[1]);
+  }
+  const slideSplitMatch = path.match(
+    new RegExp(
+      `^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/split$`
+    )
+  );
+  if (slideSplitMatch?.[1] !== undefined && slideSplitMatch[2] !== undefined) {
+    return handleSlideSplit(
+      request,
+      env,
+      slideSplitMatch[1],
+      slideSplitMatch[2]
+    );
   }
   const slideCompositionCreateMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/composition$`)
