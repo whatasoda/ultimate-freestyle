@@ -719,6 +719,7 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("親の自動配置から外し、位置と大きさを指定する");
     expect(workspaceHtml).toContain('data-component-frame-toggle');
     expect(workspaceHtml).toContain('data-component-path="frame.x"');
+    expect(workspaceHtml).toContain('data-component-frame-preset="5,10,43,80"');
     expect(workspaceHtml).toContain('data-component-path="style.foreground"');
     expect(workspaceHtml).toContain('data-component-color-preview="style.background"');
     expect(workspaceHtml).toContain('data-component-path="animation"');

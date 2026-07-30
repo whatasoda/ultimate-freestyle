@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=69"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=70"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -709,6 +709,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("data-component-frame-toggle");
     expect(dashboardScriptText).toContain("component.frame = null");
+    expect(dashboardScriptText).toContain("左位置と幅の合計を100%以内にしてください");
+    expect(dashboardScriptText).toContain("スライド枠を越えています");
+    expect(dashboardScriptText).toContain("data-component-frame-preset");
     expect(dashboardScriptText).toContain("changingConfiguredVoice");
     expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
 

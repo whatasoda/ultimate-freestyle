@@ -923,6 +923,30 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   };
   for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
     const frameToggle = form.querySelector("[data-component-frame-toggle]");
+    const frameFields = [...form.querySelectorAll("[data-component-frame-field]")].filter((field) => field instanceof HTMLInputElement);
+    const frameFeedback = form.querySelector("[data-component-frame-feedback]");
+    const validateFrame = () => {
+      if (!(frameToggle instanceof HTMLInputElement)) return;
+      for (const field of frameFields) field.setCustomValidity("");
+      if (!frameToggle.checked) {
+        if (frameFeedback instanceof HTMLElement) frameFeedback.textContent = "";
+        return;
+      }
+      const values = Object.fromEntries(frameFields.map((field) => [field.dataset.componentPath || "", Number(field.value)]));
+      const horizontalOverflow = values["frame.x"] + values["frame.width"] > 100;
+      const verticalOverflow = values["frame.y"] + values["frame.height"] > 100;
+      const width = frameFields.find((field) => field.dataset.componentPath === "frame.width");
+      const height = frameFields.find((field) => field.dataset.componentPath === "frame.height");
+      if (horizontalOverflow) width?.setCustomValidity("左位置と幅の合計を100%以内にしてください。");
+      if (verticalOverflow) height?.setCustomValidity("上位置と高さの合計を100%以内にしてください。");
+      if (frameFeedback instanceof HTMLElement) {
+        frameFeedback.textContent = horizontalOverflow || verticalOverflow
+          ? "スライド枠を越えています。位置または大きさを小さくしてください。"
+          : "スライド枠内に収まっています。";
+        frameFeedback.classList.toggle("warning", horizontalOverflow || verticalOverflow);
+        frameFeedback.classList.toggle("success", !horizontalOverflow && !verticalOverflow);
+      }
+    };
     const syncFrameControls = () => {
       if (!(frameToggle instanceof HTMLInputElement)) return;
       const frameControls = form.querySelector("[data-component-frame-controls]");
@@ -930,10 +954,24 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       for (const field of form.querySelectorAll("[data-component-frame-field]")) {
         if (field instanceof HTMLInputElement) field.disabled = !frameToggle.checked;
       }
+      validateFrame();
     };
     frameToggle?.addEventListener("input", syncFrameControls);
+    for (const preset of form.querySelectorAll("[data-component-frame-preset]")) {
+      if (!(preset instanceof HTMLButtonElement) || !(frameToggle instanceof HTMLInputElement)) continue;
+      preset.addEventListener("click", () => {
+        const values = (preset.dataset.componentFramePreset || "").split(",").map(Number);
+        if (values.length !== 4 || values.some((value) => !Number.isFinite(value))) return;
+        frameToggle.checked = true;
+        syncFrameControls();
+        frameFields.forEach((field, index) => { field.value = String(values[index]); });
+        validateFrame();
+        frameFields.at(-1)?.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
     syncFrameControls();
     form.addEventListener("input", () => {
+      validateFrame();
       clearTimeout(draftSceneTimer);
       draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
       const layoutStatus = document.querySelector("[data-layout-status]");
