@@ -1269,6 +1269,11 @@ describe("presentation artifact renderer", () => {
     expect(pagedVoiceHtml.match(/data-voice-segment /g)).toHaveLength(40);
     expect(pagedVoiceHtml).toContain("2 / 3ページ · 81件");
     expect(pagedVoiceHtml).toContain('name="q" value="区間"');
+    expect(pagedVoiceHtml).toContain('class="voice-search-row"');
+    expect(pagedVoiceHtml).toContain('class="voice-filter-tabs" role="group"');
+    expect(pagedVoiceHtml).toContain('.voice-filter { position: sticky;');
+    expect(pagedVoiceHtml).toContain('.voice-filter-tabs { flex-wrap: nowrap;');
+    expect(pagedVoiceHtml).toContain('.voice-review > summary .voice-status { grid-column: 2;');
     expect(pagedVoiceHtml).toContain("?status=needs_generation&amp;q=%E5%8C%BA%E9%96%93&amp;page=3");
     expect(new TextEncoder().encode(pagedVoiceHtml).byteLength).toBeLessThan(400_000);
   });
