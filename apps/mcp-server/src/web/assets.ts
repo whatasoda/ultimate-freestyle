@@ -1,11 +1,27 @@
-export const DASHBOARD_ASSET_VERSION = "150";
+export const DASHBOARD_ASSET_VERSION = "151";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const revealFragmentTarget = (target) => {
+    if (!(target instanceof HTMLElement)) return;
+    let details = target instanceof HTMLDetailsElement ? target : target.closest("details");
+    while (details instanceof HTMLDetailsElement) {
+      details.open = true;
+      details = details.parentElement?.closest("details") || null;
+    }
+  };
   if (location.hash.length > 1) {
     const fragmentTarget = document.getElementById(decodeURIComponent(location.hash.slice(1)));
     if (fragmentTarget instanceof HTMLElement && fragmentTarget.tabIndex === -1) {
+      revealFragmentTarget(fragmentTarget);
       requestAnimationFrame(() => fragmentTarget.focus({ preventScroll: true }));
     }
+  }
+  for (const link of document.querySelectorAll('a[href^="#"]')) {
+    if (!(link instanceof HTMLAnchorElement) || link.hash.length <= 1) continue;
+    link.addEventListener("click", () => {
+      const target = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+      if (target instanceof HTMLElement) revealFragmentTarget(target);
+    });
   }
   const projectSectionLinks = [...document.querySelectorAll(".project-section-nav a[href^='#']")];
   const setCurrentProjectSection = (id) => {
