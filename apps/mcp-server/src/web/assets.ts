@@ -35,6 +35,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     else button.removeAttribute("aria-busy");
   };
   const publicationActionSelector = "[data-create-preview], [data-review-preview], [data-publish-preview], [data-unpublish], [data-publish-rollback]";
+  const publicationBaseDisabled = (button) => {
+    if (button.matches("[data-create-preview]")) return button.dataset.canPreview !== "true";
+    if (button.matches("[data-review-preview]")) return button.dataset.reviewAvailable !== "true";
+    if (button.matches("[data-publish-preview]")) {
+      return button.dataset.durationValid !== "true" || button.dataset.previewReviewed !== "true" || button.dataset.publishedCurrent === "true";
+    }
+    return false;
+  };
   const syncPublicationDirtyState = (dirtyCount) => {
     const panel = document.querySelector("[data-publication]");
     const notice = document.querySelector("[data-publication-dirty]");
@@ -46,13 +54,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     for (const button of document.querySelectorAll(publicationActionSelector)) {
       if (!(button instanceof HTMLButtonElement)) continue;
-      if (blocked) {
-        if (button.dataset.disabledBeforeDirty === undefined) button.dataset.disabledBeforeDirty = String(button.disabled);
-        button.disabled = true;
-      } else if (button.dataset.disabledBeforeDirty !== undefined) {
-        button.disabled = button.dataset.disabledBeforeDirty === "true";
-        delete button.dataset.disabledBeforeDirty;
-      }
+      button.disabled = blocked || publicationBaseDisabled(button);
     }
   };
   const guardPublicationAction = () => {
@@ -78,12 +80,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   };
   const saveState = document.querySelector("[data-save-state]");
   const syncSaveState = () => {
-    if (!(saveState instanceof HTMLElement)) return;
     const dirtyCount = document.querySelectorAll('[data-dirty="true"]').length;
-    saveState.dataset.state = dirtyCount > 0 ? "dirty" : "saved";
-    saveState.textContent = dirtyCount > 0 ? "未保存 " + dirtyCount + "件" : "保存済み";
-    if (dirtyCount > 0 && document.body.dataset.mobilePane !== "preview") document.body.dataset.mobilePreviewPending = "true";
-    if (dirtyCount === 0) document.body.dataset.mobilePreviewPending = "false";
+    if (saveState instanceof HTMLElement) {
+      saveState.dataset.state = dirtyCount > 0 ? "dirty" : "saved";
+      saveState.textContent = dirtyCount > 0 ? "未保存 " + dirtyCount + "件" : "保存済み";
+      if (dirtyCount > 0 && document.body.dataset.mobilePane !== "preview") document.body.dataset.mobilePreviewPending = "true";
+      if (dirtyCount === 0) document.body.dataset.mobilePreviewPending = "false";
+    }
     syncPublicationDirtyState(dirtyCount);
     const previewBadge = document.querySelector("[data-mobile-preview-badge]");
     if (previewBadge instanceof HTMLElement) previewBadge.hidden = document.body.dataset.mobilePreviewPending !== "true";
@@ -114,6 +117,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     const reviewButton = document.querySelector("[data-review-preview]");
     if (reviewButton instanceof HTMLButtonElement) {
+      reviewButton.dataset.reviewAvailable = "false";
       reviewButton.disabled = true;
       reviewButton.textContent = "終了画面の到達待ち";
     }
@@ -3010,6 +3014,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           reviewButton.dataset.version = String(result.revision.project_version);
           reviewButton.dataset.renderer = result.revision.renderer_version;
           reviewButton.dataset.reviewPreview = "/api/projects/" + result.revision.project_id + "/previews/" + result.revision.revision_id + "/review";
+          reviewButton.dataset.reviewAvailable = "false";
           reviewButton.disabled = true;
           reviewButton.textContent = "終了画面の到達待ち";
         }
@@ -3058,6 +3063,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "確認状態を記録できませんでした。"));
         reviewButton.textContent = "プレビュー確認済み";
+        reviewButton.dataset.reviewAvailable = "false";
         if (previewReviewStatus instanceof HTMLElement) previewReviewStatus.textContent = "確認済み";
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.previewReviewed = "true";
@@ -3071,6 +3077,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       } catch (error) {
         reviewRetryCount += 1;
         reviewButton.textContent = reviewRetryCount <= 3 ? "到達記録を再試行中…" : "到達記録を再試行";
+        reviewButton.dataset.reviewAvailable = String(reviewRetryCount > 3);
         reviewButton.disabled = reviewRetryCount <= 3;
         publishFeedback.textContent = caughtErrorMessage(error, "確認状態を記録できませんでした。");
         publishFeedback.classList.add("warning");

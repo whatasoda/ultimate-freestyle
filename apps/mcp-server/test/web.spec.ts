@@ -458,6 +458,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
     expect(DASHBOARD_SCRIPT).toContain("大きな画像を圧縮しています");
     expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
+    expect(DASHBOARD_SCRIPT).toContain("publicationBaseDisabled");
+    expect(DASHBOARD_SCRIPT).not.toContain("disabledBeforeDirty");
     expect(DASHBOARD_SCRIPT).toContain("templates[templateId]?.template_name");
     expect(DASHBOARD_SCRIPT).toContain("result.affected_slides.total");
     expect(DASHBOARD_SCRIPT).toContain("appearanceEditor.dataset.previewTemplates = JSON.stringify(templates)");
