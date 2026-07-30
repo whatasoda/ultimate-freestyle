@@ -141,22 +141,36 @@ export async function removeProjectImage(
   if (asset === null) {
     return false;
   }
-  const row = await env.DB.prepare(
-    "SELECT document_json FROM research_projects WHERE id = ? AND owner_user_id = ?"
+  const reference = await env.DB.prepare(
+    `SELECT documents.source
+     FROM (
+       SELECT 'current' AS source, document_json
+       FROM research_projects
+       WHERE id = ? AND owner_user_id = ?
+       UNION ALL
+       SELECT 'history' AS source, document_json
+       FROM project_draft_revisions
+       WHERE project_id = ? AND owner_user_id = ?
+     ) AS documents,
+     json_tree(documents.document_json) AS values_tree
+     WHERE values_tree.key = 'asset_id' AND values_tree.value = ?
+     ORDER BY documents.source = 'current' DESC
+     LIMIT 1`
   )
-    .bind(asset.project_id, ownerUserId)
-    .first<{ document_json: string }>();
-  const referencesAsset = (value: unknown): boolean => {
-    if (Array.isArray(value)) return value.some(referencesAsset);
-    if (value === null || typeof value !== "object") return false;
-    const record = value as Record<string, unknown>;
-    if (record.asset_id === assetId) return true;
-    return Object.values(record).some(referencesAsset);
-  };
-  if (row !== null && referencesAsset(JSON.parse(row.document_json))) {
+    .bind(
+      asset.project_id,
+      ownerUserId,
+      asset.project_id,
+      ownerUserId,
+      assetId
+    )
+    .first<{ source: "current" | "history" }>();
+  if (reference !== null) {
     throw new AssetServiceError(
       "ASSET_IN_USE",
-      "この画像はスライドで使用中です。スライドから外してから削除してください。"
+      reference.source === "current"
+        ? "この画像は現在のスライドで使用中です。スライドから外してから削除してください。"
+        : "この画像は保持中の下書き履歴で使用中のため削除できません。履歴が更新され、参照する版が保持対象から外れるまで画像は保護されます。"
     );
   }
   await env.MEDIA_BUCKET.delete(asset.object_key);
