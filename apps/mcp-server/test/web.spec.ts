@@ -518,7 +518,9 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:preview-review");
     expect(DASHBOARD_SCRIPT).toContain("recordCompletedPreview");
     expect(detailHtml).toContain("公開前チェック ·");
-    expect(detailHtml).toContain("基本 2/4 · おすすめ 3/5");
+    expect(detailHtml).toContain("基本 2/5 · おすすめ 3/5");
+    expect(detailHtml).toContain("固定版のVOICEVOX音声");
+    expect(detailHtml).toContain('data-can-preview="false"');
     expect(detailHtml).toContain("公開版の画像容量");
     expect(detailHtml).toContain("表紙スライド · おすすめ");
     expect(detailHtml).toContain("文字量と表示枠 · おすすめ");
@@ -562,7 +564,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("評価を頼む文をコピー");
     expect(detailHtml).toContain("根拠がない項目はNE");
     expect(detailHtml).toContain("VOICEVOX音声は 0 / 1 区間まで生成済みです");
-    expect(detailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
+    expect(detailHtml).toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("data-review-preview");
     expect(detailHtml).toContain("終了画面の到達待ち");
@@ -755,7 +757,7 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("data-voice-preview-seek");
     expect(DASHBOARD_SCRIPT).toContain("updatePreviewTimeline");
     expect(voicePageHtml).toContain("data-voice-filter-empty");
-    expect(voicePageHtml).toContain("音声生成は任意です");
+    expect(voicePageHtml).toContain("固定プレビューを作る前に全区間の生成が必要です");
 
     const workspaceUrl =
       "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro";
