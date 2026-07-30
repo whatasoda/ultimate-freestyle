@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "146";
+export const DASHBOARD_ASSET_VERSION = "147";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (location.hash.length > 1) {
@@ -2279,6 +2279,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         next.focus();
       });
     }
+    const mobileWorkspaceTabs = mobilePaneButtons[0]?.closest(".mobile-workspace-tabs");
+    if (mobileWorkspaceTabs instanceof HTMLElement) mobileWorkspaceTabs.hidden = false;
   }
 
   const mobileInspectorButtons = [...document.querySelectorAll("[data-inspector-pane]")];
@@ -2347,6 +2349,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       for (const details of inspectorSections) details.open = desktopInspectorOpen.get(details.dataset.inspectorSection || "") ?? details.open;
       syncingInspectorPane = false;
     });
+    const mobileInspectorTabs = mobileInspectorButtons[0]?.closest(".mobile-inspector-tabs");
+    if (mobileInspectorTabs instanceof HTMLElement) mobileInspectorTabs.hidden = false;
   }
 
   const previewFocusButton = document.querySelector("[data-preview-focus]");

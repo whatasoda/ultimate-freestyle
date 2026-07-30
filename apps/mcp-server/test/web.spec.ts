@@ -444,8 +444,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=146"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=146"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=147"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=147"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -768,7 +768,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=146"'
+      'href="/assets/dashboard.css?v=147"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -776,7 +776,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("発表画面には直接表示されません");
     expect(workspaceHtml).toContain('data-composition-mode="canvas"');
     expect(workspaceHtml).toContain('data-inspector-section="structure" open');
-    expect(workspaceHtml).toContain('class="mobile-workspace-tabs"');
+    expect(workspaceHtml).toContain('class="mobile-workspace-tabs" role="tablist" aria-label="モバイル編集表示" hidden');
+    expect(DASHBOARD_SCRIPT).toContain('mobileWorkspaceTabs.hidden = false');
     expect(workspaceHtml).toContain('data-mobile-pane="preview"');
     expect(workspaceHtml).toContain('data-mobile-pane="edit"');
     expect(workspaceHtml).toContain('data-mobile-pane="slides"');
@@ -940,7 +941,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=146"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=147"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -949,7 +950,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=146"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=147"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -3024,7 +3025,8 @@ describe("Web dashboard", () => {
     const flowWorkspaceHtml = await flowWorkspace.text();
     expect(flowWorkspaceHtml).toContain('data-composition-mode="flow"');
     expect(flowWorkspaceHtml).toContain('data-inspector-section="content" open');
-    expect(flowWorkspaceHtml).toContain('class="mobile-inspector-tabs" role="tablist" aria-label="編集項目"');
+    expect(flowWorkspaceHtml).toContain('class="mobile-inspector-tabs" role="tablist" aria-label="編集項目" hidden');
+    expect(DASHBOARD_SCRIPT).toContain('mobileInspectorTabs.hidden = false');
     expect(flowWorkspaceHtml).toContain('data-inspector-pane="quality" aria-controls="inspector-quality"');
     expect(DASHBOARD_SCRIPT).toContain('const mobileInspectorMedia = matchMedia("(max-width: 48rem)")');
     expect(DASHBOARD_SCRIPT).toContain('selectInspectorPane(next.dataset.inspectorPane');
