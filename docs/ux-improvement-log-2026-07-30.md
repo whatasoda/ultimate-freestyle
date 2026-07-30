@@ -1184,3 +1184,9 @@
 - Web UI JSON、画像、Twitch API応答にはstreaming上限がある一方、Remote MCPのPOST本体だけはSDKのJSON parseへ無制限に渡っていた。小粒度toolの正規入力は十分小さいため、巨大bodyは利便性を増やさずmemory負荷だけを増やす。
 - 認証済みMCP handlerの入口でPOST bodyを256 KiBまでstreaming読取し、上限到達時は直ちにstreamをcancelする。過大入力はHTTP 413、読取不能は400とし、JSON-RPC `-32600`、安定したerror code、request IDを返す。
 - 通常のinitializeが再構成後のRequestでもStreamable HTTP handlerへ届くこと、上限超過がSDKより前にcancelされることをWorker契約テストへ追加した。
+
+## 改善ループ334
+
+- 全Web画面が読み込むdashboard scriptは約220 KiBあり、内容versionをqueryへ付けているのに常に`no-cache, must-revalidate`だった。一覧・詳細・音声・一枚編集の移動ごとに同じscriptの再検証が発生していた。
+- asset versionをscript本体側の単一定数へ移し、HTMLと配信routeで共有する。現在versionと完全一致するURLだけ`public, max-age=31536000, immutable`にし、versionなし・古いversionは従来どおり必ず再検証する。
+- `?v=131`の長期cacheとversionなしURLの非cache契約を並べて固定した。これにより内容変更時の取り違えを避けつつ、編集画面間の再訪ではブラウザcacheだけで読み込める。

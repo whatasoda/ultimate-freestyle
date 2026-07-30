@@ -1,3 +1,5 @@
+export const DASHBOARD_ASSET_VERSION = "131";
+
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const apiErrorMessage = (result, fallback) => {
     const messages = {
@@ -3989,10 +3991,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 })();`;
 
-export function dashboardScriptResponse(): Response {
+export function dashboardScriptResponse(versioned = false): Response {
   return new Response(DASHBOARD_SCRIPT, {
     headers: {
-      "cache-control": "no-cache, must-revalidate",
+      "cache-control": versioned
+        ? "public, max-age=31536000, immutable"
+        : "no-cache, must-revalidate",
       "content-type": "text/javascript; charset=utf-8",
       "x-content-type-options": "nosniff"
     }

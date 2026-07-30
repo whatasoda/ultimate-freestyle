@@ -40,6 +40,7 @@ import {
 } from "../projects/quality";
 import type { RenderedQualityReport } from "../projects/quality-reports";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
+import { DASHBOARD_ASSET_VERSION } from "./assets";
 import {
   MAX_JOB_CHARACTERS,
   MAX_SEGMENT_CHARACTERS,
@@ -220,7 +221,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=131";
+const DASHBOARD_SCRIPT_SRC = `/assets/dashboard.js?v=${DASHBOARD_ASSET_VERSION}`;
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",

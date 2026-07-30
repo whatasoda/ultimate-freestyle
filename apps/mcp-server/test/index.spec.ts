@@ -1,5 +1,5 @@
 import { exports } from "cloudflare:workers";
-import { env } from "cloudflare:test";
+import { createExecutionContext, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import { handleMcpRequest, MAX_MCP_REQUEST_BYTES } from "../src/index";
@@ -25,10 +25,7 @@ describe("MCP Worker", () => {
         })
       }),
       env,
-      {
-        waitUntil() {},
-        passThroughOnException() {}
-      } as ExecutionContext
+      createExecutionContext()
     );
 
     expect(response.status).toBe(200);
@@ -52,7 +49,7 @@ describe("MCP Worker", () => {
         body: stream
       }),
       env,
-      {} as ExecutionContext
+      createExecutionContext()
     );
     const body = await response.json<{
       jsonrpc: string;

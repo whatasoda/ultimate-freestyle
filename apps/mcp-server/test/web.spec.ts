@@ -872,6 +872,15 @@ describe("Web dashboard", () => {
     expect(dashboardScript.headers.get("cache-control")).toBe(
       "no-cache, must-revalidate"
     );
+    const versionedDashboardScript = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=131"),
+      authEnv
+    );
+    expect(versionedDashboardScript.status).toBe(200);
+    expect(versionedDashboardScript.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable"
+    );
     const dashboardScriptText = await dashboardScript.text();
     expect(() => new Function(dashboardScriptText)).not.toThrow();
     expect(dashboardScriptText).toContain("queueMicrotask(syncFramePosition)");
