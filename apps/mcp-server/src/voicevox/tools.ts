@@ -1,4 +1,7 @@
-import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  ResourceTemplate,
+  type McpServer
+} from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { recordAuditEvent } from "../auth/repository";
@@ -29,6 +32,59 @@ const voiceErrorSchema = z.object({
   ]),
   message: z.string()
 });
+const compactVoiceJobSchema = voiceJobStatusSchema.pick({
+  job_id: true,
+  requested_version: true,
+  status: true,
+  total_segments: true,
+  completed_segments: true,
+  failed_segments: true,
+  cached_segments: true,
+  error: true,
+  status_url: true
+});
+const compactVoiceStatusSchema = z.object({
+  project_id: z.string().uuid(),
+  version: z.number().int().positive(),
+  configured: z.boolean(),
+  default_profile: z.object({
+    id: z.string(),
+    label: z.string(),
+    speaker_name: z.string(),
+    style_name: z.string()
+  }).nullable(),
+  summary: voiceProjectStatusSchema.shape.summary,
+  active_job: compactVoiceJobSchema.nullable(),
+  latest_job: compactVoiceJobSchema.nullable(),
+  details_uri: z.string()
+});
+
+function compactVoiceJob(job: z.infer<typeof voiceJobStatusSchema> | null) {
+  if (job === null) return null;
+  return compactVoiceJobSchema.parse(job);
+}
+
+function compactVoiceStatus(
+  voice: z.infer<typeof voiceProjectStatusSchema>
+): z.infer<typeof compactVoiceStatusSchema> {
+  return {
+    project_id: voice.project_id,
+    version: voice.version,
+    configured: voice.configured,
+    default_profile: voice.default_profile === null
+      ? null
+      : {
+          id: voice.default_profile.id,
+          label: voice.default_profile.label,
+          speaker_name: voice.default_profile.speaker_name,
+          style_name: voice.default_profile.style_name
+        },
+    summary: voice.summary,
+    active_job: compactVoiceJob(voice.active_job),
+    latest_job: compactVoiceJob(voice.latest_job),
+    details_uri: `research://projects/${voice.project_id}/voice`
+  };
+}
 
 function normalizeVoiceError(error: unknown): z.infer<typeof voiceErrorSchema> {
   if (error instanceof ProjectToolError) {
@@ -64,17 +120,50 @@ export function registerVoiceTools(
   env: Pick<Env, "DB" | "VOICE_JOBS_QUEUE">,
   getAuthProps: () => Record<string, unknown> | undefined
 ): void {
+  server.registerResource(
+    "research-project-voice",
+    new ResourceTemplate("research://projects/{id}/voice", { list: undefined }),
+    {
+      title: "研究のVOICEVOX詳細",
+      description:
+        "既定profileの調声値、区間ごとの原稿・実効調声・生成状態、進行中と直近のjobを返します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const id = variables.id;
+      let body: Record<string, unknown>;
+      try {
+        const ownerUserId = requireSubject(getAuthProps, "research:read");
+        const voice = typeof id === "string"
+          ? await getVoiceProjectStatus(env.DB, ownerUserId, id)
+          : null;
+        body = voice === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : { ok: true, voice };
+      } catch (error) {
+        body = { ok: false, error: normalizeVoiceError(error) };
+      }
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(body)
+        }]
+      };
+    }
+  );
+
   server.registerTool(
     "get_voice_generation_status",
     {
       title: "VOICEVOX音声の生成状態を取得",
       description:
-        "研究全体の既定音声、区間ごとの生成要否、進行中または直近のjobを返します。原稿や調声値を変更した後の差分確認に使います。",
+        "研究全体の音声設定と生成数の要約、進行中または直近のjob、詳細resource URIを返します。区間ごとの原稿と調声値はdetails_uriを読んでください。",
       inputSchema: { project_id: z.string().uuid() },
       outputSchema: {
         ok: z.boolean(),
         request_id: z.string().uuid(),
-        voice: voiceProjectStatusSchema.nullable(),
+        voice: compactVoiceStatusSchema.nullable(),
         error: voiceErrorSchema.nullable()
       },
       annotations: {
@@ -102,7 +191,7 @@ export function registerVoiceTools(
         return toolResult({
           ok: true,
           request_id: requestId,
-          voice,
+          voice: compactVoiceStatus(voice),
           error: null
         });
       } catch (error) {
@@ -124,7 +213,7 @@ export function registerVoiceTools(
     {
       title: "VOICEVOX音声の差分生成を開始",
       description:
-        "原稿、話者、style、調声値が変わった区間だけを非同期生成します。同じidempotency_keyの再送は同じjobを返します。開始後はget_voice_generation_statusで確認してください。",
+        "原稿、話者、style、調声値が変わった区間だけを非同期生成します。同じidempotency_keyの再送は同じjobを返します。開始後はget_voice_generation_statusのdetails_uriで確認してください。",
       inputSchema: {
         project_id: z.string().uuid(),
         expected_version: z.number().int().positive(),
@@ -136,7 +225,7 @@ export function registerVoiceTools(
         project_id: z.string().uuid(),
         version: z.number().int().positive().nullable(),
         replayed: z.boolean(),
-        job: voiceJobStatusSchema.nullable(),
+        job: compactVoiceJobSchema.nullable(),
         error: voiceErrorSchema.nullable()
       },
       annotations: {
@@ -174,7 +263,7 @@ export function registerVoiceTools(
           project_id,
           version: result.job.requested_version,
           replayed: result.replayed,
-          job: result.job,
+          job: compactVoiceJob(result.job),
           error: null
         });
       } catch (error) {

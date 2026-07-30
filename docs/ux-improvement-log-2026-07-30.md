@@ -644,3 +644,9 @@
 - MCPの`update_slide_fields`は一文修正でも最大2万字の本文・1万字の補足全体を再送し、引数上限と古い本文による上書き事故の両方を招いていた。
 - 本文・補足の直接fieldを`body_edits`へ置換し、一意なold_textだけを置き換える`replace_once`、全面差替え、前後への追記、補足のclearを最大2対象まで扱えるようにした。
 - anchorが0件または複数件なら保存せず`INVALID_CHANGE`を返し、対象の取り違えを防ぐ。本文は空にできず、編集後の本文・補足をそれぞれの正本上限で再検証する。全面再送fieldがtool schemaから消えたことも契約テストで固定した。
+
+## 改善ループ244
+
+- `get_voice_generation_status`のoutput schemaが全区間の原稿、7種の実効調声、完全なjobをtool定義へ含め、MCP全体で最大の約8.8KBを占めていた。
+- toolはversion、既定profile名、生成数、compactなjob、`details_uri`だけを返し、区間詳細を`research://projects/{id}/voice` resourceへ分離した。生成開始toolのjob出力も進捗確認に必要な項目だけへ縮小した。
+- tool数36以下を維持しながら`tools/list`のbyte上限を100KBから90KB、最大input schemaを12KBから8KBへ厳格化し、VOICEVOX output単体にも6KB上限を追加した。resource側では従来の完全な調声・区間情報をcontract testで検証する。

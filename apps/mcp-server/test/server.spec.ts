@@ -87,11 +87,11 @@ describe("MCP contract", () => {
       const largestInputSchema = Math.max(
         ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
       );
-      expect(largestInputSchema).toBeLessThan(12_000);
+      expect(largestInputSchema).toBeLessThan(8_000);
       expect(tools.length).toBeLessThanOrEqual(36);
       expect(
         new TextEncoder().encode(JSON.stringify(tools)).length
-      ).toBeLessThan(100_000);
+      ).toBeLessThan(90_000);
       const blockTool = tools.find((tool) => tool.name === "edit_slide_block");
       expect(JSON.stringify(blockTool?.inputSchema)).not.toContain('"block"');
       const templateUpdateTool = tools.find(
@@ -120,6 +120,12 @@ describe("MCP contract", () => {
       expect(
         (narrationTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("voice_tuning");
+      const voiceStatusTool = tools.find(
+        (tool) => tool.name === "get_voice_generation_status"
+      );
+      expect(JSON.stringify(voiceStatusTool?.outputSchema).length).toBeLessThan(
+        6_000
+      );
       expect(tools).toContainEqual(
         expect.objectContaining({
           name: "delete_project_image",
@@ -505,6 +511,9 @@ describe("MCP contract", () => {
           expect.objectContaining({
             uriTemplate:
               "research://projects/{id}/slides/{slideId}/elements/{elementId}"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/voice"
           })
         ])
       );
@@ -1304,9 +1313,23 @@ describe("MCP contract", () => {
           version: 15,
           configured: true,
           default_profile: {
-            tuning: { speedScale: 1.1, intonationScale: 1.2 }
+            label: "案内役"
           },
           summary: { total: 1, ready: 0, needs_generation: 1 },
+          details_uri: `research://projects/${projectId}/voice`
+        }
+      });
+      const voiceDetails = await readJsonResource(
+        client,
+        `research://projects/${projectId}/voice`
+      );
+      expect(voiceDetails).toMatchObject({
+        ok: true,
+        voice: {
+          version: 15,
+          default_profile: {
+            tuning: { speedScale: 1.1, intonationScale: 1.2 }
+          },
           segments: [{
             profile_label: "案内役",
             effective_tuning: {
