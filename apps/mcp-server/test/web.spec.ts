@@ -537,7 +537,9 @@ describe("Web dashboard", () => {
     );
     const workspaceHtml = await workspace.text();
     expect(workspace.status).toBe(200);
-    expect(workspaceHtml).toContain("Slide workspace");
+    expect(workspaceHtml).toContain("スライド編集");
+    expect(workspaceHtml).toContain("発表全体の既定:");
+    expect(workspaceHtml).toContain("スライド設定として上書きします");
     expect(workspaceHtml).toContain("内容を保存");
     expect(workspaceHtml).toContain('data-markdown-action="heading"');
     expect(workspaceHtml).toContain('data-markdown-action="bold"');

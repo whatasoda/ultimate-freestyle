@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@47";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@48";
 
 function escapeHtml(value: string): string {
   return value
@@ -317,7 +317,8 @@ function renderSceneNode(
     return `<uf-${node.kind} ${attributes}>${children}</uf-${node.kind}>`;
   }
   if (node.kind === "hero") {
-    return `<uf-hero ${attributes} data-align="${node.align}">${node.eyebrow === null ? "" : `<p class="component-eyebrow">${escapeHtml(node.eyebrow)}</p>`}<h2>${escapeHtml(node.heading)}</h2>${node.subtitle === null ? "" : `<p class="component-subtitle">${escapeHtml(node.subtitle)}</p>`}</uf-hero>`;
+    const compactHeading = [...node.heading].length <= 16;
+    return `<uf-hero ${attributes} data-align="${node.align}" data-compact-heading="${String(compactHeading)}">${node.eyebrow === null ? "" : `<p class="component-eyebrow">${escapeHtml(node.eyebrow)}</p>`}<h2>${escapeHtml(node.heading)}</h2>${node.subtitle === null ? "" : `<p class="component-subtitle">${escapeHtml(node.subtitle)}</p>`}</uf-hero>`;
   }
   if (node.kind === "markdown") {
     return `<uf-markdown ${attributes}>${renderTextBlocks(node.markdown)}</uf-markdown>`;
@@ -716,6 +717,7 @@ export function renderPresentationHtml(
     uf-hero[data-align="end"] { align-items: flex-end; text-align: end; }
     :is(uf-hero,uf-markdown,uf-card,uf-metric,uf-quote,uf-callout,uf-bar-chart,uf-timeline)[data-fit-content] { --fit-scale: 1; }
     uf-hero h2 { max-width: 16ch; margin: 0; font-family: var(--font-heading); font-size: calc(7.1cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); font-weight: var(--heading-weight); line-height: .96; letter-spacing: -.055em; text-wrap: balance; overflow-wrap: anywhere; }
+    uf-hero[data-compact-heading="true"] h2 { max-width: none; white-space: nowrap; text-wrap: nowrap; }
     .component-eyebrow, .component-label { margin: 0; color: var(--accent); font: 850 calc(1.05cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale))/1.2 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
     .component-subtitle { max-width: 48rem; margin: 0; color: color-mix(in srgb, currentColor 68%, transparent); font-size: calc(1.8cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
     uf-markdown h2, uf-markdown h3, uf-markdown h4, uf-card h2, uf-card h3, uf-card h4 { margin: 0 0 .45em; font-family: var(--font-heading); font-size: calc(3.7cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); font-weight: var(--heading-weight); line-height: 1.05; overflow-wrap: anywhere; }

@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@47");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@48");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -659,6 +659,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("<uf-stack");
     expect(html).toContain("<uf-grid");
     expect(html).toContain("<uf-hero");
+    expect(html).toContain('data-compact-heading="true"');
     expect(html).toContain("<uf-metric");
     expect(html).toContain("<uf-bar-chart");
     expect(html).toContain('data-reveal-at="2"');
@@ -688,6 +689,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("setTimeout(scheduleFit, 300)");
     expect(html).toContain("uf-card h4");
     expect(html).toContain("uf-hero { gap: .45cqh");
+    expect(html).toContain('uf-hero[data-compact-heading="true"] h2');
     expect(html).toContain("var(--density-scale) * var(--fit-scale)");
     expect(html).toContain("@media (prefers-reduced-motion: reduce) { *, *::before, *::after");
     expect(html).not.toContain(">fallback<");
