@@ -1102,6 +1102,8 @@ describe("presentation artifact renderer", () => {
       selectedNarrationAt: 77
     }).text();
     expect(largeNarrationHtml.match(/data-narration-select=/g)).toHaveLength(101);
+    expect(largeNarrationHtml).toContain("data-narration-search");
+    expect(largeNarrationHtml).toContain("STEP・原稿・音声状態");
     expect(largeNarrationHtml.match(/data-segment-editor/g)).toHaveLength(1);
     expect(largeNarrationHtml).toContain('id="narration-segment-77"');
     expect(largeNarrationHtml).toContain('data-selected-narration="77"');

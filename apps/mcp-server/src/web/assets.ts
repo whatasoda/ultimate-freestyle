@@ -2336,6 +2336,37 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     componentSearch.addEventListener("input", filterComponents);
     filterComponents();
   }
+  const narrationSearch = document.querySelector("[data-narration-search]");
+  const narrationSearchCount = document.querySelector("[data-narration-search-count]");
+  const narrationSearchEmpty = document.querySelector("[data-narration-search-empty]");
+  const narrationLinks = [...document.querySelectorAll("[data-narration-select]")];
+  if (narrationSearch instanceof HTMLInputElement && narrationSearchCount instanceof HTMLOutputElement) {
+    const filterNarration = () => {
+      const query = narrationSearch.value.trim().toLocaleLowerCase("ja");
+      let visible = 0;
+      for (const link of narrationLinks) {
+        if (!(link instanceof HTMLAnchorElement)) continue;
+        const matches = query.length === 0 || (link.dataset.searchText || "").includes(query);
+        link.hidden = !matches;
+        if (matches) visible += 1;
+      }
+      narrationSearchCount.value = visible + " / " + narrationLinks.length + "件";
+      if (narrationSearchEmpty instanceof HTMLElement) narrationSearchEmpty.hidden = visible !== 0;
+    };
+    narrationSearch.addEventListener("input", filterNarration);
+    filterNarration();
+  }
+  for (const link of narrationLinks) {
+    if (!(link instanceof HTMLAnchorElement)) continue;
+    if (link.getAttribute("aria-current") === "true") requestAnimationFrame(() => link.scrollIntoView({ block: "nearest", inline: "center" }));
+    link.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      dispatchEvent(new Event("ultimate-freestyle:persist-drafts"));
+      document.body.dataset.internalNavigation = "true";
+      location.assign(link.href);
+    });
+  }
 
   if (slideFrame instanceof HTMLIFrameElement) {
     const syncFramePosition = () => {

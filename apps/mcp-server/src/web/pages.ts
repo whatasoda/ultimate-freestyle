@@ -215,7 +215,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=125";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=126";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -639,7 +639,7 @@ function shell(title: string, body: string): string {
       .component-search-row input { min-width: 0; flex: 1; }
       .component-search-row output { min-width: 6.5rem; text-align: end; white-space: nowrap; }
       .segment-outline { display: flex; gap: .4rem; overflow-x: auto; padding: .15rem 0 .5rem; scrollbar-width: thin; }
-      .segment-outline a { flex: 0 0 auto; padding: .45rem .65rem; border: 1px solid var(--line); border-radius: .5rem; color: var(--muted); text-decoration: none; font: 700 .75rem/1 ui-monospace, monospace; }
+      .segment-outline a { display: inline-flex; align-items: center; flex: 0 0 auto; min-height: 2.75rem; padding: .45rem .65rem; border: 1px solid var(--line); border-radius: .5rem; color: var(--muted); text-decoration: none; font: 700 .75rem/1 ui-monospace, monospace; }
       .segment-outline a:hover, .segment-outline a[aria-current="true"] { border-color: #9d7bff; background: #8062df30; color: white; }
       .voice-pager { display: flex; align-items: center; justify-content: center; gap: .65rem; margin-top: 1rem; }
       .voice-pager span { color: var(--muted); font-size: .82rem; }
@@ -737,8 +737,8 @@ function shell(title: string, body: string): string {
       .job-numbers { display: flex; flex-wrap: wrap; gap: .75rem; color: var(--muted); font-size: .78rem; }
       .voice-segment-list { display: grid; gap: .55rem; }
       .voice-filter { display: flex; flex-wrap: wrap; gap: .45rem; }
-      .voice-filter button { min-height: 2.2rem; padding: .45rem .7rem; font-size: .78rem; }
-      .voice-filter button[aria-pressed="true"] { border-color: #9d7bff; background: #8062df30; color: white; }
+      .voice-filter :is(button,.button) { min-height: 2.75rem; padding: .45rem .7rem; font-size: .78rem; }
+      .voice-filter :is(button,.button)[aria-current="page"] { border-color: #9d7bff; background: #8062df30; color: white; }
       .voice-result-count { margin-left: auto; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
       .voice-search { width: 100%; min-height: 2.55rem; padding: .55rem .7rem; border: 1px solid var(--line); border-radius: .6rem; background: #0a111b; color: var(--ink); font: inherit; }
       .voice-review { overflow: hidden; border: 1px solid var(--line); border-radius: .75rem; background: #08111b77; }
@@ -2356,7 +2356,11 @@ export function slideWorkspacePage(options: {
         .join("")
     : `<p class="prose">読み上げ区間はまだありません。「読み上げ区間を追加」から最初の原稿を入力できます。</p>`;
   const narrationSegmentOutline = narrationSegments.length > 1
-    ? `<nav class="segment-outline" aria-label="読み上げ区間">${narrationSegments.map((segment) => `<a data-narration-select="${segment.at}" href="${currentSlideDashboardPath}?step=${segment.at}&narration=${segment.at}#narration-segment-${segment.at}"${segment.at === selectedNarrationSegment?.at ? ' aria-current="true"' : ""}>STEP ${segment.at}</a>`).join("")}</nav>`
+    ? `<label class="component-search">読み上げ区間を絞り込む<span class="component-search-row"><input type="search" data-narration-search placeholder="STEP・原稿・音声状態" autocomplete="off"><output data-narration-search-count aria-live="polite">${narrationSegments.length} / ${narrationSegments.length}件</output></span></label><p class="filmstrip-empty" data-narration-search-empty hidden>一致する読み上げ区間はありません。</p><nav class="segment-outline" aria-label="読み上げ区間">${narrationSegments.map((segment) => {
+      const audioState = segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替";
+      const preview = [...segment.text].slice(0, 24).join("");
+      return `<a data-narration-select="${segment.at}" data-search-text="${escapeHtml(`step ${segment.at} ${segment.text} ${audioState}`.toLocaleLowerCase("ja"))}" aria-label="STEP ${segment.at}: ${escapeHtml(preview)} · ${audioState}" href="${currentSlideDashboardPath}?step=${segment.at}&narration=${segment.at}#narration-segment-${segment.at}"${segment.at === selectedNarrationSegment?.at ? ' aria-current="true"' : ""}>STEP ${segment.at}</a>`;
+    }).join("")}</nav>`
     : "";
   const usedNarrationSteps = new Set(
     slide.narration?.segments.map((segment) => segment.at) ?? []
