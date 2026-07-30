@@ -182,6 +182,10 @@ const canvasBlockRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   block: slideBlockSchema
 });
+const canvasBlockActionRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  action: z.enum(["duplicate", "delete"])
+});
 
 const templateFieldsRequestSchema = presentationTemplateSchema
   .omit({ id: true })
@@ -1668,6 +1672,81 @@ async function handleCanvasBlockUpdate(
   }
 }
 
+async function handleCanvasBlockAction(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string,
+  blockId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = canvasBlockActionRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "表示パーツの操作内容を確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  let resultBlockId: string | null = null;
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "canvas") {
+          const error = new Error("The slide does not use a canvas composition.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        const index = slide.composition.blocks.findIndex((block) => block.id === blockId);
+        const block = slide.composition.blocks[index];
+        if (block === undefined) {
+          const error = new Error("The canvas block does not exist.");
+          Object.assign(error, { code: "BLOCK_NOT_FOUND" });
+          throw error;
+        }
+        if (parsed.data.action === "delete") {
+          slide.composition.blocks.splice(index, 1);
+          return;
+        }
+        const used = new Set(slide.composition.blocks.map((item) => item.id));
+        const base = `${block.id.slice(0, 48)}-copy`;
+        let candidate = base;
+        for (let suffix = 2; used.has(candidate); suffix += 1) candidate = `${base.slice(0, 58)}-${suffix}`;
+        const copy = structuredClone(block);
+        copy.id = candidate;
+        copy.frame.x = Math.min(100 - copy.frame.width, copy.frame.x + 3);
+        copy.frame.y = Math.min(100 - copy.frame.height, copy.frame.y + 3);
+        copy.z_index = Math.min(100, copy.z_index + 1);
+        slide.composition.blocks.splice(index + 1, 0, copy);
+        resultBlockId = candidate;
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: `project.slide_canvas_block_${parsed.data.action}d`,
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, block_id: blockId, result_block_id: resultBlockId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, block_id: blockId, result_block_id: resultBlockId, action: parsed.data.action, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "表示パーツを操作できませんでした。");
+  }
+}
+
 function projectMutationErrorResponse(
   error: unknown,
   fallbackMessage: string
@@ -3022,6 +3101,22 @@ export async function handleWebRequest(
       env,
       slideActionMatch[1],
       slideActionMatch[2]
+    );
+  }
+  const canvasBlockActionMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/blocks/([a-z0-9][a-z0-9-]{0,63})/actions$`)
+  );
+  if (
+    canvasBlockActionMatch?.[1] !== undefined &&
+    canvasBlockActionMatch[2] !== undefined &&
+    canvasBlockActionMatch[3] !== undefined
+  ) {
+    return handleCanvasBlockAction(
+      request,
+      env,
+      canvasBlockActionMatch[1],
+      canvasBlockActionMatch[2],
+      canvasBlockActionMatch[3]
     );
   }
   const canvasBlockMatch = path.match(

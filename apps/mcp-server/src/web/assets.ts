@@ -968,6 +968,37 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  for (const button of document.querySelectorAll("[data-canvas-block-action]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", async () => {
+      const form = button.closest("form");
+      const feedback = form?.querySelector("[data-form-feedback]");
+      if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) return;
+      const action = button.dataset.canvasBlockAction;
+      if (action === "delete" && !confirm("この表示パーツを削除しますか？")) return;
+      setButtonBusy(button, true);
+      feedback.textContent = action === "duplicate" ? "表示パーツを複製しています…" : "表示パーツを削除しています…";
+      feedback.classList.remove("success", "warning");
+      try {
+        const response = await fetch(button.dataset.actionUrl || "", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-csrf-token": form.dataset.csrf || "" },
+          body: JSON.stringify({ expected_version: Number(form.dataset.version), action })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "表示パーツを操作できませんでした。"));
+        form.dataset.dirty = "false";
+        feedback.textContent = action === "duplicate" ? "複製しました。画面を更新します…" : "削除しました。画面を更新します…";
+        feedback.classList.add("success");
+        location.reload();
+      } catch (error) {
+        feedback.textContent = caughtErrorMessage(error, "表示パーツを操作できませんでした。");
+        feedback.classList.add("warning");
+        setButtonBusy(button, false);
+      }
+    });
+  }
+
   const syncSceneComponentDrafts = () => {
     if (!(slideFrame instanceof HTMLIFrameElement)) return;
     for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
