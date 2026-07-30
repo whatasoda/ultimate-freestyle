@@ -866,7 +866,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("パーツ固有の配置");
     expect(workspaceHtml).toContain('data-component-path="fit"');
     expect(workspaceHtml).toContain('data-component-path="columns"');
-    expect(workspaceHtml).toContain('data-asset-urls=');
+    expect(workspaceHtml).toContain('data-workspace-asset-urls=');
+    expect(workspaceHtml).not.toContain(' data-asset-urls=');
     expect(workspaceHtml).toContain("/components/headline");
     expect(workspaceHtml).toContain("/components/comparison");
     expect(workspaceHtml).toContain("グラフの最大値");

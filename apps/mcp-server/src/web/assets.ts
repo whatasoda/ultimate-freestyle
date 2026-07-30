@@ -1415,7 +1415,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const syncSceneComponentDraft = (form) => {
     if (!(form instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     let assetUrls = {};
-    try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
+    try { assetUrls = JSON.parse(form.closest(".slide-workspace")?.dataset.workspaceAssetUrls || "{}"); } catch {}
     slideFrame.contentWindow?.postMessage({
       type: "ultimate-freestyle:preview-scene-component",
       slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
@@ -1445,7 +1445,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const syncCanvasBlockDraft = (form) => {
     if (!(form instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     let assetUrls = {};
-    try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
+    try { assetUrls = JSON.parse(form.closest(".slide-workspace")?.dataset.workspaceAssetUrls || "{}"); } catch {}
     slideFrame.contentWindow?.postMessage({
       type: "ultimate-freestyle:preview-canvas-block",
       slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
