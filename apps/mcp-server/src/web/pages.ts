@@ -286,6 +286,10 @@ function headers(setCookies: string[] = []): Headers {
   return result;
 }
 
+function serializedValueBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length;
+}
+
 const DASHBOARD_STYLE = String.raw`
       :root { color-scheme: dark; font-family: Inter, "Noto Sans JP", system-ui, sans-serif; --ink: #eef3fa; --muted: #9aa9bb; --line: #2c3a4e; --panel: #121c2aee; --accent: #9d7bff; }
       * { box-sizing: border-box; }
@@ -399,6 +403,11 @@ const DASHBOARD_STYLE = String.raw`
       .project-storage { display: grid; gap: .4rem; margin-top: 1rem; }
       .project-storage progress { width: 100%; accent-color: #74e6b2; }
       .project-storage[data-state="warning"] progress { accent-color: #ffbb66; }
+      .storage-breakdown { margin-top: .25rem; }
+      .storage-breakdown summary { color: #ffe0a6; cursor: pointer; font-size: .78rem; font-weight: 780; }
+      .storage-breakdown ol { display: grid; gap: .3rem; margin: .55rem 0 0; padding-left: 1.4rem; }
+      .storage-breakdown li { color: var(--muted); font-size: .76rem; line-height: 1.45; }
+      .storage-breakdown a { color: #b9ddff; }
       .log { padding: .8rem 0; border-top: 1px solid var(--line); }
       .log:first-of-type { padding-top: 0; border-top: 0; }
       .log small { color: var(--muted); }
@@ -1391,6 +1400,35 @@ export function projectDetailPage(options: {
   const projectBytes = projectDocumentBytes(document);
   const projectStoragePercent = Math.round(projectBytes / MAX_PROJECT_DOCUMENT_BYTES * 100);
   const projectStorageWarning = projectBytes >= MAX_PROJECT_DOCUMENT_BYTES * 0.75;
+  const storageBreakdown = projectStorageWarning
+    ? [
+        { label: "スライド", href: "#presentation-structure", bytes: serializedValueBytes(document.deck?.slides ?? []) },
+        { label: "研究ログ", href: "#research-log", bytes: serializedValueBytes(document.logs) },
+        {
+          label: "研究内容",
+          href: "#basic-information",
+          bytes: serializedValueBytes({
+            title: document.title,
+            summary: document.summary,
+            question: document.question,
+            hypothesis: document.hypothesis,
+            method: document.method,
+            findings: document.findings,
+            limitations: document.limitations
+          })
+        },
+        {
+          label: "発表全体の設定",
+          href: "#presentation-screen",
+          bytes: serializedValueBytes(document.deck === null
+            ? null
+            : { ...document.deck, slides: undefined })
+        }
+      ].sort((first, second) => second.bytes - first.bytes)
+    : [];
+  const storageBreakdownHtml = storageBreakdown.length === 0
+    ? ""
+    : `<details class="storage-breakdown"><summary>容量の大きい順を確認</summary><ol>${storageBreakdown.map((item) => `<li><a href="${item.href}">${item.label}</a> · 約${Math.ceil(item.bytes / 1024)} KiB</li>`).join("")}</ol></details>`;
   const projectFieldsPath = `/api/projects/${escapeHtml(options.project.project_id)}/fields`;
   const projectListItemsPath = `/api/projects/${escapeHtml(options.project.project_id)}/list-items`;
   const renderResearchListEditor = (
@@ -1948,7 +1986,7 @@ export function projectDetailPage(options: {
                <p class="inherit-note">固定プレビューで実際に使う画像は30件・合計30MiBまでです。未使用画像は公開版へ複製されません。</p>
                <div class="copy-box"><code>接続したAIは画像本体を引数へ含めず、asset IDと説明の一覧を取得できます。</code><div class="actions"><button class="ghost" type="button" data-copy-text="${escapeHtml(imageAiPrompt)}">画像の使い方をAIへ相談</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div>
              </section>
-             <section class="panel"><h2>研究ログ</h2>${logs}${document.logs.length > recentLogs.length ? `<p class="meta">最新20件を表示 · 全${document.logs.length}件</p>` : ""}</section>
+             <section class="panel" id="research-log" tabindex="-1"><h2>研究ログ</h2>${logs}${document.logs.length > recentLogs.length ? `<p class="meta">最新20件を表示 · 全${document.logs.length}件</p>` : ""}</section>
            </div>
            <aside class="detail-column">
              <section class="panel"><h2>研究情報</h2><dl class="stat-list">
@@ -1958,7 +1996,7 @@ export function projectDetailPage(options: {
                <dt>ログ</dt><dd>${document.logs.length}件</dd>
                <dt>スライド</dt><dd>${slides.length}枚</dd>
                <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
-             </dl><div class="project-storage" data-state="${projectStorageWarning ? "warning" : "ok"}"><span class="meta">保存容量 ${Math.ceil(projectBytes / 1024)} / ${MAX_PROJECT_DOCUMENT_BYTES / 1024} KiB（${projectStoragePercent}%）</span><progress max="${MAX_PROJECT_DOCUMENT_BYTES}" value="${projectBytes}">${projectStoragePercent}%</progress><small class="inherit-note">${projectStorageWarning ? "上限に近づいています。不要なログやスライドを整理してください。" : `残り約${Math.floor((MAX_PROJECT_DOCUMENT_BYTES - projectBytes) / 1024)} KiBです。`}</small></div></section>
+             </dl><div class="project-storage" data-state="${projectStorageWarning ? "warning" : "ok"}"><span class="meta">保存容量 ${Math.ceil(projectBytes / 1024)} / ${MAX_PROJECT_DOCUMENT_BYTES / 1024} KiB（${projectStoragePercent}%）</span><progress max="${MAX_PROJECT_DOCUMENT_BYTES}" value="${projectBytes}">${projectStoragePercent}%</progress><small class="inherit-note">${projectStorageWarning ? "上限に近づいています。大きい項目から整理してください。" : `残り約${Math.floor((MAX_PROJECT_DOCUMENT_BYTES - projectBytes) / 1024)} KiBです。`}</small>${storageBreakdownHtml}</div></section>
              ${draftHistoryPanel}
              <section class="panel" id="presentation-structure" tabindex="-1"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
              ${evaluationPanel}

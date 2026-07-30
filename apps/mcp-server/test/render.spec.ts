@@ -1200,6 +1200,43 @@ describe("presentation artifact renderer", () => {
     expect(overLimitHtml).toContain("発表を20分以内に収める");
     expect(overLimitHtml).toContain('data-duration-valid="false" data-preview-current="false" data-preview-reviewed="false" data-published-current="false" disabled');
 
+    const storageWarningProject = projectRecordSchema.parse({
+      ...projectWithNextSlide,
+      document: {
+        ...projectWithNextSlide.document,
+        logs: Array.from({ length: 48 }, (_, index) => ({
+          id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+          occurred_at: "2026-07-26T12:00:00.000Z",
+          kind: "observation",
+          text: "x".repeat(8_000),
+          source_url: null
+        }))
+      }
+    });
+    const storageWarningHtml = await projectDetailPage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project: storageWarningProject,
+      assets: [],
+      draftRevisions: [],
+      renderedQualityReport: null,
+      publication: {
+        project_id: storageWarningProject.project_id,
+        draft_version: storageWarningProject.version,
+        current_renderer_version: PRESENTATION_RENDERER_VERSION,
+        slug: null,
+        latest_preview: null,
+        published: null,
+        published_history: [],
+        events: []
+      }
+    }).text();
+    expect(storageWarningHtml).toContain("容量の大きい順を確認");
+    expect(storageWarningHtml).toMatch(/研究ログ<\/a> · 約3\d\d KiB/);
+    expect(storageWarningHtml).toContain('href="#research-log"');
+    const storageBreakdown = storageWarningHtml.slice(storageWarningHtml.indexOf("容量の大きい順を確認"));
+    expect(storageBreakdown.indexOf("研究ログ</a>")).toBeLessThan(storageBreakdown.indexOf("スライド</a>"));
+
     const qualityPriorityProject = projectRecordSchema.parse({
       ...overLimitProject,
       document: {
