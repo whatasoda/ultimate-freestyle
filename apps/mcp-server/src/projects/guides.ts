@@ -9,9 +9,15 @@ import {
 import { z } from "zod";
 
 import { twitchGrantPropsSchema } from "../auth/types";
-import { PRESENTATION_RENDERER_VERSION } from "../presentation/render";
+import { listProjectAssets } from "../assets/repository";
+import {
+  listPresentationAssetIds,
+  PRESENTATION_RENDERER_VERSION
+} from "../presentation/render";
 import {
   getPublicationStatus,
+  MAX_PRESENTATION_ASSETS,
+  MAX_PRESENTATION_ASSET_BYTES,
   MAX_PRESENTATION_DURATION_SECONDS
 } from "../publications/service";
 import { getVoiceProjectStatus } from "../voicevox/service";
@@ -719,13 +725,14 @@ export function registerResearchGuides(
     async (uri, variables) => {
       const auth = projectResourceBody(getAuthProps, "research:read");
       const id = variables.id;
-      const [status, project, voice] = !("error" in auth) && typeof id === "string"
+      const [status, project, voice, assets] = !("error" in auth) && typeof id === "string"
         ? await Promise.all([
             getPublicationStatus(db, auth.ownerUserId, id),
             getProject(db, auth.ownerUserId, id),
-            getVoiceProjectStatus(db, auth.ownerUserId, id)
+            getVoiceProjectStatus(db, auth.ownerUserId, id),
+            listProjectAssets(db, auth.ownerUserId, id)
           ])
-        : [null, null, null];
+        : [null, null, null, []];
       const latest = status?.latest_preview ?? null;
       const previewCurrent = status !== null && latest !== null &&
         latest.project_version === status.draft_version &&
@@ -738,10 +745,44 @@ export function registerResearchGuides(
         (sum, slide) => sum + slide.duration_seconds,
         0
       ) ?? 0;
+      const assetIds = project === null ? [] : listPresentationAssetIds(project);
+      const assetsById = new Map(assets.map((asset) => [asset.asset_id, asset]));
+      const missingAssetIds = assetIds.filter((assetId) => !assetsById.has(assetId));
+      const assetBytes = assetIds.reduce(
+        (sum, assetId) => sum + (assetsById.get(assetId)?.byte_size ?? 0),
+        0
+      );
+      const assetBlockers = [
+        ...(assetIds.length > MAX_PRESENTATION_ASSETS
+          ? [{
+              code: "PRESENTATION_ASSET_LIMIT",
+              message: `発表で使用する画像を${MAX_PRESENTATION_ASSETS}件以内に減らしてください。`,
+              count: assetIds.length,
+              limit: MAX_PRESENTATION_ASSETS
+            }]
+          : []),
+        ...(missingAssetIds.length > 0
+          ? [{
+              code: "PRESENTATION_ASSET_NOT_FOUND",
+              message: `${missingAssetIds.length}件の参照画像が研究内に見つかりません。`,
+              asset_ids: missingAssetIds.slice(0, 10),
+              omitted_count: Math.max(0, missingAssetIds.length - 10)
+            }]
+          : []),
+        ...(assetBytes > MAX_PRESENTATION_ASSET_BYTES
+          ? [{
+              code: "PRESENTATION_ASSET_LIMIT",
+              message: "発表で使用する画像を合計30MiB以内に減らしてください。",
+              byte_size: assetBytes,
+              limit_bytes: MAX_PRESENTATION_ASSET_BYTES
+            }]
+          : [])
+      ];
       const previewBlockers = [
         ...(slideCount === 0
           ? [{ code: "DECK_REQUIRED", message: "プレビューには1枚以上のスライドが必要です。" }]
           : []),
+        ...assetBlockers,
         ...(voice?.configured && voice.summary.ready !== voice.summary.total
           ? [{
               code: "VOICE_INCOMPLETE",
@@ -809,7 +850,19 @@ export function registerResearchGuides(
                   published_current: publishedCurrent,
                   next_action: nextAction,
                   preview_blockers: previewBlockers,
-                  publish_blockers: publishBlockers
+                  publish_blockers: publishBlockers,
+                  asset_preflight: {
+                    referenced_count: assetIds.length,
+                    found_count: assetIds.length - missingAssetIds.length,
+                    byte_size: assetBytes,
+                    count_limit: MAX_PRESENTATION_ASSETS,
+                    byte_limit: MAX_PRESENTATION_ASSET_BYTES
+                  },
+                  runtime_checks: [
+                    "参照画像のR2実体",
+                    "生成音声の合計100MiB上限",
+                    "生成HTMLの2MiB上限"
+                  ]
                 },
                 web: {
                   dashboard: {

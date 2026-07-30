@@ -661,6 +661,18 @@ describe("MCP contract", () => {
           publish_blockers: expect.arrayContaining([
             expect.objectContaining({ code: "DECK_REQUIRED" }),
             expect.objectContaining({ code: "PREVIEW_REQUIRED" })
+          ]),
+          asset_preflight: {
+            referenced_count: 0,
+            found_count: 0,
+            byte_size: 0,
+            count_limit: 30,
+            byte_limit: 30 * 1024 * 1024
+          },
+          runtime_checks: expect.arrayContaining([
+            "参照画像のR2実体",
+            "生成音声の合計100MiB上限",
+            "生成HTMLの2MiB上限"
           ])
         },
         web: {
