@@ -155,6 +155,18 @@ const FONT_LABELS = {
   handwritten: "手書き・ノート",
   condensed: "凝縮ゴシック"
 } as const;
+const FONT_CANDIDATES: Record<keyof typeof FONT_LABELS, string[]> = {
+  "system-sans": [],
+  gothic: ["BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN"],
+  rounded: ["M PLUS Rounded 1c", "Hiragino Maru Gothic ProN"],
+  mincho: ["Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN"],
+  serif: ["Georgia", "Noto Serif JP", "Yu Mincho"],
+  monospace: ["BIZ UDGothic", "SFMono-Regular", "Consolas"],
+  display: ["Arial Black", "Hiragino Kaku Gothic StdN", "Yu Gothic"],
+  textbook: ["UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN"],
+  handwritten: ["Klee", "Hannotate SC", "YuKyokasho"],
+  condensed: ["Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN"]
+};
 
 const DENSITY_LABELS = {
   spacious: "ゆったり",
@@ -203,7 +215,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=119";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=120";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -448,6 +460,8 @@ function shell(title: string, body: string): string {
       .font-pick { display: grid; gap: .2rem; min-height: 3.4rem; padding: .5rem; border: 1px solid var(--line); background: #0a111b; color: #e4ebf5; text-align: left; }
       .font-pick[aria-pressed="true"] { border-color: #9d7bff; background: #8062df24; }
       .font-pick small { color: var(--muted); font: 600 .64rem/1.2 system-ui, sans-serif; }
+      .font-pick[data-font-available="false"] { border-style: dashed; opacity: .72; }
+      .font-pick[data-font-available="false"] small::after { content: " · 代替表示"; color: #ffd681; }
       .font-pick[data-font-pick="system-sans"] { font-family: Inter, "Noto Sans JP", system-ui, sans-serif; }
       .font-pick[data-font-pick="gothic"] { font-family: "BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif; }
       .font-pick[data-font-pick="rounded"] { font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", ui-rounded, sans-serif; }
@@ -2161,7 +2175,7 @@ export function slideWorkspacePage(options: {
     };
     return `<button class="visual-pick" type="button" data-visual-pick="${value}" data-visual-palette="${escapeHtml(JSON.stringify(palette))}" aria-pressed="${String(value === selected)}" style="--visual-swatch:${preset.background};--visual-accent:${preset.accent}"><span class="visual-swatch" aria-hidden="true"></span><span>${label}</span></button>`;
   }).join("")}</div><p class="inherit-note">選ぶと配色一式を適用します。下の色はその後も個別に調整できます。</p>`;
-  const fontPresetPicker = (selected: string) => `<div class="font-picker" role="group" aria-label="本文と見出しのフォントをまとめて選ぶ">${Object.entries(FONT_LABELS).map(([value, label]) => `<button class="font-pick" type="button" data-font-pick="${value}" aria-pressed="${String(value === selected)}"><span>最自由研究 Aa</span><small>${label}</small></button>`).join("")}</div>`;
+  const fontPresetPicker = (selected: string) => `<div class="font-picker" role="group" aria-label="本文と見出しのフォントをまとめて選ぶ">${Object.entries(FONT_LABELS).map(([value, label]) => `<button class="font-pick" type="button" data-font-pick="${value}" data-font-candidates="${escapeHtml(JSON.stringify(FONT_CANDIDATES[value as keyof typeof FONT_LABELS]))}" aria-pressed="${String(value === selected)}"><span>最自由研究 Aa</span><small>${label}</small></button>`).join("")}</div>`;
   const coverLayoutPicker = `<div class="cover-picker" role="group" aria-label="表紙レイアウトを選ぶ">${[["center", "中央"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言強調"], ["band", "中央帯"], ["corner", "左下"], ["frame", "額縁"]].map(([value, label]) => `<button class="cover-pick" type="button" data-cover-pick="${value}" aria-pressed="${String((slide.cover_layout ?? "center") === value)}"><span class="cover-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const narrationDisplayPicker = `<div class="narration-picker" role="group" aria-label="読み上げ文の表示形式を選ぶ">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<button class="narration-display-pick" type="button" data-narration-display-pick="${value}" aria-pressed="${String(narrationDisplay === value)}"><span class="narration-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const regionLayoutPicker = activeTemplate === undefined ? "" : `<div class="region-picker" role="group" aria-label="本文と補足の領域配置を選ぶ">${[["single", "単一"], ["sidebar-right", "右補足"], ["sidebar-left", "左補足"], ["lower-third", "下段補足"], ["split", "左右均等"], ["top-band", "上段補足"], ["focus", "中央集中"]].map(([value, label]) => `<button class="region-pick" type="button" data-region-pick="${value}" aria-pressed="${String(activeTemplate.region_layout === value)}"><span class="region-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;

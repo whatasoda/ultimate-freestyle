@@ -439,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=119"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=120"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
@@ -968,6 +968,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-composition");
     expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("data-component-frame-toggle");
+    expect(dashboardScriptText).toContain("fontProbeContext.measureText");
+    expect(dashboardScriptText).toContain("localFontAvailable");
+    expect(dashboardScriptText).toContain("button.dataset.fontAvailable = String(available)");
     expect(dashboardScriptText).toContain("component.frame = null");
     expect(dashboardScriptText).toContain("左位置と幅の合計を100%以内にしてください");
     expect(dashboardScriptText).toContain("スライド枠を越えています");

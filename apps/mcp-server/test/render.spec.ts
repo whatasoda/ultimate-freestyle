@@ -639,6 +639,34 @@ describe("presentation artifact renderer", () => {
           accent: "#ffcf32",
           layout: "cinematic",
           narration_defaults: null,
+          templates: [
+            {
+              id: "rich-style",
+              name: "リッチ構成",
+              region_layout: "single",
+              sidebar_width_percent: 30,
+              background: "#11100e",
+              surface: "#172033",
+              foreground: "#f8fafc",
+              muted: "#a9b5c7",
+              accent: "#ffcf32",
+              corner_radius_px: 12,
+              spacing_scale: 1,
+              font_scale: 1,
+              enter_animation: "fade",
+              reveal_animation: "rise",
+              visual_preset: "studio",
+              body_font: "gothic",
+              heading_font: "display",
+              density: "comfortable",
+              motion_style: "calm",
+              body_weight: 400,
+              heading_weight: 800,
+              line_height: 1.5,
+              letter_spacing_em: 0
+            }
+          ],
+          default_template_id: "rich-style",
           slides: [
             {
               id: "rich-result",
@@ -901,6 +929,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("プレビューを広げる");
     expect(workspaceHtml).toContain("別画面で開く");
     expect(workspaceHtml).toContain("標準（短文・箇条書き）");
+    expect(workspaceHtml).toContain('data-font-candidates=');
+    expect(workspaceHtml).toContain('data-font-available="false"');
     expect(workspaceHtml.indexOf(">root<")).toBeLessThan(
       workspaceHtml.indexOf(">headline<")
     );

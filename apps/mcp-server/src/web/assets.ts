@@ -1747,6 +1747,30 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       form.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
+  const fontProbeContext = document.createElement("canvas").getContext("2d");
+  if (fontProbeContext) {
+    const probeText = "mmmmmmmmmmlli最自由研究Aa";
+    const genericFamilies = ["monospace", "sans-serif", "serif"];
+    const genericWidths = genericFamilies.map((family) => {
+      fontProbeContext.font = "72px " + family;
+      return fontProbeContext.measureText(probeText).width;
+    });
+    const localFontAvailable = (family) => genericFamilies.some((generic, index) => {
+      const safeFamily = family.replaceAll('"', "");
+      fontProbeContext.font = '72px "' + safeFamily + '", ' + generic;
+      return Math.abs(fontProbeContext.measureText(probeText).width - genericWidths[index]) > 0.1;
+    });
+    for (const button of document.querySelectorAll("[data-font-pick]")) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      let candidates = [];
+      try { candidates = JSON.parse(button.dataset.fontCandidates || "[]"); } catch {}
+      const available = candidates.length === 0 || candidates.some((family) =>
+        typeof family === "string" && localFontAvailable(family)
+      );
+      button.dataset.fontAvailable = String(available);
+      if (!available) button.title = "この端末では指定フォントを確認できないため、近い代替フォントで表示します。";
+    }
+  }
   for (const button of document.querySelectorAll("[data-cover-pick]")) {
     if (!(button instanceof HTMLButtonElement)) continue;
     button.addEventListener("click", () => {
