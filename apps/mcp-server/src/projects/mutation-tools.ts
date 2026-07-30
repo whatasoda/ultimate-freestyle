@@ -1410,7 +1410,7 @@ export function registerProjectMutationTools(
     {
       title: "scene componentを削除",
       description:
-        "指定componentと、そのcomponentを親にする子孫を一件の操作で削除します。",
+        "子を持たないcomponentを一件削除します。子がある場合は先に子を削除または移動してください。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -1444,19 +1444,14 @@ export function registerProjectMutationTools(
               "The slide component does not exist."
             );
           }
-          const removing = new Set([component_id]);
-          let changed = true;
-          while (changed) {
-            changed = false;
-            for (const node of slide.composition.nodes) {
-              if (node.parent_id !== null && removing.has(node.parent_id) && !removing.has(node.id)) {
-                removing.add(node.id);
-                changed = true;
-              }
-            }
+          if (slide.composition.nodes.some((node) => node.parent_id === component_id)) {
+            throw new ProjectToolError(
+              "COMPONENT_HAS_CHILDREN",
+              "Delete or move child components before deleting their parent."
+            );
           }
           slide.composition.nodes = slide.composition.nodes.filter(
-            (node) => !removing.has(node.id)
+            (node) => node.id !== component_id
           );
           recalculateSlideRevealSteps(slide);
         }
@@ -1750,7 +1745,7 @@ export function registerProjectMutationTools(
     "delete_slide",
     {
       title: "スライドを一枚削除",
-      description: "指定したスライドと、その中のreveal・読み上げを削除します。",
+      description: "指定したスライドと、その中のreveal・読み上げを削除します。最後の1枚は削除できません。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
@@ -1774,6 +1769,12 @@ export function registerProjectMutationTools(
           const index = deck.slides.findIndex((slide) => slide.id === slide_id);
           if (index === -1) {
             throw new ProjectToolError("SLIDE_NOT_FOUND", "The slide does not exist.");
+          }
+          if (deck.slides.length === 1) {
+            throw new ProjectToolError(
+              "LAST_SLIDE_REQUIRED",
+              "Create or duplicate another slide before deleting the last slide."
+            );
           }
           deck.slides.splice(index, 1);
         }

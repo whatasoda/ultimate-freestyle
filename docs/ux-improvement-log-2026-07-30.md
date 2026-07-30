@@ -405,3 +405,9 @@
 - 停止時は公開revisionの参照だけを外し、下書き、固定プレビュー、画像、音声は残す。誤操作を避ける確認文にも残る内容を明記した。
 - 停止後は公開リンクとURLコピーを隠し、確認済みの現行プレビューならその場で再公開できる状態へ戻すようにした。
 - dashboard assetをv99へ更新した。
+
+## 改善ループ208
+
+- MCPだけが親scene componentの子孫を暗黙に一括削除していた差をなくし、Web UIと同じく子を移動または削除してから親を削除する契約へ統一した。
+- MCPで最後の1枚を削除して空のdeckを作れた差もなくし、Web UIと同じ`LAST_SLIDE_REQUIRED`で拒否するようにした。
+- `COMPONENT_HAS_CHILDREN`と`LAST_SLIDE_REQUIRED`を安定したMCP error codeへ追加し、どちらもversionを進めないcontract testを加えた。

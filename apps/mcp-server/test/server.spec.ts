@@ -518,6 +518,19 @@ describe("MCP contract", () => {
         }
       });
       expect(createdSlide.structuredContent).toMatchObject({ ok: true, version: 5 });
+      const deleteLastSlide = await client.callTool({
+        name: "delete_slide",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 5,
+          slide_id: "question"
+        }
+      });
+      expect(deleteLastSlide.isError).toBe(true);
+      expect(deleteLastSlide.structuredContent).toMatchObject({
+        ok: false,
+        error: { code: "LAST_SLIDE_REQUIRED" }
+      });
       const slideFields = await client.callTool({
         name: "update_slide_fields",
         arguments: {
@@ -784,6 +797,20 @@ describe("MCP contract", () => {
       expect(componentStyle.structuredContent).toMatchObject({
         ok: true,
         version: 16
+      });
+      const deleteParentComponent = await client.callTool({
+        name: "delete_slide_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 16,
+          slide_id: "question",
+          component_id: "result-stack"
+        }
+      });
+      expect(deleteParentComponent.isError).toBe(true);
+      expect(deleteParentComponent.structuredContent).toMatchObject({
+        ok: false,
+        error: { code: "COMPONENT_HAS_CHILDREN" }
       });
       const adjustedSceneSlide = await readJsonResource(
         client,
