@@ -4,6 +4,10 @@ import {
   createEmptyProject,
   projectDocumentSchema
 } from "../src/projects/schema";
+import {
+  invalidateInheritedVoiceAudio,
+  invalidateVoiceProfileAudio
+} from "../src/projects/voice-audio";
 
 function voiceProject() {
   const project = createEmptyProject("複数話者テスト");
@@ -64,6 +68,59 @@ function voiceProject() {
 }
 
 describe("VOICEVOX project schema", () => {
+  it("invalidates explicit and inherited audio for the changed default profile", () => {
+    const project = voiceProject();
+    const slide = project.deck!.slides[0]!;
+    const explicit = slide.narration!.segments[0]!;
+    explicit.audio_src = "/audio/explicit.mp3";
+    slide.reveal_steps = 2;
+    slide.narration!.segments.push(
+      {
+        at: 1,
+        text: "既定の声を継承します。",
+        audio_src: "/audio/inherited.mp3",
+        voice_profile_id: null,
+        voice_tuning: null
+      },
+      {
+        at: 2,
+        text: "別の声を使います。",
+        audio_src: "/audio/other.mp3",
+        voice_profile_id: "other-profile",
+        voice_tuning: null
+      }
+    );
+
+    invalidateVoiceProfileAudio(project, "zundamon-normal");
+
+    expect(slide.narration!.segments.map((segment) => segment.audio_src)).toEqual([
+      null,
+      null,
+      "/audio/other.mp3"
+    ]);
+  });
+
+  it("invalidates only inherited audio when the default profile changes", () => {
+    const project = voiceProject();
+    const slide = project.deck!.slides[0]!;
+    slide.narration!.segments[0]!.audio_src = "/audio/explicit.mp3";
+    slide.reveal_steps = 1;
+    slide.narration!.segments.push({
+      at: 1,
+      text: "継承音声",
+      audio_src: "/audio/inherited.mp3",
+      voice_profile_id: null,
+      voice_tuning: null
+    });
+
+    invalidateInheritedVoiceAudio(project);
+
+    expect(slide.narration!.segments.map((segment) => segment.audio_src)).toEqual([
+      "/audio/explicit.mp3",
+      null
+    ]);
+  });
+
   it("accepts stable speaker/style profiles and per-segment tuning", () => {
     expect(projectDocumentSchema.safeParse(voiceProject()).success).toBe(true);
   });

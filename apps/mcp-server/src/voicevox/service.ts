@@ -14,6 +14,10 @@ import { z } from "zod";
 
 import { getProject, mutateProject } from "../projects/repository";
 import type { ProjectRecord } from "../projects/schema";
+import {
+  invalidateInheritedVoiceAudio,
+  invalidateVoiceProfileAudio
+} from "../projects/voice-audio";
 
 const MAX_JOBS_PER_MONTH = 20;
 const MAX_CHARACTERS_PER_MONTH = 200_000;
@@ -292,6 +296,7 @@ export async function setupVoicevoxProfile(
           "発表スライドを作成してから音声を設定してください。"
         );
       }
+      const previousDefaultProfileId = document.deck.voicevox?.default_profile_id ?? null;
       const profile = {
         id: catalogProfile.id,
         label: catalogProfile.label,
@@ -305,6 +310,12 @@ export async function setupVoicevoxProfile(
             : null
       };
       const existing = document.deck.voicevox?.profiles ?? [];
+      if (existing.some((item) => item.id === profile.id)) {
+        invalidateVoiceProfileAudio(document, profile.id);
+      }
+      if (previousDefaultProfileId !== profile.id) {
+        invalidateInheritedVoiceAudio(document);
+      }
       const profiles = existing.filter((item) => item.id !== profile.id);
       profiles.unshift(profile);
       document.deck.voicevox = {

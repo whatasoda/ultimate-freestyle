@@ -11,6 +11,10 @@ import { z } from "zod";
 import { recordAuditEvent } from "../auth/repository";
 import { mutateProject } from "./repository";
 import {
+  invalidateInheritedVoiceAudio,
+  invalidateVoiceProfileAudio
+} from "./voice-audio";
+import {
   animationSchema,
   compositionRevealPositions,
   coverLayoutSchema,
@@ -395,17 +399,6 @@ function findTemplate(document: ProjectDocument, templateId: string) {
     );
   }
   return template;
-}
-
-function invalidateProfileAudio(
-  document: ProjectDocument,
-  profileId: string
-): void {
-  for (const slide of requireDeck(document).slides) {
-    for (const segment of slide.narration?.segments ?? []) {
-      if (segment.voice_profile_id === profileId) segment.audio_src = null;
-    }
-  }
 }
 
 function recalculateSlideRevealSteps(
@@ -1099,6 +1092,7 @@ export function registerProjectMutationTools(
         changedId: profile_id ?? catalog_profile_id,
         mutate: (document) => {
           const deck = requireDeck(document);
+          const previousDefaultProfileId = deck.voicevox?.default_profile_id ?? null;
           const catalogProfile = findVoicevoxCatalogProfile(catalog_profile_id);
           if (catalogProfile === undefined) {
             throw new ProjectToolError(
@@ -1130,10 +1124,13 @@ export function registerProjectMutationTools(
           if (index === -1) deck.voicevox.profiles.push(profile);
           else {
             deck.voicevox.profiles[index] = profile;
-            invalidateProfileAudio(document, profile.id);
+            invalidateVoiceProfileAudio(document, profile.id);
           }
           if (make_default === true || deck.voicevox.profiles.length === 1) {
             deck.voicevox.default_profile_id = profile.id;
+            if (previousDefaultProfileId !== profile.id) {
+              invalidateInheritedVoiceAudio(document);
+            }
           }
         }
       })
@@ -1179,7 +1176,7 @@ export function registerProjectMutationTools(
             tuning === null
               ? null
               : { ...(profile.tuning ?? {}), ...tuning };
-          invalidateProfileAudio(document, profile_id);
+          invalidateVoiceProfileAudio(document, profile_id);
         }
       })
   );

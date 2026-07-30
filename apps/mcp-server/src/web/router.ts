@@ -32,6 +32,7 @@ import {
   restoreProjectDraftRevision
 } from "../projects/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
+import { invalidateVoiceProfileAudio } from "../projects/voice-audio";
 import {
   animationSchema,
   coverLayoutSchema,
@@ -859,13 +860,7 @@ async function handleVoiceProfileTuning(
           throw error;
         }
         profile.tuning = parsed.data.tuning;
-        for (const slide of document.deck?.slides ?? []) {
-          for (const segment of slide.narration?.segments ?? []) {
-            if (segment.voice_profile_id === null || segment.voice_profile_id === profile.id) {
-              segment.audio_src = null;
-            }
-          }
-        }
+        invalidateVoiceProfileAudio(document, profile.id);
       }
     });
     await recordWebAudit(env.DB, {
