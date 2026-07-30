@@ -100,7 +100,7 @@ import {
 } from "./pages";
 
 const MAX_FORM_BYTES = 16 * 1024;
-const MAX_JSON_BYTES = 32 * 1024;
+const MAX_JSON_BYTES = 96 * 1024;
 const UUID_PATH =
   "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const IMAGE_CLIENT_ERROR_CODES = new Set([
@@ -114,15 +114,18 @@ const IMAGE_CLIENT_ERROR_CODES = new Set([
 
 const projectFieldsRequestSchema = z.object({
   expected_version: z.number().int().positive(),
-  title: z.string().min(1).max(120),
-  stage: projectStageSchema,
-  summary: z.string().max(2_000),
-  question: z.string().max(2_000),
-  hypothesis: z.string().max(4_000),
-  method: z.string().max(20_000),
+  title: z.string().min(1).max(120).optional(),
+  stage: projectStageSchema.optional(),
+  summary: z.string().max(2_000).optional(),
+  question: z.string().max(2_000).optional(),
+  hypothesis: z.string().max(4_000).optional(),
+  method: z.string().max(20_000).optional(),
   findings: z.array(z.string().min(1).max(4_000)).max(100).optional(),
   limitations: z.array(z.string().min(1).max(4_000)).max(100).optional()
-});
+}).strict().refine(
+  (value) => Object.keys(value).some((key) => key !== "expected_version"),
+  { message: "更新する項目を1つ以上指定してください。" }
+);
 const imageAltRequestSchema = z.object({
   alt_text: z.string().max(500)
 });
@@ -1244,24 +1247,31 @@ async function handleProjectFieldsUpdate(
     );
   }
   try {
-    const { expected_version, question, hypothesis, method, ...fields } = parsed.data;
+    const { expected_version, ...fields } = parsed.data;
     const project = await mutateProject(env.DB, {
       ownerUserId: session.userId,
       projectId,
       expectedVersion: expected_version,
       mutate: (document) => {
-        Object.assign(document, fields, {
-          question: question.trim() || null,
-          hypothesis: hypothesis.trim() || null,
-          method: method.trim() || null
-        });
+        if (fields.title !== undefined) document.title = fields.title;
+        if (fields.stage !== undefined) document.stage = fields.stage;
+        if (fields.summary !== undefined) document.summary = fields.summary;
+        if (fields.question !== undefined) document.question = fields.question.trim() || null;
+        if (fields.hypothesis !== undefined) document.hypothesis = fields.hypothesis.trim() || null;
+        if (fields.method !== undefined) document.method = fields.method.trim() || null;
+        if (fields.findings !== undefined) document.findings = fields.findings;
+        if (fields.limitations !== undefined) document.limitations = fields.limitations;
       }
     });
     await recordWebAudit(env.DB, {
       userId: session.userId,
       eventType: "project.fields_updated",
       outcome: "succeeded",
-      details: { project_id: projectId, version: project.version },
+      details: {
+        project_id: projectId,
+        version: project.version,
+        changed_fields: Object.keys(fields).join(",")
+      },
       createdAt: new Date().toISOString()
     });
     return jsonResponse({

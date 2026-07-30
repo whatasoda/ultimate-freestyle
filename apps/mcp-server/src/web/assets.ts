@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "134";
+export const DASHBOARD_ASSET_VERSION = "135";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const apiErrorMessage = (result, fallback) => {
@@ -865,16 +865,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const serializeVersionedForm = (form) => {
     const data = new FormData(form);
     const body = { expected_version: Number(form.dataset.version) };
-    if (form.matches("[data-project-editor]")) Object.assign(body, {
-      title: String(data.get("title") || ""),
-      stage: String(data.get("stage") || ""),
-      summary: String(data.get("summary") || ""),
-      question: String(data.get("question") || ""),
-      hypothesis: String(data.get("hypothesis") || ""),
-      method: String(data.get("method") || ""),
-      findings: String(data.get("findings") || "").split(/\n+/).map((value) => value.trim()).filter(Boolean),
-      limitations: String(data.get("limitations") || "").split(/\n+/).map((value) => value.trim()).filter(Boolean)
-    });
+    if (form.matches("[data-project-editor]")) {
+      for (const name of ["title", "stage", "summary", "question", "hypothesis", "method"]) {
+        if (data.has(name)) body[name] = String(data.get(name) || "");
+      }
+      for (const name of ["findings", "limitations"]) {
+        if (!data.has(name)) continue;
+        body[name] = String(data.get(name) || "").split(/\n+/).map((value) => value.trim()).filter(Boolean);
+      }
+    }
     if (form.matches("[data-slide-editor]")) Object.assign(body, {
       title: String(data.get("title") || ""),
       duration_seconds: numberValue(data, "duration_seconds"),

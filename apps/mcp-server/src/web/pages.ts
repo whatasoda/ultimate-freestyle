@@ -1852,18 +1852,42 @@ export function projectDetailPage(options: {
            <div class="detail-column">
              <details class="panel panel-disclosure" id="basic-information"${researchReady ? "" : " open"}><summary>研究内容を編集</summary><div class="disclosure-body">
                <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
-                 <div class="editor-grid">
+                 <fieldset><legend>題名と概要</legend><div class="editor-grid">
                    <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label>
                    <label>段階<select name="stage">${Object.entries(STAGE_LABELS).map(([value, label]) => `<option value="${value}"${document.stage === value ? " selected" : ""}>${label}</option>`).join("")}</select></label>
                    <label class="wide">概要<textarea name="summary" maxlength="2000">${escapeHtml(document.summary)}</textarea></label>
+                 </div></fieldset>
+                 <div class="actions"><button type="submit">題名と概要を保存</button><span class="version" data-editor-version>v${options.project.version}</span></div>
+                 <p class="feedback" data-editor-feedback aria-live="polite"></p>
+               </form>
+               <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+                 <fieldset><legend>問いと仮説</legend><div class="editor-grid">
                    <label class="wide">研究の問い<textarea name="question" maxlength="2000">${escapeHtml(document.question ?? "")}</textarea></label>
                    <label class="wide">仮説<textarea name="hypothesis" maxlength="4000">${escapeHtml(document.hypothesis ?? "")}</textarea></label>
+                 </div></fieldset>
+                 <div class="actions"><button type="submit">問いと仮説を保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
+                 <p class="feedback" data-form-feedback aria-live="polite"></p>
+               </form>
+               <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+                 <fieldset><legend>方法</legend><div class="editor-grid">
                    <label class="wide">方法<textarea name="method" maxlength="20000">${escapeHtml(document.method ?? "")}</textarea></label>
+                 </div></fieldset>
+                 <div class="actions"><button type="submit">方法を保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
+                 <p class="feedback" data-form-feedback aria-live="polite"></p>
+               </form>
+               <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+                 <fieldset><legend>わかったこと</legend><div class="editor-grid">
                    <label class="wide">わかったこと<textarea name="findings" maxlength="20000" placeholder="1行に1件">${escapeHtml(document.findings.join("\n"))}</textarea><small class="inherit-note">1行を1件として保存します。</small></label>
+                 </div></fieldset>
+                 <div class="actions"><button type="submit">わかったことを保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
+                 <p class="feedback" data-form-feedback aria-live="polite"></p>
+               </form>
+               <form class="editor" data-project-editor action="/api/projects/${escapeHtml(options.project.project_id)}/fields" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
+                 <fieldset><legend>限界と今後</legend><div class="editor-grid">
                    <label class="wide">限界・今後の課題<textarea name="limitations" maxlength="20000" placeholder="1行に1件">${escapeHtml(document.limitations.join("\n"))}</textarea><small class="inherit-note">1行を1件として保存します。</small></label>
-                 </div>
-                 <div class="actions"><button type="submit">変更を保存</button><span class="version" data-editor-version>v${options.project.version}</span></div>
-                 <p class="feedback" data-editor-feedback aria-live="polite"></p>
+                 </div></fieldset>
+                 <div class="actions"><button type="submit">限界と今後を保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
+                 <p class="feedback" data-form-feedback aria-live="polite"></p>
                </form>
              </div></details>
              ${presentationSettingsPanel}

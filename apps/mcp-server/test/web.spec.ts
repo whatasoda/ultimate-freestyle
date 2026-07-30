@@ -441,8 +441,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=134"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=134"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=135"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=135"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -522,6 +522,12 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain('id="research-images"');
     expect(detailHtml).toContain('id="presentation-structure"');
     expect(detailHtml).toContain("基本情報を編集");
+    expect(detailHtml.match(/data-project-editor/g)).toHaveLength(5);
+    expect(detailHtml).toContain("題名と概要を保存");
+    expect(detailHtml).toContain("問いと仮説を保存");
+    expect(detailHtml).toContain("方法を保存");
+    expect(detailHtml).toContain("わかったことを保存");
+    expect(detailHtml).toContain("限界と今後を保存");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
     expect(detailHtml).toContain("ワイド 16:9");
@@ -718,7 +724,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=134"'
+      'href="/assets/dashboard.css?v=135"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -890,7 +896,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=134"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=135"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -899,7 +905,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=134"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=135"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -995,6 +1001,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("500 * (2 ** (reviewRetryCount - 1))");
     expect(dashboardScriptText).toContain("reloadPublicationWhenSafe(publishFeedback)");
     expect(dashboardScriptText).toContain('[data-versioned-form], [data-project-editor]');
+    expect(dashboardScriptText).toContain("if (data.has(name)) body[name]");
     expect(dashboardScriptText).toContain("syncPublicationDirtyState(dirtyCount)");
     expect(dashboardScriptText).toContain("未保存の入力を保護するため自動再読み込みを止めました");
     expect(dashboardScriptText).toContain("result.voice_generation_required");
@@ -1160,8 +1167,6 @@ describe("Web dashboard", () => {
             stage: "design",
             summary: "Webから保存した概要",
             question: "微調整後の問い？",
-            hypothesis: "",
-            method: "",
             findings: ["Webで整理した結果"],
             limitations: ["追加の測定が必要"]
           })
@@ -1200,6 +1205,30 @@ describe("Web dashboard", () => {
     expect(await conflictUpdate.json()).toMatchObject({
       ok: false,
       current_version: 2,
+      error: { code: "PROJECT_VERSION_CONFLICT" }
+    });
+
+    const largeJapaneseMethod = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/fields",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 1,
+            method: "観".repeat(20_000)
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(largeJapaneseMethod.status).toBe(409);
+    expect(await largeJapaneseMethod.json()).toMatchObject({
       error: { code: "PROJECT_VERSION_CONFLICT" }
     });
 
