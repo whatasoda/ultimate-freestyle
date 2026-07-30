@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@96";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@97";
 
 function escapeHtml(value: string): string {
   return value
@@ -1653,6 +1653,12 @@ export function renderPresentationHtml(
         type: 'ultimate-freestyle:render-diagnostics',
         slide_id: '__prelude__',
         step: 0,
+        ready: preludeStart instanceof HTMLButtonElement && !preludeStart.disabled,
+        preload: {
+          completed: Number(prelude.dataset.preloadCompleted || 0),
+          total: Number(prelude.dataset.preloadTotal || 0),
+          failed: Number(prelude.dataset.preloadFailed || 0)
+        },
         overflows: overflowing ? [{ id: 'prelude', region: '0ページ目', overflow_x: Math.max(0, content.width - boundary.width * .94), overflow_y: Math.max(0, content.height - boundary.height * .94), fit_scale: scale }] : [],
         fits: [{ id: 'prelude', region: '0ページ目', fit_scale: scale }],
         contrasts: contrast ? [{ id: 'prelude', region: '0ページ目', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground }] : [],
@@ -2229,6 +2235,11 @@ export function renderPresentationHtml(
       if (preludeStatus) preludeStatus.textContent = completed < total
         ? completed + ' / ' + total + ' 件を準備中'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
+      if (prelude instanceof HTMLElement) {
+        prelude.dataset.preloadCompleted = String(completed);
+        prelude.dataset.preloadTotal = String(total);
+        prelude.dataset.preloadFailed = String(failed);
+      }
       schedulePreludeFit();
     };
     const preloadedResources = new Set();
@@ -2285,6 +2296,7 @@ export function renderPresentationHtml(
       const remaining = Math.max(0, Number(DECK.loadingScreen.minimum_duration_ms) - (performance.now() - startedLoadingAt));
       if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
       if (preludeStart) preludeStart.disabled = false;
+      schedulePreludeFit();
       if (!loadingSettled && preludeStatus) preludeStatus.textContent = completed + ' / ' + resources.length + ' 件を準備中 · 先に開始できます';
       await Promise.race([loadingTask, new Promise((resolve) => setTimeout(resolve, 10_000))]);
       if (preludeStatus) preludeStatus.textContent = completed < resources.length

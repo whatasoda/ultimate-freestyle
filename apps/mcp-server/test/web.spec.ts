@@ -452,6 +452,9 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("advanceQualitySweep");
     expect(DASHBOARD_SCRIPT).toContain('url.searchParams.set("prelude", "1")');
     expect(DASHBOARD_SCRIPT).toContain("Number(data.step) !== sweepStep");
+    expect(DASHBOARD_SCRIPT).toContain('slide.id === "__prelude__" && data.ready !== true');
+    expect(DASHBOARD_SCRIPT).toContain("qualitySweepButton.dataset.preludeMinimumMs");
+    expect(detailHtml).toContain('data-prelude-minimum-ms="500"');
     expect(DASHBOARD_SCRIPT).toContain("推奨色を入力");
     expect(DASHBOARD_SCRIPT).toContain('item.id === "flow:sidebar" ? "muted" : "foreground"');
     expect(detailHtml).toContain("data-quality-sweep-cancel");
@@ -558,7 +561,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@96"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@97"');
 
     const voicePage = await requestProvider(
       provider,

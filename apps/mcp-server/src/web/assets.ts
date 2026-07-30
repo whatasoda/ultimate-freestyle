@@ -339,17 +339,22 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     };
     const waitForSweepResult = () => {
       clearTimeout(sweepTimer);
+      const slide = slides[sweepIndex];
+      const timeout = slide?.id === "__prelude__"
+        ? Math.max(5000, Number(qualitySweepButton.dataset.preludeMinimumMs || 0) + 2000)
+        : 5000;
       sweepTimer = setTimeout(() => {
         if (!sweepRunning) return;
         currentSlideFindings.push("STEP " + sweepStep + ": 描画結果を取得できませんでした");
         advanceQualitySweep();
-      }, 5000);
+      }, timeout);
     };
     addEventListener("message", (event) => {
       if (!sweepRunning || event.origin !== location.origin || event.source !== qualitySweepFrame.contentWindow) return;
       const data = event.data;
       const slide = slides[sweepIndex];
       if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || data.slide_id !== slide?.id || Number(data.step) !== sweepStep) return;
+      if (slide.id === "__prelude__" && data.ready !== true) return;
       clearTimeout(sweepTimer);
       const overflows = Array.isArray(data.overflows) ? data.overflows : [];
       const compressed = Array.isArray(data.fits)
