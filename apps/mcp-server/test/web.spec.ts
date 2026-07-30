@@ -1720,6 +1720,19 @@ describe("Web dashboard", () => {
     );
     expect(cleanQualityReport.status).toBe(200);
 
+    const voiceReadyDetail = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const voiceReadyDetailHtml = await voiceReadyDetail.text();
+    expect(voiceReadyDetailHtml).toContain("VOICEVOX<small>1/1区間</small>");
+    expect(voiceReadyDetailHtml).toMatch(/data-create-preview=[^>]+data-can-preview="true"/);
+    expect(voiceReadyDetailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
+
     const previewCreate = await requestProvider(
       provider,
       new Request(
