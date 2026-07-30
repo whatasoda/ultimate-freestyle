@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@89";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@90";
 
 function escapeHtml(value: string): string {
   return value
@@ -1010,7 +1010,7 @@ export function renderPresentationHtml(
 <body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-editor-prelude="${String(options.editorPrelude ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
-    <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p><p class="sr-only" data-slide-announcer aria-live="polite" aria-atomic="true"></p>
+    <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p><p class="sr-only" data-slide-announcer aria-live="polite" aria-atomic="true"></p><p class="sr-only" data-voice-announcer aria-live="polite" aria-atomic="true"></p>
       <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
@@ -1052,7 +1052,7 @@ export function renderPresentationHtml(
       </section>
     </div></div>
     <footer>
-      <span id="counter">1 / ${deck.slides.length}</span><div class="progress" role="progressbar" aria-label="発表の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="スライド 1 / ${deck.slides.length}"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span><span class="voice-mode" data-voice-status data-state="idle" role="status" aria-live="polite">音声待機</span>
+      <span id="counter">1 / ${deck.slides.length}</span><div class="progress" role="progressbar" aria-label="発表の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="スライド 1 / ${deck.slides.length}"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span><span class="voice-mode" data-voice-status data-state="idle">音声待機</span>
       <div class="voice-progress" title="読み上げ進捗" role="progressbar" aria-label="読み上げ進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="voice-progress"></i></div>
       <div class="controls">
         <button id="prev" aria-label="前へ" aria-keyshortcuts="ArrowLeft ArrowUp PageUp Backspace" title="前へ（← / PageUp）">←</button><button id="next" aria-label="次へ" aria-keyshortcuts="ArrowRight ArrowDown PageDown Space Enter" title="次へ（→ / Space / PageDown）">→</button>
@@ -1094,6 +1094,7 @@ export function renderPresentationHtml(
     const stage = document.querySelector('.stage');
     const voiceUnlock = document.querySelector('[data-voice-unlock]');
     const voiceStatus = document.querySelector('[data-voice-status]');
+    const voiceAnnouncer = document.querySelector('[data-voice-announcer]');
     const presentationResume = document.querySelector('[data-presentation-resume]');
     const completion = document.querySelector('[data-completion]');
     const restartButton = document.querySelector('[data-restart]');
@@ -1228,6 +1229,7 @@ export function renderPresentationHtml(
       voiceStatus.dataset.state = state;
       voiceStatus.textContent = label;
       voiceStatus.title = label;
+      if (voiceAnnouncer instanceof HTMLElement && ['blocked', 'failed', 'fallback'].includes(state) && voiceAnnouncer.textContent !== label) voiceAnnouncer.textContent = label;
     };
     const showVoiceUnlock = () => {
       if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = false;

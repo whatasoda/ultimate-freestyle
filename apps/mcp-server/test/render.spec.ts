@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@89");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@90");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
@@ -209,6 +209,9 @@ describe("presentation artifact renderer", () => {
     expect(html).not.toContain("rgba?(s*([d.]+)");
     expect(html).toContain("const withoutStart = trimmed.startsWith('|')");
     expect(html).toContain('data-voice-status data-state="idle"');
+    expect(html).not.toContain('data-voice-status data-state="idle" role="status"');
+    expect(html).toContain('data-voice-announcer aria-live="polite" aria-atomic="true"');
+    expect(html).toContain("['blocked', 'failed', 'fallback'].includes(state)");
     expect(html).toContain("VOICEVOX失敗 → ");
     expect(html).toContain("voiceProfileLabel");
     expect(html).toContain("音声クレジット</summary>");
