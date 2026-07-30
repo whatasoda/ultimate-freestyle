@@ -566,3 +566,9 @@
 - MCPだけがVOICEVOXの話者UUID、style ID、カタログrevisionを自由入力でき、Web UIの管理カタログを迂回して生成失敗する問題を解消した。
 - 118種類の話者・スタイルを`research://guide/voicevox-catalog` resourceとして公開し、`set_voicevox_profile`はカタログprofile IDと任意の表示名だけを受け取る。
 - 実際のspeaker UUID、style ID、style名、revisionは共有カタログからサーバー側で固定し、ずんだもん・ノーマルの推奨調声値もWeb UIと同じ経路で適用する。
+
+## 改善ループ232
+
+- これまでの「公開履歴」は公開済みrevisionの一覧であり、初回公開、過去版への切替、公開停止を時系列で区別できなかった。
+- `publication_events`を追記専用で追加し、公開先の更新と同じD1 batchへ`publish`、`rollback`、`unpublish`をfrom/to revision付きで保存する。
+- Web UIでは「公開可能な過去版」と「公開操作履歴」を分離し、非公開からv4、v4から非公開のように状態遷移を読めるようにした。rollbackの監査イベントも通常公開から分けた。

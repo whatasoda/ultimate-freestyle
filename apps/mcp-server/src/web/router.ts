@@ -3386,9 +3386,17 @@ async function handlePreviewPublish(
     );
     await recordWebAudit(env.DB, {
       userId: session.userId,
-      eventType: "presentation.published",
+      eventType:
+        status.events[0]?.action === "rollback"
+          ? "presentation.rolled_back"
+          : "presentation.published",
       outcome: "succeeded",
-      details: { project_id: projectId, revision_id: parsed.data.revision_id },
+      details: {
+        project_id: projectId,
+        revision_id: parsed.data.revision_id,
+        action: status.events[0]?.action ?? "publish",
+        from_revision_id: status.events[0]?.from_revision_id ?? null
+      },
       createdAt: new Date().toISOString()
     });
     return jsonResponse({

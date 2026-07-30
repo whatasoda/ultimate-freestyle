@@ -1299,7 +1299,10 @@ describe("Web dashboard", () => {
     expect(publish.status).toBe(200);
     const publishResult = (await publish.json()) as {
       public_url: string;
-      publication: { published_history: Array<{ revision_id: string }> };
+      publication: {
+        published_history: Array<{ revision_id: string }>;
+        events: Array<{ action: string; from_revision_id: string | null; to_revision_id: string | null }>;
+      };
     };
     expect(publishResult.publication.published_history).toContainEqual({
       revision_id: previewResult.revision.revision_id,
@@ -1313,6 +1316,12 @@ describe("Web dashboard", () => {
       reviewed_at: expect.any(String),
       published_at: expect.any(String)
     });
+    expect(publishResult.publication.events[0]).toMatchObject({
+      action: "publish",
+      from_revision_id: null,
+      to_revision_id: previewResult.revision.revision_id,
+      to_project_version: 4
+    });
     const publishedDetail = await requestProvider(
       provider,
       new Request(
@@ -1322,7 +1331,10 @@ describe("Web dashboard", () => {
       authEnv
     );
     const publishedDetailHtml = await publishedDetail.text();
-    expect(publishedDetailHtml).toContain("公開履歴 · 1件");
+    expect(publishedDetailHtml).toContain("公開可能な過去版 · 1件");
+    expect(publishedDetailHtml).toContain("公開操作履歴 · 1件");
+    expect(publishedDetailHtml).toContain("公開開始");
+    expect(publishedDetailHtml).toContain("非公開 → v4");
     expect(publishedDetailHtml).toContain("下書き履歴 · 3件");
     expect(publishedDetailHtml).toContain("公開中");
     expect(publishedDetailHtml).toContain("この版を確認");
@@ -1376,7 +1388,16 @@ describe("Web dashboard", () => {
     );
     expect(unpublish.status).toBe(200);
     expect(await unpublish.json()).toMatchObject({
-      publication: { published: null },
+      publication: {
+        published: null,
+        events: expect.arrayContaining([
+          expect.objectContaining({
+            action: "unpublish",
+            from_project_version: 4,
+            to_project_version: null
+          })
+        ])
+      },
       public_url: null
     });
     const unpublishedPage = await requestProvider(
@@ -2308,7 +2329,14 @@ describe("Web dashboard", () => {
     expect(await rollbackPublish.json()).toMatchObject({
       publication: {
         draft_version: 35,
-        published: { revision_id: previewResult.revision.revision_id, project_version: 4 }
+        published: { revision_id: previewResult.revision.revision_id, project_version: 4 },
+        events: expect.arrayContaining([
+          expect.objectContaining({
+            action: "rollback",
+            from_project_version: null,
+            to_project_version: 4
+          })
+        ])
       }
     });
     const rolledBackPage = await requestProvider(

@@ -62,6 +62,17 @@ export type PublicationStatus = {
   latest_preview: PresentationRevision | null;
   published: PresentationRevision | null;
   published_history: PresentationRevision[];
+  events: PublicationEvent[];
+};
+
+export type PublicationEvent = {
+  event_id: string;
+  action: "publish" | "rollback" | "unpublish";
+  from_revision_id: string | null;
+  from_project_version: number | null;
+  to_revision_id: string | null;
+  to_project_version: number | null;
+  created_at: string;
 };
 
 type RevisionRow = {
@@ -325,6 +336,21 @@ export async function getPublicationStatus(
     )
     .bind(projectId, ownerUserId)
     .all<RevisionRow>();
+  const eventRows = await db
+    .prepare(
+      `SELECT events.id AS event_id, events.action,
+              events.from_revision_id, previous.project_version AS from_project_version,
+              events.to_revision_id, next.project_version AS to_project_version,
+              events.created_at
+       FROM publication_events AS events
+       LEFT JOIN presentation_revisions AS previous ON previous.id = events.from_revision_id
+       LEFT JOIN presentation_revisions AS next ON next.id = events.to_revision_id
+       WHERE events.project_id = ? AND events.owner_user_id = ?
+       ORDER BY events.created_at DESC, events.id DESC
+       LIMIT 20`
+    )
+    .bind(projectId, ownerUserId)
+    .all<PublicationEvent>();
   return {
     project_id: projectId,
     draft_version: project.version,
@@ -340,7 +366,8 @@ export async function getPublicationStatus(
       state?.published_revision_id === undefined
         ? null
         : (revisions.get(state.published_revision_id) ?? null),
-    published_history: historyRows.results.map(toRevision)
+    published_history: historyRows.results.map(toRevision),
+    events: eventRows.results
   };
 }
 
@@ -562,6 +589,7 @@ export async function publishPresentationPreview(
       "確認対象のプレビューが見つかりません。"
     );
   }
+  if (status.published?.revision_id === revisionId) return status;
   if (revision.published_at === null) {
     const totalDurationSeconds = project.document.deck?.slides.reduce(
       (total, slide) => total + slide.duration_seconds,
@@ -593,6 +621,7 @@ export async function publishPresentationPreview(
     }
   }
   const now = new Date().toISOString();
+  const action = revision.published_at === null ? "publish" : "rollback";
   const [publicationResult] = await db.batch([
     db.prepare(
       `UPDATE project_publications
@@ -603,7 +632,21 @@ export async function publishPresentationPreview(
       `UPDATE presentation_revisions
        SET published_at = ?
        WHERE id = ? AND project_id = ? AND owner_user_id = ?`
-    ).bind(now, revisionId, projectId, ownerUserId)
+    ).bind(now, revisionId, projectId, ownerUserId),
+    db.prepare(
+      `INSERT INTO publication_events (
+         id, project_id, owner_user_id, action,
+         from_revision_id, to_revision_id, created_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      projectId,
+      ownerUserId,
+      action,
+      status.published?.revision_id ?? null,
+      revisionId,
+      now
+    )
   ]);
   if (publicationResult.meta.changes === 0) {
     throw new PublicationError(
@@ -621,14 +664,32 @@ export async function unpublishPresentation(
   ownerUserId: string,
   projectId: string
 ): Promise<PublicationStatus> {
-  const result = await db
-    .prepare(
+  const status = await getPublicationStatus(db, ownerUserId, projectId);
+  if (status === null) {
+    throw new PublicationError("PROJECT_NOT_FOUND", "研究が見つかりません。");
+  }
+  if (status.published === null) return status;
+  const now = new Date().toISOString();
+  const [result] = await db.batch([
+    db.prepare(
       `UPDATE project_publications
        SET published_revision_id = NULL, updated_at = ?
        WHERE project_id = ? AND owner_user_id = ?`
     )
-    .bind(new Date().toISOString(), projectId, ownerUserId)
-    .run();
+    .bind(now, projectId, ownerUserId),
+    db.prepare(
+      `INSERT INTO publication_events (
+         id, project_id, owner_user_id, action,
+         from_revision_id, to_revision_id, created_at
+       ) VALUES (?, ?, ?, 'unpublish', ?, NULL, ?)`
+    ).bind(
+      crypto.randomUUID(),
+      projectId,
+      ownerUserId,
+      status.published.revision_id,
+      now
+    )
+  ]);
   if (result.meta.changes === 0) {
     throw new PublicationError("PROJECT_NOT_FOUND", "研究が見つかりません。");
   }

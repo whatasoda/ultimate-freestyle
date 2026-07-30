@@ -910,7 +910,8 @@ describe("presentation artifact renderer", () => {
         slug: null,
         latest_preview: null,
         published: null,
-        published_history: []
+        published_history: [],
+        events: []
       }
     }).text();
     expect(overLimitHtml).toContain("23分20秒");
