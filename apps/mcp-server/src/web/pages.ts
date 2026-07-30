@@ -12,6 +12,11 @@ import type {
   ProjectDraftRevisionSummary
 } from "../projects/repository";
 import {
+  PROJECT_DRAFT_REVISION_BYTE_BUDGET,
+  PROJECT_DRAFT_REVISION_LIMIT,
+  PROJECT_DRAFT_REVISION_MINIMUM
+} from "../projects/repository";
+import {
   DEFAULT_VOICEVOX_TUNING,
   VOICEVOX_TUNING_LIMITS,
   mergeVoicevoxTuning,
@@ -1379,7 +1384,7 @@ export function projectDetailPage(options: {
   const revisionSourceLabels = { created: "作成", edit: "編集", restore: "復元" } as const;
   const draftHistoryPanel = options.draftRevisions.length === 0
     ? ""
-    : `<details class="panel panel-disclosure"><summary>下書き履歴 · ${options.draftRevisions.length}件</summary><div class="disclosure-body"><p class="inherit-note">直近50版を保存します。過去版は現在の下書きを消さず、新しいversionとして復元します。</p><div class="draft-history">${options.draftRevisions.map((revision) => {
+    : `<details class="panel panel-disclosure"><summary>下書き履歴 · ${options.draftRevisions.length}件</summary><div class="disclosure-body"><p class="inherit-note">直近${PROJECT_DRAFT_REVISION_MINIMUM}版を必ず残し、最大${PROJECT_DRAFT_REVISION_LIMIT}版・合計${PROJECT_DRAFT_REVISION_BYTE_BUDGET / 1024 / 1024}MiBまで新しい版を優先して保存します。過去版は現在の下書きを消さず、新しいversionとして復元します。</p><div class="draft-history">${options.draftRevisions.map((revision) => {
         const current = revision.version === options.project.version;
         return `<article class="draft-revision"><div><p><strong>v${revision.version} · ${escapeHtml(revision.title)}</strong>${current ? ' <span class="success">現在</span>' : ""}</p><small>${escapeHtml(revisionSourceLabels[revision.source])} · ${escapeHtml(STAGE_LABELS[revision.stage])} · ${revision.slide_count}枚 · ${formatDuration(revision.total_duration_seconds)} · ${escapeHtml(new Date(revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></div><span class="actions"><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}">内容を確認</a>${current ? "" : `<button class="ghost" type="button" data-draft-restore="/api/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}/restore" data-target-version="${revision.version}" data-current-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button>`}</span></article>`;
       }).join("")}</div><p class="feedback" data-draft-restore-feedback aria-live="polite"></p></div></details>`;

@@ -532,6 +532,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("説明を保存");
     expect(detailHtml).toContain("自由配置 1パーツ");
     expect(detailHtml).toContain("/revisions/1\">内容を確認");
+    expect(detailHtml).toContain("直近10版を必ず残し、最大50版・合計8MiB");
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
     );

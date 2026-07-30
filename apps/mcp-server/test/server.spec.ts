@@ -177,7 +177,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.14.0",
-        renderer_version: "uf-renderer@98",
+        renderer_version: "uf-renderer@99",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -1234,7 +1234,11 @@ describe("MCP contract", () => {
       expect(revisions).toMatchObject({
         ok: true,
         current_version: 19,
-        retained_limit: 50,
+        retention: {
+          maximum_versions: 50,
+          guaranteed_recent_versions: 10,
+          byte_budget: 8 * 1024 * 1024
+        },
         selection_workflow: {
           restore_tool: "restore_draft_revision",
           current_project_uri: `research://projects/${firstProject.project_id}`

@@ -24,7 +24,10 @@ import { getVoiceProjectStatus } from "../voicevox/service";
 import {
   getProject,
   getProjectDraftRevision,
-  listProjectDraftRevisions
+  listProjectDraftRevisions,
+  PROJECT_DRAFT_REVISION_BYTE_BUDGET,
+  PROJECT_DRAFT_REVISION_LIMIT,
+  PROJECT_DRAFT_REVISION_MINIMUM
 } from "./repository";
 import { RUBRIC_MARKDOWN } from "./rubric";
 import { staticSlideQuality } from "./quality";
@@ -500,7 +503,7 @@ export function registerResearchGuides(
     {
       title: "研究の下書き履歴",
       description:
-        "復元前に確認する、認証中の利用者が所有する研究の保存対象全50版です。一版resourceと一枚resourceで差を確認してから復元します。",
+        "復元前に確認する、認証中の利用者が所有する研究の保存対象です。最大件数と容量の範囲で新しい版を優先し、一版resourceと一枚resourceで差を確認してから復元します。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -519,14 +522,18 @@ export function registerResearchGuides(
                 ok: true,
                 project_id: project.project_id,
                 current_version: project.version,
-                retained_limit: 50,
+                retention: {
+                  maximum_versions: PROJECT_DRAFT_REVISION_LIMIT,
+                  guaranteed_recent_versions: PROJECT_DRAFT_REVISION_MINIMUM,
+                  byte_budget: PROJECT_DRAFT_REVISION_BYTE_BUDGET
+                },
                 selection_workflow: {
                   revision_detail_uri_template: `research://projects/${project.project_id}/revisions/{version}`,
                   revision_slide_uri_template: `research://projects/${project.project_id}/revisions/{version}/slides/{slideId}`,
                   current_project_uri: `research://projects/${project.project_id}`,
                   restore_tool: "restore_draft_revision"
                 },
-                revisions: await listProjectDraftRevisions(db, auth.ownerUserId, project.project_id, 50)
+                revisions: await listProjectDraftRevisions(db, auth.ownerUserId, project.project_id, PROJECT_DRAFT_REVISION_LIMIT)
               };
       return {
         contents: [

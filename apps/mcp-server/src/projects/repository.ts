@@ -63,6 +63,9 @@ type ProjectRow = {
 
 const MAX_PROJECTS_PER_USER = 20;
 const MAX_PROJECT_DOCUMENT_BYTES = 512 * 1024;
+export const PROJECT_DRAFT_REVISION_LIMIT = 50;
+export const PROJECT_DRAFT_REVISION_MINIMUM = 10;
+export const PROJECT_DRAFT_REVISION_BYTE_BUDGET = 8 * 1024 * 1024;
 
 function assertProjectSize(document: ProjectDocument): void {
   const byteLength = new TextEncoder().encode(JSON.stringify(document)).length;
@@ -347,16 +350,27 @@ export async function updateProject(
     ),
     db.prepare(
       `DELETE FROM project_draft_revisions
-       WHERE project_id = ? AND owner_user_id = ? AND version NOT IN (
-         SELECT version FROM project_draft_revisions
-         WHERE project_id = ? AND owner_user_id = ?
-         ORDER BY version DESC LIMIT 50
+       WHERE project_id = ? AND owner_user_id = ? AND version IN (
+         SELECT version FROM (
+           SELECT version,
+                  ROW_NUMBER() OVER (ORDER BY version DESC) AS position,
+                  SUM(LENGTH(CAST(document_json AS BLOB))) OVER (
+                    ORDER BY version DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                  ) AS cumulative_bytes
+           FROM project_draft_revisions
+           WHERE project_id = ? AND owner_user_id = ?
+         )
+         WHERE position > ?
+            OR (position > ? AND cumulative_bytes > ?)
        )`
     ).bind(
       options.projectId,
       options.ownerUserId,
       options.projectId,
-      options.ownerUserId
+      options.ownerUserId,
+      PROJECT_DRAFT_REVISION_LIMIT,
+      PROJECT_DRAFT_REVISION_MINIMUM,
+      PROJECT_DRAFT_REVISION_BYTE_BUDGET
     )
   ]);
 
@@ -406,7 +420,7 @@ export async function listProjectDraftRevisions(
      WHERE project_id = ? AND owner_user_id = ?
      ORDER BY version DESC
      LIMIT ?`
-  ).bind(projectId, ownerUserId, Math.min(Math.max(limit, 1), 50)).all<{
+  ).bind(projectId, ownerUserId, Math.min(Math.max(limit, 1), PROJECT_DRAFT_REVISION_LIMIT)).all<{
     project_id: string;
     version: number;
     title: string;
