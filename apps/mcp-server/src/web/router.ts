@@ -1411,6 +1411,10 @@ async function handleSceneComponentUpdate(
           throw error;
         }
         switch (component.kind) {
+          case "layer":
+          case "stack":
+          case "grid":
+            break;
           case "hero":
             if (existing.kind === "hero") Object.assign(existing, {
               eyebrow: component.eyebrow,
@@ -1488,11 +1492,14 @@ async function handleSceneComponentUpdate(
             }
             break;
           default: {
-            const error = new Error("This component has no editable text fields.");
+            const error = new Error("This component cannot be edited here.");
             Object.assign(error, { code: "INVALID_FIELDS" });
             throw error;
           }
         }
+        existing.at = component.at;
+        existing.animation = component.animation;
+        existing.style = component.style;
       }
     });
     await recordWebAudit(env.DB, {

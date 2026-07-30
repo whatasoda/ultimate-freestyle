@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@49");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@50");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -708,6 +708,10 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('data-component-id="headline"');
     expect(workspaceHtml).toContain('data-save-state data-state="saved"');
     expect(workspaceHtml).toContain("この表示パーツを保存");
+    expect(workspaceHtml).toContain("パーツの見た目");
+    expect(workspaceHtml).toContain('data-component-path="style.foreground"');
+    expect(workspaceHtml).toContain('data-component-color-preview="style.background"');
+    expect(workspaceHtml).toContain('data-component-path="animation"');
     expect(workspaceHtml).toContain("/components/headline");
     expect(workspaceHtml).toContain("/components/comparison");
     expect(workspaceHtml).toContain("グラフの最大値");

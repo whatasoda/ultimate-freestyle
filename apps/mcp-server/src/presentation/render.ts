@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@49";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@50";
 
 function escapeHtml(value: string): string {
   return value
@@ -1461,6 +1461,25 @@ export function renderPresentationHtml(
       if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'scene' || data.slide_id !== DECK.slides[slide].id || !component || typeof component !== 'object') return;
       const target = currentSlide.querySelector('[data-node-id="' + String(component.id) + '"]');
       if (!(target instanceof HTMLElement) || target.dataset.component !== 'uf-' + String(component.kind).replaceAll('_', '-')) return;
+      const componentStyle = component.style && typeof component.style === 'object' ? component.style : {};
+      const previewLength = (value) => Number(value || 0) / 16 + 'cqw';
+      const verticalAlign = componentStyle.vertical_align === 'center' ? 'center' : componentStyle.vertical_align === 'end' ? 'flex-end' : 'flex-start';
+      const shadow = componentStyle.shadow === 'soft' ? '0 .375cqw 1.375cqw #0005' : componentStyle.shadow === 'strong' ? '0 .75cqw 2.25cqw #0009' : 'none';
+      target.dataset.reveal = String(component.at || 0);
+      target.dataset.revealAt = String(component.at || 0);
+      target.dataset.animation = String(component.animation || 'none');
+      target.classList.toggle('is-visible', Number(component.at || 0) <= step);
+      target.setAttribute('aria-hidden', String(Number(component.at || 0) > step));
+      target.style.background = componentStyle.background || 'transparent';
+      target.style.color = componentStyle.foreground || 'inherit';
+      target.style.border = Number(componentStyle.border_width_px || 0) > 0 ? 'max(1px, ' + previewLength(componentStyle.border_width_px) + ') solid ' + (componentStyle.border_color || 'transparent') : '0 solid transparent';
+      target.style.borderRadius = previewLength(componentStyle.corner_radius_px);
+      target.style.padding = previewLength(componentStyle.padding_px);
+      target.style.setProperty('--component-opacity', String(componentStyle.opacity ?? 1));
+      target.style.setProperty('--component-font-scale', String(componentStyle.font_scale ?? 1));
+      target.style.textAlign = componentStyle.text_align === 'center' ? 'center' : componentStyle.text_align === 'end' ? 'end' : 'start';
+      if (component.kind !== 'stack') target.style.justifyContent = verticalAlign;
+      target.style.boxShadow = shadow;
       const addText = (parent, tag, className, value) => {
         if (value === null || value === undefined) return null;
         const item = document.createElement(tag);
@@ -1470,6 +1489,7 @@ export function renderPresentationHtml(
         return item;
       };
       if (component.kind === 'hero') {
+        target.dataset.compactHeading = String([...String(component.heading || '')].length <= 16);
         target.replaceChildren();
         addText(target, 'p', 'component-eyebrow', component.eyebrow);
         addText(target, 'h2', '', component.heading);

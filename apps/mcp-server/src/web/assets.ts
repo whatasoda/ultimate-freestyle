@@ -583,12 +583,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let component = {};
     try { component = JSON.parse(form.dataset.component || "{}"); } catch {}
     for (const field of form.querySelectorAll("[data-component-field]")) {
-      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement)) continue;
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) continue;
       const path = (field.dataset.componentPath || field.name).split(".");
       let owner = component;
       for (const segment of path.slice(0, -1)) {
         if (!owner || typeof owner !== "object") break;
-        owner = owner[Number.isInteger(Number(segment)) ? Number(segment) : segment];
+        const key = Number.isInteger(Number(segment)) ? Number(segment) : segment;
+        if (!owner[key] || typeof owner[key] !== "object") owner[key] = {};
+        owner = owner[key];
       }
       if (!owner || typeof owner !== "object") continue;
       const key = path.at(-1);
@@ -826,6 +828,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         layoutStatus.textContent = "表示パーツの文言をプレビューへ反映しています…";
         layoutStatus.dataset.level = "";
       }
+    });
+  }
+  for (const color of document.querySelectorAll("[data-component-color-preview]")) {
+    if (!(color instanceof HTMLInputElement) || color.type !== "color") continue;
+    const form = color.closest("form");
+    const text = form?.querySelector('[data-component-path="' + color.dataset.componentColorPreview + '"]');
+    if (!(form instanceof HTMLFormElement) || !(text instanceof HTMLInputElement)) continue;
+    color.addEventListener("input", () => {
+      text.value = color.value;
+      text.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    text.addEventListener("input", () => {
+      if (/^#[0-9a-f]{6}$/i.test(text.value)) color.value = text.value;
     });
   }
 
@@ -1291,7 +1306,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const section = document.querySelector('[data-inspector-section="' + sectionName + '"]');
       return { section, target: target || section };
     };
-    const appendDiagnostic = (item, message) => {
+    const appendDiagnostic = (item, message, preferredPath = "") => {
       if (!(qualityList instanceof HTMLElement)) return;
       const row = document.createElement("li");
       row.dataset.layoutWarning = "true";
@@ -1308,7 +1323,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           const componentDetail = target.closest("details.component-detail");
           if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
           target.scrollIntoView({ block: "center", behavior: "smooth" });
-          const field = target.querySelector("textarea, input, select");
+          const preferredField = preferredPath ? target.querySelector('[data-component-path="' + preferredPath + '"]') : null;
+          const field = preferredField || target.querySelector("textarea, input, select");
           if (field instanceof HTMLElement) field.focus({ preventScroll: true });
         });
         row.append(button);
@@ -1345,7 +1361,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           appendDiagnostic(item, item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。");
         }
         for (const item of contrasts) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1です（目安" + item.required.toFixed(1) + ":1以上）。");
+          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1です（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
         }
       }
       if (qualitySummary instanceof HTMLElement) {
