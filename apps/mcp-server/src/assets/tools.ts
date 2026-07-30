@@ -8,7 +8,7 @@ import {
   requireSubject,
   toolResult
 } from "../projects/tools";
-import { listProjectAssets } from "./repository";
+import { listProjectAssetsPage } from "./repository";
 import { projectAssetSchema } from "./schema";
 import { AssetServiceError, removeProjectImage } from "./service";
 
@@ -61,12 +61,17 @@ export function registerAssetTools(
     {
       title: "研究画像の一覧を取得",
       description:
-        "自分が所有する研究へWeb UIから追加した画像のasset ID、説明、寸法、容量を返します。画像binaryやbase64は返しません。",
-      inputSchema: { project_id: z.string().uuid() },
+        "自分が所有する研究へWeb UIから追加した画像のasset ID、説明、寸法、容量を最大50件ずつ返します。next_offsetがあれば次のoffsetへ渡します。画像binaryやbase64は返しません。",
+      inputSchema: {
+        project_id: z.string().uuid(),
+        limit: z.number().int().min(1).max(50).default(20),
+        offset: z.number().int().min(0).max(100).default(0)
+      },
       outputSchema: {
         ok: z.boolean(),
         request_id: z.string().uuid(),
-        images: z.array(projectAssetSchema),
+        images: z.array(projectAssetSchema).max(50),
+        next_offset: z.number().int().positive().nullable(),
         error: assetErrorSchema.nullable()
       },
       annotations: {
@@ -76,7 +81,7 @@ export function registerAssetTools(
         openWorldHint: false
       }
     },
-    async ({ project_id }) => {
+    async ({ project_id, limit, offset }) => {
       const requestId = crypto.randomUUID();
       try {
         const ownerUserId = requireSubject(getAuthProps, "research:read");
@@ -86,10 +91,12 @@ export function registerAssetTools(
             "The project does not exist."
           );
         }
+        const page = await listProjectAssetsPage(env.DB, ownerUserId, project_id, { limit, offset });
         return toolResult({
           ok: true,
           request_id: requestId,
-          images: await listProjectAssets(env.DB, ownerUserId, project_id),
+          images: page.assets,
+          next_offset: page.nextOffset,
           error: null
         });
       } catch (error) {
@@ -99,6 +106,7 @@ export function registerAssetTools(
             ok: false,
             request_id: requestId,
             images: [],
+            next_offset: null,
             error: normalized
           },
           true

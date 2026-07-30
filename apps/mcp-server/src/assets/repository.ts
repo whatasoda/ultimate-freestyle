@@ -125,6 +125,30 @@ export async function listProjectAssets(
   return result.results.map(toAsset);
 }
 
+export async function listProjectAssetsPage(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  options: { limit: number; offset: number }
+): Promise<{ assets: ProjectAsset[]; nextOffset: number | null }> {
+  const result = await db
+    .prepare(
+      `SELECT id, project_id, owner_user_id, object_key, original_filename,
+              alt_text, mime_type, width, height, byte_size, created_at, updated_at
+       FROM project_assets
+       WHERE owner_user_id = ? AND project_id = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT ? OFFSET ?`
+    )
+    .bind(ownerUserId, projectId, options.limit + 1, options.offset)
+    .all<AssetRow>();
+  const hasNext = result.results.length > options.limit;
+  return {
+    assets: result.results.slice(0, options.limit).map(toAsset),
+    nextOffset: hasNext ? options.offset + options.limit : null
+  };
+}
+
 export async function getProjectAsset(
   db: D1Database,
   ownerUserId: string,

@@ -1076,3 +1076,9 @@
 - MCPの品質resourceと公開resourceが分離しており、実表示確認が未実行・古い・警告ありでも、公開resourceだけ読むAgentには次の行動が`create_preview`や`publish`と見え得た。
 - 公開準備へ品質resource URIと`missing / stale / issues / clean`を統合し、具体的なadvisoryを返す。画像・音声・時間のhard blockerがなければ、品質がcleanになるまで`review_quality`を次の行動として優先する。
 - 実表示確認済みの研究と未実行の研究をMCP契約テストへ追加し、公開可能性そのものは既存のhard blocker規則と区別した。
+
+## 改善ループ316
+
+- `list_project_images`は最大100画像の長いファイル名・説明・URLを常に一括返却し、数件のasset IDを選びたいAgentにも不要なcontextを消費させていた。
+- 既定20件・最大50件の`limit`と`offset`を追加し、続きがある場合だけ`next_offset`を返す。Web UIや公開処理で全画像を読む既存repository関数は変えず、MCP応答だけを部分化した。
+- 2画像を1件ずつ取得するMCP契約で順序、次offset、終端nullを固定し、成功・error応答とも固定schemaへ揃えた。

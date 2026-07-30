@@ -512,13 +512,35 @@ describe("MCP contract", () => {
         height: 9,
         byteSize: 3
       });
+      const secondAssetId = "40000000-0000-4000-8000-000000000005";
+      await createProjectAsset(env.DB, {
+        assetId: secondAssetId,
+        projectId: firstProject.project_id,
+        ownerUserId: subjectId,
+        objectKey: `project-images/${secondAssetId}.webp`,
+        originalFilename: "detail.png",
+        altText: "補足写真",
+        width: 4,
+        height: 3,
+        byteSize: 4
+      });
       const images = await client.callTool({
         name: "list_project_images",
-        arguments: { project_id: firstProject.project_id }
+        arguments: { project_id: firstProject.project_id, limit: 1 }
       });
       expect(images.structuredContent).toMatchObject({
         ok: true,
-        images: [{ asset_id: assetId, alt_text: "実験結果" }]
+        images: [expect.objectContaining({ asset_id: secondAssetId, alt_text: "補足写真" })],
+        next_offset: 1
+      });
+      const nextImages = await client.callTool({
+        name: "list_project_images",
+        arguments: { project_id: firstProject.project_id, limit: 1, offset: 1 }
+      });
+      expect(nextImages.structuredContent).toMatchObject({
+        ok: true,
+        images: [expect.objectContaining({ asset_id: assetId, alt_text: "実験結果" })],
+        next_offset: null
       });
       const deletedImage = await client.callTool({
         name: "delete_project_image",
