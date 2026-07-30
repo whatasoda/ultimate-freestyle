@@ -1172,3 +1172,9 @@
 - 研究一覧は状態filterと並び順を保持する一方、検索語だけは研究を開いて戻ると消えていた。複数研究から同じ話者・品質状態・題名を探して順に直す反復が途切れていた。
 - 研究名を含み得る検索語は永続的なlocalStorageへ置かず、Twitch loginごと・タブごとのsessionStorageへ保存する。再訪時に復元し、Escで入力と保存値を同時に消す。
 - 検索fieldのユーザー識別値をHTML escapeし、dashboard scriptを`v131`へ更新した。出力属性と保存keyをWeb契約テストで固定した。
+
+## 改善ループ332
+
+- 2026-07-30更新のCloudflare Workers best practicesと最新`@cloudflare/workers-types`を再取得し、binding型生成、secret分離、Queue、body stream上限、`waitUntil`、構造化log、observabilityを現行実装へ照合した。これらは適合していた。
+- compatibility date・Wrangler・Workers型を本日版へ一組で上げる検証では、リポジトリの7日間minimum-release-ageが新規依存を拒否し、既存workerdも2026-07-21より新しいcompatibility dateで14 test workerを起動しなかった。
+- 供給網保護を迂回せず、`2026-07-21`と許可済み依存を維持する判断とした。設定を完全に戻した後、14 files・55 testsとContainer込みdry-run buildが成功することを再確認した。更新は新しい依存が待機期間を満たした時点で一括して行う。
