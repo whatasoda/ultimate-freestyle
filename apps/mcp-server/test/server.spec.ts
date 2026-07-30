@@ -114,6 +114,10 @@ describe("MCP contract", () => {
       expect(JSON.stringify(templateUpdateTool?.inputSchema)).not.toContain(
         '"heading_font":{"'
       );
+      const templateCreateTool = tools.find(
+        (tool) => tool.name === "create_presentation_template"
+      );
+      expect(JSON.stringify(templateCreateTool?.inputSchema)).toContain('"copy_from_template_id"');
       const slideFieldsTool = tools.find(
         (tool) => tool.name === "update_slide_fields"
       );
@@ -2288,6 +2292,47 @@ describe("MCP contract", () => {
         ok: true,
         version: 4,
         items: [{ position: 1, text: "三回の観察では温度が一定だった。" }]
+      });
+
+      const originalTemplate = await client.callTool({
+        name: "create_presentation_template",
+        arguments: {
+          project_id: projectId,
+          expected_version: 4,
+          template_id: "paper-original",
+          name: "紙面の原案",
+          visual_preset: "paper"
+        }
+      });
+      expect(originalTemplate.structuredContent).toMatchObject({ ok: true, version: 5 });
+      const copiedTemplate = await client.callTool({
+        name: "create_presentation_template",
+        arguments: {
+          project_id: projectId,
+          expected_version: 5,
+          template_id: "paper-variant",
+          name: "紙面の別案",
+          copy_from_template_id: "paper-original",
+          make_default: true
+        }
+      });
+      expect(copiedTemplate.structuredContent).toMatchObject({ ok: true, version: 6 });
+      const copiedDeck = await readJsonResource(
+        client,
+        `research://projects/${projectId}/deck`
+      );
+      expect(copiedDeck).toMatchObject({
+        ok: true,
+        version: 6,
+        deck: {
+          settings: {
+            default_template_id: "paper-variant",
+            templates: [
+              expect.objectContaining({ id: "paper-original", visual_preset: "paper" }),
+              expect.objectContaining({ id: "paper-variant", name: "紙面の別案", visual_preset: "paper" })
+            ]
+          }
+        }
       });
     } finally {
       await client.close();

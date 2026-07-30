@@ -1053,14 +1053,15 @@ export function registerProjectMutationTools(
   server.registerTool(
     "create_presentation_template",
     {
-      title: "presetから発表テンプレートを作成",
+      title: "presetまたは既存案から発表テンプレートを作成",
       description:
-        "安全なvisual presetからtemplateを一件作ります。作成後は部分更新toolで必要な項目だけ調整します。",
+        "安全なvisual presetまたは既存templateから新しい案を一件作ります。visual_presetとcopy_from_template_idはどちらか一方だけを指定し、作成後は部分更新toolで必要な項目だけ調整します。",
       inputSchema: {
         ...projectIdInput,
         template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         name: z.string().min(1).max(80),
-        visual_preset: visualPresetSchema,
+        visual_preset: visualPresetSchema.optional(),
+        copy_from_template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).optional(),
         make_default: z.boolean().optional()
       },
       outputSchema: mutationOutput,
@@ -1071,7 +1072,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, template_id, name, visual_preset, make_default }) =>
+    async ({ project_id, expected_version, template_id, name, visual_preset, copy_from_template_id, make_default }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -1086,11 +1087,20 @@ export function registerProjectMutationTools(
               "A presentation template with this ID already exists."
             );
           }
+          if ((visual_preset === undefined) === (copy_from_template_id === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_FIELDS",
+              "Specify exactly one of visual_preset or copy_from_template_id."
+            );
+          }
+          const source = copy_from_template_id === undefined
+            ? TEMPLATE_PRESET_DEFAULTS[visual_preset!]
+            : findTemplate(document, copy_from_template_id);
           deck.templates.push(
             presentationTemplateSchema.parse({
+              ...source,
               id: template_id,
-              name,
-              ...TEMPLATE_PRESET_DEFAULTS[visual_preset]
+              name
             })
           );
           if (make_default === true) deck.default_template_id = template_id;
