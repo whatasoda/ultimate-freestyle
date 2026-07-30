@@ -438,7 +438,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=114"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=115"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -563,7 +563,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@98"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@99"');
 
     const voicePage = await requestProvider(
       provider,
@@ -908,6 +908,10 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-canvas-block");
+    expect(dashboardScriptText).toContain("syncSceneComponentDraft(form)");
+    expect(dashboardScriptText).toContain("syncCanvasBlockDraft(form)");
+    expect(dashboardScriptText).not.toContain("syncSceneComponentDrafts");
+    expect(dashboardScriptText).not.toContain("syncCanvasBlockDrafts");
     expect(dashboardScriptText).toContain("data-canvas-block-editor");
     expect(dashboardScriptText).toContain("data-canvas-block-action");
     expect(dashboardScriptText).toContain("data-canvas-block-create");

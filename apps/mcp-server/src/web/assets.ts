@@ -1412,19 +1412,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
-  const syncSceneComponentDrafts = () => {
-    if (!(slideFrame instanceof HTMLIFrameElement)) return;
-    for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
-      if (!(form instanceof HTMLFormElement)) continue;
-      let assetUrls = {};
-      try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
-      slideFrame.contentWindow?.postMessage({
-        type: "ultimate-freestyle:preview-scene-component",
-        slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
-        component: sceneComponentFromForm(form),
-        asset_urls: assetUrls
-      }, location.origin);
-    }
+  const syncSceneComponentDraft = (form) => {
+    if (!(form instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    let assetUrls = {};
+    try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:preview-scene-component",
+      slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
+      component: sceneComponentFromForm(form),
+      asset_urls: assetUrls
+    }, location.origin);
   };
   const syncCompositionDraft = () => {
     if (!(compositionEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
@@ -1445,19 +1442,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       layoutStatus.dataset.level = "";
     }
   });
-  const syncCanvasBlockDrafts = () => {
-    if (!(slideFrame instanceof HTMLIFrameElement)) return;
-    for (const form of document.querySelectorAll("[data-canvas-block-editor]")) {
-      if (!(form instanceof HTMLFormElement)) continue;
-      let assetUrls = {};
-      try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
-      slideFrame.contentWindow?.postMessage({
-        type: "ultimate-freestyle:preview-canvas-block",
-        slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
-        block: sceneComponentFromForm(form),
-        asset_urls: assetUrls
-      }, location.origin);
-    }
+  const syncCanvasBlockDraft = (form) => {
+    if (!(form instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    let assetUrls = {};
+    try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:preview-canvas-block",
+      slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
+      block: sceneComponentFromForm(form),
+      asset_urls: assetUrls
+    }, location.origin);
   };
   for (const form of document.querySelectorAll("[data-scene-component-editor], [data-canvas-block-editor]")) {
     for (const button of form.querySelectorAll("[data-component-order]")) {
@@ -1548,10 +1542,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const canvasEditor = form.matches("[data-canvas-block-editor]");
       if (canvasEditor) {
         clearTimeout(draftCanvasTimer);
-        draftCanvasTimer = setTimeout(syncCanvasBlockDrafts, 120);
+        draftCanvasTimer = setTimeout(() => syncCanvasBlockDraft(form), 120);
       } else {
         clearTimeout(draftSceneTimer);
-        draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
+        draftSceneTimer = setTimeout(() => syncSceneComponentDraft(form), 120);
       }
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
@@ -2209,8 +2203,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncAppearanceDraft();
       syncCompositionDraft();
       syncNarrationDrafts();
-      syncSceneComponentDrafts();
-      syncCanvasBlockDrafts();
+      for (const form of document.querySelectorAll('[data-scene-component-editor][data-dirty="true"]')) syncSceneComponentDraft(form);
+      for (const form of document.querySelectorAll('[data-canvas-block-editor][data-dirty="true"]')) syncCanvasBlockDraft(form);
       syncGridSnap();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
