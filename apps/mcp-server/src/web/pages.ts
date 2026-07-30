@@ -1208,28 +1208,67 @@ export function draftRevisionPage(options: {
   const selectedSlides = selected.deck?.slides ?? [];
   const currentById = new Map(currentSlides.map((slide) => [slide.id, slide]));
   const selectedById = new Map(selectedSlides.map((slide) => [slide.id, slide]));
+  const currentIndexById = new Map(currentSlides.map((slide, index) => [slide.id, index]));
   const added = selectedSlides.filter((slide) => !currentById.has(slide.id)).length;
   const removed = currentSlides.filter((slide) => !selectedById.has(slide.id)).length;
   const changed = selectedSlides.filter((slide) => {
     const currentSlide = currentById.get(slide.id);
     return currentSlide !== undefined && JSON.stringify(currentSlide) !== JSON.stringify(slide);
   }).length;
+  const reordered = selectedSlides.filter(
+    (slide, index) => currentIndexById.has(slide.id) && currentIndexById.get(slide.id) !== index
+  ).length;
   const selectedDuration = selectedSlides.reduce((total, slide) => total + slide.duration_seconds, 0);
   const currentDuration = currentSlides.reduce((total, slide) => total + slide.duration_seconds, 0);
-  const comparedFields = ["title", "stage", "summary", "question", "hypothesis", "method"] as const;
-  const fieldChanges = comparedFields.filter(
-    (field) => JSON.stringify(selected[field]) !== JSON.stringify(options.current.document[field])
+  const researchFields = [
+    ["title", "研究名"],
+    ["stage", "制作段階"],
+    ["summary", "概要"],
+    ["question", "問い"],
+    ["hypothesis", "仮説"],
+    ["method", "方法"],
+    ["findings", "わかったこと"],
+    ["limitations", "制約・限界"],
+    ["logs", "研究ログ"]
+  ] as const;
+  const researchChanges = researchFields.filter(
+    ([field]) => JSON.stringify(selected[field]) !== JSON.stringify(options.current.document[field])
+  );
+  const deckFields = [
+    ["short_title", "発表名"],
+    ["description", "発表説明"],
+    ["author", "作者"],
+    ["year", "年"],
+    ["accent", "アクセント色"],
+    ["layout", "基本レイアウト"],
+    ["aspect_ratio", "画面比率"],
+    ["loading_screen", "0ページ目"],
+    ["templates", "テンプレート"],
+    ["default_template_id", "既定テンプレート"],
+    ["narration_defaults", "読み上げ枠の既定"],
+    ["voicevox", "VOICEVOX設定"]
+  ] as const;
+  const deckChanges = deckFields.filter(
+    ([field]) => JSON.stringify(selected.deck?.[field] ?? null) !== JSON.stringify(options.current.document.deck?.[field] ?? null)
   );
   const sourceLabel = { created: "作成", edit: "編集", restore: "復元" }[options.revision.source];
   const isCurrent = options.revision.version === options.current.version;
-  const frameUrl = `/dashboard/projects/${escapeHtml(options.current.project_id)}/revisions/${options.revision.version}/frame?slide=1&amp;step=0`;
+  const frameUrl = `/dashboard/projects/${escapeHtml(options.current.project_id)}/revisions/${options.revision.version}/frame?slide=0&amp;step=0`;
   const slideList = selectedSlides.length === 0
     ? '<p class="prose">この版には発表スライドがありません。</p>'
     : `<ol class="revision-slide-list">${selectedSlides.map((slide, index) => {
         const prior = currentById.get(slide.id);
-        const state = prior === undefined ? "この版だけ" : JSON.stringify(prior) === JSON.stringify(slide) ? "同じ" : "変更";
+        const moved = currentIndexById.get(slide.id) !== index;
+        const state = prior === undefined ? "この版だけ" : JSON.stringify(prior) !== JSON.stringify(slide) ? moved ? "変更・順番" : "変更" : moved ? "順番変更" : "同じ";
         return `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(slide.title)}</strong><span>${state}</span></li>`;
       }).join("")}</ol>`;
+  const currentOnlySlides = currentSlides.filter((slide) => !selectedById.has(slide.id));
+  const currentOnlyList = currentOnlySlides.length === 0
+    ? ""
+    : `<section class="panel"><h2>復元すると外れるスライド</h2><p class="inherit-note">現在版だけにあるため、この版を復元すると次のスライドは発表から外れます。現在版そのものは履歴に残ります。</p><ol class="revision-slide-list">${currentOnlySlides.map((slide) => {
+        const index = currentIndexById.get(slide.id) ?? 0;
+        return `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(slide.title)}</strong><span>現在版だけ</span></li>`;
+      }).join("")}</ol></section>`;
   return new Response(
     shell(
       `v${options.revision.version}を確認 — ${selected.title}`,
@@ -1240,8 +1279,9 @@ export function draftRevisionPage(options: {
            <section class="panel"><h2>${escapeHtml(selected.title)}</h2><p class="meta">${escapeHtml(new Date(options.revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(STAGE_LABELS[selected.stage])} · ${selectedSlides.length}枚 · ${formatDuration(selectedDuration)}</p></section>
            ${selected.deck === null ? "" : `<section class="panel"><div class="section-head"><div><h2>この版の実表示</h2><p class="meta">読み取り専用です。ページ送り・段階表示も確認できます。</p></div><a class="button ghost" href="${frameUrl}" target="_blank" rel="noopener">別画面で確認</a></div><iframe class="revision-preview" title="v${options.revision.version}の発表プレビュー" src="${frameUrl}" style="--revision-aspect:${selected.deck.aspect_ratio === "4:3" ? "4 / 3" : "16 / 9"}"></iframe></section>`}
            <section class="panel"><h2>この版のスライド</h2>${slideList}</section>
+           ${currentOnlyList}
          </div><aside class="detail-column">
-           <section class="panel"><h2>現在版 v${options.current.version} との差</h2><dl class="stat-list"><dt>基本項目</dt><dd>${fieldChanges.length === 0 ? "変更なし" : `${fieldChanges.length}項目`}</dd><dt>スライド変更</dt><dd>${changed}枚</dd><dt>この版だけにある</dt><dd>${added}枚</dd><dt>現在版だけにある</dt><dd>${removed}枚</dd><dt>発表時間差</dt><dd>${selectedDuration - currentDuration >= 0 ? "+" : ""}${selectedDuration - currentDuration}秒</dd></dl>${fieldChanges.length === 0 ? "" : `<p class="inherit-note">変更項目: ${escapeHtml(fieldChanges.join("、"))}</p>`}</section>
+           <section class="panel"><h2>現在版 v${options.current.version} との差</h2><dl class="stat-list"><dt>研究内容</dt><dd>${researchChanges.length === 0 ? "変更なし" : `${researchChanges.length}項目`}</dd><dt>発表全体の設定</dt><dd>${deckChanges.length === 0 ? "変更なし" : `${deckChanges.length}項目`}</dd><dt>スライド内容</dt><dd>${changed}枚</dd><dt>順番変更</dt><dd>${reordered}枚</dd><dt>この版だけにある</dt><dd>${added}枚</dd><dt>現在版だけにある</dt><dd>${removed}枚</dd><dt>発表時間差</dt><dd>${selectedDuration - currentDuration >= 0 ? "+" : ""}${selectedDuration - currentDuration}秒</dd></dl>${researchChanges.length === 0 ? "" : `<p class="inherit-note">研究内容: ${escapeHtml(researchChanges.map(([, label]) => label).join("、"))}</p>`}${deckChanges.length === 0 ? "" : `<p class="inherit-note">発表設定: ${escapeHtml(deckChanges.map(([, label]) => label).join("、"))}</p>`}</section>
            <section class="panel"><h2>復元操作</h2><p class="prose">復元しても現在版は消えず、この内容を新しいversionとして保存します。</p>${isCurrent ? '<p class="success">これは現在の下書きです。</p>' : `<button type="button" data-draft-restore="/api/projects/${escapeHtml(options.current.project_id)}/revisions/${options.revision.version}/restore" data-target-version="${options.revision.version}" data-current-version="${options.current.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button><p class="feedback" data-draft-restore-feedback aria-live="polite"></p>`}</section>
          </aside></div>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`

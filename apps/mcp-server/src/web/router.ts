@@ -432,7 +432,7 @@ async function handleProjectDetail(
     project,
     assets: await listProjectAssets(env.DB, session.userId, projectId),
     publication: (await getPublicationStatus(env.DB, session.userId, projectId))!,
-    draftRevisions: await listProjectDraftRevisions(env.DB, session.userId, projectId, 20)
+    draftRevisions: await listProjectDraftRevisions(env.DB, session.userId, projectId, 50)
   });
 }
 

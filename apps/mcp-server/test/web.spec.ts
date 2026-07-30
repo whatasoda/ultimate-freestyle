@@ -533,12 +533,14 @@ describe("Web dashboard", () => {
     expect(draftRevisionHtml).toContain("v1を復元前に確認");
     expect(draftRevisionHtml).toContain("現在版 v1 との差");
     expect(draftRevisionHtml).toContain("これは現在の下書きです");
-    expect(draftRevisionHtml).toContain("/revisions/1/frame?slide=1&amp;step=0");
+    expect(draftRevisionHtml).toContain("研究内容</dt><dd>変更なし");
+    expect(draftRevisionHtml).toContain("発表全体の設定</dt><dd>変更なし");
+    expect(draftRevisionHtml).toContain("/revisions/1/frame?slide=0&amp;step=0");
 
     const draftRevisionFrame = await requestProvider(
       provider,
       new Request(
-        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/revisions/1/frame?slide=1&step=0",
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/revisions/1/frame?slide=0&step=0",
         { headers: { cookie: browserCookies } }
       ),
       authEnv
@@ -2463,7 +2465,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     const restoredDetailHtml = await restoredDetail.text();
-    expect(restoredDetailHtml).toContain("下書き履歴 · 20件");
+    expect(restoredDetailHtml).toContain("下書き履歴 · 36件");
     expect(restoredDetailHtml).toContain("v36");
     expect(restoredDetailHtml).toContain("復元");
     expect(DASHBOARD_SCRIPT).toContain("data-draft-restore");
