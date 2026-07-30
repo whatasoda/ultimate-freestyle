@@ -726,7 +726,9 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("/components/headline");
     expect(workspaceHtml).toContain("/components/comparison");
     expect(workspaceHtml).toContain("グラフの最大値");
-    expect(workspaceHtml).toContain("項目1 · ラベル");
+    expect(workspaceHtml).toContain('data-component-item="before"');
+    expect(workspaceHtml).toContain("項目 1");
+    expect(workspaceHtml).toContain("<label>ラベル");
     expect(workspaceHtml).toContain('data-component-path="items.0.value"');
     expect(workspaceHtml).toContain('data-component-path="items.0.at"');
     expect(workspaceHtml).toContain('data-component-path="items.0.color"');

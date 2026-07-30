@@ -643,6 +643,10 @@ function shell(title: string, body: string): string {
       .inspector-body { display: grid; gap: .9rem; padding: 1rem; }
       .editor fieldset { display: grid; gap: .7rem; min-width: 0; margin: 0; padding: .8rem; border: 1px solid var(--line); border-radius: .7rem; }
       .editor legend { padding: 0 .35rem; color: #dce6f3; font-size: .82rem; font-weight: 800; }
+      .component-items { display: grid; gap: .7rem; }
+      .editor .component-item { border-color: #40516a; background: #08111b80; }
+      .component-item legend { color: #b9ddff; }
+      .component-item legend code { margin-left: .35rem; color: var(--muted); font-size: .68rem; font-weight: 600; }
       .editor input[type="color"] { min-height: 2.7rem; padding: .3rem; }
       .ratio-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
       .ratio-option { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .65rem; padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; background: #0b1420; cursor: pointer; }
@@ -865,6 +869,34 @@ function sceneTextFields(node: SlideSceneNode): SceneTextField[] {
   }
 }
 
+function sceneTextFieldControl(field: SceneTextField): string {
+  const attributes = `name="${field.name}" data-component-field data-component-path="${field.name}" data-component-number="${String(field.number !== undefined)}" data-nullable="${String(field.nullable === true)}" maxlength="${field.maxLength}"${field.required ? " required" : ""}`;
+  return field.multiline
+    ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(String(field.value ?? ""))}</textarea></label>`
+    : `<label>${field.label}<input ${attributes}${field.number === undefined ? "" : ` type="number" min="${field.number.min}" max="${field.number.max}" step="${field.number.step ?? 1}"`} value="${escapeHtml(String(field.value ?? ""))}"></label>`;
+}
+
+function sceneComponentContentControls(node: SlideSceneNode, maxStep: number): string {
+  if (node.kind === "bar_chart") {
+    const maxValue = sceneTextFieldControl({
+      name: "max_value",
+      label: "グラフの最大値",
+      value: node.max_value,
+      maxLength: 20,
+      required: true,
+      number: { min: 0.000001, max: 1_000_000_000, step: 0.01 }
+    });
+    const items = node.items.map((item, index) => `<fieldset class="component-item" data-component-item="${escapeHtml(item.id)}"><legend>項目 ${index + 1} <code>${escapeHtml(item.id)}</code></legend><div class="editor-grid">${sceneTextFieldControl({ name: `items.${index}.label`, label: "ラベル", value: item.label, maxLength: 120, required: true })}${sceneTextFieldControl({ name: `items.${index}.value`, label: "値", value: item.value, maxLength: 20, required: true, number: { min: 0, max: 1_000_000_000, step: 0.01 } })}<label>表示STEP<input name="items.${index}.at" data-component-field data-component-path="items.${index}.at" data-component-number="true" data-nullable="false" type="number" min="0" max="${maxStep}" value="${item.at}"></label><label>色<span class="color-control"><input type="color" value="${escapeHtml(item.color ?? "#9d7bff")}" data-component-color-preview="items.${index}.color" aria-label="項目${index + 1}の色を見本から選ぶ"><input name="items.${index}.color" data-component-field data-component-color-hex data-component-path="items.${index}.color" data-component-number="false" data-nullable="true" value="${escapeHtml(item.color ?? "")}" placeholder="空欄でアクセント色" pattern="^$|^#[0-9A-Fa-f]{6}$" maxlength="7" spellcheck="false"></span></label></div></fieldset>`).join("");
+    return `<fieldset><legend>グラフ全体</legend><div class="editor-grid">${maxValue}</div></fieldset><div class="component-items">${items}</div>`;
+  }
+  if (node.kind === "timeline") {
+    const items = node.items.map((item, index) => `<fieldset class="component-item" data-component-item="${escapeHtml(item.id)}"><legend>項目 ${index + 1} <code>${escapeHtml(item.id)}</code></legend><div class="editor-grid">${sceneTextFieldControl({ name: `items.${index}.kicker`, label: "時期", value: item.kicker, maxLength: 120, nullable: true })}${sceneTextFieldControl({ name: `items.${index}.heading`, label: "見出し", value: item.heading, maxLength: 500, required: true })}${sceneTextFieldControl({ name: `items.${index}.detail`, label: "詳細", value: item.detail, maxLength: 2_000, multiline: true, nullable: true })}<label>表示STEP<input name="items.${index}.at" data-component-field data-component-path="items.${index}.at" data-component-number="true" data-nullable="false" type="number" min="0" max="${maxStep}" value="${item.at}"></label></div></fieldset>`).join("");
+    return `<div class="component-items">${items}</div>`;
+  }
+  const controls = sceneTextFields(node).map(sceneTextFieldControl).join("");
+  return controls ? `<fieldset><legend>内容</legend><div class="editor-grid">${controls}</div></fieldset>` : "";
+}
+
 function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number): string {
   const style = node.style ?? {};
   const numberField = (
@@ -891,7 +923,7 @@ function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number)
     <fieldset><legend>パーツの見た目</legend><div class="editor-grid">${colorField("style.background", "背景色", style.background, "#111827")}${colorField("style.foreground", "文字色", style.foreground, "#f8fafc")}${colorField("style.border_color", "境界線色", style.border_color, "#52647c")}${numberField("style.border_width_px", "境界線の太さ", style.border_width_px ?? 0, 0, 8)}${numberField("style.corner_radius_px", "角丸", style.corner_radius_px ?? 0, 0, 64)}${numberField("style.padding_px", "内側余白", style.padding_px ?? 0, 0, 64)}${numberField("style.font_scale", "文字倍率", style.font_scale ?? 1, 0.5, 3, 0.05)}${numberField("style.opacity", "不透明度", style.opacity ?? 1, 0.1, 1, 0.05)}${selectField("style.text_align", "文字揃え", style.text_align ?? "start", [["start", "左"], ["center", "中央"], ["end", "右"]])}${selectField("style.vertical_align", "縦位置", style.vertical_align ?? "start", [["start", "上"], ["center", "中央"], ["end", "下"]])}${selectField("style.shadow", "影", style.shadow ?? "none", [["none", "なし"], ["soft", "柔らかい"], ["strong", "強い"]])}</div><p class="inherit-note">色のHEX値を空欄にすると、背景は透明、文字と境界線は周囲の設定を使います。変更は保存前からプレビューへ反映されます。</p></fieldset>`;
 }
 
-function sceneComponentKindControls(node: SlideSceneNode, assets: ProjectAsset[], maxStep: number): string {
+function sceneComponentKindControls(node: SlideSceneNode, assets: ProjectAsset[]): string {
   const select = (path: string, label: string, value: string, options: Array<[string, string]>) => `<label>${label}<select name="${path}" data-component-field data-component-path="${path}" data-component-number="false" data-nullable="false">${options.map(([option, optionLabel]) => `<option value="${escapeHtml(option)}"${option === value ? " selected" : ""}>${escapeHtml(optionLabel)}</option>`).join("")}</select></label>`;
   const number = (path: string, label: string, value: number, min: number, max: number) => `<label>${label}<input name="${path}" data-component-field data-component-path="${path}" data-component-number="true" data-nullable="false" type="number" min="${min}" max="${max}" value="${value}"></label>`;
   let controls = "";
@@ -913,10 +945,6 @@ function sceneComponentKindControls(node: SlideSceneNode, assets: ProjectAsset[]
     controls = select("emphasis", "数値の強調", node.emphasis, [["normal", "標準"], ["strong", "強い"], ["signal", "アクセント面"]]);
   } else if (node.kind === "callout") {
     controls = select("variant", "意味", node.variant, [["info", "情報"], ["success", "成功"], ["warning", "注意"], ["danger", "危険"]]);
-  } else if (node.kind === "bar_chart") {
-    controls = node.items.map((item, index) => `${number(`items.${index}.at`, `項目${index + 1} · 表示STEP`, item.at, 0, maxStep)}<label>項目${index + 1} · 色<span class="color-control"><input type="color" value="${escapeHtml(item.color ?? "#9d7bff")}" data-component-color-preview="items.${index}.color" aria-label="項目${index + 1}の色を見本から選ぶ"><input name="items.${index}.color" data-component-field data-component-color-hex data-component-path="items.${index}.color" data-component-number="false" data-nullable="true" value="${escapeHtml(item.color ?? "")}" placeholder="空欄でアクセント色" pattern="^$|^#[0-9A-Fa-f]{6}$" maxlength="7" spellcheck="false"></span></label>`).join("");
-  } else if (node.kind === "timeline") {
-    controls = node.items.map((item, index) => number(`items.${index}.at`, `項目${index + 1} · 表示STEP`, item.at, 0, maxStep)).join("");
   }
   return controls ? `<fieldset><legend>パーツ固有の配置</legend><div class="editor-grid">${controls}</div></fieldset>` : "";
 }
@@ -1661,13 +1689,8 @@ export function slideWorkspacePage(options: {
     ? slide.composition.nodes
         .map((node) => {
           const fields = sceneTextFields(node);
-          const controls = fields.map((field) => {
-            const attributes = `name="${field.name}" data-component-field data-component-path="${field.name}" data-component-number="${String(field.number !== undefined)}" data-nullable="${String(field.nullable === true)}" maxlength="${field.maxLength}"${field.required ? " required" : ""}`;
-            return field.multiline
-              ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(String(field.value ?? ""))}</textarea></label>`
-              : `<label>${field.label}<input ${attributes}${field.number === undefined ? "" : ` type="number" min="${field.number.min}" max="${field.number.max}" step="${field.number.step ?? 1}"`} value="${escapeHtml(String(field.value ?? ""))}"></label>`;
-          }).join("");
-          const kindControls = sceneComponentKindControls(node, options.assets ?? [], slide.reveal_steps);
+          const controls = sceneComponentContentControls(node, slide.reveal_steps);
+          const kindControls = sceneComponentKindControls(node, options.assets ?? []);
           const appearanceControls = sceneComponentAppearanceControls(node, slide.reveal_steps);
           const assetUrls = Object.fromEntries((options.assets ?? []).map((asset) => [asset.asset_id, asset.content_url]));
           return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-asset-urls="${escapeHtml(JSON.stringify(assetUrls))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
