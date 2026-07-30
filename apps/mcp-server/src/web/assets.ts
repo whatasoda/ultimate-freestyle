@@ -1971,7 +1971,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         updateStep(currentStep + (button.dataset.stepDirection === "previous" ? -1 : 1));
       });
     }
-    updateStep(0);
+    const requestedStep = Number(new URLSearchParams(location.search).get("step") || 0);
+    updateStep(Number.isInteger(requestedStep) ? requestedStep : 0);
+    const linkedSegment = location.hash.startsWith("#narration-segment-")
+      ? document.getElementById(decodeURIComponent(location.hash.slice(1)))
+      : null;
+    if (linkedSegment instanceof HTMLFormElement) {
+      const narrationSection = linkedSegment.closest('[data-inspector-section="narration"]');
+      if (narrationSection instanceof HTMLDetailsElement) narrationSection.open = true;
+      setMobilePane("edit");
+      requestAnimationFrame(() => {
+        linkedSegment.scrollIntoView({ block: "center" });
+        const text = linkedSegment.elements.namedItem("text");
+        if (text instanceof HTMLTextAreaElement) text.focus({ preventScroll: true });
+      });
+    }
   }
 
   if (slideFrame instanceof HTMLIFrameElement) {

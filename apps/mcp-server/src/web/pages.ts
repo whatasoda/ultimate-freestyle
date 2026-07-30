@@ -241,7 +241,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=109";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=110";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -689,6 +689,7 @@ function shell(title: string, body: string): string {
       .component-detail > summary { padding: .55rem; cursor: pointer; color: #dce6f3; }
       .component-detail .setting-table { padding: 0 .65rem .7rem; }
       .voice-segment { display: grid; gap: .75rem; padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; background: #08111b66; }
+      .voice-segment:target { border-color: var(--accent); box-shadow: 0 0 0 3px #2bb9ec33; }
       .voice-segment-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .65rem; align-items: center; }
       .voice-timing { color: var(--muted); font-size: .72rem; font-variant-numeric: tabular-nums; }
       .voice-timing[data-state="warning"] { color: #ffcb78; font-weight: 750; }
@@ -1773,7 +1774,7 @@ export function voiceFinishPage(options: {
             .join("");
           return `<details class="voice-review"${index === (attentionSegmentIndex === -1 ? 0 : attentionSegmentIndex) ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}">
             <summary><span class="component-step">${String(index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
-            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
+            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}?step=${segment.at}#narration-segment-${segment.at}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
           </details>`;
         })
         .join("")
@@ -2096,7 +2097,7 @@ export function slideWorkspacePage(options: {
               (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
             )
           ].join("");
-          return `<form class="voice-segment editor" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-profile-tunings="${escapeHtml(JSON.stringify(profileTunings))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
+          return `<form class="voice-segment editor" id="narration-segment-${segment.at}" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-profile-tunings="${escapeHtml(JSON.stringify(profileTunings))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
             <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="voice-timing" data-segment-duration data-state="${estimatedDuration > stepDuration * 1.15 ? "warning" : "ok"}">概算 ${estimatedDuration.toFixed(1)}秒 / STEP目安 ${stepDuration.toFixed(1)}秒</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
             <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
             <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOXの声<select name="voice_profile_id">${profileOptions}</select></label></div>

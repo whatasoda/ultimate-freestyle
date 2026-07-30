@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=109"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=110"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -545,6 +545,7 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("data-voice-visible");
     expect(voicePageHtml).toContain("スライド名・原稿・声を検索");
     expect(voicePageHtml).toContain("data-voice-preview-feedback");
+    expect(voicePageHtml).toContain("?step=0#narration-segment-0");
     expect(DASHBOARD_SCRIPT).toContain("data-voice-preview-seek");
     expect(DASHBOARD_SCRIPT).toContain("updatePreviewTimeline");
     expect(voicePageHtml).toContain("data-voice-filter-empty");
@@ -619,6 +620,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-inspector-section="narration"');
     expect(workspaceHtml).toContain("ブラウザ仮試聴では速度・高さ・音量を近似");
     expect(workspaceHtml).toContain("この区間を保存");
+    expect(workspaceHtml).toContain('id="narration-segment-0"');
     expect(workspaceHtml).toContain("最初の読み上げ文");
     expect(workspaceHtml).toContain('aria-current="page"');
     expect(workspaceHtml).toContain('data-slide-action="duplicate"');
@@ -745,6 +747,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("setPreviewFocus");
     expect(dashboardScriptText).toContain("workspace-preview-focus");
     expect(dashboardScriptText).toContain("workspace-mobile-pane");
+    expect(dashboardScriptText).toContain('#narration-segment-');
+    expect(dashboardScriptText).toContain('setMobilePane("edit")');
     expect(dashboardScriptText).toContain('setMobilePane("edit")');
     expect(dashboardScriptText).toContain('event.key === "ArrowRight"');
     expect(dashboardScriptText).toContain('mobilePreviewPending');
