@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@67";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@68";
 
 function escapeHtml(value: string): string {
   return value
@@ -1136,6 +1136,32 @@ export function renderPresentationHtml(
       }
       updateElapsed();
     };
+    let modalReturnFocus = null;
+    const modalBackground = [...document.querySelectorAll('header, footer, .stage > :not([data-completion]):not([data-shortcuts])')];
+    const openModal = (modal, initialFocus) => {
+      if (!(modal instanceof HTMLElement)) return;
+      modalReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      modal.hidden = false;
+      for (const item of modalBackground) if (item instanceof HTMLElement) item.inert = true;
+      if (initialFocus instanceof HTMLElement) initialFocus.focus();
+    };
+    const closeModal = (modal, restoreFocus = true) => {
+      if (!(modal instanceof HTMLElement) || modal.hidden) return false;
+      modal.hidden = true;
+      for (const item of modalBackground) if (item instanceof HTMLElement) item.inert = false;
+      if (restoreFocus) (modalReturnFocus?.isConnected ? modalReturnFocus : stage)?.focus();
+      modalReturnFocus = null;
+      return true;
+    };
+    const trapModalFocus = (event, modal) => {
+      const focusable = [...modal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+        .filter((item) => item instanceof HTMLElement && !item.hidden);
+      if (focusable.length === 0) { event.preventDefault(); return; }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
     const updateControls = () => {
       if (previousButton instanceof HTMLButtonElement) previousButton.disabled = !started || (slide === 0 && step === 0);
       if (nextButton instanceof HTMLButtonElement) nextButton.disabled = !started;
@@ -1193,25 +1219,21 @@ export function renderPresentationHtml(
           : '想定より' + format(Math.abs(difference)) + (difference > 0 ? '長い結果です。' : '短い結果です。');
         completionTime.dataset.state = difference > 0 ? 'over' : 'within';
       }
-      completion.hidden = false;
-      if (restartButton instanceof HTMLButtonElement) restartButton.focus();
+      openModal(completion, restartButton);
     };
     const hideCompletion = () => {
       if (!(completion instanceof HTMLElement) || completion.hidden) return false;
-      completion.hidden = true;
+      closeModal(completion);
       updateControls();
-      stage?.focus();
       return true;
     };
     const showShortcuts = () => {
       if (!(shortcuts instanceof HTMLElement) || editorFrame) return;
-      shortcuts.hidden = false;
-      if (dismissShortcutsButton instanceof HTMLButtonElement) dismissShortcutsButton.focus();
+      openModal(shortcuts, dismissShortcutsButton);
     };
     const hideShortcuts = () => {
       if (!(shortcuts instanceof HTMLElement) || shortcuts.hidden) return false;
-      shortcuts.hidden = true;
-      if (helpButton instanceof HTMLButtonElement) helpButton.focus();
+      closeModal(shortcuts);
       return true;
     };
     const advance = () => {
@@ -1902,7 +1924,8 @@ export function renderPresentationHtml(
     };
     const render = () => {
       unitStartedAt = performance.now();
-      if (completion instanceof HTMLElement) completion.hidden = true;
+      if (completion instanceof HTMLElement && !completion.hidden) closeModal(completion, false);
+      if (shortcuts instanceof HTMLElement && !shortcuts.hidden) closeModal(shortcuts, false);
       updateControls();
       stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
       slides[slide].querySelectorAll('[data-reveal]').forEach((item) => { const visible = Number(item.dataset.reveal) <= step; item.classList.toggle('is-visible', visible); item.setAttribute('aria-hidden', String(!visible)); });
@@ -2075,9 +2098,20 @@ export function renderPresentationHtml(
         event.preventDefault();
         return;
       }
-      if (event.key === 'Escape' && hideShortcuts()) { event.preventDefault(); return; }
-      if (event.key === 'Escape' && hideCompletion()) { event.preventDefault(); return; }
-      if (shortcuts instanceof HTMLElement && !shortcuts.hidden) return;
+      const activeModal = shortcuts instanceof HTMLElement && !shortcuts.hidden
+        ? shortcuts
+        : completion instanceof HTMLElement && !completion.hidden
+          ? completion
+          : null;
+      if (activeModal) {
+        if (event.key === 'Escape') {
+          if (activeModal === shortcuts) hideShortcuts(); else hideCompletion();
+          event.preventDefault();
+        } else if (event.key === 'Tab') {
+          trapModalFocus(event, activeModal);
+        }
+        return;
+      }
       const target = event.target;
       const interactive = target instanceof Element ? target.closest('button, a, input, select, textarea') : null;
       if (interactive instanceof HTMLInputElement || interactive instanceof HTMLSelectElement || interactive instanceof HTMLTextAreaElement) return;
@@ -2188,6 +2222,7 @@ export function renderPresentationHtml(
     });
     voiceUnlock?.addEventListener('click', () => { if (started) speak(); });
     restartButton?.addEventListener('click', () => {
+      hideCompletion();
       elapsedAccumulated = 0;
       if (!timerRunning) setTimerRunning(true);
       else startedAt = Date.now();
