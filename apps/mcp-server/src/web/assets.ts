@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "142";
+export const DASHBOARD_ASSET_VERSION = "143";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const link of document.querySelectorAll(".project-section-nav a[href^='#']")) {
@@ -22,6 +22,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       PROJECT_TOO_LARGE: "研究データが512 KiBの保存上限を超えます。文章や不要なスライドを減らしてから保存してください。"
     };
     const code = result?.error?.code;
+    if (code === "PROJECT_TOO_LARGE" && result?.error?.details) {
+      const details = result.error.details;
+      const current = Number.isFinite(details.current_bytes) ? Math.ceil(details.current_bytes / 1024) + " KiBから" : "";
+      const proposed = Number.isFinite(details.proposed_bytes) ? Math.ceil(details.proposed_bytes / 1024) + " KiB" : "上限超過";
+      const exceeded = Number.isFinite(details.exceeded_by_bytes) ? Math.ceil(details.exceeded_by_bytes / 1024) + " KiB超過" : "";
+      return messages[code] + " " + current + proposed + "へ増えます" + (exceeded ? "（" + exceeded + "）" : "") + "。";
+    }
     return (code && messages[code]) || result?.error?.message || fallback;
   };
   const caughtErrorMessage = (error, fallback) => error instanceof TypeError
