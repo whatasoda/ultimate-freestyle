@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@110");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@111");
     expect(html).toContain("const isEditorTargetVisible = (item)");
     expect(html).toContain(
       "item.closest('.reveal-block[aria-hidden=\"true\"]') === null"
@@ -412,6 +412,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("occlusions, fonts }");
     expect(html).toContain('"handwritten":["Klee"');
     expect(html).toContain("const collectContrast = (target, slideElement)");
+    expect(html).toContain("return lowest ?? manualReview");
+    expect(html).toContain("manual_review: true");
     expect(html).not.toContain("background.complex && ratio >= 2");
     expect(html).toContain("suggested_foreground");
     expect(html).toContain("ultimate-freestyle:set-position");

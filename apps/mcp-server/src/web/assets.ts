@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "136";
+export const DASHBOARD_ASSET_VERSION = "137";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const apiErrorMessage = (result, fallback) => {
@@ -334,7 +334,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         qualitySweepStatus.classList.toggle("warning", sweepIssueCount > 0);
         qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0);
       }
-      if (sweepIssueCount === 0) appendSweepResult(null, "全段階で見切れ、過剰な自動縮小、文字コントラスト不足は見つかりませんでした。", false);
+      if (sweepIssueCount === 0) appendSweepResult(null, "全段階で見切れ、過剰な自動縮小、配色の確認事項は見つかりませんでした。", false);
       persistQualitySweep("completed");
       void saveQualitySweep("completed");
     };
@@ -411,7 +411,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         ? data.fits.filter((item) => Number.isFinite(item?.fit_scale) && item.fit_scale < 0.7)
         : [];
       const contrasts = Array.isArray(data.contrasts)
-        ? data.contrasts.filter((item) => Number.isFinite(item?.ratio) && Number.isFinite(item?.required) && item.ratio < item.required)
+        ? data.contrasts.filter((item) => Number.isFinite(item?.ratio) && Number.isFinite(item?.required) && (item.ratio < item.required || item.manual_review === true))
         : [];
       const clamps = Array.isArray(data.clamps)
         ? data.clamps.filter((item) => Number.isFinite(item?.hidden_lines) && item.hidden_lines > 0)
@@ -429,7 +429,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const details = [
           overflows.length ? "見切れ" + overflows.length + "か所" : "",
           compressed.length ? "70%未満の縮小" + compressed.length + "か所" : "",
-          contrasts.length ? "文字コントラスト不足" + contrasts.length + "か所" : "",
+          contrasts.length ? "配色の目視確認" + contrasts.length + "か所" : "",
           clamps.length ? "読み上げ文の省略" + clamps.length + "か所" : "",
           readability.length ? "小さすぎる文字" + readability.length + "か所" : "",
           occlusions.length ? "表示パーツの重なり" + occlusions.length + "組" : "",
@@ -2583,7 +2583,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         ? data.fits.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.fit_scale) && item.fit_scale < 0.7)
         : [];
       const contrasts = Array.isArray(data.contrasts)
-        ? data.contrasts.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.ratio) && Number.isFinite(item.required) && item.ratio < item.required)
+        ? data.contrasts.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.ratio) && Number.isFinite(item.required) && (item.ratio < item.required || item.manual_review === true))
         : [];
       const clamps = Array.isArray(data.clamps)
         ? data.clamps.filter((item) => item && typeof item.id === "string" && Number.isFinite(item.hidden_lines) && item.hidden_lines > 0)
@@ -2603,7 +2603,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           : compressed.length
             ? compressed.length + "か所の文字を70%未満まで縮小しています。組版か文章量を見直してください。"
           : contrasts.length
-            ? contrasts.length + "か所で文字と背景のコントラストが不足しています。配色を見直してください。"
+            ? contrasts.some((item) => item.ratio < item.required)
+              ? contrasts.length + "か所で文字と背景のコントラストを確認してください。"
+              : contrasts.length + "か所は背景模様・透明度を含むため、実際の読みやすさを目視確認してください。"
           : clamps.length
             ? "読み上げ枠で文章の一部が省略されています。枠の大きさ・文字倍率・最大行数を見直してください。"
           : readability.length
@@ -2624,7 +2626,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           appendDiagnostic(item, item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。");
         }
         for (const item of contrasts) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1" + (item.estimated ? "（背景模様・透明度を含む概算のため目視確認）" : "") + "です（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
+          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1" + (item.manual_review ? "です。背景模様・透明度を含む概算のため目視確認が必要です" : (item.estimated ? "（背景模様・透明度を含む概算）です" : "です")) + "（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
         }
         for (const item of clamps) {
           appendDiagnostic(item, "読み上げ枠で約" + item.hidden_lines + "行が省略されています。最大行数、文字倍率、枠の大きさを調整してください。");
@@ -2648,7 +2650,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           : compressed.length
             ? total + "件の確認事項があります（うち過剰な自動縮小" + compressed.length + "件）。"
           : contrasts.length
-            ? total + "件の確認事項があります（うち文字コントラスト不足" + contrasts.length + "件）。"
+            ? total + "件の確認事項があります（うち配色の確認" + contrasts.length + "件）。"
           : clamps.length
             ? total + "件の確認事項があります（うち読み上げ文の省略" + clamps.length + "件）。"
           : readability.length

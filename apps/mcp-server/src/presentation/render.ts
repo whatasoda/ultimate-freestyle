@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@110";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@111";
 
 function escapeHtml(value: string): string {
   return value
@@ -1570,6 +1570,7 @@ export function renderPresentationHtml(
         return [...item.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
       });
       let lowest = null;
+      let manualReview = null;
       for (const candidate of candidates) {
         const style = getComputedStyle(candidate);
         const foreground = parseRenderedColor(style.color);
@@ -1590,13 +1591,19 @@ export function renderPresentationHtml(
         const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
         const required = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700) ? 3 : 4.5;
         const ratio = contrastRatio(displayedForeground, background.color);
-        if (ratio + .05 >= required || (lowest && lowest.ratio <= ratio)) continue;
         const dark = { red: 17, green: 24, blue: 39, alpha: 1 };
         const light = { red: 248, green: 250, blue: 252, alpha: 1 };
         const suggested = contrastRatio(dark, background.color) >= contrastRatio(light, background.color) ? dark : light;
-        lowest = { ratio, required, estimated: background.complex || effectiveOpacity < .99, suggested_foreground: colorHex(suggested) };
+        const estimated = background.complex || effectiveOpacity < .99;
+        if (ratio + .05 < required) {
+          if (!lowest || lowest.ratio > ratio) lowest = { ratio, required, estimated, manual_review: false, suggested_foreground: colorHex(suggested) };
+          continue;
+        }
+        if (estimated && (!manualReview || manualReview.ratio > ratio)) {
+          manualReview = { ratio, required, estimated: true, manual_review: true, suggested_foreground: colorHex(suggested) };
+        }
       }
-      return lowest;
+      return lowest ?? manualReview;
     };
     const collectSmallText = (target, slideElement) => {
       const slideHeight = slideElement.clientHeight;
@@ -1793,7 +1800,7 @@ export function renderPresentationHtml(
         },
         overflows: overflowing ? [{ id: 'prelude', region: '0ページ目', overflow_x: Math.max(0, content.width - boundary.width * .94), overflow_y: Math.max(0, content.height - boundary.height * .94), fit_scale: scale }] : [],
         fits: [{ id: 'prelude', region: '0ページ目', fit_scale: scale }],
-        contrasts: contrast ? [{ id: 'prelude', region: '0ページ目', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground }] : [],
+        contrasts: contrast ? [{ id: 'prelude', region: '0ページ目', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, manual_review: contrast.manual_review, suggested_foreground: contrast.suggested_foreground }] : [],
         clamps: [],
         readability: smallText ? [{ id: 'prelude', region: '0ページ目', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px }] : [],
         occlusions: [],
@@ -1846,7 +1853,7 @@ export function renderPresentationHtml(
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
         if (editorFrame) {
           const contrast = collectContrast(target, currentSlide);
-          if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground });
+          if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, manual_review: contrast.manual_review, suggested_foreground: contrast.suggested_foreground });
           const smallText = collectSmallText(target, currentSlide);
           if (smallText) readability.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px });
         }
