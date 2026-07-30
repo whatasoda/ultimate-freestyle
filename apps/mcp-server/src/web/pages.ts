@@ -238,7 +238,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=87";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=88";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -2096,7 +2096,7 @@ export function slideWorkspacePage(options: {
            <nav class="filmstrip" aria-label="スライド一覧"><label class="filmstrip-search">${deck.slides.length}枚から検索<input type="search" data-filmstrip-search placeholder="タイトル・構成・音声状態" autocomplete="off"></label>${filmstrip}<p class="filmstrip-empty" data-filmstrip-empty hidden>一致するスライドはありません。</p></nav>
            <section class="panel workspace-preview">
              <div class="workspace-frame" style="--workspace-aspect:${(deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame data-aspect-ratio="${deck.aspect_ratio ?? "16:9"}"></iframe></div>
-             <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output aria-live="polite">STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button></div>
+             <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output aria-live="polite">STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button>${slide.composition?.mode === "scene" || slide.composition?.mode === "canvas" ? '<button class="ghost" type="button" data-grid-snap aria-pressed="false">5%グリッド OFF</button>' : ""}</div>
              ${slide.composition?.mode === "scene" || slide.composition?.mode === "canvas" ? '<p class="inherit-note">パーツをクリックすると編集欄を開きます。自由配置はドラッグで移動、右下でリサイズ、矢印キーで1%移動（Shiftで5%）、Alt＋矢印で大きさを調整できます。</p>' : ""}
              <p class="quality-status" data-layout-status role="status" aria-live="polite">実表示の文字収まりを確認しています…</p>
            </section>

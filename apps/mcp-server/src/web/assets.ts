@@ -1646,6 +1646,27 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  const gridSnapButton = document.querySelector("[data-grid-snap]");
+  let gridSnapEnabled = false;
+  const syncGridSnap = () => {
+    if (!(gridSnapButton instanceof HTMLButtonElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    gridSnapButton.setAttribute("aria-pressed", String(gridSnapEnabled));
+    gridSnapButton.textContent = "5%グリッド " + (gridSnapEnabled ? "ON" : "OFF");
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:set-editor-options",
+      grid_snap: gridSnapEnabled
+    }, location.origin);
+  };
+  if (gridSnapButton instanceof HTMLButtonElement) {
+    try { gridSnapEnabled = localStorage.getItem("ultimate-freestyle:grid-snap") === "true"; } catch {}
+    syncGridSnap();
+    gridSnapButton.addEventListener("click", () => {
+      gridSnapEnabled = !gridSnapEnabled;
+      try { localStorage.setItem("ultimate-freestyle:grid-snap", String(gridSnapEnabled)); } catch {}
+      syncGridSnap();
+    });
+  }
+
   const stepOutput = document.querySelector("[data-step-output]");
   const stepButtons = [...document.querySelectorAll("[data-step-direction]")];
   if (
@@ -1704,6 +1725,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncNarrationDrafts();
       syncSceneComponentDrafts();
       syncCanvasBlockDrafts();
+      syncGridSnap();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");

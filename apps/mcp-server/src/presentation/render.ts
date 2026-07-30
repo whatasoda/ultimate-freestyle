@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@64";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@65";
 
 function escapeHtml(value: string): string {
   return value
@@ -644,6 +644,7 @@ export function renderPresentationHtml(
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node):hover { outline: max(2px, .18cqw) dashed color-mix(in srgb, var(--accent) 78%, white); outline-offset: max(1px, .1cqw); }
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node)[data-editor-selected="true"] { outline: max(3px, .24cqw) solid var(--accent); outline-offset: max(1px, .12cqw); }
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node)[data-editor-selected="true"]::after { content: ""; position: absolute; right: max(-7px, -.45cqw); bottom: max(-7px, -.45cqw); width: max(12px, .9cqw); height: max(12px, .9cqw); z-index: 1000; border: max(2px, .12cqw) solid white; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 1px #111827; cursor: nwse-resize; }
+    body[data-editor-frame="true"][data-editor-grid="true"] .stage::after { content: ""; position: absolute; inset: 0; z-index: 10000; pointer-events: none; background-image: linear-gradient(to right, #8ecbff30 max(1px, .05cqw), transparent max(1px, .05cqw)), linear-gradient(to bottom, #8ecbff30 max(1px, .05cqw), transparent max(1px, .05cqw)); background-size: 5% 5%; }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
     .slide::before, .slide::after { content: ""; position: absolute; z-index: 0; pointer-events: none; }
     .slide > * { position: relative; z-index: 1; }
@@ -1065,7 +1066,7 @@ export function renderPresentationHtml(
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    let swipeStart = null, suppressStageClick = false;
+    let swipeStart = null, suppressStageClick = false, editorGridSnap = false;
     let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
@@ -2058,10 +2059,11 @@ export function renderPresentationHtml(
       if (!editorDrag || editorDrag.pointerId !== event.pointerId) return;
       const deltaX = (event.clientX - editorDrag.startX) / editorDrag.boundaryRect.width * 100;
       const deltaY = (event.clientY - editorDrag.startY) / editorDrag.boundaryRect.height * 100;
-      const x = editorDrag.mode === 'move' ? clamp(editorDrag.x + deltaX, 0, 100 - editorDrag.width) : editorDrag.x;
-      const y = editorDrag.mode === 'move' ? clamp(editorDrag.y + deltaY, 0, 100 - editorDrag.height) : editorDrag.y;
-      const width = editorDrag.mode === 'resize' ? clamp(editorDrag.width + deltaX, 5, 100 - editorDrag.x) : editorDrag.width;
-      const height = editorDrag.mode === 'resize' ? clamp(editorDrag.height + deltaY, 5, 100 - editorDrag.y) : editorDrag.height;
+      const snapDrag = (value) => editorGridSnap ? Math.round(value / 5) * 5 : value;
+      const x = editorDrag.mode === 'move' ? clamp(snapDrag(editorDrag.x + deltaX), 0, 100 - editorDrag.width) : editorDrag.x;
+      const y = editorDrag.mode === 'move' ? clamp(snapDrag(editorDrag.y + deltaY), 0, 100 - editorDrag.height) : editorDrag.y;
+      const width = editorDrag.mode === 'resize' ? clamp(snapDrag(editorDrag.width + deltaX), 5, 100 - editorDrag.x) : editorDrag.width;
+      const height = editorDrag.mode === 'resize' ? clamp(snapDrag(editorDrag.height + deltaY), 5, 100 - editorDrag.y) : editorDrag.height;
       editorDrag.target.style.left = x + '%';
       editorDrag.target.style.top = y + '%';
       editorDrag.target.style.width = width + '%';
@@ -2142,6 +2144,10 @@ export function renderPresentationHtml(
     addEventListener('message', (event) => {
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
+      else if (event.data?.type === 'ultimate-freestyle:set-editor-options') {
+        editorGridSnap = event.data.grid_snap === true;
+        document.body.dataset.editorGrid = String(editorGridSnap);
+      }
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-scene-component') previewSceneComponent(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-canvas-block') previewCanvasBlock(event.data);

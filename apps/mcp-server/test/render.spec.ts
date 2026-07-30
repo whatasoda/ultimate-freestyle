@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@64");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@65");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -712,6 +712,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("cursor: nwse-resize");
     expect(html).toContain("if (event.altKey)");
     expect(html).toContain("target.focus({ preventScroll: true })");
+    expect(html).toContain("ultimate-freestyle:set-editor-options");
+    expect(html).toContain("background-size: 5% 5%");
     expect(html).toContain('data-editor-selected="true"');
     expect(html).not.toContain(">fallback<");
 
@@ -727,6 +729,7 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-scene-component-editor");
     expect(workspaceHtml).toContain("パーツをクリックすると編集欄を開きます");
     expect(workspaceHtml).toContain("Alt＋矢印で大きさを調整");
+    expect(workspaceHtml).toContain("5%グリッド OFF");
     expect(workspaceHtml).toContain("data-composition-editor");
     expect(workspaceHtml).toContain('name="composition_background"');
     expect(workspaceHtml).toContain("構成全体を保存");
