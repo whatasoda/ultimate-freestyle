@@ -590,6 +590,7 @@ function shell(title: string, body: string): string {
       .publication-history { display: grid; gap: .35rem; margin-top: .65rem; }
       .publication-history .status-row { align-items: center; padding: .55rem .65rem; border: 1px solid var(--line); border-radius: .55rem; }
       .publication-history .status-row span, .publication-history .status-row small { display: grid; gap: .12rem; }
+      .publication-history .actions { display: flex; align-items: center; gap: .4rem; }
       .success { color: #74e6b2 !important; }
       .warning { color: #ffd681 !important; }
       .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
@@ -1252,7 +1253,8 @@ export function projectDetailPage(options: {
         const publishedAt = revision.published_at === null
           ? revision.created_at
           : revision.published_at;
-        return `<article class="status-row"><span><strong>v${revision.project_version} · ${escapeHtml(revision.renderer_version)}</strong><small>${escapeHtml(new Date(publishedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></span>${active ? '<strong class="success">公開中</strong>' : `<button class="ghost" type="button" data-publish-rollback="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(revision.revision_id)}" data-csrf="${escapeHtml(options.csrfToken)}">この版へ戻す</button>`}</article>`;
+        const revisionMeta = `${(revision.byte_size / 1024).toFixed(1)} KB · ${revision.content_hash.slice(0, 8)}`;
+        return `<article class="status-row"><span><strong>v${revision.project_version} · ${escapeHtml(revision.renderer_version)}</strong><small>${escapeHtml(new Date(publishedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(revisionMeta)}</small></span><span class="actions"><a class="button ghost" href="/preview/${escapeHtml(revision.revision_id)}" target="_blank" rel="noopener">この版を確認</a>${active ? '<strong class="success">公開中</strong>' : `<button class="ghost" type="button" data-publish-rollback="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(revision.revision_id)}" data-csrf="${escapeHtml(options.csrfToken)}">この版へ戻す</button>`}</span></article>`;
       }).join("")}</div></details>`;
   const researchReady =
     (document.question?.trim().length ?? 0) > 0 &&

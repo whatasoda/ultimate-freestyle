@@ -1084,6 +1084,7 @@ describe("Web dashboard", () => {
         revision_id: string;
         project_version: number;
         renderer_version: string;
+        content_hash: string;
       };
       preview_url: string;
     };
@@ -1318,6 +1319,9 @@ describe("Web dashboard", () => {
     const publishedDetailHtml = await publishedDetail.text();
     expect(publishedDetailHtml).toContain("公開履歴 · 1件");
     expect(publishedDetailHtml).toContain("公開中");
+    expect(publishedDetailHtml).toContain("この版を確認");
+    expect(publishedDetailHtml).toContain(`/preview/${previewResult.revision.revision_id}`);
+    expect(publishedDetailHtml).toContain(previewResult.revision.content_hash.slice(0, 8));
     expect(DASHBOARD_SCRIPT).toContain("data-publish-rollback");
     expect(DASHBOARD_SCRIPT).toContain("以前の公開版へ戻しました");
     const publicPage = await requestProvider(
