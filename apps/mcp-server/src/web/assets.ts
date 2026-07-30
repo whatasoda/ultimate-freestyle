@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "147";
+export const DASHBOARD_ASSET_VERSION = "148";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (location.hash.length > 1) {
@@ -3300,9 +3300,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       speakerSelect?.addEventListener("change", () => stopVoicevoxSample());
       profileTuningForm?.addEventListener("input", () => stopVoicevoxSample());
     }
+    let activePollUrl = "";
+    let pollInFlight = false;
     const pollJob = async (statusUrl) => {
       const url = safeStatusUrl(statusUrl);
-      if (url === null) return;
+      if (url === null || pollInFlight) return;
+      activePollUrl = url;
+      pollInFlight = true;
       clearTimeout(pollTimer);
       try {
         const response = await fetch(url, { headers: { accept: "application/json" } });
@@ -3312,6 +3316,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         pollFailures = 0;
         updateJob(job);
         if (terminalStatuses.has(job.status)) {
+          activePollUrl = "";
           setTimeout(() => location.reload(), job.status === "completed" ? 800 : 1200);
           return;
         }
@@ -3324,8 +3329,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           feedback.classList.add("warning");
         }
         pollTimer = setTimeout(() => pollJob(url), Math.min(15000, 2000 * 2 ** pollFailures));
+      } finally {
+        pollInFlight = false;
       }
     };
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden || activePollUrl === "") return;
+      clearTimeout(pollTimer);
+      void pollJob(activePollUrl);
+    });
     if (setupButton instanceof HTMLButtonElement) {
       const initialProfileId = profileSelect instanceof HTMLSelectElement ? profileSelect.value : "";
       setupButton.addEventListener("click", async () => {
