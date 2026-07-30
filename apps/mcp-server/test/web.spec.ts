@@ -1224,7 +1224,7 @@ describe("Web dashboard", () => {
       occurred_at: now,
       kind: "observation",
       text: "削除導線を確認する研究ログ",
-      source_url: null
+      source_url: "https://example.com/evidence?trial=1&result=ok"
     });
     for (let index = 1; index <= 20; index += 1) {
       listItemDocument.logs.push({
@@ -1331,6 +1331,8 @@ describe("Web dashboard", () => {
     expect(olderLogHtml).toContain(`action="/api/projects/${listItemProjectId}/logs/${researchLogEntryId}?log_page=2"`);
     expect(olderLogHtml).toContain("2 / 2ページ · 全21件");
     expect(olderLogHtml).toContain("← 新しいログ");
+    expect(olderLogHtml).toContain('href="https://example.com/evidence?trial=1&amp;result=ok"');
+    expect(olderLogHtml).toContain('rel="noopener noreferrer">出典を開く ↗</a>');
     const deleteListItem = await mutateListItem({
       expected_version: 3,
       action: "delete",

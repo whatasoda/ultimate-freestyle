@@ -824,6 +824,16 @@ function formatDate(iso: string): string {
   return date?.replaceAll("-", "/") ?? iso;
 }
 
+function safeResearchSourceUrl(value: string | null): string | null {
+  if (value === null) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function accountHeader(twitchLogin: string, csrfToken: string): string {
   return `<header class="site-header">
     <a class="brand" href="/dashboard">最自由研究</a>
@@ -1475,7 +1485,10 @@ export function projectDetailPage(options: {
   const logs = recentLogs.length
     ? recentLogs
         .map(
-          (entry) => `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p><form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}?log_page=${logPage}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="ghost danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`
+          (entry) => {
+            const sourceUrl = safeResearchSourceUrl(entry.source_url);
+            return `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p>${sourceUrl === null ? "" : `<p><a class="back" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">出典を開く ↗</a></p>`}<form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}?log_page=${logPage}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="ghost danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`;
+          }
         )
         .join("")
     : `<p class="prose">まだ研究ログがありません。</p>`;

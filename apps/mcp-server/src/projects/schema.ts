@@ -715,7 +715,7 @@ export const researchLogEntrySchema = z.object({
     "note"
   ]),
   text: z.string().min(1).max(10_000),
-  source_url: z.string().url().max(2_000).nullable()
+  source_url: z.string().url().max(2_000).regex(/^https?:\/\//i).nullable()
 });
 
 export const RESEARCH_LOG_LIMIT = 500;

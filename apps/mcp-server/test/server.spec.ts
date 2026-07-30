@@ -7,7 +7,7 @@ import { createServer } from "../src/server";
 import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { saveRenderedQualityReport } from "../src/projects/quality-reports";
-import { createEmptyProject, projectSummarySchema } from "../src/projects/schema";
+import { createEmptyProject, projectSummarySchema, researchLogEntrySchema } from "../src/projects/schema";
 import { setupZundamonProfile } from "../src/voicevox/service";
 
 async function readJsonResource(client: Client, uri: string): Promise<unknown> {
@@ -89,6 +89,14 @@ describe("MCP contract", () => {
       expect(tools.map((tool) => tool.name)).not.toContain("get_project_slide");
       expect(tools.map((tool) => tool.name)).not.toContain("evaluate_project");
       expect(tools.map((tool) => tool.name)).not.toContain("append_research_log");
+      const sourceLog = {
+        id: "45000000-0000-4000-8000-000000000045",
+        occurred_at: "2026-07-30T12:00:00.000Z",
+        kind: "source" as const,
+        text: "出典URLのprotocolを確認する。"
+      };
+      expect(researchLogEntrySchema.safeParse({ ...sourceLog, source_url: "https://example.com/evidence" }).success).toBe(true);
+      expect(researchLogEntrySchema.safeParse({ ...sourceLog, source_url: "javascript:alert(1)" }).success).toBe(false);
       const largestInputSchema = Math.max(
         ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
       );

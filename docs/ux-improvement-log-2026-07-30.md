@@ -1472,3 +1472,9 @@
 - 研究ログの保存上限500件、Web UIの20件/page、URLで受け付ける最大25pageが別々の数値だった。上限変更時に一つだけ更新すると、保存できるのに画面から到達できない範囲が生まれる。
 - 保存schemaから`RESEARCH_LOG_LIMIT`と`RESEARCH_LOG_PAGE_SIZE`を公開し、SSRの分割、query上限、削除後page補正を同じ値から計算するようにした。
 - 最大pageを定数の商から導出し、ログ上限と到達可能範囲が常に一致する契約へ揃えた。
+
+## 改善ループ382
+
+- `source_url`付きの研究ログはMCPから取得できる一方、Web UIでは本文しか表示せず、出典を確認してから残す・削除する判断ができなかった。
+- 各ログに新しいtabで開く「出典を開く」導線を追加し、保存済みの不正protocolが混ざってもHTTP(S)以外はリンク化しない防御を入れた。
+- 新規入力schemaもHTTP(S)へ限定し、`javascript:`を拒否するschema契約と、queryを含むURLのHTML escape・`noopener noreferrer`をSSR契約で検証した。
