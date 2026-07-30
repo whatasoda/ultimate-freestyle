@@ -215,7 +215,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=120";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=121";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -628,6 +628,8 @@ function shell(title: string, body: string): string {
       .component-outline { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
       .component-outline li { overflow: hidden; border: 1px solid var(--line); border-radius: .55rem; color: #bdc9d8; font-size: .8rem; }
       .component-outline-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .55rem; }
+      a.component-outline-row { color: inherit; text-decoration: none; }
+      a.component-outline-row:hover, a.component-outline-row[aria-current="true"] { background: #8062df24; color: white; }
       .component-outline .component-outline { gap: .35rem; margin: 0 .45rem .45rem .85rem; padding-left: .65rem; border-left: 1px solid #52647c; }
       .component-outline .component-outline li { background: #08111b66; }
       .component-outline code { color: #91ddff; }
@@ -927,7 +929,7 @@ function sceneComponentContentControls(node: SlideSceneNode, maxStep: number): s
 
 type SceneHierarchyIndex = {
   containerNodes: SlideSceneNode[];
-  descendantsById: Map<string, Set<string>>;
+  childrenByParentId: Map<string, SlideSceneNode[]>;
   siblingsByParentId: Map<string | null, SlideSceneNode[]>;
 };
 
@@ -947,28 +949,22 @@ function createSceneHierarchyIndex(nodes: SlideSceneNode[]): SceneHierarchyIndex
   for (const siblings of siblingsByParentId.values()) {
     siblings.sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
   }
-  const descendantsById = new Map<string, Set<string>>();
-  const descendantsFor = (nodeId: string): Set<string> => {
-    const cached = descendantsById.get(nodeId);
-    if (cached !== undefined) return cached;
-    const descendants = new Set<string>();
-    descendantsById.set(nodeId, descendants);
-    for (const child of childrenByParentId.get(nodeId) ?? []) {
-      descendants.add(child.id);
-      for (const descendantId of descendantsFor(child.id)) descendants.add(descendantId);
-    }
-    return descendants;
-  };
-  for (const node of nodes) descendantsFor(node.id);
   return {
     containerNodes: nodes.filter((node) => ["layer", "stack", "grid"].includes(node.kind)),
-    descendantsById,
+    childrenByParentId,
     siblingsByParentId
   };
 }
 
 function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideSceneNode[], index: SceneHierarchyIndex): string {
-  const descendants = index.descendantsById.get(node.id) ?? new Set<string>();
+  const descendants = new Set<string>();
+  const pending = [...(index.childrenByParentId.get(node.id) ?? [])];
+  while (pending.length > 0) {
+    const child = pending.pop();
+    if (child === undefined || descendants.has(child.id)) continue;
+    descendants.add(child.id);
+    pending.push(...(index.childrenByParentId.get(child.id) ?? []));
+  }
   const parents = index.containerNodes
     .filter((candidate) => candidate.id !== node.id && !descendants.has(candidate.id))
     .map((candidate) => `<option value="${escapeHtml(candidate.id)}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
@@ -1066,7 +1062,7 @@ function sceneComponentCreator(options: {
   return `<details class="component-detail"><summary>リッチ表示パーツを追加</summary><form class="editor" data-scene-component-create data-versioned-form data-method="POST" action="${options.action}" data-version="${options.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>種類<select name="kind"><optgroup label="配置"><option value="layer">重ねる領域</option><option value="stack">縦横に並べる領域</option><option value="grid">格子状に並べる領域</option></optgroup><optgroup label="文章"><option value="hero">大見出し</option><option value="markdown">Markdown本文</option><option value="quote">引用</option></optgroup><optgroup label="情報"><option value="card">カード</option><option value="metric">数値</option><option value="callout">注目情報</option></optgroup><optgroup label="データ"><option value="bar_chart">棒グラフ</option><option value="timeline">時系列</option></optgroup><optgroup label="素材"><option value="shape">図形</option><option value="image"${options.assets.length === 0 ? " disabled" : ""}>画像${options.assets.length === 0 ? "（画像を先に追加）" : ""}</option></optgroup></select></label><label>追加先<select name="parent_id"><option value="">スライド直下（自由配置）</option>${parentOptions}</select></label><label>画像パーツで使用する画像<select name="asset_id"><option value="">選択してください</option>${imageOptions}</select></label></div><p class="inherit-note">配置領域の中へ追加すると自動配置になります。スライド直下へ追加すると、重なりを避ける初期位置を設定します。</p><div class="actions"><button type="submit">リッチ表示パーツを追加</button><span class="version" data-version-label>v${options.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
 }
 
-function sceneComponentOutline(nodes: SlideSceneNode[]): string {
+function sceneComponentOutline(nodes: SlideSceneNode[], selectedId: string | null, slidePath: string): string {
   const children = new Map<string | null, SlideSceneNode[]>();
   for (const node of nodes) {
     const siblings = children.get(node.parent_id) ?? [];
@@ -1082,7 +1078,8 @@ function sceneComponentOutline(nodes: SlideSceneNode[]): string {
     const items = (children.get(parentId) ?? [])
       .map((node) => {
         const descendants = renderChildren(node.id);
-        return `<li><div class="component-outline-row"><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>${node.frame === null || node.frame === undefined ? "自動配置" : "自由配置"}</small></span><span class="component-step">STEP ${node.at}</span></div><details class="component-detail"><summary>全設定を確認</summary>${componentSettings(node)}</details>${descendants}</li>`;
+        const href = `${slidePath}?component=${encodeURIComponent(node.id)}`;
+        return `<li><a class="component-outline-row" data-component-select="${escapeHtml(node.id)}" href="${escapeHtml(href)}"${node.id === selectedId ? ' aria-current="true"' : ""}><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>${node.frame === null || node.frame === undefined ? "自動配置" : "自由配置"}</small></span><span class="component-step">STEP ${node.at}</span></a>${descendants}</li>`;
       })
       .join("");
     return items.length > 0 ? `<ul class="component-outline">${items}</ul>` : "";
@@ -1969,6 +1966,7 @@ export function slideWorkspacePage(options: {
   csrfToken: string;
   project: ProjectRecord;
   slideId: string;
+  selectedComponentId?: string | null;
   assets?: ProjectAsset[];
 }): Response {
   const deck = options.project.document.deck;
@@ -1988,6 +1986,7 @@ export function slideWorkspacePage(options: {
   const nextSlidePath = nextSlide === undefined
     ? null
     : `${slideDashboardPath}${escapeHtml(nextSlide.id)}`;
+  const currentSlideDashboardPath = `${slideDashboardPath}${escapeHtml(slide.id)}`;
   const projectPath = `/api/projects/${escapeHtml(options.project.project_id)}`;
   const slidePath = `${projectPath}/slides/${escapeHtml(slide.id)}`;
   const slideActionPath = `${slidePath}/actions`;
@@ -2004,13 +2003,22 @@ export function slideWorkspacePage(options: {
       }
     )
     .join("");
+  const sceneNodes = slide.composition?.mode === "scene" ? slide.composition.nodes : [];
+  const selectedSceneNode = slide.composition?.mode === "scene"
+    ? sceneNodes.find((node) => node.id === options.selectedComponentId) ?? sceneNodes[0] ?? null
+    : null;
+  const canvasBlocks = slide.composition?.mode === "canvas" ? slide.composition.blocks : [];
+  const selectedCanvasBlock = slide.composition?.mode === "canvas"
+    ? canvasBlocks.find((block) => block.id === options.selectedComponentId) ?? canvasBlocks[0] ?? null
+    : null;
+  const selectedComponentId = selectedSceneNode?.id ?? selectedCanvasBlock?.id ?? null;
   const componentOutline =
     slide.composition?.mode === "scene"
-      ? sceneComponentOutline(slide.composition.nodes)
+      ? sceneComponentOutline(slide.composition.nodes, selectedComponentId, currentSlideDashboardPath)
       : slide.composition?.mode === "canvas"
         ? `<ul class="component-outline">${slide.composition.blocks
             .map(
-              (block) => `<li><div class="component-outline-row"><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}%</small></span><span class="component-step">STEP ${block.at}</span></div><details class="component-detail"><summary>全設定を確認</summary>${settingTable(Object.entries(block))}</details></li>`
+              (block) => `<li><a class="component-outline-row" data-component-select="${escapeHtml(block.id)}" href="${escapeHtml(`${currentSlideDashboardPath}?component=${encodeURIComponent(block.id)}`)}"${block.id === selectedComponentId ? ' aria-current="true"' : ""}><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}%</small></span><span class="component-step">STEP ${block.at}</span></a></li>`
             )
             .join("")}</ul>`
         : `<p class="mode-note">定型レイアウトです。本文、段階表示、補足欄から構成されます。下の選択から自由配置または入れ子のリッチ構成を開始できます。</p>`;
@@ -2020,21 +2028,20 @@ export function slideWorkspacePage(options: {
       : slide.composition?.mode === "canvas"
         ? "自由配置の表示パーツです。この画面で内容、画像、位置、大きさ、重なり、表示STEP、アニメーション、見た目を調整できます。入れ子が必要な場合はAIからリッチ構成へ移行できます。"
         : "本文と補足欄を使う定型レイアウトです。";
-  const sceneNodes = slide.composition?.mode === "scene" ? slide.composition.nodes : [];
   const sceneHierarchyIndex = createSceneHierarchyIndex(sceneNodes);
   const workspaceAssetUrls = Object.fromEntries((options.assets ?? []).map((asset) => [asset.asset_id, asset.content_url]));
-  const sceneComponentEditors = slide.composition?.mode === "scene"
-    ? sceneNodes
+  const sceneComponentEditors = selectedSceneNode === null
+    ? ""
+    : [selectedSceneNode]
         .map((node) => {
           const fields = sceneTextFields(node);
           const hierarchyControls = sceneComponentHierarchyControls(node, sceneNodes, sceneHierarchyIndex);
           const controls = sceneComponentContentControls(node, slide.reveal_steps);
           const kindControls = sceneComponentKindControls(node, options.assets ?? []);
           const appearanceControls = sceneComponentAppearanceControls(node, slide.reveal_steps);
-          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${hierarchyControls}${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><button class="ghost" type="button" data-scene-component-action="duplicate" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">複製</button><button class="ghost danger" type="button" data-scene-component-action="delete" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+          return `<details class="component-detail" open><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${hierarchyControls}${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><button class="ghost" type="button" data-scene-component-action="duplicate" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">複製</button><button class="ghost danger" type="button" data-scene-component-action="delete" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
-        .join("")
-    : "";
+        .join("");
   const sceneComponentCreate = slide.composition?.mode === "scene"
     ? sceneComponentCreator({
         nodes: slide.composition.nodes,
@@ -2044,16 +2051,16 @@ export function slideWorkspacePage(options: {
         csrfToken: options.csrfToken
       })
     : "";
-  const canvasBlockEditors = slide.composition?.mode === "canvas"
-    ? slide.composition.blocks.map((block) => canvasBlockEditor({
-        block,
+  const canvasBlockEditors = selectedCanvasBlock === null
+    ? ""
+    : canvasBlockEditor({
+        block: selectedCanvasBlock,
         assets: options.assets ?? [],
-        action: `${slidePath}/blocks/${escapeHtml(block.id)}`,
+        action: `${slidePath}/blocks/${escapeHtml(selectedCanvasBlock.id)}`,
         version: options.project.version,
         csrfToken: options.csrfToken,
         maxStep: slide.reveal_steps
-      })).join("")
-    : "";
+      });
   const canvasBlockCreator = slide.composition?.mode === "canvas"
     ? `<details class="component-detail"><summary>表示パーツを追加</summary><form class="editor" data-canvas-block-create data-versioned-form data-method="POST" action="${slidePath}/blocks" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>種類<select name="kind"><option value="markdown">テキスト</option><option value="shape">図形</option><option value="image"${(options.assets ?? []).length === 0 ? " disabled" : ""}>画像${(options.assets ?? []).length === 0 ? "（画像を先に追加）" : ""}</option></select></label><label>画像パーツで使用する画像<select name="asset_id"><option value="">選択してください</option>${(options.assets ?? []).map((asset) => `<option value="${escapeHtml(asset.asset_id)}">${escapeHtml(asset.alt_text || asset.original_filename)}</option>`).join("")}</select></label></div><p class="inherit-note">追加後に内容、位置、大きさ、重なり順、見た目を調整できます。</p><div class="actions"><button type="submit">表示パーツを追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
     : "";
@@ -2384,7 +2391,7 @@ export function slideWorkspacePage(options: {
          <div class="workspace-head"><div><p class="eyebrow">スライド編集 · ${slideIndex + 1} / ${deck.slides.length}</p><h1 data-current-slide-title>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a><div class="slide-actions" role="group" aria-label="スライド構成の操作"><button class="ghost" type="button" data-slide-action="move" data-position="${Math.max(0, slideIndex - 1)}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-slide-action="move" data-position="${slideIndex + 1}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === deck.slides.length - 1 ? " disabled" : ""}>↓ 後へ</button><button class="ghost" type="button" data-slide-action="duplicate" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}">複製</button><button class="ghost danger" type="button" data-slide-action="delete" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${deck.slides.length === 1 ? " disabled" : ""}>削除</button></div><span class="feedback" data-slide-action-feedback aria-live="polite"></span></div></div>
          ${effectiveSummary}
          <nav class="mobile-workspace-tabs" role="tablist" aria-label="モバイル編集表示"><button class="ghost" id="mobile-tab-preview" type="button" role="tab" data-mobile-pane="preview" aria-selected="true" aria-controls="workspace-preview-pane">プレビュー<span class="tab-badge" data-mobile-preview-badge hidden>未確認</span></button><button class="ghost" id="mobile-tab-edit" type="button" role="tab" data-mobile-pane="edit" aria-selected="false" aria-controls="workspace-edit-pane" tabindex="-1">編集</button><button class="ghost" id="mobile-tab-slides" type="button" role="tab" data-mobile-pane="slides" aria-selected="false" aria-controls="workspace-slides-pane" tabindex="-1">スライド一覧</button></nav>
-         <div class="slide-workspace" data-workspace-asset-urls="${escapeHtml(JSON.stringify(workspaceAssetUrls))}">
+         <div class="slide-workspace" data-workspace-asset-urls="${escapeHtml(JSON.stringify(workspaceAssetUrls))}" data-selected-component="${escapeHtml(selectedComponentId ?? "")}">
            <nav class="filmstrip" id="workspace-slides-pane" role="tabpanel" aria-labelledby="mobile-tab-slides"><label class="filmstrip-search">${deck.slides.length}枚から検索<input type="search" data-filmstrip-search placeholder="タイトル・構成・音声状態" autocomplete="off"></label>${filmstrip}<p class="filmstrip-empty" data-filmstrip-empty hidden>一致するスライドはありません。</p></nav>
            <section class="panel workspace-preview" id="workspace-preview-pane" role="tabpanel" aria-labelledby="mobile-tab-preview">
              <div class="workspace-frame" style="--workspace-aspect:${(deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame data-aspect-ratio="${deck.aspect_ratio ?? "16:9"}"></iframe></div>

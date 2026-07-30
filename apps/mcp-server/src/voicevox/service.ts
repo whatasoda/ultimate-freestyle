@@ -25,6 +25,7 @@ const MAX_CHARACTERS_PER_MONTH = 200_000;
 export const MAX_JOB_CHARACTERS = 30_000;
 const MAX_SEGMENTS_PER_JOB = 100;
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
+const FINGERPRINT_QUERY_BATCH_SIZE = 80;
 
 export type VoiceGenerationMessage = {
   job_id: string;
@@ -99,6 +100,18 @@ export const voiceJobStatusSchema = z.object({
   status_url: z.string()
 });
 
+export const voiceSegmentStatusSchema = z.object({
+  slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+  slide_title: z.string().min(1).max(120),
+  at: z.number().int().nonnegative().max(100),
+  text: z.string().min(1).max(2_000),
+  speaker: z.string().max(80).nullable(),
+  profile_label: z.string().max(80).nullable(),
+  effective_tuning: voicevoxTuningStatusSchema,
+  status: z.enum(["ready", "needs_generation", "queued", "failed"]),
+  audio_url: z.string().max(500).nullable()
+});
+
 export const voiceProjectStatusSchema = z.object({
   project_id: z.string().uuid(),
   version: z.number().int().positive(),
@@ -117,23 +130,23 @@ export const voiceProjectStatusSchema = z.object({
     failed: z.number().int().nonnegative(),
     queued: z.number().int().nonnegative()
   }),
-  segments: z.array(z.object({
-    slide_id: z.string(),
-    slide_title: z.string(),
-    at: z.number().int().nonnegative(),
-    text: z.string(),
-    speaker: z.string().nullable(),
-    profile_label: z.string().nullable(),
-    effective_tuning: voicevoxTuningStatusSchema,
-    status: z.enum(["ready", "needs_generation", "queued", "failed"]),
-    audio_url: z.string().nullable()
-  })),
+  segments: z.array(voiceSegmentStatusSchema),
   active_job: voiceJobStatusSchema.nullable(),
   latest_job: voiceJobStatusSchema.nullable()
 });
 
 export type VoiceJob = z.infer<typeof voiceJobStatusSchema>;
 export type VoiceProjectStatus = z.infer<typeof voiceProjectStatusSchema>;
+export type VoiceSegmentStatus = z.infer<typeof voiceSegmentStatusSchema>;
+export type VoiceSlideStatus = {
+  project_id: string;
+  version: number;
+  configured: boolean;
+  slide_id: string;
+  slide_title: string | null;
+  slide_found: boolean;
+  segments: VoiceSegmentStatus[];
+};
 
 export class VoiceGenerationError extends Error {
   constructor(
@@ -206,7 +219,9 @@ function toJob(row: VoiceJobRow): VoiceJob {
 async function buildVoicePlan(
   db: D1Database,
   ownerUserId: string,
-  project: ProjectRecord
+  project: ProjectRecord,
+  slides: NonNullable<ProjectRecord["document"]["deck"]>["slides"] =
+    project.document.deck?.slides ?? []
 ): Promise<VoiceSegmentPlan[]> {
   const deck = project.document.deck;
   if (deck === null) return [];
@@ -219,7 +234,7 @@ async function buildVoicePlan(
   if (defaultProfile === undefined) return [];
 
   const unresolved: Array<Omit<VoiceSegmentPlan, "fingerprint" | "artifact">> = [];
-  for (const slide of deck.slides) {
+  for (const slide of slides) {
     for (const segment of slide.narration?.segments ?? []) {
       const profile =
         (segment.voice_profile_id
@@ -253,21 +268,82 @@ async function buildVoicePlan(
     }))
   );
   if (planned.length === 0) return [];
-  const placeholders = planned.map(() => "?").join(",");
-  const rows = await db
-    .prepare(
-      `SELECT fingerprint, object_key, content_hash, mime_type, byte_size, created_at
-       FROM voice_audio_artifacts
-       WHERE owner_user_id = ? AND project_id = ?
-         AND fingerprint IN (${placeholders})`
-    )
-    .bind(ownerUserId, project.project_id, ...planned.map((item) => item.fingerprint))
-    .all<VoiceArtifactRow>();
-  const artifacts = new Map(rows.results.map((row) => [row.fingerprint, row]));
+  const artifacts = new Map<string, VoiceArtifactRow>();
+  for (let index = 0; index < planned.length; index += FINGERPRINT_QUERY_BATCH_SIZE) {
+    const fingerprints = planned
+      .slice(index, index + FINGERPRINT_QUERY_BATCH_SIZE)
+      .map((item) => item.fingerprint);
+    const placeholders = fingerprints.map(() => "?").join(",");
+    const rows = await db
+      .prepare(
+        `SELECT fingerprint, object_key, content_hash, mime_type, byte_size, created_at
+         FROM voice_audio_artifacts
+         WHERE owner_user_id = ? AND project_id = ?
+           AND fingerprint IN (${placeholders})`
+      )
+      .bind(ownerUserId, project.project_id, ...fingerprints)
+      .all<VoiceArtifactRow>();
+    for (const row of rows.results) artifacts.set(row.fingerprint, row);
+  }
   return planned.map((segment) => ({
     ...segment,
     artifact: artifacts.get(segment.fingerprint) ?? null
   }));
+}
+
+function configuredVoiceSegments(
+  projectId: string,
+  plan: VoiceSegmentPlan[],
+  jobStates: Map<string, string>
+): VoiceSegmentStatus[] {
+  return plan.map((segment) => {
+    const jobState = jobStates.get(segment.fingerprint);
+    const status = segment.artifact
+      ? "ready"
+      : jobState === "failed"
+        ? "failed"
+        : jobState === "queued" || jobState === "running"
+          ? "queued"
+          : "needs_generation";
+    return voiceSegmentStatusSchema.parse({
+      slide_id: segment.slideId,
+      slide_title: segment.slideTitle,
+      at: segment.at,
+      text: segment.text,
+      speaker: segment.speaker,
+      profile_label: segment.profileLabel,
+      effective_tuning: segment.input.tuning,
+      status,
+      audio_url: segment.artifact
+        ? `/api/projects/${projectId}/voice/audio/${segment.fingerprint}`
+        : null
+    });
+  });
+}
+
+function unconfiguredVoiceSegments(
+  deck: NonNullable<ProjectRecord["document"]["deck"]> | null,
+  slides: NonNullable<ProjectRecord["document"]["deck"]>["slides"]
+): VoiceSegmentStatus[] {
+  return slides.flatMap((slide) =>
+    (slide.narration?.segments ?? []).map((segment) =>
+      voiceSegmentStatusSchema.parse({
+        slide_id: slide.id,
+        slide_title: slide.title,
+        at: segment.at,
+        text: segment.text,
+        speaker:
+          segment.speaker ??
+          slide.narration?.speaker ??
+          deck?.narration_defaults?.speaker ??
+          null,
+        profile_label: null,
+        effective_tuning: mergeVoicevoxTuning(segment.voice_tuning ?? undefined),
+        status: "needs_generation",
+        audio_url: null
+      })
+    )
+  );
 }
 
 export async function setupVoicevoxProfile(
@@ -368,6 +444,38 @@ async function findLatestJob(
   return row === null ? null : toJob(row);
 }
 
+async function findJobStates(
+  db: D1Database,
+  jobId: string,
+  fingerprints?: string[]
+): Promise<Map<string, string>> {
+  const states = new Map<string, string>();
+  if (fingerprints === undefined) {
+    const rows = await db
+      .prepare(
+        `SELECT fingerprint, status FROM voice_generation_segments
+         WHERE job_id = ?`
+      )
+      .bind(jobId)
+      .all<{ fingerprint: string; status: string }>();
+    for (const row of rows.results) states.set(row.fingerprint, row.status);
+    return states;
+  }
+  for (let index = 0; index < fingerprints.length; index += FINGERPRINT_QUERY_BATCH_SIZE) {
+    const batch = fingerprints.slice(index, index + FINGERPRINT_QUERY_BATCH_SIZE);
+    const placeholders = batch.map(() => "?").join(",");
+    const rows = await db
+      .prepare(
+        `SELECT fingerprint, status FROM voice_generation_segments
+         WHERE job_id = ? AND fingerprint IN (${placeholders})`
+      )
+      .bind(jobId, ...batch)
+      .all<{ fingerprint: string; status: string }>();
+    for (const row of rows.results) states.set(row.fingerprint, row.status);
+  }
+  return states;
+}
+
 export async function getVoiceGenerationJob(
   db: D1Database,
   ownerUserId: string,
@@ -403,61 +511,13 @@ export async function getVoiceProjectStatus(
     ? await buildVoicePlan(db, ownerUserId, project)
     : [];
   const latestJob = await findLatestJob(db, ownerUserId, projectId);
-  const jobStates = new Map<string, string>();
-  if (latestJob !== null) {
-    const rows = await db
-      .prepare(
-        `SELECT fingerprint, status FROM voice_generation_segments
-         WHERE job_id = ?`
-      )
-      .bind(latestJob.job_id)
-      .all<{ fingerprint: string; status: string }>();
-    for (const row of rows.results) jobStates.set(row.fingerprint, row.status);
-  }
-  const configuredSegments = plan.map((segment) => {
-    const jobState = jobStates.get(segment.fingerprint);
-    const status = segment.artifact
-      ? "ready"
-      : jobState === "failed"
-        ? "failed"
-        : jobState === "queued" || jobState === "running"
-          ? "queued"
-          : "needs_generation";
-    return {
-      slide_id: segment.slideId,
-      slide_title: segment.slideTitle,
-      at: segment.at,
-      text: segment.text,
-      speaker: segment.speaker,
-      profile_label: segment.profileLabel,
-      effective_tuning: segment.input.tuning,
-      status,
-      audio_url: segment.artifact
-        ? `/api/projects/${projectId}/voice/audio/${segment.fingerprint}`
-        : null
-    } as const;
-  });
+  const jobStates = latestJob === null
+    ? new Map<string, string>()
+    : await findJobStates(db, latestJob.job_id);
+  const configuredSegments = configuredVoiceSegments(projectId, plan, jobStates);
   const segments = defaultProfile
     ? configuredSegments
-    : (deck?.slides.flatMap((slide) =>
-        (slide.narration?.segments ?? []).map((segment) => ({
-          slide_id: slide.id,
-          slide_title: slide.title,
-          at: segment.at,
-          text: segment.text,
-          speaker:
-            segment.speaker ??
-            slide.narration?.speaker ??
-            deck.narration_defaults?.speaker ??
-            null,
-          profile_label: null,
-          effective_tuning: mergeVoicevoxTuning(
-            segment.voice_tuning ?? undefined
-          ),
-          status: "needs_generation" as const,
-          audio_url: null
-        }))
-      ) ?? []);
+    : unconfiguredVoiceSegments(deck ?? null, deck?.slides ?? []);
   return voiceProjectStatusSchema.parse({
     project_id: projectId,
     version: project.version,
@@ -487,6 +547,68 @@ export async function getVoiceProjectStatus(
         : null,
     latest_job: latestJob
   });
+}
+
+export async function getVoiceSlideStatus(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  slideId: string,
+  segmentAt?: number
+): Promise<VoiceSlideStatus | null> {
+  const project = await getProject(db, ownerUserId, projectId);
+  if (project === null) return null;
+  const deck = project.document.deck;
+  const slide = deck?.slides.find((item) => item.id === slideId);
+  if (slide === undefined) {
+    return {
+      project_id: projectId,
+      version: project.version,
+      configured: false,
+      slide_id: slideId,
+      slide_title: null,
+      slide_found: false,
+      segments: []
+    };
+  }
+  const defaultProfile = deck?.voicevox?.profiles.find(
+    (profile) => profile.id === deck.voicevox?.default_profile_id
+  );
+  const selectedSlide = segmentAt === undefined
+    ? slide
+    : {
+        ...slide,
+        narration: slide.narration === null || slide.narration === undefined
+          ? null
+          : {
+              ...slide.narration,
+              segments: slide.narration.segments.filter((segment) => segment.at === segmentAt)
+            }
+      };
+  const plan = defaultProfile === undefined
+    ? []
+    : await buildVoicePlan(db, ownerUserId, project, [selectedSlide]);
+  const latestJob = plan.length === 0
+    ? null
+    : await findLatestJob(db, ownerUserId, projectId);
+  const jobStates = latestJob === null || plan.length === 0
+    ? new Map<string, string>()
+    : await findJobStates(
+        db,
+        latestJob.job_id,
+        plan.map((segment) => segment.fingerprint)
+      );
+  return {
+    project_id: projectId,
+    version: project.version,
+    configured: defaultProfile !== undefined,
+    slide_id: slide.id,
+    slide_title: slide.title,
+    slide_found: true,
+    segments: defaultProfile === undefined
+      ? unconfiguredVoiceSegments(deck ?? null, [selectedSlide])
+      : configuredVoiceSegments(projectId, plan, jobStates)
+  };
 }
 
 async function sendVoiceMessages(

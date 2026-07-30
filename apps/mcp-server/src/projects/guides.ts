@@ -119,7 +119,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - 読み上げ本文は \`set_slide_narration\`、segmentの話者・VOICEVOX profile・調声値は \`update_slide_narration_voice\` で別々に更新する。
 - VOICEVOXの声は \`research://guide/voicevox-catalog\` から選び、\`set_voicevox_profile\`へ \`catalog_profile_id\` を渡す。話者UUIDやstyle IDは手入力しない。
 - profileの基準調声値だけを変える場合は \`update_voicevox_profile_tuning\` を使う。本文や音声設定が変わると、古い生成音声は無効になる。
-- 生成数とjobの要約はget_voice_generation_statusまたはresearch://projects/{id}/voice、区間ごとの原稿・実効調声・生成状態はそこから案内される一枚単位のvoice resourceで確認する。
+- 生成数とjobの要約はget_voice_generation_statusまたはresearch://projects/{id}/voice、一枚の区間一覧はvoice/slides/{slideId}、原稿全文・実効調声・生成状態はそこから案内される一区間resourceで確認する。
 - 任意の音声URLは入力できない。音声fileの参照は管理された生成処理だけが設定する。
 
 各toolの成功時に返るversionを、次のtoolの\`expected_version\`へ渡す。`;

@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@101");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@102");
     expect(html).toContain("effectiveOpacity *=");
     expect(html).toContain("background.complex || effectiveOpacity < .99");
     expect(html).toContain('--aspect-font-scale: 1;');
@@ -846,6 +846,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("hidden_lines: hidden.length");
     expect(html).toContain("overflows: diagnostics, fits, contrasts, clamps");
     expect(html).toContain("const selectEditorTarget =");
+    expect(html).toContain("const setEditorSelection =");
+    expect(html).toContain("ultimate-freestyle:set-editor-selection");
+    expect(html).toContain("target.dataset.editorSelected !== 'true'");
     expect(html).toContain("表示パーツの選択を解除しました");
     expect(html).toContain("自動配置のパーツです");
     expect(html).toContain("data-editor-announcer");
@@ -856,7 +859,22 @@ describe("presentation artifact renderer", () => {
       twitchLogin: "researcher",
       csrfToken: "csrf-token",
       project,
-      slideId: "rich-result"
+      slideId: "rich-result",
+      selectedComponentId: "comparison"
+    }).text();
+    const imageWorkspaceHtml = await slideWorkspacePage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project,
+      slideId: "rich-result",
+      selectedComponentId: "photo"
+    }).text();
+    const gridWorkspaceHtml = await slideWorkspacePage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project,
+      slideId: "rich-result",
+      selectedComponentId: "content-grid"
     }).text();
     expect(workspaceHtml).toContain('class="component-outline-row"');
     expect(workspaceHtml).toContain('class="filmstrip-meta"');
@@ -870,7 +888,10 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-composition-editor");
     expect(workspaceHtml).toContain('name="composition_background"');
     expect(workspaceHtml).toContain("構成全体を保存");
-    expect(workspaceHtml).toContain('data-component-id="headline"');
+    expect(workspaceHtml).toContain('data-component-id="comparison"');
+    expect(workspaceHtml.match(/data-scene-component-editor/g)).toHaveLength(1);
+    expect(workspaceHtml).toContain('data-selected-component="comparison"');
+    expect(workspaceHtml).toContain('?component=headline');
     expect(workspaceHtml).toContain('data-save-state data-state="saved"');
     expect(workspaceHtml).toContain("この表示パーツを保存");
     expect(workspaceHtml).toContain('data-scene-component-action="duplicate"');
@@ -895,12 +916,11 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('data-component-path="style.foreground"');
     expect(workspaceHtml).toContain('data-component-color-preview="style.background"');
     expect(workspaceHtml).toContain('data-component-path="animation"');
-    expect(workspaceHtml).toContain("パーツ固有の配置");
-    expect(workspaceHtml).toContain('data-component-path="fit"');
-    expect(workspaceHtml).toContain('data-component-path="columns"');
+    expect(imageWorkspaceHtml).toContain("パーツ固有の配置");
+    expect(imageWorkspaceHtml).toContain('data-component-path="fit"');
+    expect(gridWorkspaceHtml).toContain('data-component-path="columns"');
     expect(workspaceHtml).toContain('data-workspace-asset-urls=');
     expect(workspaceHtml).not.toContain(' data-asset-urls=');
-    expect(workspaceHtml).toContain("/components/headline");
     expect(workspaceHtml).toContain("/components/comparison");
     expect(workspaceHtml).toContain("グラフの最大値");
     expect(workspaceHtml).toContain('data-component-item="before"');
@@ -935,6 +955,105 @@ describe("presentation artifact renderer", () => {
       workspaceHtml.indexOf(">headline<")
     );
     expect(workspaceHtml).not.toContain("parent: root");
+
+    const largeSceneProject = projectRecordSchema.parse({
+      ...structuredClone(project),
+      document: {
+        ...structuredClone(project.document),
+        deck: {
+          ...structuredClone(project.document.deck),
+          slides: [
+            {
+              ...structuredClone(project.document.deck?.slides[0]),
+              composition: {
+                mode: "scene",
+                runtime_version: "uf-runtime@1",
+                background: "#11100e",
+                clip_content: true,
+                nodes: [
+                  {
+                    id: "root",
+                    kind: "stack",
+                    parent_id: null,
+                    order: 0,
+                    at: 0,
+                    animation: "none",
+                    frame: null,
+                    direction: "column",
+                    gap_px: 8,
+                    align: "stretch",
+                    justify: "start",
+                    wrap: false
+                  },
+                  ...Array.from({ length: 199 }, (_, index) => ({
+                    id: `text-${index}`,
+                    kind: "markdown" as const,
+                    parent_id: "root",
+                    order: index,
+                    at: 0,
+                    animation: "none" as const,
+                    frame: null,
+                    markdown: `項目 ${index}`
+                  }))
+                ]
+              }
+            }
+          ]
+        }
+      }
+    });
+    const largeSceneHtml = await slideWorkspacePage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project: largeSceneProject,
+      slideId: "rich-result",
+      selectedComponentId: "text-198"
+    }).text();
+    expect(largeSceneHtml.match(/data-component-select=/g)).toHaveLength(200);
+    expect(largeSceneHtml.match(/data-scene-component-editor/g)).toHaveLength(1);
+    expect(largeSceneHtml).toContain('data-component-id="text-198"');
+    expect(new TextEncoder().encode(largeSceneHtml).byteLength).toBeLessThan(500_000);
+
+    const largeCanvasProject = projectRecordSchema.parse({
+      ...structuredClone(project),
+      document: {
+        ...structuredClone(project.document),
+        deck: {
+          ...structuredClone(project.document.deck),
+          slides: [
+            {
+              ...structuredClone(project.document.deck?.slides[0]),
+              composition: {
+                mode: "canvas",
+                background: "#11100e",
+                clip_content: true,
+                blocks: Array.from({ length: 100 }, (_, index) => ({
+                  id: `shape-${index}`,
+                  kind: "shape" as const,
+                  frame: { x: 5, y: 5, width: 20, height: 20 },
+                  z_index: index,
+                  at: 0,
+                  animation: "none" as const,
+                  shape: "rectangle" as const,
+                  label: `図形 ${index}`
+                }))
+              }
+            }
+          ]
+        }
+      }
+    });
+    const largeCanvasHtml = await slideWorkspacePage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project: largeCanvasProject,
+      slideId: "rich-result",
+      selectedComponentId: "shape-99"
+    }).text();
+    expect(largeCanvasHtml.match(/data-component-select=/g)).toHaveLength(100);
+    expect(largeCanvasHtml.match(/data-canvas-block-editor/g)).toHaveLength(1);
+    expect(largeCanvasHtml).toContain('data-block-id="shape-99"');
+    expect(new TextEncoder().encode(largeCanvasHtml).byteLength).toBeLessThan(400_000);
 
     const projectWithNextSlide = projectRecordSchema.parse({
       ...project,

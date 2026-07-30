@@ -1132,6 +1132,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (form.dataset.dirty !== "true") return;
       try { sessionStorage.setItem(draftKey, JSON.stringify({ version: Number(form.dataset.version), fields: draftFields() })); } catch {}
     };
+    addEventListener("ultimate-freestyle:persist-drafts", persistDraft);
     const removeDraft = () => {
       clearTimeout(draftTimer);
       try { sessionStorage.removeItem(draftKey); } catch {}
@@ -1201,7 +1202,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           location.href = result.next_url;
           return;
         }
-        if (form.matches("[data-template-create], [data-narration-segment-create], [data-canvas-block-create], [data-scene-component-create]")) {
+        if (form.matches("[data-canvas-block-create], [data-scene-component-create]")) {
+          const createdId = String(result.component_id || result.block_id || "");
+          if (createdId) navigateToComponent(createdId);
+          else location.reload();
+          return;
+        }
+        if (form.matches("[data-template-create], [data-narration-segment-create]")) {
           location.reload();
           return;
         }
@@ -1342,7 +1349,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         form.dataset.dirty = "false";
         feedback.textContent = "読み上げ区間を削除しました。画面を更新します…";
         feedback.classList.add("success");
-        location.reload();
+        if (action === "duplicate" && result.result_block_id) navigateToComponent(String(result.result_block_id));
+        else {
+          const url = new URL(location.href);
+          url.searchParams.delete("component");
+          document.body.dataset.internalNavigation = "true";
+          location.assign(url);
+        }
       } catch (error) {
         feedback.textContent = caughtErrorMessage(error, "読み上げ区間を削除できませんでした。");
         feedback.classList.add("warning");
@@ -1373,7 +1386,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         form.dataset.dirty = "false";
         feedback.textContent = action === "duplicate" ? "複製しました。画面を更新します…" : "削除しました。画面を更新します…";
         feedback.classList.add("success");
-        location.reload();
+        if (action === "duplicate" && result.result_block_id) navigateToComponent(String(result.result_block_id));
+        else {
+          const url = new URL(location.href);
+          url.searchParams.delete("component");
+          document.body.dataset.internalNavigation = "true";
+          location.assign(url);
+        }
       } catch (error) {
         feedback.textContent = caughtErrorMessage(error, "表示パーツを操作できませんでした。");
         feedback.classList.add("warning");
@@ -1404,7 +1423,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         form.dataset.dirty = "false";
         feedback.textContent = action === "duplicate" ? "複製しました。画面を更新します…" : "削除しました。画面を更新します…";
         feedback.classList.add("success");
-        location.reload();
+        if (action === "duplicate" && result.result_component_id) navigateToComponent(String(result.result_component_id));
+        else {
+          const url = new URL(location.href);
+          url.searchParams.delete("component");
+          document.body.dataset.internalNavigation = "true";
+          location.assign(url);
+        }
       } catch (error) {
         feedback.textContent = caughtErrorMessage(error, "表示パーツを操作できませんでした。");
         feedback.classList.add("warning");
@@ -2244,6 +2269,32 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
   }
 
+  const componentSelectionUrl = (componentId, href = location.href) => {
+    const url = new URL(href, location.origin);
+    url.searchParams.set("component", componentId);
+    const step = stepOutput instanceof HTMLOutputElement
+      ? Number(stepOutput.value.match(/STEP (\d+)/)?.[1] || 0)
+      : 0;
+    url.searchParams.set("step", String(step));
+    return url;
+  };
+  const navigateToComponent = (componentId, href) => {
+    const workspace = document.querySelector(".slide-workspace");
+    if (workspace instanceof HTMLElement && workspace.dataset.selectedComponent === componentId) return false;
+    dispatchEvent(new Event("ultimate-freestyle:persist-drafts"));
+    document.body.dataset.internalNavigation = "true";
+    location.assign(componentSelectionUrl(componentId, href));
+    return true;
+  };
+  for (const link of document.querySelectorAll("[data-component-select]")) {
+    if (!(link instanceof HTMLAnchorElement)) continue;
+    link.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      navigateToComponent(link.dataset.componentSelect || "", link.href);
+    });
+  }
+
   if (slideFrame instanceof HTMLIFrameElement) {
     const syncFramePosition = () => {
       const step = stepOutput instanceof HTMLOutputElement
@@ -2268,6 +2319,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       for (const form of document.querySelectorAll('[data-scene-component-editor][data-dirty="true"]')) syncSceneComponentDraft(form);
       for (const form of document.querySelectorAll('[data-canvas-block-editor][data-dirty="true"]')) syncCanvasBlockDraft(form);
       syncGridSnap();
+      const workspace = document.querySelector(".slide-workspace");
+      if (workspace instanceof HTMLElement && workspace.dataset.selectedComponent) {
+        slideFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-editor-selection", component_id: workspace.dataset.selectedComponent }, location.origin);
+      }
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");
@@ -2275,14 +2330,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const diagnosticTarget = (id, preferredPath = "") => {
       let sectionName = "structure";
       let target = null;
+      let componentId = "";
       if (id.startsWith("node:")) {
-        const componentId = id.slice(5);
+        componentId = id.slice(5);
         target = [...document.querySelectorAll("[data-scene-component-editor]")].find((form) => form instanceof HTMLFormElement && form.dataset.componentId === componentId) || null;
       } else if (id.startsWith("block:")) {
-        const blockId = id.slice(6);
+        componentId = id.slice(6);
         target = [...document.querySelectorAll("[data-canvas-block-editor]")].find((form) => {
           if (!(form instanceof HTMLFormElement)) return false;
-          try { return JSON.parse(form.dataset.component || "{}").id === blockId; } catch { return false; }
+          try { return JSON.parse(form.dataset.component || "{}").id === componentId; } catch { return false; }
         }) || null;
       } else if (id === "flow:main" || id === "flow:sidebar") {
         sectionName = preferredPath ? "design" : "content";
@@ -2292,14 +2348,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         target = document.querySelector("[data-narration-settings-editor]");
       }
       const section = document.querySelector('[data-inspector-section="' + sectionName + '"]');
-      return { section, target: target || section };
+      return { section, target: target || section, componentId, mounted: target instanceof HTMLFormElement };
     };
     const appendDiagnostic = (item, message, preferredPath = "") => {
       if (!(qualityList instanceof HTMLElement)) return;
       const row = document.createElement("li");
       row.dataset.layoutWarning = "true";
       row.append(document.createTextNode(message));
-      const { section, target } = diagnosticTarget(item.id, preferredPath);
+      const { section, target, componentId, mounted } = diagnosticTarget(item.id, preferredPath);
       if (section instanceof HTMLDetailsElement && target instanceof HTMLElement) {
         const fallbackFieldName = item.id === "narration" ? "appearance_foreground" : item.id === "flow:sidebar" ? "muted" : "foreground";
         const preferredField = preferredPath
@@ -2311,6 +2367,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         button.dataset.diagnosticFix = "true";
         button.textContent = "修正欄へ";
         button.addEventListener("click", () => {
+          if (componentId && !mounted) {
+            navigateToComponent(componentId);
+            return;
+          }
           setMobilePane("edit");
           section.open = true;
           const componentDetail = target.closest("details.component-detail");
@@ -2381,7 +2441,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           ? [...document.querySelectorAll("[data-scene-component-editor]")]
           : [...document.querySelectorAll("[data-canvas-block-editor]")];
         const target = forms.find((form) => form instanceof HTMLFormElement && (data.component_type === "scene" ? form.dataset.componentId : form.dataset.blockId) === data.component_id);
-        if (!(target instanceof HTMLFormElement)) return;
+        if (!(target instanceof HTMLFormElement)) {
+          navigateToComponent(data.component_id);
+          return;
+        }
         setMobilePane("edit");
         if (document.body.dataset.previewFocus === "true" && previewFocusButton instanceof HTMLButtonElement) previewFocusButton.click();
         const section = target.closest("[data-inspector-section]");
@@ -2495,6 +2558,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   addEventListener("beforeunload", (event) => {
+    if (document.body.dataset.internalNavigation === "true") return;
     if (!document.querySelector('[data-dirty="true"]')) return;
     event.preventDefault();
     event.returnValue = "";

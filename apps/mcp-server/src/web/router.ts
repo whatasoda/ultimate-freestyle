@@ -627,6 +627,7 @@ async function handleSlideWorkspace(
     csrfToken: session.csrfToken,
     project,
     slideId,
+    selectedComponentId: new URL(request.url).searchParams.get("component"),
     assets: await listProjectAssets(env.DB, session.userId, projectId)
   });
 }

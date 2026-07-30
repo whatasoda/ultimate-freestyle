@@ -13,10 +13,15 @@ import {
 import {
   createVoiceGenerationJob,
   getVoiceProjectStatus,
+  getVoiceSlideStatus,
   voiceJobStatusSchema,
   voiceProjectStatusSchema,
-  VoiceGenerationError
+  voiceSegmentStatusSchema,
+  VoiceGenerationError,
+  type VoiceSegmentStatus
 } from "./service";
+
+const VOICE_TEXT_PREVIEW_CHARACTERS = 120;
 
 const voiceErrorSchema = z.object({
   code: z.enum([
@@ -59,6 +64,36 @@ const compactVoiceStatusSchema = z.object({
   details_uri: z.string(),
   slide_details_uri_template: z.string()
 });
+const voiceSegmentSummarySchema = z.object({
+  at: z.number().int().nonnegative().max(100),
+  status: z.enum(["ready", "needs_generation", "queued", "failed"]),
+  character_count: z.number().int().nonnegative(),
+  text_preview: z.string().max(VOICE_TEXT_PREVIEW_CHARACTERS),
+  text_truncated: z.boolean(),
+  speaker: z.string().nullable(),
+  profile_label: z.string().nullable(),
+  has_audio: z.boolean(),
+  details_uri: z.string()
+});
+const voiceSlideIndexSchema = z.object({
+  ok: z.literal(true),
+  project_id: z.string().uuid(),
+  version: z.number().int().positive(),
+  slide_id: z.string(),
+  slide_title: z.string(),
+  configured: z.boolean(),
+  segment_details_uri_template: z.string(),
+  segments: z.array(voiceSegmentSummarySchema).max(101)
+});
+const voiceSegmentDetailSchema = z.object({
+  ok: z.literal(true),
+  project_id: z.string().uuid(),
+  version: z.number().int().positive(),
+  slide_id: z.string(),
+  slide_title: z.string(),
+  configured: z.boolean(),
+  segment: voiceSegmentStatusSchema
+});
 
 function compactVoiceJob(job: z.infer<typeof voiceJobStatusSchema> | null) {
   if (job === null) return null;
@@ -86,6 +121,25 @@ function compactVoiceStatus(
     details_uri: `research://projects/${voice.project_id}/voice`,
     slide_details_uri_template: `research://projects/${voice.project_id}/voice/slides/{slideId}`
   };
+}
+
+function compactVoiceSegment(
+  projectId: string,
+  slideId: string,
+  segment: VoiceSegmentStatus
+): z.infer<typeof voiceSegmentSummarySchema> {
+  const characters = [...segment.text];
+  return voiceSegmentSummarySchema.parse({
+    at: segment.at,
+    status: segment.status,
+    character_count: characters.length,
+    text_preview: characters.slice(0, VOICE_TEXT_PREVIEW_CHARACTERS).join(""),
+    text_truncated: characters.length > VOICE_TEXT_PREVIEW_CHARACTERS,
+    speaker: segment.speaker,
+    profile_label: segment.profile_label,
+    has_audio: segment.audio_url !== null,
+    details_uri: `research://projects/${projectId}/voice/slides/${slideId}/segments/${segment.at}`
+  });
 }
 
 function normalizeVoiceError(error: unknown): z.infer<typeof voiceErrorSchema> {
@@ -128,7 +182,7 @@ export function registerVoiceTools(
     {
       title: "研究のVOICEVOX詳細",
       description:
-        "既定profile、生成数、jobとスライド別区間数を返します。原稿・実効調声は一枚resourceから取得します。",
+        "既定profile、生成数、jobとスライド別区間数を返します。一枚resourceで区間を選び、原稿全文・実効調声は一区間resourceから取得します。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -176,7 +230,7 @@ export function registerVoiceTools(
     {
       title: "研究の一枚分のVOICEVOX詳細",
       description:
-        "指定スライドの読み上げ原稿、話者、profile、実効調声、生成状態だけを返します。",
+        "指定スライドだけを計画し、区間ごとの短い原稿preview、話者、profile、生成状態、一区間resource URIを返します。原稿全文と実効調声は一区間resourceから取得します。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -186,24 +240,99 @@ export function registerVoiceTools(
       try {
         const ownerUserId = requireSubject(getAuthProps, "research:read");
         const voice = typeof id === "string"
-          ? await getVoiceProjectStatus(env.DB, ownerUserId, id)
+          && typeof slideId === "string"
+          ? await getVoiceSlideStatus(env.DB, ownerUserId, id, slideId)
           : null;
-        if (voice === null) {
-          body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
-        } else if (typeof slideId !== "string") {
+        if (typeof id !== "string" || typeof slideId !== "string") {
           body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+        } else if (voice === null) {
+          body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+        } else if (!voice.slide_found) {
+          body = { ok: false, error: { code: "SLIDE_NOT_FOUND" } };
         } else {
-          const segments = voice.segments.filter((segment) => segment.slide_id === slideId);
-          body = segments.length === 0
+          body = voice.segments.length === 0
             ? { ok: false, error: { code: "SLIDE_VOICE_NOT_FOUND" } }
-            : {
+            : voiceSlideIndexSchema.parse({
                 ok: true,
                 project_id: voice.project_id,
                 version: voice.version,
                 slide_id: slideId,
-                slide_title: segments[0]?.slide_title,
-                segments
-              };
+                slide_title: voice.slide_title,
+                configured: voice.configured,
+                segment_details_uri_template:
+                  `research://projects/${voice.project_id}/voice/slides/${slideId}/segments/{at}`,
+                segments: voice.segments.map((segment) =>
+                  compactVoiceSegment(voice.project_id, slideId, segment)
+                )
+              });
+        }
+      } catch (error) {
+        body = { ok: false, error: normalizeVoiceError(error) };
+      }
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(body)
+        }]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-slide-voice-segment",
+    new ResourceTemplate(
+      "research://projects/{id}/voice/slides/{slideId}/segments/{at}",
+      { list: undefined }
+    ),
+    {
+      title: "研究の一読み上げ区間のVOICEVOX詳細",
+      description:
+        "指定スライドの一つのSTEPだけを計画し、原稿全文、話者、profile、実効調声、生成状態を返します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const atValue = variables.at;
+      const at = typeof atValue === "string" && /^(0|[1-9]\d{0,2})$/.test(atValue)
+        ? Number(atValue)
+        : null;
+      let body: Record<string, unknown>;
+      try {
+        const ownerUserId = requireSubject(getAuthProps, "research:read");
+        if (
+          typeof id !== "string" ||
+          typeof slideId !== "string" ||
+          at === null ||
+          at > 100
+        ) {
+          body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+        } else {
+          const voice = await getVoiceSlideStatus(
+            env.DB,
+            ownerUserId,
+            id,
+            slideId,
+            at
+          );
+          if (voice === null) {
+            body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+          } else if (!voice.slide_found) {
+            body = { ok: false, error: { code: "SLIDE_NOT_FOUND" } };
+          } else if (voice.segments.length === 0) {
+            body = { ok: false, error: { code: "VOICE_SEGMENT_NOT_FOUND" } };
+          } else {
+            body = voiceSegmentDetailSchema.parse({
+              ok: true,
+              project_id: voice.project_id,
+              version: voice.version,
+              slide_id: slideId,
+              slide_title: voice.slide_title,
+              configured: voice.configured,
+              segment: voice.segments[0]
+            });
+          }
         }
       } catch (error) {
         body = { ok: false, error: normalizeVoiceError(error) };
@@ -223,7 +352,7 @@ export function registerVoiceTools(
     {
       title: "VOICEVOX音声の生成状態を取得",
       description:
-        "研究全体の音声設定と生成数の要約、進行中または直近のjob、詳細resource URIを返します。区間ごとの原稿と調声値はdetails_uriを読んでください。",
+        "研究全体の音声設定と生成数の要約、進行中または直近のjob、詳細resource URIを返します。details_uriから一枚と一区間を順に選ぶと、原稿全文と調声値を小さく取得できます。",
       inputSchema: { project_id: z.string().uuid() },
       outputSchema: {
         ok: z.boolean(),
@@ -278,7 +407,7 @@ export function registerVoiceTools(
     {
       title: "VOICEVOX音声の差分生成を開始",
       description:
-        "原稿、話者、style、調声値が変わった区間だけを非同期生成します。同じidempotency_keyの再送は同じjobを返します。開始後はget_voice_generation_statusのdetails_uriで確認してください。",
+        "原稿、話者、style、調声値が変わった区間だけを非同期生成します。同じidempotency_keyの再送は同じjobを返します。開始後はget_voice_generation_statusから一枚・一区間resourceを順に確認してください。",
       inputSchema: {
         project_id: z.string().uuid(),
         expected_version: z.number().int().positive(),

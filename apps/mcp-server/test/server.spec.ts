@@ -7,7 +7,8 @@ import { createServer } from "../src/server";
 import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { saveRenderedQualityReport } from "../src/projects/quality-reports";
-import { projectSummarySchema } from "../src/projects/schema";
+import { createEmptyProject, projectSummarySchema } from "../src/projects/schema";
+import { setupZundamonProfile } from "../src/voicevox/service";
 
 async function readJsonResource(client: Client, uri: string): Promise<unknown> {
   const resource = await client.readResource({ uri });
@@ -179,7 +180,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.14.0",
-        renderer_version: "uf-renderer@101",
+        renderer_version: "uf-renderer@102",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -590,6 +591,10 @@ describe("MCP contract", () => {
           }),
           expect.objectContaining({
             uriTemplate: "research://projects/{id}/voice/slides/{slideId}"
+          }),
+          expect.objectContaining({
+            uriTemplate:
+              "research://projects/{id}/voice/slides/{slideId}/segments/{at}"
           })
         ])
       );
@@ -1625,7 +1630,39 @@ describe("MCP contract", () => {
         project_id: projectId,
         version: 15,
         slide_id: "intro",
+        configured: true,
+        segment_details_uri_template:
+          `research://projects/${projectId}/voice/slides/intro/segments/{at}`,
         segments: [{
+          at: 0,
+          status: "needs_generation",
+          character_count: 14,
+          text_preview: "研究のきっかけから始めます。",
+          text_truncated: false,
+          profile_label: "案内役",
+          has_audio: false,
+          details_uri: `research://projects/${projectId}/voice/slides/intro/segments/0`
+        }]
+      });
+      expect(
+        (slideVoiceDetails as { segments: object[] }).segments[0]
+      ).not.toHaveProperty("text");
+      expect(
+        (slideVoiceDetails as { segments: object[] }).segments[0]
+      ).not.toHaveProperty("effective_tuning");
+      const segmentVoiceDetails = await readJsonResource(
+        client,
+        `research://projects/${projectId}/voice/slides/intro/segments/0`
+      );
+      expect(segmentVoiceDetails).toMatchObject({
+        ok: true,
+        project_id: projectId,
+        version: 15,
+        slide_id: "intro",
+        configured: true,
+        segment: {
+          at: 0,
+          text: "研究のきっかけから始めます。",
           profile_label: "案内役",
           effective_tuning: {
             speedScale: 1.1,
@@ -1635,8 +1672,26 @@ describe("MCP contract", () => {
             pauseLengthScale: 1,
             prePhonemeLength: 0.1,
             postPhonemeLength: 0.1
-          }
-        }]
+          },
+          status: "needs_generation",
+          audio_url: null
+        }
+      });
+      const missingSegmentVoice = await readJsonResource(
+        client,
+        `research://projects/${projectId}/voice/slides/intro/segments/1`
+      );
+      expect(missingSegmentVoice).toMatchObject({
+        ok: false,
+        error: { code: "VOICE_SEGMENT_NOT_FOUND" }
+      });
+      const invalidSegmentVoice = await readJsonResource(
+        client,
+        `research://projects/${projectId}/voice/slides/intro/segments/101`
+      );
+      expect(invalidSegmentVoice).toMatchObject({
+        ok: false,
+        error: { code: "INVALID_RESOURCE_URI" }
       });
       const voiceBlockedPublication = await readJsonResource(
         client,
@@ -1747,6 +1802,132 @@ describe("MCP contract", () => {
           audio_src: null
         }
       });
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("keeps slide voice resources bounded and reads one segment independently", async () => {
+    const subjectId = "56000000-0000-4000-8000-000000000005";
+    const projectId = "66000000-0000-4000-8000-000000000006";
+    const now = "2026-07-30T00:00:00.000Z";
+    const document = createEmptyProject("大きな読み上げ契約テスト");
+    const makeSlide = (id: string, title: string, textBody: string) => ({
+      id,
+      title,
+      duration_seconds: 60,
+      reveal_steps: 100,
+      tone: "dark" as const,
+      content_markdown: `# ${title}`,
+      reveal_blocks: [],
+      sidebar_markdown: null,
+      narration: {
+        display: "commentary" as const,
+        speaker: "話".repeat(80),
+        segments: Array.from({ length: 101 }, (_, at) => ({
+          at,
+          text: `${title}の区間${at}。${textBody}`,
+          audio_src: null
+        }))
+      }
+    });
+    document.deck = {
+      short_title: "大きな読み上げ",
+      description: "",
+      author: "tester",
+      year: 2026,
+      accent: "#8bd450",
+      layout: "minimal",
+      narration_defaults: null,
+      voicevox: null,
+      slides: [
+        makeSlide("selected", "対象", `${"長".repeat(120)}${"x".repeat(1_380)}`),
+        makeSlide("unselected", "対象外", "x".repeat(1_500))
+      ]
+    };
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO users (id, twitch_user_id, twitch_login, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(subjectId, "bounded-voice-user", "bounded-voice", now, now),
+      env.DB.prepare(
+        `INSERT INTO research_projects (
+           id, owner_user_id, title, stage, document_json, version,
+           idempotency_key, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      ).bind(
+        projectId,
+        subjectId,
+        document.title,
+        document.stage,
+        JSON.stringify(document),
+        "bounded-voice-contract",
+        now,
+        now
+      )
+    ]);
+    await setupZundamonProfile(env.DB, {
+      ownerUserId: subjectId,
+      projectId,
+      expectedVersion: 1
+    });
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer(eligibilityConfig, () => ({
+      subject_id: subjectId,
+      mcp_scopes: ["research:read"],
+      identity: { user_id: subjectId, login: "bounded-voice" },
+      eligibility: {
+        eligible: true,
+        reason: "subscriber",
+        checked_at: now,
+        expires_at: "2026-07-30T01:00:00.000Z",
+        followed_at: null,
+        follow_days: null,
+        subscribed: true,
+        override: null
+      },
+      twitch_tokens: {
+        access_token: "not-returned",
+        refresh_token: "not-returned",
+        expires_at: "2026-07-30T01:00:00.000Z",
+        scopes: []
+      }
+    }));
+    const client = new Client({ name: "voice-resource-budget-test", version: "0.1.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const slideVoice = await readJsonResource(
+        client,
+        `research://projects/${projectId}/voice/slides/selected`
+      ) as { version: number; segments: Array<Record<string, unknown>> };
+      expect(slideVoice).toMatchObject({ ok: true });
+      expect(slideVoice.version).toBe(2);
+      expect(slideVoice.segments).toHaveLength(101);
+      expect(slideVoice.segments[0]).not.toHaveProperty("text");
+      expect(slideVoice.segments[0]).not.toHaveProperty("effective_tuning");
+      expect(slideVoice.segments[0]).toMatchObject({
+        text_preview: `対象の区間0。${"長".repeat(113)}`,
+        text_truncated: true,
+        character_count: 1_507
+      });
+      expect(
+        new TextEncoder().encode(JSON.stringify(slideVoice)).byteLength
+      ).toBeLessThan(128 * 1024);
+
+      const segmentVoice = await readJsonResource(
+        client,
+        `research://projects/${projectId}/voice/slides/selected/segments/50`
+      ) as { version: number; segment: { at: number; text: string } };
+      expect(segmentVoice.version).toBe(2);
+      expect(segmentVoice.segment.at).toBe(50);
+      expect(segmentVoice.segment.text).toBe(
+        `対象の区間50。${"長".repeat(120)}${"x".repeat(1_380)}`
+      );
+      expect(
+        new TextEncoder().encode(JSON.stringify(segmentVoice)).byteLength
+      ).toBeLessThan(8 * 1024);
     } finally {
       await client.close();
       await server.close();

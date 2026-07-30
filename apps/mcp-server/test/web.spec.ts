@@ -439,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=120"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=121"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
@@ -610,7 +610,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@101"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@102"');
 
     const voicePage = await requestProvider(
       provider,
@@ -787,7 +787,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain("VOICEVOX音声が未生成");
     expect(workspaceHtml).toContain("ずんだもん・ノーマル");
-    expect(workspaceHtml).toContain("全設定を確認");
+    expect(workspaceHtml).toContain("data-component-select");
     expect(workspaceHtml).toContain("data-layout-status");
     expect(workspaceHtml).toContain('data-base-count="');
 
@@ -971,6 +971,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("fontProbeContext.measureText");
     expect(dashboardScriptText).toContain("localFontAvailable");
     expect(dashboardScriptText).toContain("button.dataset.fontAvailable = String(available)");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:persist-drafts");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:set-editor-selection");
+    expect(dashboardScriptText).toContain("navigateToComponent(data.component_id)");
     expect(dashboardScriptText).toContain("component.frame = null");
     expect(dashboardScriptText).toContain("左位置と幅の合計を100%以内にしてください");
     expect(dashboardScriptText).toContain("スライド枠を越えています");

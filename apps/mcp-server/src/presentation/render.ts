@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@101";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@102";
 
 function escapeHtml(value: string): string {
   return value
@@ -1135,12 +1135,20 @@ export function renderPresentationHtml(
     const announceEditor = (message) => {
       if (editorAnnouncer instanceof HTMLElement) editorAnnouncer.textContent = message;
     };
+    const setEditorSelection = (componentId) => {
+      document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
+      const target = [...document.querySelectorAll('[data-block-id], [data-node-id]')].find((item) =>
+        item instanceof HTMLElement && (item.getAttribute('data-node-id') || item.getAttribute('data-block-id')) === componentId
+      );
+      if (!(target instanceof HTMLElement)) return null;
+      target.dataset.editorSelected = 'true';
+      return target;
+    };
     const selectEditorTarget = (target) => {
       if (!editorFrame || !(target instanceof HTMLElement)) return;
-      document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
-      target.dataset.editorSelected = 'true';
-      target.focus({ preventScroll: true });
       const id = target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '';
+      setEditorSelection(id);
+      target.focus({ preventScroll: true });
       announceEditor('表示パーツ「' + id + '」を選択しました。');
       parent.postMessage({
         type: 'ultimate-freestyle:select-component',
@@ -2533,6 +2541,11 @@ export function renderPresentationHtml(
       if (!editorFrame || event.button !== 0 || !(event.target instanceof Element)) return;
       const target = event.target.closest('[data-block-id], [data-node-id][data-positioned="true"]');
       if (!(target instanceof HTMLElement)) return;
+      if (target.dataset.editorSelected !== 'true') {
+        selectEditorTarget(target);
+        event.preventDefault();
+        return;
+      }
       const boundary = target.offsetParent;
       if (!(boundary instanceof HTMLElement)) return;
       const targetRect = target.getBoundingClientRect();
@@ -2683,6 +2696,7 @@ export function renderPresentationHtml(
     addEventListener('message', (event) => {
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
+      else if (event.data?.type === 'ultimate-freestyle:set-editor-selection' && typeof event.data.component_id === 'string') setEditorSelection(event.data.component_id);
       else if (event.data?.type === 'ultimate-freestyle:set-editor-options') {
         editorGridSnap = event.data.grid_snap === true;
         document.body.dataset.editorGrid = String(editorGridSnap);
