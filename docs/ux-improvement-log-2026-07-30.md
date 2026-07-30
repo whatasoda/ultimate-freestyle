@@ -626,3 +626,9 @@
 - 導線へSTEP queryと区間anchorを付け、一枚編集画面で該当STEPの実表示へ同期し、読み上げsectionを開き、モバイルでは編集tabへ切り替え、対象原稿へfocusするようにした。
 - 対象区間をaccent枠で一時的に強調し、一覧で試聴して気づいた箇所から調声・原稿修正まで迷わず往復できるようにした。
 - dashboard assetをv110へ更新した。
+
+## 改善ループ241
+
+- MCPのtemplate更新toolは約24個のoptional fieldを毎回`tools/list`へ展開し、AIが数項目だけ変える場合にも契約全体が大きかった。
+- `updates`配列へfield/valueを最大8件だけ渡す契約へ置換し、tool数を増やさず入力schemaを縮小した。fieldごとの正本schemaはサーバー側registryで再利用し、無効な型・色・enumは`INVALID_FIELDS`で拒否する。
+- 同じfieldの重複指定も拒否し、配列後方の値で暗黙上書きされる曖昧さをなくした。競合、複数field更新、拡張色・配置のcontract testを新契約へ移行した。

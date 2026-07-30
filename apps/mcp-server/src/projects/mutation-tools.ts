@@ -92,6 +92,32 @@ const templateMutableInput = {
   line_height: presentationTemplateSchema.shape.line_height,
   letter_spacing_em: presentationTemplateSchema.shape.letter_spacing_em
 };
+const templateMutableFieldSchema = z.enum([
+  "name",
+  "region_layout",
+  "sidebar_width_percent",
+  "background",
+  "surface",
+  "foreground",
+  "muted",
+  "accent",
+  "accent_secondary",
+  "border",
+  "corner_radius_px",
+  "spacing_scale",
+  "font_scale",
+  "enter_animation",
+  "reveal_animation",
+  "visual_preset",
+  "body_font",
+  "heading_font",
+  "density",
+  "motion_style",
+  "body_weight",
+  "heading_weight",
+  "line_height",
+  "letter_spacing_em"
+]);
 
 export type VisualPreset = z.infer<typeof visualPresetSchema>;
 
@@ -950,7 +976,15 @@ export function registerProjectMutationTools(
       inputSchema: {
         ...projectIdInput,
         template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        ...templateMutableInput
+        updates: z
+          .array(
+            z.object({
+              field: templateMutableFieldSchema,
+              value: z.union([z.string().max(120), z.number()])
+            })
+          )
+          .min(1)
+          .max(8)
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -960,18 +994,30 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, template_id, ...fields }) =>
+    async ({ project_id, expected_version, template_id, updates }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
         changedKind: "template_fields_updated",
         changedId: template_id,
         mutate: (document) => {
-          if (Object.values(fields).every((value) => value === undefined)) {
-            throw new ProjectToolError(
-              "INVALID_CHANGE",
-              "At least one template field must be supplied."
-            );
+          const fields: Record<string, unknown> = {};
+          for (const update of updates) {
+            if (update.field in fields) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                `The ${update.field} field appears more than once.`
+              );
+            }
+            const schema = templateMutableInput[update.field];
+            const parsed = schema.safeParse(update.value);
+            if (!parsed.success) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                parsed.error.issues[0]?.message ?? `The ${update.field} field is invalid.`
+              );
+            }
+            fields[update.field] = parsed.data;
           }
           Object.assign(findTemplate(document, template_id), fields);
         }

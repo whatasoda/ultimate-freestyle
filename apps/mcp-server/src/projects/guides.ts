@@ -72,7 +72,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - visual presetは \`studio\`、\`paper\`、\`editorial\`、\`neon\`、\`retro-game\`、\`soft-pop\`、\`scientific\`、\`museum\`、\`terminal\`。
 - font presetは \`system-sans\`、\`gothic\`、\`rounded\`、\`mincho\`、\`serif\`、\`monospace\`、\`display\`、\`textbook\`、\`handwritten\`、\`condensed\`。任意font名やURLは入力しない。
 - 密度は \`spacious\`、\`comfortable\`、\`compact\`、動きの傾向は \`calm\`、\`snappy\`、\`dramatic\`。
-- 色、配置、font、密度、animationの調整は \`update_presentation_template_fields\` で変更項目だけを送る。
+- 色、配置、font、密度、animationの調整はupdate_presentation_template_fieldsのupdatesへfield/valueを最大8件入れ、変更項目だけを送る。
 - 領域配置は単一、左右補足、下段補足に加え、左右均等の \`split\`、上段補足の \`top-band\`、中央集中の \`focus\`を選べる。
 - 基本5色に加えて \`accent_secondary\` と \`border\` を指定できる。値は6桁hexだけを使い、任意CSSやgradientは入力しない。
 

@@ -94,6 +94,13 @@ describe("MCP contract", () => {
       ).toBeLessThan(100_000);
       const blockTool = tools.find((tool) => tool.name === "edit_slide_block");
       expect(JSON.stringify(blockTool?.inputSchema)).not.toContain('"block"');
+      const templateUpdateTool = tools.find(
+        (tool) => tool.name === "update_presentation_template_fields"
+      );
+      expect(JSON.stringify(templateUpdateTool?.inputSchema)).toContain('"updates"');
+      expect(JSON.stringify(templateUpdateTool?.inputSchema)).not.toContain(
+        '"heading_font":{"'
+      );
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
@@ -1065,7 +1072,7 @@ describe("MCP contract", () => {
           project_id: projectId,
           expected_version: 2,
           template_id: "research-paper",
-          heading_font: "mincho"
+          updates: [{ field: "heading_font", value: "mincho" }]
         }
       });
       expect(conflict.isError).toBe(true);
@@ -1081,10 +1088,12 @@ describe("MCP contract", () => {
           project_id: projectId,
           expected_version: 3,
           template_id: "research-paper",
-          heading_font: "mincho",
-          body_weight: 500,
-          line_height: 1.5,
-          motion_style: "calm"
+          updates: [
+            { field: "heading_font", value: "mincho" },
+            { field: "body_weight", value: 500 },
+            { field: "line_height", value: 1.5 },
+            { field: "motion_style", value: "calm" }
+          ]
         }
       });
       await client.callTool({
@@ -1218,9 +1227,11 @@ describe("MCP contract", () => {
           project_id: projectId,
           expected_version: 13,
           template_id: "research-paper",
-          region_layout: "split",
-          accent_secondary: "#65ccff",
-          border: "#334155"
+          updates: [
+            { field: "region_layout", value: "split" },
+            { field: "accent_secondary", value: "#65ccff" },
+            { field: "border", value: "#334155" }
+          ]
         }
       });
       expect(expandedTemplate.structuredContent).toMatchObject({
