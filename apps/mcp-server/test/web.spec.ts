@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=104"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=105"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -709,6 +709,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('addEventListener("beforeunload"');
     expect(dashboardScriptText).toContain("ultimate-freestyle:form-draft:");
     expect(dashboardScriptText).toContain("更新前の未保存入力を復元しました");
+    expect(dashboardScriptText).toContain("現在版へ入力を適用");
+    expect(dashboardScriptText).toContain("退避内容をコピー");
+    expect(dashboardScriptText).toContain("current_version: Number(result.current_version)");
     expect(dashboardScriptText).toContain("ultimate-freestyle:version-changed");
     expect(dashboardScriptText).toContain('field.maxLength * 0.9');
     expect(dashboardScriptText).toContain('event.key.toLowerCase() !== "s"');

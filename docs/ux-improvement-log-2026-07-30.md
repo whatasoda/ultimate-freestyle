@@ -585,3 +585,10 @@
 - canvasの`upsert_slide_block`は一件とはいえframe、style、内容を含むblock全体を毎回要求し、小さい入力上限のMCP clientでは個別編集になっていなかった。
 - tool数を増やさず`edit_slide_block`へ置換し、安全な既定配置からの作成と、一fieldだけの更新を同じ小さな契約で扱うようにした。kindに存在しないfieldやcanvas外へ出る座標は安定した`INVALID_FIELDS`で拒否する。
 - element resourceをscene専用からcanvas blockにも拡張し、AI agentは対象一件と現在versionを読み直してから修正できる。作成、field更新、kind不一致、範囲外、個別resourceをcontract testで検証した。
+
+## 改善ループ235
+
+- 別タブやMCPが先に更新してversion競合になったとき、案内どおり再読み込みすると旧versionのsession draftを即削除してしまうデータ損失経路を修正した。
+- 409応答時に入力値、旧version、現在version、退避日時をブラウザへ隔離保存する。再読み込み後は自動上書きせず、競合した入力として「現在版へ入力を適用」「退避内容をコピー」「退避内容を破棄」から明示的に選べる。
+- 409を経由せず外部更新後に再訪した古いdraftも削除せず同じ復旧UIへ回し、AI側の変更と人間側の入力を見比べてから保存できるようにした。
+- dashboard assetをv105へ更新した。

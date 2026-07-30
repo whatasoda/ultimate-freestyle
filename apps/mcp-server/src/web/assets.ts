@@ -2,7 +2,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const apiErrorMessage = (result, fallback) => {
     const messages = {
       AUTH_REQUIRED: "ログインの有効期限が切れました。研究一覧からログインし直してください。",
-      PROJECT_VERSION_CONFLICT: "別の画面またはAIから先に更新されました。入力内容を退避してから画面を再読み込みしてください。",
+      PROJECT_VERSION_CONFLICT: "別の画面またはAIから先に更新されました。入力はこのブラウザに退避しました。再読み込み後に現在版へ適用できます。",
       PROJECT_NOT_FOUND: "研究が見つかりません。研究一覧へ戻って選び直してください。",
       SLIDE_NOT_FOUND: "スライドが見つかりません。画面を再読み込みしてください。",
       TEMPLATE_NOT_FOUND: "テンプレートが見つかりません。画面を再読み込みしてください。",
@@ -885,6 +885,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       clearTimeout(draftTimer);
       try { sessionStorage.removeItem(draftKey); } catch {}
     };
+    const applyDraftFields = (fields) => {
+      for (const saved of fields) {
+        const field = form.elements.namedItem(String(saved.name || ""));
+        if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) continue;
+        if (field instanceof HTMLInputElement && field.type === "checkbox") field.checked = saved.checked === true;
+        else field.value = String(saved.value ?? "");
+      }
+    };
     form.addEventListener("input", () => {
       form.dataset.dirty = "true";
       clearTimeout(draftTimer);
@@ -916,7 +924,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           body: JSON.stringify(serializeVersionedForm(form))
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(apiErrorMessage(result, "保存できませんでした。"));
+        if (!response.ok) {
+          if (result?.error?.code === "PROJECT_VERSION_CONFLICT") {
+            clearTimeout(draftTimer);
+            try {
+              sessionStorage.setItem(draftKey, JSON.stringify({
+                version: Number(form.dataset.version),
+                current_version: Number(result.current_version),
+                conflict: true,
+                captured_at: new Date().toISOString(),
+                fields: draftFields()
+              }));
+            } catch {}
+          }
+          throw new Error(apiErrorMessage(result, "保存できませんでした。"));
+        }
         form.dataset.dirty = "false";
         removeDraft();
         syncPageVersion(result.version);
@@ -962,16 +984,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
     let restored = false;
+    let conflictedDraft = null;
     try {
       const draft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
       if (draft?.version === Number(form.dataset.version) && Array.isArray(draft.fields)) {
-        for (const saved of draft.fields) {
-          const field = form.elements.namedItem(String(saved.name || ""));
-          if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) continue;
-          if (field instanceof HTMLInputElement && field.type === "checkbox") field.checked = saved.checked === true;
-          else field.value = String(saved.value ?? "");
-        }
+        applyDraftFields(draft.fields);
         restored = true;
+      } else if (Array.isArray(draft?.fields)) {
+        conflictedDraft = draft;
       } else if (draft !== null) sessionStorage.removeItem(draftKey);
     } catch { removeDraft(); }
     if (restored) {
@@ -987,6 +1007,56 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       form.prepend(notice);
       form.dataset.dirty = "true";
       form.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    if (conflictedDraft !== null) {
+      const notice = document.createElement("div");
+      notice.className = "draft-recovery conflict";
+      const text = document.createElement("p");
+      text.textContent = "別versionで保存した未保存入力があります。現在版へ適用する前に、AIや別画面の変更と重ならないか確認してください。";
+      const actions = document.createElement("div");
+      actions.className = "draft-recovery-actions";
+      const apply = document.createElement("button");
+      apply.type = "button";
+      apply.className = "ghost";
+      apply.textContent = "現在版へ入力を適用";
+      apply.addEventListener("click", () => {
+        applyDraftFields(conflictedDraft.fields);
+        form.dataset.dirty = "true";
+        try {
+          sessionStorage.setItem(draftKey, JSON.stringify({
+            version: Number(form.dataset.version),
+            fields: conflictedDraft.fields
+          }));
+        } catch {}
+        notice.remove();
+        form.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      const copy = document.createElement("button");
+      copy.type = "button";
+      copy.className = "ghost";
+      copy.textContent = "退避内容をコピー";
+      copy.addEventListener("click", async () => {
+        const copyText = conflictedDraft.fields.map((field) =>
+          String(field.name || "") + ": " + String(field.checked === null ? field.value ?? "" : field.checked)
+        ).join("\n\n");
+        try {
+          await navigator.clipboard.writeText(copyText);
+          copy.textContent = "コピーしました";
+        } catch {
+          copy.textContent = "コピーできませんでした";
+        }
+      });
+      const discard = document.createElement("button");
+      discard.type = "button";
+      discard.className = "ghost";
+      discard.textContent = "退避内容を破棄";
+      discard.addEventListener("click", () => {
+        removeDraft();
+        notice.remove();
+      });
+      actions.append(apply, copy, discard);
+      notice.append(text, actions);
+      form.prepend(notice);
     }
   }
 
