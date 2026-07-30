@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@102");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@103");
     expect(html).toContain("effectiveOpacity *=");
     expect(html).toContain("background.complex || effectiveOpacity < .99");
     expect(html).toContain('--aspect-font-scale: 1;');
@@ -822,6 +822,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("target.dataset.overflow = String(overflowing)");
     expect(html).not.toContain("Math.max(0, target.scrollWidth - target.clientWidth)");
     expect(html).toContain("const collectClippedOverflow = (target)");
+    expect(html).toContain("target.matches('uf-image small[data-fit-content], uf-shape span[data-fit-content]')");
+    expect(html).toContain("document.createTreeWalker(target, NodeFilter.SHOW_TEXT)");
     expect(html).toContain("boundary.getBoundingClientRect()");
     expect(html).toContain("overflow.x > 1 || overflow.y > 1");
     expect(html).toContain("scale > .45");

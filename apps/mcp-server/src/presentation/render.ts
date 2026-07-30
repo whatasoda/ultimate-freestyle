@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@102";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@103";
 
 function escapeHtml(value: string): string {
   return value
@@ -1457,17 +1457,22 @@ export function renderPresentationHtml(
       });
     };
     const collectClippedOverflow = (target) => {
-      const clips = (value) => ['auto', 'clip', 'hidden', 'scroll'].includes(value);
-      let boundary = target;
-      while (boundary.parentElement) {
-        const style = getComputedStyle(boundary);
-        if (clips(style.overflowX) || clips(style.overflowY)) break;
-        boundary = boundary.parentElement;
-      }
+      const boundary = target.matches('uf-image small[data-fit-content], uf-shape span[data-fit-content]')
+        ? target.parentElement || target
+        : target;
       const boundaryRect = boundary.getBoundingClientRect();
       const contentRects = [...target.querySelectorAll('*')]
         .map((item) => item.getBoundingClientRect())
         .filter((rect) => rect.width > 0 && rect.height > 0);
+      const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
+      while (walker.nextNode()) {
+        const node = walker.currentNode;
+        if (!node.textContent?.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        contentRects.push(...[...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0));
+        range.detach();
+      }
       if (contentRects.length === 0) contentRects.push(target.getBoundingClientRect());
       const left = Math.min(...contentRects.map((rect) => rect.left));
       const right = Math.max(...contentRects.map((rect) => rect.right));
