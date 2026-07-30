@@ -179,7 +179,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const collectOcclusions =");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@74");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@75");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -231,6 +231,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("addEventListener('visibilitychange'");
     expect(html).toContain("speechSynthesis.pause()");
     expect(html).toContain("presentationResume.focus()");
+    expect(html).toContain('data-region="narration"');
+    expect(html).toContain('aria-live="off"');
+    expect(html).toContain("setAttribute('aria-valuetext'");
+    expect(html).not.toContain('<span id="counter" aria-live="polite">');
     expect(html).toContain("else scheduleAutoAdvance();");
     expect(html).toContain("ultimate-freestyle:preview-fields");
     expect(html).toContain("ultimate-freestyle:preview-scene-component");
