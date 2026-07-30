@@ -238,7 +238,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=92";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=93";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -735,6 +735,9 @@ function shell(title: string, body: string): string {
       .voice-review-title small { margin-top: .2rem; color: var(--muted); }
       .voice-review-body { display: grid; gap: .75rem; padding: 0 .8rem .8rem; }
       .voice-review-body p { margin: 0; color: #d7e0eb; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .voice-audio-timeline { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .65rem; align-items: center; }
+      .voice-audio-timeline input { width: 100%; accent-color: var(--accent); }
+      .voice-audio-timeline output { min-width: 7.5rem; color: var(--muted); font-size: .75rem; font-variant-numeric: tabular-nums; text-align: right; }
       .voice-status { display: inline-flex; padding: .28rem .5rem; border-radius: 999px; background: #354052; color: #d8e1eb; font-size: .7rem; font-weight: 800; white-space: nowrap; }
       .voice-status.ready, .voice-status.completed { background: #174d3a; color: #91efc4; }
       .voice-status.needs_generation, .voice-status.queued, .voice-status.running, .voice-status.generating { background: #5a4618; color: #ffe29a; }
@@ -1704,7 +1707,7 @@ export function voiceFinishPage(options: {
             .join("");
           return `<details class="voice-review"${index === (attentionSegmentIndex === -1 ? 0 : attentionSegmentIndex) ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}">
             <summary><span class="component-step">${String(index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
-            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details><div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
+            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
           </details>`;
         })
         .join("")

@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=92"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=93"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -532,6 +532,8 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("data-voice-visible");
     expect(voicePageHtml).toContain("スライド名・原稿・声を検索");
     expect(voicePageHtml).toContain("data-voice-preview-feedback");
+    expect(DASHBOARD_SCRIPT).toContain("data-voice-preview-seek");
+    expect(DASHBOARD_SCRIPT).toContain("updatePreviewTimeline");
     expect(voicePageHtml).toContain("data-voice-filter-empty");
     expect(voicePageHtml).toContain("音声生成は任意です");
 

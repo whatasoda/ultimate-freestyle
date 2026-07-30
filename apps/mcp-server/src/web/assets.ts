@@ -2366,8 +2366,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let activePlayer = null;
     let activePreviewButton = null;
     let activePreviewFeedback = null;
+    let activePreviewSeek = null;
+    let activePreviewTime = null;
+    const playbackTime = (seconds) => {
+      if (!Number.isFinite(seconds) || seconds < 0) return "--:--";
+      return String(Math.floor(seconds / 60)).padStart(2, "0") + ":" + String(Math.floor(seconds % 60)).padStart(2, "0");
+    };
+    const updatePreviewTimeline = (current, duration) => {
+      if (activePreviewSeek instanceof HTMLInputElement) {
+        activePreviewSeek.max = String(Number.isFinite(duration) ? duration : 0);
+        activePreviewSeek.value = String(Number.isFinite(current) && Number.isFinite(duration) ? Math.min(current, duration) : 0);
+        activePreviewSeek.disabled = !Number.isFinite(duration) || duration <= 0;
+      }
+      if (activePreviewTime instanceof HTMLOutputElement) activePreviewTime.textContent = playbackTime(current) + " / " + playbackTime(duration);
+    };
     const stopPreview = (message = "") => {
-      if (activePlayer) { activePlayer.pause(); activePlayer.removeAttribute("src"); activePlayer.load(); activePlayer = null; }
+      if (activePlayer) {
+        const duration = activePlayer.duration;
+        activePlayer.pause();
+        updatePreviewTimeline(0, duration);
+        activePlayer.removeAttribute("src");
+        activePlayer.load();
+        activePlayer = null;
+      }
       if ("speechSynthesis" in window) speechSynthesis.cancel();
       if (activePreviewButton instanceof HTMLButtonElement) {
         activePreviewButton.setAttribute("aria-pressed", "false");
@@ -2376,14 +2397,27 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (activePreviewFeedback instanceof HTMLElement) activePreviewFeedback.textContent = message;
       activePreviewButton = null;
       activePreviewFeedback = null;
+      activePreviewSeek = null;
+      activePreviewTime = null;
     };
+    for (const seek of voicePage.querySelectorAll("[data-voice-preview-seek]")) {
+      if (!(seek instanceof HTMLInputElement)) continue;
+      seek.addEventListener("input", () => {
+        if (seek !== activePreviewSeek || !activePlayer) return;
+        activePlayer.currentTime = Number(seek.value);
+        updatePreviewTimeline(activePlayer.currentTime, activePlayer.duration);
+      });
+    }
     for (const button of voicePage.querySelectorAll("[data-voice-preview]")) {
       if (!(button instanceof HTMLButtonElement)) continue;
       button.addEventListener("click", () => {
         if (activePreviewButton === button) { stopPreview("試聴を停止しました。"); return; }
         stopPreview();
         activePreviewButton = button;
-        activePreviewFeedback = button.closest("[data-voice-segment]")?.querySelector("[data-voice-preview-feedback]") || null;
+        const segment = button.closest("[data-voice-segment]");
+        activePreviewFeedback = segment?.querySelector("[data-voice-preview-feedback]") || null;
+        activePreviewSeek = segment?.querySelector("[data-voice-preview-seek]") || null;
+        activePreviewTime = segment?.querySelector("[data-voice-preview-time]") || null;
         if (activePreviewFeedback instanceof HTMLElement) activePreviewFeedback.textContent = "再生しています…";
         button.setAttribute("aria-pressed", "true");
         button.textContent = "停止";
@@ -2391,6 +2425,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (audioUrl !== null && button.dataset.audioUrl) {
           const player = new Audio(audioUrl);
           activePlayer = player;
+          const updatePlayerTimeline = () => updatePreviewTimeline(player.currentTime, player.duration);
+          player.addEventListener("loadedmetadata", updatePlayerTimeline);
+          player.addEventListener("durationchange", updatePlayerTimeline);
+          player.addEventListener("timeupdate", updatePlayerTimeline);
           player.addEventListener("ended", () => stopPreview("試聴が終わりました。"), { once: true });
           player.addEventListener("error", () => stopPreview("生成音声を再生できませんでした。ページを再読み込みしてお試しください。"), { once: true });
           player.play().catch(() => stopPreview("ブラウザが音声再生を許可しませんでした。もう一度ボタンを押してください。"));
