@@ -9,7 +9,11 @@ import {
 import { z } from "zod";
 
 import { twitchGrantPropsSchema } from "../auth/types";
-import { getPublicationStatus } from "../publications/service";
+import {
+  getPublicationStatus,
+  MAX_PRESENTATION_DURATION_SECONDS
+} from "../publications/service";
+import { getVoiceProjectStatus } from "../voicevox/service";
 import {
   getProject,
   getProjectDraftRevision,
@@ -565,10 +569,13 @@ export function registerResearchGuides(
     async (uri, variables) => {
       const auth = projectResourceBody(getAuthProps, "research:read");
       const id = variables.id;
-      const status =
-        !("error" in auth) && typeof id === "string"
-          ? await getPublicationStatus(db, auth.ownerUserId, id)
-          : null;
+      const [status, project, voice] = !("error" in auth) && typeof id === "string"
+        ? await Promise.all([
+            getPublicationStatus(db, auth.ownerUserId, id),
+            getProject(db, auth.ownerUserId, id),
+            getVoiceProjectStatus(db, auth.ownerUserId, id)
+          ])
+        : [null, null, null];
       const latest = status?.latest_preview ?? null;
       const previewCurrent = status !== null && latest !== null &&
         latest.project_version === status.draft_version &&
@@ -576,13 +583,51 @@ export function registerResearchGuides(
       const publishedCurrent = status !== null && status.published !== null &&
         status.published.project_version === status.draft_version &&
         status.published.renderer_version === status.current_renderer_version;
-      const nextAction = !previewCurrent
-        ? "create_preview"
-        : latest?.reviewed_at === null
-          ? "review_preview"
-          : publishedCurrent
-            ? "complete"
-            : "publish";
+      const slideCount = project?.document.deck?.slides.length ?? 0;
+      const durationSeconds = project?.document.deck?.slides.reduce(
+        (sum, slide) => sum + slide.duration_seconds,
+        0
+      ) ?? 0;
+      const previewBlockers = [
+        ...(slideCount === 0
+          ? [{ code: "DECK_REQUIRED", message: "プレビューには1枚以上のスライドが必要です。" }]
+          : []),
+        ...(voice?.configured && voice.summary.ready !== voice.summary.total
+          ? [{
+              code: "VOICE_INCOMPLETE",
+              message: `VOICEVOX音声が${voice.summary.ready}/${voice.summary.total}区間まで生成されています。`,
+              ready: voice.summary.ready,
+              total: voice.summary.total
+            }]
+          : [])
+      ];
+      const publishBlockers = [
+        ...previewBlockers,
+        ...(durationSeconds > MAX_PRESENTATION_DURATION_SECONDS
+          ? [{
+              code: "PRESENTATION_DURATION_EXCEEDED",
+              message: "想定発表時間を20分以内に短縮してください。",
+              duration_seconds: durationSeconds,
+              limit_seconds: MAX_PRESENTATION_DURATION_SECONDS
+            }]
+          : []),
+        ...(!previewCurrent
+          ? [{ code: "PREVIEW_REQUIRED", message: "現在版の固定プレビューを作成してください。" }]
+          : latest?.reviewed_at === null
+            ? [{ code: "PREVIEW_NOT_REVIEWED", message: "固定プレビューを最後の終了画面まで確認してください。" }]
+            : [])
+      ];
+      const contentBlocked = previewBlockers.length > 0 ||
+        durationSeconds > MAX_PRESENTATION_DURATION_SECONDS;
+      const nextAction = contentBlocked
+        ? "fix_blockers"
+        : !previewCurrent
+          ? "create_preview"
+          : latest?.reviewed_at === null
+            ? "review_preview"
+            : publishedCurrent
+              ? "complete"
+              : "publish";
       const body =
         "error" in auth
           ? { ok: false, error: { code: auth.error } }
@@ -610,19 +655,25 @@ export function registerResearchGuides(
                 readiness: {
                   needs_preview: !previewCurrent,
                   needs_review: previewCurrent && latest.reviewed_at === null,
-                  can_publish: previewCurrent && latest.reviewed_at !== null && !publishedCurrent,
+                  can_publish: previewCurrent && latest.reviewed_at !== null && !publishedCurrent && publishBlockers.length === 0,
                   published_current: publishedCurrent,
-                  next_action: nextAction
+                  next_action: nextAction,
+                  preview_blockers: previewBlockers,
+                  publish_blockers: publishBlockers
                 },
                 web: {
-                  requires_session: true,
-                  dashboard_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${status.project_id}`,
-                  preview_url: latest === null
-                    ? null
-                    : `https://saijiyu-kenkyu.2764.moe/preview/${latest.revision_id}`,
-                  public_url: status.published === null || status.slug === null
-                    ? null
-                    : `https://saijiyu-kenkyu.2764.moe/p/${status.slug}`
+                  dashboard: {
+                    url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${status.project_id}`,
+                    requires_session: true
+                  },
+                  preview: latest === null ? null : {
+                    url: `https://saijiyu-kenkyu.2764.moe/preview/${latest.revision_id}`,
+                    requires_session: true
+                  },
+                  public: status.published === null || status.slug === null ? null : {
+                    url: `https://saijiyu-kenkyu.2764.moe/p/${status.slug}`,
+                    requires_session: false
+                  }
                 },
                 recent_events: status.events.slice(0, 5)
               };

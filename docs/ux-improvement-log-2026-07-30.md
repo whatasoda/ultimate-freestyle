@@ -751,3 +751,9 @@
 - 発表全体の既定VOICEVOXを継承する区間は`voice_profile_id`が空のため、MCPでprofile調声を変えても古い`audio_src`が正本へ残る問題を修正した。明示profile一致だけでなく、変更profileを既定として継承する区間も無効化する。
 - 既定profileを別の声へ切り替える場合は全継承区間を無効化し、明示的に別profileを選んでいる区間の生成音声は維持する。Web UIの声変更・トーン変更とMCPのprofile設定・調声を共通関数へ統一した。
 - 明示指定、既定継承、別profileの3種類を持つfixtureで、必要な音声だけがnullになることを自動検証した。project resourceと生成状態が古い参照で食い違わない正本になった。
+
+## 改善ループ262
+
+- 公開状態resourceがスライドなし、VOICEVOX未生成、20分超過でも`create_preview`や`publish`を次操作として返し、Web UIで初めて失敗する状態を修正した。
+- `preview_blockers`と`publish_blockers`へ安定code、説明、音声生成数または時間上限を返す。内容上の阻害がある間は`next_action: fix_blockers`とし、`can_publish`もfalseにする。preview未作成・未確認という工程上の阻害も公開側へ明示する。
+- Web URLごとに認証要否を分け、研究詳細と固定previewはsession必須、公開ページは不要とした。deckなしとVOICEVOX 0/1のcontract testで、Agentが失敗前に修正を案内できることを固定した。

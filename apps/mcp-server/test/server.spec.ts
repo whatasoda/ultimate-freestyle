@@ -583,13 +583,22 @@ describe("MCP contract", () => {
           needs_review: false,
           can_publish: false,
           published_current: false,
-          next_action: "create_preview"
+          next_action: "fix_blockers",
+          preview_blockers: [
+            expect.objectContaining({ code: "DECK_REQUIRED" })
+          ],
+          publish_blockers: expect.arrayContaining([
+            expect.objectContaining({ code: "DECK_REQUIRED" }),
+            expect.objectContaining({ code: "PREVIEW_REQUIRED" })
+          ])
         },
         web: {
-          requires_session: true,
-          dashboard_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${firstProject.project_id}`,
-          preview_url: null,
-          public_url: null
+          dashboard: {
+            url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${firstProject.project_id}`,
+            requires_session: true
+          },
+          preview: null,
+          public: null
         },
         recent_events: []
       });
@@ -1409,6 +1418,23 @@ describe("MCP contract", () => {
               postPhonemeLength: 0.1
             }
           }]
+        }
+      });
+      const voiceBlockedPublication = await readJsonResource(
+        client,
+        `research://projects/${projectId}/publication`
+      );
+      expect(voiceBlockedPublication).toMatchObject({
+        readiness: {
+          next_action: "fix_blockers",
+          preview_blockers: [
+            expect.objectContaining({
+              code: "VOICE_INCOMPLETE",
+              ready: 0,
+              total: 1
+            })
+          ],
+          can_publish: false
         }
       });
       const deniedGeneration = await client.callTool({
