@@ -569,7 +569,8 @@ async function handleSlideFrame(
   }
   const html = renderPresentationHtml(project, {
     frameAncestors: "'self'",
-    editorFrame: true
+    editorFrame: true,
+    editorPrelude: new URL(request.url).searchParams.get("prelude") === "1"
   });
   return new Response(html, {
     headers: {

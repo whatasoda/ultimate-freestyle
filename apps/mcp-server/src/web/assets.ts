@@ -178,7 +178,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let completedCheckpoints = 0;
     let currentSlideFindings = [];
     let sweepTimer;
+    let sweepFrameMode = "unloaded";
     const totalCheckpoints = slides.reduce((total, slide) => total + Number(slide.max_step || 0) + 1, 0);
+    const presentationSlideCount = slides.filter((slide) => slide.id !== "__prelude__").length;
+    const includesPrelude = slides.some((slide) => slide.id === "__prelude__");
     const appendSweepResult = (slide, message, warning = true) => {
       if (!(qualitySweepResults instanceof HTMLOListElement)) return;
       const item = document.createElement("li");
@@ -199,8 +202,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (qualitySweepCancel instanceof HTMLButtonElement) qualitySweepCancel.hidden = true;
       if (qualitySweepStatus instanceof HTMLElement) {
         qualitySweepStatus.textContent = sweepIssueCount
-          ? sweepIssueCount + "枚に確認事項があります。"
-          : "全" + slides.length + "枚・" + totalCheckpoints + "段階が発表枠内に収まっています。";
+          ? sweepIssueCount + "項目に確認事項があります。"
+          : (includesPrelude ? "0ページ目と" : "") + "全" + presentationSlideCount + "枚・" + totalCheckpoints + "段階が発表枠内に収まっています。";
         qualitySweepStatus.classList.toggle("warning", sweepIssueCount > 0);
         qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0);
       }
@@ -209,7 +212,28 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const requestSweepPosition = () => {
       const slide = slides[sweepIndex];
       if (!slide) { finishQualitySweep(); return; }
-      qualitySweepFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: sweepIndex + 1, step: sweepStep }, location.origin);
+      if (slide.id === "__prelude__") {
+        if (sweepFrameMode !== "prelude") {
+          const url = new URL(qualitySweepButton.dataset.frameUrl || "", location.origin);
+          url.searchParams.set("prelude", "1");
+          url.searchParams.set("quality_run", String(Date.now()));
+          sweepFrameMode = "prelude";
+          qualitySweepFrame.src = url.toString();
+        }
+        waitForSweepResult();
+        return;
+      }
+      if (sweepFrameMode !== "slides") {
+        const url = new URL(qualitySweepButton.dataset.frameUrl || "", location.origin);
+        url.searchParams.set("slide", String(sweepIndex + (includesPrelude ? 0 : 1)));
+        url.searchParams.set("step", String(sweepStep));
+        url.searchParams.set("quality_run", String(Date.now()));
+        sweepFrameMode = "slides";
+        qualitySweepFrame.src = url.toString();
+        waitForSweepResult();
+        return;
+      }
+      qualitySweepFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: sweepIndex + (includesPrelude ? 0 : 1), step: sweepStep }, location.origin);
       waitForSweepResult();
     };
     const advanceQualitySweep = () => {
@@ -295,10 +319,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         qualitySweepStatus.classList.remove("warning", "success");
       }
       if (qualitySweepPreview instanceof HTMLElement) qualitySweepPreview.hidden = false;
-      const url = new URL(qualitySweepButton.dataset.frameUrl || "", location.origin);
-      url.searchParams.set("quality_run", String(Date.now()));
-      qualitySweepFrame.src = url.toString();
-      waitForSweepResult();
+      sweepFrameMode = "unloaded";
+      requestSweepPosition();
     });
     if (qualitySweepCancel instanceof HTMLButtonElement) {
       qualitySweepCancel.addEventListener("click", () => {
@@ -306,6 +328,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         sweepRunning = false;
         clearTimeout(sweepTimer);
         qualitySweepFrame.removeAttribute("src");
+        sweepFrameMode = "unloaded";
         qualitySweepCancel.hidden = true;
         setButtonBusy(qualitySweepButton, false);
         qualitySweepButton.textContent = "最初からチェック";

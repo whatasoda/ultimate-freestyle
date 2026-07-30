@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@88");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@89");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
@@ -190,6 +190,15 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("data-heading-font=\"system-sans\"");
     expect(html).toContain("const fitPrelude = () =>");
     expect(html).toContain("prelude.dataset.fitScale = String(scale)");
+    expect(html).toContain("slide_id: '__prelude__'");
+    expect(html).toContain('data-editor-prelude="false"');
+    expect(html).toContain("stage.dataset.measuring = 'true'");
+    expect(html).toContain("delete stage.dataset.measuring");
+    expect(html).toContain("summary, [tabindex]");
+    expect(html).toContain("if (started) { slide = 0");
+    expect(html).toContain("if (started) { slide = slides.length - 1");
+    expect(html).toContain("max-height: 90%; overflow: auto");
+    expect(html).toContain("padding-inline-start: .6em");
     expect(html).toContain(".slide-content > :is(h2,h3,h4,table,figure) { break-inside: avoid; }");
     expect(html).toContain(".slide-content :is(p,li) { orphans: 2; widows: 2; }");
     expect(html).not.toContain(".slide-content > * { break-inside: avoid; }");

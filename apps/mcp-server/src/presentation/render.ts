@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@88";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@89";
 
 function escapeHtml(value: string): string {
   return value
@@ -200,6 +200,7 @@ export type PresentationRenderOptions = {
   assetUrls?: Readonly<Record<string, string>>;
   frameAncestors?: "'none'" | "'self'";
   editorFrame?: boolean;
+  editorPrelude?: boolean;
   revisionId?: string;
 };
 
@@ -852,7 +853,7 @@ export function renderPresentationHtml(
     .narration[data-display="inline"] { max-height: 25cqh; padding-block: 1.1cqh; border-top-color: var(--narration-custom-border, #cbd5e1); background: var(--narration-custom-background, #f8fafcee); color: var(--narration-custom-foreground, #172033); font-size: calc(1.1cqw * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
     .narration[data-display="inline"] .narration-track { display: grid; gap: .32em; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
     .narration-segment { opacity: .34; transition: opacity var(--motion-duration) var(--motion-ease), translate var(--motion-duration) var(--motion-ease); overflow-wrap: anywhere; }
-    .narration-segment.is-current { opacity: 1; translate: .35em 0; font-weight: 800; }
+    .narration-segment.is-current { opacity: 1; padding-inline-start: .6em; box-shadow: inset .24em 0 var(--narration-custom-accent, var(--accent)); font-weight: 800; }
     .eyebrow { margin: 0 0 4%; color: var(--accent); font-size: calc(1cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
     .slide-content { min-width: 0; column-gap: var(--slide-column-gap); column-fill: balance; }
     .slide-content[data-columns="2"] { column-count: 2; }
@@ -882,6 +883,7 @@ export function renderPresentationHtml(
     .reveal-block[data-animation="blur"].is-visible { filter: blur(0); }
     .reveal-block[data-animation="wipe"] { clip-path: inset(0 100% 0 0); translate: none; }
     .reveal-block[data-animation="wipe"].is-visible { clip-path: inset(0); }
+    .stage[data-measuring="true"] .reveal-block { translate: 0 0 !important; scale: 1 !important; filter: none !important; clip-path: inset(0) !important; }
     .reveal-block p, .reveal-block li { font-size: calc(1.65cqw * var(--template-font-scale) * var(--slide-body-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
     .slide-sidebar h2, .slide-sidebar h3, .slide-sidebar h4 { color: var(--accent); }
     .slide-sidebar p, .slide-sidebar li { font-size: calc(1.1cqw * var(--template-font-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
@@ -909,7 +911,7 @@ export function renderPresentationHtml(
     .voice-unlock[hidden], .presentation-resume[hidden] { display: none; }
     .completion { position: absolute; z-index: 50; inset: 0; display: grid; place-items: center; padding: 8%; background: #05080dcc; backdrop-filter: blur(.45cqw); }
     .completion[hidden] { display: none; }
-    .completion-card { width: min(34em, 78%); padding: 2.4em; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff33); border-radius: 1.2em; background: #101827f2; box-shadow: 0 1.5em 5em #000b; text-align: center; }
+    .completion-card { width: min(34em, 78%); max-height: 90%; overflow: auto; padding: 2.4em; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff33); border-radius: 1.2em; background: #101827f2; box-shadow: 0 1.5em 5em #000b; text-align: center; }
     .completion-card h2 { margin: 0 0 .35em; color: #fff; font-size: clamp(1.4rem, 3.2cqw, 2.7rem); }
     .completion-card p { margin: 0 0 1.4em; color: #b7c2d2; }
     .completion-time { display: grid; gap: .25em; margin: 1em 0 1.4em; color: #dbe5f1; font-variant-numeric: tabular-nums; }
@@ -919,7 +921,7 @@ export function renderPresentationHtml(
     .completion-credit { margin: 0 0 1.2em; color: #9fb0c3; font-size: .82em; }
     .completion-credit summary { cursor: pointer; font-weight: 800; }
     .completion-credit p { margin: .45em 0 0; overflow-wrap: anywhere; }
-    .completion-actions { display: flex; justify-content: center; gap: .7em; }
+    .completion-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .7em; }
     .completion-actions button { padding: .65em 1em; }
     .completion-actions .primary { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 32%, #172131); }
     .shortcuts { position: absolute; z-index: 55; inset: 0; display: grid; place-items: center; padding: 6%; background: #05080ddd; backdrop-filter: blur(.45cqw); }
@@ -998,15 +1000,18 @@ export function renderPresentationHtml(
       .controls button { width: 100%; min-width: 0; padding-inline: 4px; font-size: 12px; }
       .controls label { grid-column: 1 / -1; justify-content: center; min-height: 32px; }
       .controls input[type="range"] { width: min(100%, 220px); }
+      .completion { padding: 4%; }
+      .completion-card { width: 100%; padding: 1.25em; }
+      .completion-actions { display: grid; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; } }
   </style>
 </head>
-<body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
+<body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-editor-prelude="${String(options.editorPrelude ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
     <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p><p class="sr-only" data-slide-announcer aria-live="polite" aria-atomic="true"></p>
-      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
+      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
           <h1>${escapeHtml(project.document.title)}</h1>
@@ -1100,6 +1105,7 @@ export function renderPresentationHtml(
     const slideAnnouncer = document.querySelector('[data-slide-announcer]');
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
+    const editorPrelude = document.body.dataset.editorPrelude === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let swipeStart = null, suppressStageClick = false, editorGridSnap = false;
     let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0, visibilityPause = null;
@@ -1188,7 +1194,7 @@ export function renderPresentationHtml(
       return true;
     };
     const trapModalFocus = (event, modal) => {
-      const focusable = [...modal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')]
+      const focusable = [...modal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), summary, [tabindex]:not([tabindex="-1"])')]
         .filter((item) => item instanceof HTMLElement && !item.hidden);
       if (focusable.length === 0) { event.preventDefault(); return; }
       const first = focusable[0];
@@ -1575,7 +1581,16 @@ export function renderPresentationHtml(
         content = preludeInner.getBoundingClientRect();
       }
       prelude.dataset.fitScale = String(scale);
-      prelude.dataset.overflow = String(content.width > boundary.width * .94 || content.height > boundary.height * .94);
+      const overflowing = content.width > boundary.width * .94 || content.height > boundary.height * .94;
+      prelude.dataset.overflow = String(overflowing);
+      if (editorPrelude && parent !== window) parent.postMessage({
+        type: 'ultimate-freestyle:render-diagnostics',
+        slide_id: '__prelude__',
+        step: 0,
+        overflows: overflowing ? [{ id: 'prelude', region: '0ページ目', overflow_x: Math.max(0, content.width - boundary.width * .94), overflow_y: Math.max(0, content.height - boundary.height * .94), fit_scale: scale }] : [],
+        fits: [{ id: 'prelude', region: '0ページ目', fit_scale: scale }],
+        contrasts: [], clamps: [], readability: [], occlusions: []
+      }, location.origin);
     };
     const schedulePreludeFit = () => requestAnimationFrame(() => requestAnimationFrame(fitPrelude));
     const fitAndReport = () => {
@@ -1585,6 +1600,7 @@ export function renderPresentationHtml(
       const contrasts = [];
       const clamps = [];
       const readability = [];
+      if (stage instanceof HTMLElement) stage.dataset.measuring = 'true';
       currentSlide.querySelectorAll('[data-fit-content]').forEach((target) => {
         if (!(target instanceof HTMLElement) || target.hidden || target.offsetParent === null) return;
         target.style.setProperty('--fit-scale', '1');
@@ -1609,6 +1625,7 @@ export function renderPresentationHtml(
       const narrationClamp = collectNarrationClamp(currentSlide);
       if (narrationClamp) clamps.push(narrationClamp);
       const occlusions = collectOcclusions(currentSlide);
+      if (stage instanceof HTMLElement) delete stage.dataset.measuring;
       if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps, readability, occlusions }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
@@ -2122,6 +2139,12 @@ export function renderPresentationHtml(
     };
     const restore = () => {
       const query = new URLSearchParams(location.search);
+      if (editorPrelude) {
+        prelude.hidden = false;
+        slides.forEach((item) => { item.hidden = true; item.dataset.state = 'inactive'; });
+        schedulePreludeFit();
+        return;
+      }
       if ((query.get('slide') === null || query.get('slide') === '0') && showPrelude(false)) return;
       started = true;
       if (!timerRunning) setTimerRunning(true);
@@ -2326,8 +2349,8 @@ export function renderPresentationHtml(
         else advance();
       }
       else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace'].includes(event.key)) { event.preventDefault(); document.querySelector('#prev').click(); }
-      else if (event.key === 'Home') { event.preventDefault(); slide = 0; step = 0; syncUrl(); render(); }
-      else if (event.key === 'End') { event.preventDefault(); slide = slides.length - 1; step = DECK.slides[slide].revealSteps; syncUrl(); render(); }
+      else if (event.key === 'Home') { event.preventDefault(); if (started) { slide = 0; step = 0; syncUrl(); render(); } }
+      else if (event.key === 'End') { event.preventDefault(); if (started) { slide = slides.length - 1; step = DECK.slides[slide].revealSteps; syncUrl(); render(); } }
       else if (event.key.toLowerCase() === 'm') { event.preventDefault(); speechButton.click(); }
       else if (event.key.toLowerCase() === 'a') { event.preventDefault(); autoButton.click(); }
       else if (event.key.toLowerCase() === 't') { event.preventDefault(); timerButton.click(); }

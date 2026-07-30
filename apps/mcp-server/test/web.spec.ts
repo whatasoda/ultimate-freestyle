@@ -421,16 +421,18 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=105"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=106"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
-    expect(detailHtml).toContain("全スライドの実表示を一括確認");
+    expect(detailHtml).toContain("0ページ目と全スライドの実表示を一括確認");
+    expect(detailHtml).toContain('&quot;id&quot;:&quot;__prelude__&quot;');
     expect(detailHtml).toContain("data-quality-sweep");
     expect(detailHtml).toContain("段階を順番に描画");
     expect(DASHBOARD_SCRIPT).toContain("advanceQualitySweep");
+    expect(DASHBOARD_SCRIPT).toContain('url.searchParams.set("prelude", "1")');
     expect(DASHBOARD_SCRIPT).toContain("Number(data.step) !== sweepStep");
     expect(DASHBOARD_SCRIPT).toContain("推奨色を入力");
     expect(DASHBOARD_SCRIPT).toContain('item.id === "flow:sidebar" ? "muted" : "foreground"');
@@ -676,6 +678,18 @@ describe("Web dashboard", () => {
     expect(frame.headers.get("x-frame-options")).toBe("SAMEORIGIN");
     expect(frameHtml).toContain('data-editor-frame="true"');
     expect(frameHtml).toContain('frame-ancestors \'self\'');
+    const preludeFrame = await requestProvider(
+      provider,
+      new Request(`${frameUrl}&prelude=1`, {
+        headers: { cookie: browserCookies }
+      }),
+      authEnv
+    );
+    const preludeFrameHtml = await preludeFrame.text();
+    expect(preludeFrame.status).toBe(200);
+    expect(preludeFrameHtml).toContain('data-editor-prelude="true"');
+    expect(preludeFrameHtml).toContain("slide_id: '__prelude__'");
+    expect(preludeFrameHtml).toMatch(/<section class="prelude"[^>]*>\s*<div/);
     const frameWithoutSession = await requestProvider(
       provider,
       new Request(frameUrl),

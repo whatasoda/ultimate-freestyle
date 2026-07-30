@@ -241,7 +241,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=105";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=106";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1521,7 +1521,7 @@ export function projectDetailPage(options: {
   </section>`;
   const presentationSettingsPanel = deck === null
     ? ""
-    : `<details class="panel panel-disclosure"><summary>発表画面と0ページ目</summary><div class="disclosure-body">
+    : `<details class="panel panel-disclosure" id="presentation-screen"><summary>発表画面と0ページ目</summary><div class="disclosure-body">
        <form class="editor" data-deck-editor data-versioned-form action="/api/projects/${escapeHtml(options.project.project_id)}/presentation/settings" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
          <fieldset><legend>スライド比率</legend><div class="ratio-options">
            <label class="ratio-option"><input type="radio" name="aspect_ratio" value="16:9"${(deck.aspect_ratio ?? "16:9") === "16:9" ? " checked" : ""}><span class="ratio-preview wide"></span><span><strong>ワイド 16:9</strong><small>PC・配信向け</small></span></label>
@@ -1538,17 +1538,28 @@ export function projectDetailPage(options: {
          <div class="actions"><button type="submit">発表画面を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
        </form>
      </div></details>`;
-  const qualitySweepSlides = slides.map((slide, index) => ({
-    id: slide.id,
-    title: slide.title,
-    number: index + 1,
-    max_step: slide.reveal_steps,
-    href: `/dashboard/projects/${options.project.project_id}/slides/${slide.id}`
-  }));
+  const qualitySweepSlides = [
+    ...(loadingScreen.enabled
+      ? [{
+          id: "__prelude__",
+          title: "準備画面",
+          number: 0,
+          max_step: 0,
+          href: "#presentation-screen"
+        }]
+      : []),
+    ...slides.map((slide, index) => ({
+      id: slide.id,
+      title: slide.title,
+      number: index + 1,
+      max_step: slide.reveal_steps,
+      href: `/dashboard/projects/${options.project.project_id}/slides/${slide.id}`
+    }))
+  ];
   const qualitySweepStepCount = qualitySweepSlides.reduce((total, slide) => total + slide.max_step + 1, 0);
   const qualitySweepPanel = qualitySweepSlides.length === 0
     ? ""
-    : `<details class="panel panel-disclosure"><summary>全スライドの実表示を一括確認</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で全${qualitySweepSlides.length}枚・${qualitySweepStepCount}段階を順番に描画し、見切れ、70%未満の自動縮小、文字コントラストを探します。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`${qualitySweepSlides[0]?.href}/frame?slide=1&step=0`)}">一括チェックを開始</button><button class="ghost" type="button" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">未実行</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="全スライドの表示確認"></iframe></div></div></details>`;
+    : `<details class="panel panel-disclosure"><summary>0ページ目と全スライドの実表示を一括確認</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で${loadingScreen.enabled ? "0ページ目と" : ""}全${slides.length}枚・${qualitySweepStepCount}段階を順番に描画し、見切れ、70%未満の自動縮小、文字コントラスト、読み上げ文の省略、文字サイズ、重なりを探します。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`/dashboard/projects/${options.project.project_id}/slides/${slides[0]?.id}/frame?slide=1&step=0`)}">一括チェックを開始</button><button class="ghost" type="button" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">未実行</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="0ページ目と全スライドの表示確認"></iframe></div></div></details>`;
 
   return new Response(
     shell(
