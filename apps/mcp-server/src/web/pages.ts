@@ -238,7 +238,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=90";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=91";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1793,7 +1793,7 @@ export function slideWorkspacePage(options: {
               (block) => `<li><div class="component-outline-row"><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}%</small></span><span class="component-step">STEP ${block.at}</span></div><details class="component-detail"><summary>全設定を確認</summary>${settingTable(Object.entries(block))}</details></li>`
             )
             .join("")}</ul>`
-        : `<p class="mode-note">定型レイアウトです。本文、段階表示、補足欄から構成されます。AIから自由構成へ切り替えると、入れ子のリッチなパーツを利用できます。</p>`;
+        : `<p class="mode-note">定型レイアウトです。本文、段階表示、補足欄から構成されます。下の選択から自由配置または入れ子のリッチ構成を開始できます。</p>`;
   const modeNote =
     slide.composition?.mode === "scene"
       ? "登録済みの表示パーツで構成されています。AIから一件ずつ構造を編集でき、この画面では内容、並び方、表示STEP、アニメーション、画像、配色、余白、文字倍率を実表示で調整できます。"
@@ -1844,7 +1844,7 @@ export function slideWorkspacePage(options: {
     defaultPosition: slideIndex + 1
   });
   const compositionEditor = slide.composition === null || slide.composition === undefined
-    ? ""
+    ? `<form class="editor" data-composition-create data-versioned-form data-method="POST" action="${slidePath}/composition" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><fieldset><legend>自由な構成を開始</legend><label class="check-label"><input name="composition_mode" type="radio" value="canvas" checked><span><strong>自由配置</strong><small class="inherit-note">本文と補足を独立したテキスト枠へ変換し、座標・大きさを直接調整します。</small></span></label><label class="check-label"><input name="composition_mode" type="radio" value="scene"><span><strong>リッチ構成</strong><small class="inherit-note">本文と補足を入れ子の表示パーツへ変換し、stack・grid・グラフなどを追加できます。</small></span></label><p class="inherit-note">現在の本文と補足欄は残したまま表示パーツへコピーします。開始後も元の文章は内容欄から確認できます。</p></fieldset><div class="actions"><button type="submit">選んだ自由構成を開始</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>`
     : `<form class="editor" data-composition-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}"><fieldset><legend>構成全体の表示</legend><label>背景色<span class="color-control"><input name="composition_background" type="color" value="${escapeHtml(slide.composition.background)}" aria-label="構成全体の背景色を色見本から選ぶ"><input type="text" value="${escapeHtml(slide.composition.background)}" data-color-text="composition_background" aria-label="構成全体の背景色のHEX値" pattern="#[0-9A-Fa-f]{6}" maxlength="7" spellcheck="false"></span></label><label class="check-label"><input name="composition_clip_content" type="checkbox"${slide.composition.clip_content ? " checked" : ""}>スライド枠外を隠す</label><p class="inherit-note">枠外を隠すと、自由配置したパーツのはみ出しを切り取ります。品質確認の見切れ診断と合わせて確認してください。</p></fieldset><div class="actions"><button type="submit">構成全体を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>`;
   const effectiveTemplateId = slide.template_id ?? deck.default_template_id ?? null;
   const activeTemplate = (deck.templates ?? []).find(

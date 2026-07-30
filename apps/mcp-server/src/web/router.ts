@@ -178,6 +178,10 @@ const slideCreateRequestSchema = z.object({
   position: z.number().int().nonnegative().max(99),
   template: z.enum(["flow", "cover", "canvas", "scene"])
 });
+const slideCompositionCreateRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  mode: z.enum(["canvas", "scene"])
+});
 
 const slideTypographyRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -1333,6 +1337,97 @@ async function handleSlideCreate(
     return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, version: project.version, next_url: `/dashboard/projects/${projectId}/slides/${slideId}`, error: null, request_id: crypto.randomUUID() });
   } catch (error) {
     return projectMutationErrorResponse(error, "スライドを追加できませんでした。");
+  }
+}
+
+async function handleSlideCompositionCreate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = slideCompositionCreateRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "開始する自由構成を選んでください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition !== null && slide.composition !== undefined) {
+          const error = new Error("The slide already uses a free composition.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        const sidebar = slide.sidebar_markdown?.trim() || null;
+        if (parsed.data.mode === "canvas") {
+          slide.composition = {
+            mode: "canvas",
+            background: "#111827",
+            clip_content: true,
+            blocks: [
+              {
+                id: "main-text",
+                kind: "markdown",
+                frame: { x: 5, y: 7, width: sidebar === null ? 90 : 63, height: 86 },
+                z_index: 0,
+                at: 0,
+                animation: "fade",
+                markdown: slide.content_markdown
+              },
+              ...(sidebar === null ? [] : [{
+                id: "sidebar-text",
+                kind: "markdown" as const,
+                frame: { x: 71, y: 7, width: 24, height: 86 },
+                z_index: 1,
+                at: 0,
+                animation: "fade" as const,
+                markdown: sidebar
+              }])
+            ]
+          };
+        } else {
+          slide.composition = {
+            mode: "scene",
+            runtime_version: "uf-runtime@1",
+            background: "#111827",
+            clip_content: true,
+            nodes: [
+              { id: "root", kind: "stack", parent_id: null, order: 0, at: 0, animation: "fade", frame: { x: 6, y: 7, width: 88, height: 86 }, direction: sidebar === null ? "column" : "row", gap_px: 16, align: "stretch", justify: "center", wrap: false },
+              { id: "main-text", kind: "markdown", parent_id: "root", order: 0, at: 0, animation: "fade", frame: null, markdown: slide.content_markdown },
+              ...(sidebar === null ? [] : [{ id: "sidebar-card", kind: "card" as const, parent_id: "root", order: 1, at: 0, animation: "fade" as const, frame: null, label: "補足", markdown: sidebar, variant: "accent" as const }])
+            ]
+          };
+        }
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_composition_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, mode: parsed.data.mode, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, mode: parsed.data.mode, version: project.version, next_url: `/dashboard/projects/${projectId}/slides/${slideId}`, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "自由構成を開始できませんでした。");
   }
 }
 
@@ -3645,6 +3740,12 @@ export async function handleWebRequest(
   );
   if (slideCreateMatch?.[1] !== undefined) {
     return handleSlideCreate(request, env, slideCreateMatch[1]);
+  }
+  const slideCompositionCreateMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/composition$`)
+  );
+  if (slideCompositionCreateMatch?.[1] !== undefined && slideCompositionCreateMatch[2] !== undefined) {
+    return handleSlideCompositionCreate(request, env, slideCompositionCreateMatch[1], slideCompositionCreateMatch[2]);
   }
   const slideTypographyMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/typography$`)

@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=90"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=91"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -738,6 +738,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-component-frame-reset");
     expect(dashboardScriptText).toContain("form.dataset.component = JSON.stringify");
     expect(dashboardScriptText).toContain("data-slide-create");
+    expect(dashboardScriptText).toContain("data-composition-create");
     expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain("data-scene-component-create");
     expect(dashboardScriptText).toContain("data-scene-item-action");
@@ -2104,6 +2105,48 @@ describe("Web dashboard", () => {
       title: "Webから追加",
       composition: { mode: "scene", runtime_version: "uf-runtime@1" }
     });
+    const createFlowSlide = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 33, title: "自由構成へ変換", position: 2, template: "flow" })
+        }
+      ),
+      authEnv
+    );
+    expect(createFlowSlide.status).toBe(200);
+    const createFlowResult = await createFlowSlide.json() as { slide_id: string; version: number };
+    expect(createFlowResult.version).toBe(34);
+    const flowWorkspace = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/${createFlowResult.slide_id}`, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const flowWorkspaceHtml = await flowWorkspace.text();
+    expect(flowWorkspaceHtml).toContain("data-composition-create");
+    expect(flowWorkspaceHtml).toContain("選んだ自由構成を開始");
+    const createComposition = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/${createFlowResult.slide_id}/composition`,
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 34, mode: "canvas" })
+        }
+      ),
+      authEnv
+    );
+    expect(createComposition.status).toBe(200);
+    expect(await createComposition.json()).toMatchObject({ ok: true, version: 35, mode: "canvas" });
+    const documentWithComposition = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const convertedSlide = JSON.parse(documentWithComposition!.document_json).deck.slides.find((item: { id: string }) => item.id === createFlowResult.slide_id);
+    expect(convertedSlide.composition).toMatchObject({ mode: "canvas", blocks: [{ id: "main-text", kind: "markdown" }] });
 
     const unsupportedUpload = await requestProvider(
       provider,

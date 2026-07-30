@@ -722,6 +722,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       composition_background: String(data.get("composition_background") || ""),
       composition_clip_content: data.has("composition_clip_content")
     });
+    if (form.matches("[data-composition-create]")) Object.assign(body, {
+      mode: String(data.get("composition_mode") || "canvas")
+    });
     if (form.matches("[data-typography-editor]")) Object.assign(body, {
       typography: {
         preset: String(data.get("preset") || "standard"),
@@ -891,7 +894,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) {
           form.dataset.component = JSON.stringify(sceneComponentFromForm(form));
         }
-        if (form.matches("[data-slide-create]")) {
+        if (form.matches("[data-slide-create], [data-composition-create]")) {
           location.href = result.next_url;
           return;
         }
