@@ -84,6 +84,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 
 ## 一枚ごとの文章組版
 
+- flow本文と補足の修正はupdate_slide_fieldsのbody_editsを使う。一文だけ直す場合はtarget、replace_once、現在のold_text、置換後textを送り、本文全体を再送しない。全面差替えはreplace、追記はappend/prepend、補足の削除だけclearを使える。
 - 定型flowは \`update_slide_typography\` で一枚ずつ調整する。短い主張は \`statement\`、通常は \`standard\`、文章主体は \`article\`、まとまりを並べる長文は \`columns\`、資料性を優先する場合は \`dense\`。
 - presetだけで本文・見出し倍率、行間、段落間隔、段数、縦横揃えの安全な既定値が決まる。必要な項目だけを追加で上書きし、元へ戻す項目はnull、上書きをまとめて消す場合は \`reset_overrides: true\` を使う。
 - \`columns\` は既定2段、最大3段。4:3の3段組みは行長が短くなるため、Web UIの実rendererと見切れ診断を必ず確認する。

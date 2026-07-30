@@ -118,6 +118,12 @@ const templateMutableFieldSchema = z.enum([
   "line_height",
   "letter_spacing_em"
 ]);
+const slideBodyEditSchema = z.object({
+  target: z.enum(["content", "sidebar"]),
+  operation: z.enum(["replace", "replace_once", "append", "prepend", "clear"]),
+  old_text: z.string().min(1).max(20_000).optional(),
+  text: z.string().max(20_000).optional()
+});
 
 export type VisualPreset = z.infer<typeof visualPresetSchema>;
 
@@ -422,6 +428,39 @@ function parseSlideBlock(value: unknown) {
     );
   }
   return parsed.data;
+}
+
+function applySlideBodyEdit(
+  currentValue: string | null,
+  edit: z.infer<typeof slideBodyEditSchema>
+): string | null {
+  const current = currentValue ?? "";
+  if (edit.operation === "clear") {
+    if (edit.target === "content") {
+      throw new ProjectToolError("INVALID_FIELDS", "Slide content cannot be empty.");
+    }
+    return null;
+  }
+  if (edit.text === undefined) {
+    throw new ProjectToolError("INVALID_FIELDS", "text is required for this body edit.");
+  }
+  if (edit.operation === "replace") return edit.text;
+  if (edit.operation === "append") return current + edit.text;
+  if (edit.operation === "prepend") return edit.text + current;
+  if (edit.old_text === undefined) {
+    throw new ProjectToolError("INVALID_FIELDS", "old_text is required for replace_once.");
+  }
+  const first = current.indexOf(edit.old_text);
+  const second = first === -1 ? -1 : current.indexOf(edit.old_text, first + edit.old_text.length);
+  if (first === -1 || second !== -1) {
+    throw new ProjectToolError(
+      "INVALID_CHANGE",
+      first === -1
+        ? "old_text was not found in the selected slide body."
+        : "old_text must match exactly once in the selected slide body."
+    );
+  }
+  return current.slice(0, first) + edit.text + current.slice(first + edit.old_text.length);
 }
 
 function upsertSceneComponent(
@@ -1204,7 +1243,7 @@ export function registerProjectMutationTools(
     {
       title: "スライドの項目だけを更新",
       description:
-        "指定したスライドのタイトル、本文、時間、見た目、補足欄だけを変更します。revealと読み上げは別toolです。",
+        "指定したスライドの基本項目と本文・補足を部分更新します。body_editsのreplace_onceはold_textが一度だけ一致する場合に安全に置換します。revealと読み上げは別toolです。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -1219,8 +1258,7 @@ export function registerProjectMutationTools(
         enter_animation: animationSchema.nullable().optional(),
         role: slideRoleSchema.optional(),
         cover_layout: coverLayoutSchema.optional(),
-        content_markdown: z.string().min(1).max(20_000).optional(),
-        sidebar_markdown: z.string().max(10_000).nullable().optional()
+        body_edits: z.array(slideBodyEditSchema).min(1).max(2).optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -1230,20 +1268,51 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, ...fields }) =>
+    async ({ project_id, expected_version, slide_id, body_edits, ...fields }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
         changedKind: "slide_fields_updated",
         changedId: slide_id,
         mutate: (document) => {
-          if (Object.values(fields).every((value) => value === undefined)) {
+          if (
+            body_edits === undefined &&
+            Object.values(fields).every((value) => value === undefined)
+          ) {
             throw new ProjectToolError(
               "INVALID_CHANGE",
               "At least one slide field must be supplied."
             );
           }
-          Object.assign(findSlide(document, slide_id), fields);
+          const slide = findSlide(document, slide_id);
+          Object.assign(slide, fields);
+          const editedTargets = new Set<string>();
+          for (const edit of body_edits ?? []) {
+            if (editedTargets.has(edit.target)) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                `The ${edit.target} body appears more than once.`
+              );
+            }
+            editedTargets.add(edit.target);
+            const next = applySlideBodyEdit(
+              edit.target === "content"
+                ? slide.content_markdown
+                : slide.sidebar_markdown ?? null,
+              edit
+            );
+            const parsed = edit.target === "content"
+              ? z.string().min(1).max(20_000).safeParse(next)
+              : z.string().max(10_000).nullable().safeParse(next);
+            if (!parsed.success) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                parsed.error.issues[0]?.message ?? "The edited slide body is invalid."
+              );
+            }
+            if (edit.target === "content") slide.content_markdown = parsed.data as string;
+            else slide.sidebar_markdown = parsed.data;
+          }
         }
       })
   );

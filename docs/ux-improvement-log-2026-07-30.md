@@ -638,3 +638,9 @@
 - `set_slide_narration`が原稿だけでなく表示方式、共通話者、VOICEVOX profile、調声値を重複して受け、原稿修正時に音声設定まで誤って送り直せる契約を縮小した。
 - 原稿toolはslide、STEP、textだけに限定し、表示枠は`configure_slide_narration`、区間音声は`update_slide_narration_voice`へ一本化した。新規原稿では発表全体の既定表示・話者を継承する。
 - 既存区間の原稿を直したときは話者、profile、調声値を保持し、本文が変わった場合だけ生成済み音声を無効化する。調声後の原稿修正でも設定が残ることをcontract testで検証した。
+
+## 改善ループ243
+
+- MCPの`update_slide_fields`は一文修正でも最大2万字の本文・1万字の補足全体を再送し、引数上限と古い本文による上書き事故の両方を招いていた。
+- 本文・補足の直接fieldを`body_edits`へ置換し、一意なold_textだけを置き換える`replace_once`、全面差替え、前後への追記、補足のclearを最大2対象まで扱えるようにした。
+- anchorが0件または複数件なら保存せず`INVALID_CHANGE`を返し、対象の取り違えを防ぐ。本文は空にできず、編集後の本文・補足をそれぞれの正本上限で再検証する。全面再送fieldがtool schemaから消えたことも契約テストで固定した。

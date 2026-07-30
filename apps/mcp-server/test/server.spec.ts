@@ -101,6 +101,13 @@ describe("MCP contract", () => {
       expect(JSON.stringify(templateUpdateTool?.inputSchema)).not.toContain(
         '"heading_font":{"'
       );
+      const slideFieldsTool = tools.find(
+        (tool) => tool.name === "update_slide_fields"
+      );
+      expect(JSON.stringify(slideFieldsTool?.inputSchema)).toContain('"body_edits"');
+      expect(
+        (slideFieldsTool?.inputSchema as { properties?: object }).properties
+      ).not.toHaveProperty("content_markdown");
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
@@ -579,11 +586,40 @@ describe("MCP contract", () => {
           expected_version: 5,
           slide_id: "question",
           template_id: "mud-biim",
-          content_markdown: "# どこまで丸くできる？",
-          sidebar_markdown: "読み上げない作者コメント"
+          body_edits: [
+            {
+              target: "content",
+              operation: "replace_once",
+              old_text: "研究の問い",
+              text: "# どこまで丸くできる？"
+            },
+            {
+              target: "sidebar",
+              operation: "replace",
+              text: "読み上げない作者コメント"
+            }
+          ]
         }
       });
       expect(slideFields.structuredContent).toMatchObject({ ok: true, version: 6 });
+      const missingBodyAnchor = await client.callTool({
+        name: "update_slide_fields",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 6,
+          slide_id: "question",
+          body_edits: [{
+            target: "content",
+            operation: "replace_once",
+            old_text: "存在しない文",
+            text: "置換後"
+          }]
+        }
+      });
+      expect(missingBodyAnchor).toMatchObject({
+        isError: true,
+        structuredContent: { error: { code: "INVALID_CHANGE" } }
+      });
       const reveal = await client.callTool({
         name: "set_slide_reveal",
         arguments: {
