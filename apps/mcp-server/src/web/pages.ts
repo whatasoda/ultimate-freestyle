@@ -905,6 +905,23 @@ function sceneComponentContentControls(node: SlideSceneNode, maxStep: number): s
   return controls ? `<fieldset><legend>内容</legend><div class="editor-grid">${controls}</div></fieldset>` : "";
 }
 
+function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideSceneNode[]): string {
+  const descendants = new Set<string>();
+  const collect = (parentId: string): void => {
+    for (const child of nodes.filter((candidate) => candidate.parent_id === parentId)) {
+      if (descendants.has(child.id)) continue;
+      descendants.add(child.id);
+      collect(child.id);
+    }
+  };
+  collect(node.id);
+  const parents = nodes
+    .filter((candidate) => ["layer", "stack", "grid"].includes(candidate.kind) && candidate.id !== node.id && !descendants.has(candidate.id))
+    .map((candidate) => `<option value="${escapeHtml(candidate.id)}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
+    .join("");
+  return `<fieldset><legend>階層と並び順</legend><div class="editor-grid"><label>追加先<select name="parent_id" data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value=""${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。自分自身や子孫は追加先に選べません。</p></fieldset>`;
+}
+
 function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number): string {
   const style = node.style ?? {};
   const frame = node.frame ?? { x: 5, y: 5, width: 90, height: 90 };
@@ -1758,15 +1775,17 @@ export function slideWorkspacePage(options: {
       : slide.composition?.mode === "canvas"
         ? "自由配置の表示パーツです。この画面で内容、画像、位置、大きさ、重なり、表示STEP、アニメーション、見た目を調整できます。入れ子が必要な場合はAIからリッチ構成へ移行できます。"
         : "本文と補足欄を使う定型レイアウトです。";
+  const sceneNodes = slide.composition?.mode === "scene" ? slide.composition.nodes : [];
   const sceneComponentEditors = slide.composition?.mode === "scene"
-    ? slide.composition.nodes
+    ? sceneNodes
         .map((node) => {
           const fields = sceneTextFields(node);
+          const hierarchyControls = sceneComponentHierarchyControls(node, sceneNodes);
           const controls = sceneComponentContentControls(node, slide.reveal_steps);
           const kindControls = sceneComponentKindControls(node, options.assets ?? []);
           const appearanceControls = sceneComponentAppearanceControls(node, slide.reveal_steps);
           const assetUrls = Object.fromEntries((options.assets ?? []).map((asset) => [asset.asset_id, asset.content_url]));
-          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-asset-urls="${escapeHtml(JSON.stringify(assetUrls))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><button class="ghost" type="button" data-scene-component-action="duplicate" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">複製</button><button class="ghost danger" type="button" data-scene-component-action="delete" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-asset-urls="${escapeHtml(JSON.stringify(assetUrls))}" data-csrf="${escapeHtml(options.csrfToken)}">${hierarchyControls}${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><button class="ghost" type="button" data-scene-component-action="duplicate" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">複製</button><button class="ghost danger" type="button" data-scene-component-action="delete" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
         .join("")
     : "";

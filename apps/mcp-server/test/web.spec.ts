@@ -1942,8 +1942,43 @@ describe("Web dashboard", () => {
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
     const createdNodes = JSON.parse(createdSceneDocument!.document_json).deck.slides[0].composition.nodes;
-    expect(createdNodes.find((node: { id: string }) => node.id === "stack-1")).toMatchObject({ kind: "stack", parent_id: null });
+    const createdStack = createdNodes.find((node: { id: string }) => node.id === "stack-1");
+    expect(createdStack).toMatchObject({ kind: "stack", parent_id: null });
     expect(createdNodes.find((node: { id: string }) => node.id === "markdown-1")).toMatchObject({ kind: "markdown", parent_id: "stack-1", frame: null });
+    const createdChild = createdNodes.find((node: { id: string }) => node.id === "markdown-1");
+    const moveSceneChild = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components/markdown-1",
+        {
+          method: "PATCH",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 26, component: { ...createdChild, parent_id: null, order: 0 } })
+        }
+      ),
+      authEnv
+    );
+    expect(moveSceneChild.status).toBe(200);
+    expect(await moveSceneChild.json()).toMatchObject({ ok: true, version: 27, component_id: "markdown-1" });
+    const movedSceneDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const movedNodes = JSON.parse(movedSceneDocument!.document_json).deck.slides[0].composition.nodes;
+    expect(movedNodes.find((node: { id: string }) => node.id === "markdown-1")).toMatchObject({ parent_id: null, order: 0 });
+    const cycleSceneComponent = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components/stack-1",
+        {
+          method: "PATCH",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 27, component: { ...createdStack, parent_id: "stack-1" } })
+        }
+      ),
+      authEnv
+    );
+    expect(cycleSceneComponent.status).toBe(422);
+    expect(await cycleSceneComponent.json()).toMatchObject({ ok: false, error: { code: "INVALID_FIELDS" } });
     const updateComposition = await requestProvider(
       provider,
       new Request(
@@ -1956,7 +1991,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 26,
+            expected_version: 27,
             composition_background: "#223344",
             composition_clip_content: false
           })
@@ -1965,7 +2000,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(updateComposition.status).toBe(200);
-    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 27 });
+    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 28 });
     const recoloredDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();

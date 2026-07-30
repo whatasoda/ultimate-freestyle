@@ -1472,6 +1472,28 @@ async function handleSceneComponentUpdate(
           Object.assign(error, { code: "INVALID_FIELDS" });
           throw error;
         }
+        const previousParentId = existing.parent_id;
+        if (component.parent_id !== null) {
+          const parent = slide.composition.nodes.find((node) => node.id === component.parent_id);
+          if (parent === undefined || !["layer", "stack", "grid"].includes(parent.kind)) {
+            const error = new Error("The selected parent cannot contain components.");
+            Object.assign(error, { code: "INVALID_FIELDS" });
+            throw error;
+          }
+          const visited = new Set<string>();
+          let ancestor: SlideSceneNode | undefined = parent;
+          while (ancestor !== undefined) {
+            if (ancestor.id === componentId || visited.has(ancestor.id)) {
+              const error = new Error("The component hierarchy cannot contain a cycle.");
+              Object.assign(error, { code: "INVALID_FIELDS" });
+              throw error;
+            }
+            visited.add(ancestor.id);
+            ancestor = ancestor.parent_id === null
+              ? undefined
+              : slide.composition.nodes.find((node) => node.id === ancestor!.parent_id);
+          }
+        }
         switch (component.kind) {
           case "layer":
             break;
@@ -1588,6 +1610,18 @@ async function handleSceneComponentUpdate(
         existing.at = component.at;
         existing.animation = component.animation;
         existing.style = component.style;
+        existing.parent_id = component.parent_id;
+        const targetSiblings = slide.composition.nodes
+          .filter((node) => node.parent_id === component.parent_id && node.id !== componentId)
+          .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+        targetSiblings.splice(Math.min(component.order, targetSiblings.length), 0, existing);
+        targetSiblings.forEach((node, siblingIndex) => { node.order = siblingIndex; });
+        if (previousParentId !== component.parent_id) {
+          slide.composition.nodes
+            .filter((node) => node.parent_id === previousParentId)
+            .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id))
+            .forEach((node, siblingIndex) => { node.order = siblingIndex; });
+        }
       }
     });
     await recordWebAudit(env.DB, {

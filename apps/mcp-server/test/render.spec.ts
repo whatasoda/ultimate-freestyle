@@ -728,6 +728,9 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-scene-component-create");
     expect(workspaceHtml).toContain("リッチ表示パーツを追加");
     expect(workspaceHtml).toContain('<option value="bar_chart">棒グラフ</option>');
+    expect(workspaceHtml).toContain("階層と並び順");
+    expect(workspaceHtml).toContain('data-component-path="parent_id"');
+    expect(workspaceHtml).toContain('data-component-path="order"');
     expect(workspaceHtml).toContain("パーツの見た目");
     expect(workspaceHtml).toContain("見た目をすべて継承へ戻す");
     expect(workspaceHtml).toContain('data-component-optional="true"');
