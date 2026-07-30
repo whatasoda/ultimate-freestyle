@@ -1442,3 +1442,9 @@
 - 研究内ナビのhover／focus文字色だけ、dashboard themeに存在しない`--text`を参照していた。宣言が無効になり、背景を強調してもmuted文字のままだった。
 - 定義済みの本文色`--ink`へ揃え、pointerとキーボードfocusで同じ明瞭な状態にする。
 - 配信CSSに有効tokenがあり、未定義`var(--text)`がないことを契約へ追加した。dashboard assetを`v156`へ更新した。
+
+## 改善ループ377
+
+- filmstrip検索欄のsticky背景は未定義の`--bg`を使い、gradient宣言全体が無効だった。スライド一覧を縦スクロールすると、固定検索欄の下へ項目が透けた。
+- dashboardの基底色`#090f18`をrootの`--bg`として定義し、body末尾色とfilmstrip gradientで共有する。
+- token定義とsticky gradientの配信CSS契約を追加し、dashboard assetを`v157`へ更新した。
