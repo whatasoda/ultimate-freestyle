@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=99"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=100"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -560,6 +560,10 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
     expect(workspaceHtml).toContain("内容を保存");
+    expect(workspaceHtml).toContain('class="mobile-workspace-tabs"');
+    expect(workspaceHtml).toContain('data-mobile-pane="preview"');
+    expect(workspaceHtml).toContain('data-mobile-pane="edit"');
+    expect(workspaceHtml).toContain('data-mobile-pane="slides"');
     expect(workspaceHtml).toContain('data-markdown-action="heading"');
     expect(workspaceHtml).toContain('data-markdown-action="bold"');
     expect(workspaceHtml).toContain('data-markdown-action="table"');
@@ -708,6 +712,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("width * height > 40_000_000");
     expect(dashboardScriptText).toContain("setPreviewFocus");
     expect(dashboardScriptText).toContain("workspace-preview-focus");
+    expect(dashboardScriptText).toContain("workspace-mobile-pane");
+    expect(dashboardScriptText).toContain('setMobilePane("edit")');
     expect(dashboardScriptText).toContain("const apiErrorMessage =");
     expect(dashboardScriptText).toContain("別の画面またはAIから先に更新されました");
     expect(dashboardScriptText).toContain("サーバーと通信できませんでした");

@@ -411,3 +411,10 @@
 - MCPだけが親scene componentの子孫を暗黙に一括削除していた差をなくし、Web UIと同じく子を移動または削除してから親を削除する契約へ統一した。
 - MCPで最後の1枚を削除して空のdeckを作れた差もなくし、Web UIと同じ`LAST_SLIDE_REQUIRED`で拒否するようにした。
 - `COMPONENT_HAS_CHILDREN`と`LAST_SLIDE_REQUIRED`を安定したMCP error codeへ追加し、どちらもversionを進めないcontract testを加えた。
+
+## 改善ループ209
+
+- 48rem以下のスライド編集画面へ、プレビュー・編集・スライド一覧を切り替えるsticky tabを追加した。
+- 選択中のtabはlocalStorageへ保存し、縦長の編集画面を往復してスクロール位置を見失う負担を減らした。
+- 実表示のパーツ選択や品質診断の「修正欄へ」からは自動で編集tabへ切り替え、対象欄への移動が隠れないようにした。
+- dashboard assetをv100へ更新した。

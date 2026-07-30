@@ -1687,6 +1687,24 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  const mobilePaneButtons = [...document.querySelectorAll("[data-mobile-pane]")];
+  const setMobilePane = (pane) => {
+    if (!["preview", "edit", "slides"].includes(pane)) return;
+    document.body.dataset.mobilePane = pane;
+    for (const button of mobilePaneButtons) {
+      if (button instanceof HTMLButtonElement) button.setAttribute("aria-pressed", String(button.dataset.mobilePane === pane));
+    }
+    try { localStorage.setItem("ultimate-freestyle:workspace-mobile-pane", pane); } catch {}
+  };
+  if (mobilePaneButtons.length > 0) {
+    let initialMobilePane = "preview";
+    try { initialMobilePane = localStorage.getItem("ultimate-freestyle:workspace-mobile-pane") || "preview"; } catch {}
+    setMobilePane(initialMobilePane);
+    for (const button of mobilePaneButtons) {
+      if (button instanceof HTMLButtonElement) button.addEventListener("click", () => setMobilePane(button.dataset.mobilePane || "preview"));
+    }
+  }
+
   const previewFocusButton = document.querySelector("[data-preview-focus]");
   if (previewFocusButton instanceof HTMLButtonElement) {
     const previewFocusKey = "ultimate-freestyle:workspace-preview-focus";
@@ -1827,6 +1845,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         button.dataset.diagnosticFix = "true";
         button.textContent = "修正欄へ";
         button.addEventListener("click", () => {
+          setMobilePane("edit");
           section.open = true;
           const componentDetail = target.closest("details.component-detail");
           if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
@@ -1841,6 +1860,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           suggestion.className = "ghost";
           suggestion.textContent = "推奨色を入力";
           suggestion.addEventListener("click", () => {
+            setMobilePane("edit");
             section.open = true;
             const componentDetail = target.closest("details.component-detail");
             if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
@@ -1896,6 +1916,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           : [...document.querySelectorAll("[data-canvas-block-editor]")];
         const target = forms.find((form) => form instanceof HTMLFormElement && (data.component_type === "scene" ? form.dataset.componentId : form.dataset.blockId) === data.component_id);
         if (!(target instanceof HTMLFormElement)) return;
+        setMobilePane("edit");
         if (document.body.dataset.previewFocus === "true" && previewFocusButton instanceof HTMLButtonElement) previewFocusButton.click();
         const section = target.closest("[data-inspector-section]");
         if (section instanceof HTMLDetailsElement) section.open = true;
