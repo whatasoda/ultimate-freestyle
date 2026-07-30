@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@73";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@74";
 
 function escapeHtml(value: string): string {
   return value
@@ -885,8 +885,8 @@ export function renderPresentationHtml(
     .prelude-help { margin: .35cqh 0 0; color: #8fa0b5; font-size: .9cqw; }
     .prelude-start { min-width: 10em; padding: .8em 1.4em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: var(--accent); font-weight: 850; }
     .prelude-start:disabled { cursor: wait; opacity: .45; }
-    .voice-unlock { position: absolute; z-index: 45; left: 50%; bottom: 4%; translate: -50% 0; min-width: 12em; padding: .75em 1.1em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: #101827ee; box-shadow: 0 1em 3em #0009; font-weight: 850; }
-    .voice-unlock[hidden] { display: none; }
+    .voice-unlock, .presentation-resume { position: absolute; z-index: 45; left: 50%; bottom: 4%; translate: -50% 0; min-width: 12em; padding: .75em 1.1em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: #101827ee; box-shadow: 0 1em 3em #0009; font-weight: 850; }
+    .voice-unlock[hidden], .presentation-resume[hidden] { display: none; }
     .completion { position: absolute; z-index: 50; inset: 0; display: grid; place-items: center; padding: 8%; background: #05080dcc; backdrop-filter: blur(.45cqw); }
     .completion[hidden] { display: none; }
     .completion-card { width: min(34em, 78%); padding: 2.4em; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff33); border-radius: 1.2em; background: #101827f2; box-shadow: 0 1.5em 5em #000b; text-align: center; }
@@ -992,6 +992,7 @@ export function renderPresentationHtml(
       </section>
       ${slideHtml}
       <button class="voice-unlock" type="button" data-voice-unlock hidden>音声を開始</button>
+      <button class="presentation-resume" type="button" data-presentation-resume hidden>発表を再開</button>
       <section class="completion" data-completion role="dialog" aria-modal="true" aria-labelledby="completion-title" aria-live="polite" hidden>
         <div class="completion-card">
           <h2 id="completion-title">発表はここまでです</h2>
@@ -1058,6 +1059,7 @@ export function renderPresentationHtml(
     const preludeStatus = document.querySelector('[data-prelude-status]');
     const stage = document.querySelector('.stage');
     const voiceUnlock = document.querySelector('[data-voice-unlock]');
+    const presentationResume = document.querySelector('[data-presentation-resume]');
     const completion = document.querySelector('[data-completion]');
     const restartButton = document.querySelector('[data-restart]');
     const dismissCompletionButton = document.querySelector('[data-dismiss-completion]');
@@ -1070,7 +1072,7 @@ export function renderPresentationHtml(
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let swipeStart = null, suppressStageClick = false, editorGridSnap = false;
-    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0, visibilityPause = null;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -2189,6 +2191,7 @@ export function renderPresentationHtml(
         }
         return;
       }
+      if (presentationResume instanceof HTMLButtonElement && !presentationResume.hidden) return;
       const target = event.target;
       const interactive = target instanceof Element ? target.closest('button, a, input, select, textarea') : null;
       if (interactive instanceof HTMLInputElement || interactive instanceof HTMLSelectElement || interactive instanceof HTMLTextAreaElement) return;
@@ -2298,6 +2301,18 @@ export function renderPresentationHtml(
       advance();
     });
     voiceUnlock?.addEventListener('click', () => { if (started) speak(); });
+    presentationResume?.addEventListener('click', () => {
+      if (!visibilityPause) return;
+      const paused = visibilityPause;
+      visibilityPause = null;
+      presentationResume.hidden = true;
+      unitStartedAt = performance.now();
+      if (paused.timer) setTimerRunning(true);
+      if (paused.audio && activeAudio) activeAudio.play().catch(showVoiceUnlock);
+      if (paused.speech && 'speechSynthesis' in window) speechSynthesis.resume();
+      if (auto && !paused.audio && !paused.speech) scheduleAutoAdvance();
+      stage?.focus();
+    });
     restartButton?.addEventListener('click', () => {
       hideCompletion();
       elapsedAccumulated = 0;
@@ -2310,6 +2325,24 @@ export function renderPresentationHtml(
     });
     dismissCompletionButton?.addEventListener('click', () => {
       hideCompletion();
+    });
+    addEventListener('visibilitychange', () => {
+      if (editorFrame || !started) return;
+      if (document.hidden) {
+        if (visibilityPause) return;
+        const audioPlaying = Boolean(activeAudio && !activeAudio.paused);
+        const speechPlaying = 'speechSynthesis' in window && speechSynthesis.speaking && !speechSynthesis.paused;
+        if (!timerRunning && !audioPlaying && !speechPlaying && !auto) return;
+        visibilityPause = { timer: timerRunning, audio: audioPlaying, speech: speechPlaying, auto };
+        if (timerRunning) setTimerRunning(false);
+        clearTimeout(autoTimer);
+        clearInterval(voiceTimer);
+        if (audioPlaying) activeAudio.pause();
+        if (speechPlaying) speechSynthesis.pause();
+      } else if (visibilityPause && presentationResume instanceof HTMLButtonElement) {
+        presentationResume.hidden = false;
+        presentationResume.focus();
+      }
     });
     addEventListener('message', (event) => {
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
