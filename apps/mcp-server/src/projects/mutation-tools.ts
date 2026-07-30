@@ -853,12 +853,13 @@ export function registerProjectMutationTools(
     {
       title: "研究の箇条書きを一件編集",
       description:
-        "findingsまたはlimitationsの一件を追加・置換・削除します。追加はindexを省略、削除はvalueをnullにします。",
+        "findingsまたはlimitationsの一件を追加・置換・部分編集・削除します。追加はindexを省略してvalueを指定し、短い全体はvalue、既存の長文はtext_editで変更します。valueをnullまたはtext_editのclearにすると削除します。",
       inputSchema: {
         ...projectIdInput,
         list: z.enum(["findings", "limitations"]),
         index: z.number().int().nonnegative().max(99).optional(),
-        value: z.string().min(1).max(4_000).nullable()
+        value: z.string().min(1).max(4_000).nullable().optional(),
+        text_edit: componentTextEditSchema.optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -868,7 +869,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, list, index, value }) =>
+    async ({ project_id, expected_version, list, index, value, text_edit }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -876,11 +877,17 @@ export function registerProjectMutationTools(
         changedId: index === undefined ? null : String(index),
         mutate: (document) => {
           const values = document[list];
+          if ((value === undefined) === (text_edit === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_FIELDS",
+              "Specify exactly one of value or text_edit."
+            );
+          }
           if (index === undefined) {
-            if (value === null) {
+            if (value === null || value === undefined || text_edit !== undefined) {
               throw new ProjectToolError(
                 "INVALID_CHANGE",
-                "An index is required when deleting an item."
+                "An index is required when editing or deleting an item."
               );
             }
             values.push(value);
@@ -892,8 +899,19 @@ export function registerProjectMutationTools(
               "The list index does not exist."
             );
           }
-          if (value === null) values.splice(index, 1);
-          else values[index] = value;
+          const nextValue = text_edit === undefined
+            ? value
+            : applyComponentTextEdit(values[index], text_edit, `${list} item`);
+          if (nextValue === null) values.splice(index, 1);
+          else {
+            if (nextValue === undefined || nextValue.length === 0 || nextValue.length > 4_000) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                "The edited list item must contain between 1 and 4000 characters."
+              );
+            }
+            values[index] = nextValue;
+          }
         }
       })
   );

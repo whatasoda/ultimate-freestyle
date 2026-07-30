@@ -129,6 +129,10 @@ describe("MCP contract", () => {
       expect(
         (projectFieldsTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("method");
+      const projectListItemTool = tools.find(
+        (tool) => tool.name === "set_project_list_item"
+      );
+      expect(JSON.stringify(projectListItemTool?.inputSchema)).toContain('"text_edit"');
       const componentContentTool = tools.find(
         (tool) => tool.name === "update_slide_component_content"
       );
@@ -2188,6 +2192,41 @@ describe("MCP contract", () => {
       expect(ambiguous).toMatchObject({
         isError: true,
         structuredContent: { error: { code: "INVALID_FIELDS" } }
+      });
+
+      const addedFinding = await client.callTool({
+        name: "set_project_list_item",
+        arguments: {
+          project_id: projectId,
+          expected_version: 2,
+          list: "findings",
+          value: "古い観察では温度が一定だった。"
+        }
+      });
+      expect(addedFinding.structuredContent).toMatchObject({ ok: true, version: 3 });
+      const editedFinding = await client.callTool({
+        name: "set_project_list_item",
+        arguments: {
+          project_id: projectId,
+          expected_version: 3,
+          list: "findings",
+          index: 0,
+          text_edit: {
+            operation: "replace_once",
+            old_text: "古い観察",
+            text: "三回の観察"
+          }
+        }
+      });
+      expect(editedFinding.structuredContent).toMatchObject({ ok: true, version: 4 });
+      const findingsPage = await readJsonResource(
+        client,
+        `research://projects/${projectId}/research/findings/pages/1`
+      );
+      expect(findingsPage).toMatchObject({
+        ok: true,
+        version: 4,
+        items: [{ position: 1, text: "三回の観察では温度が一定だった。" }]
       });
     } finally {
       await client.close();
