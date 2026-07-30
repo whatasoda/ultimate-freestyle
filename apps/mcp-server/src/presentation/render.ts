@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@92";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@93";
 
 function escapeHtml(value: string): string {
   return value
@@ -1112,7 +1112,7 @@ export function renderPresentationHtml(
     const editorPrelude = document.body.dataset.editorPrelude === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let swipeStart = null, suppressStageClick = false, editorGridSnap = false;
-    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0, visibilityPause = null;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0, visibilityPause = null, progressClock = null, autoDeadline = null;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -1248,16 +1248,53 @@ export function renderPresentationHtml(
       stage?.removeAttribute('data-voice-blocked');
       if (restoreStageFocus) stage?.focus({ preventScroll: true });
     };
+    const stopProgressClock = () => {
+      clearInterval(voiceTimer);
+      voiceTimer = undefined;
+      progressClock = null;
+    };
+    const startProgressClock = (durationMilliseconds, elapsedMilliseconds = 0) => {
+      stopProgressClock();
+      const duration = Math.max(1, durationMilliseconds);
+      progressClock = { duration, elapsed: clamp(elapsedMilliseconds, 0, duration), startedAt: performance.now() };
+      const tick = () => {
+        if (!progressClock) return;
+        setVoiceProgress((progressClock.elapsed + performance.now() - progressClock.startedAt) / progressClock.duration * 100);
+      };
+      tick();
+      voiceTimer = setInterval(tick, 100);
+    };
+    const pauseProgressClock = () => {
+      if (!progressClock) { clearInterval(voiceTimer); voiceTimer = undefined; return null; }
+      const paused = {
+        duration: progressClock.duration,
+        elapsed: clamp(progressClock.elapsed + performance.now() - progressClock.startedAt, 0, progressClock.duration)
+      };
+      stopProgressClock();
+      return paused;
+    };
+    const startAdvanceTimer = (delay) => {
+      clearTimeout(autoTimer);
+      const remaining = Math.max(0, delay);
+      autoDeadline = performance.now() + remaining;
+      autoTimer = setTimeout(() => {
+        autoDeadline = null;
+        stopProgressClock();
+        setVoiceProgress(100);
+        advance();
+      }, remaining);
+    };
     const stopVoice = () => {
       voiceRun += 1;
       if ('speechSynthesis' in window) speechSynthesis.cancel();
-      clearInterval(voiceTimer);
+      stopProgressClock();
       clearTimeout(autoTimer);
+      autoDeadline = null;
       if (activeAudio) { activeAudio.pause(); activeAudio.removeAttribute('src'); activeAudio.load(); activeAudio = null; }
       setVoiceProgress(0);
       setVoiceStatus('idle', '音声待機');
     };
-    const finishVoice = () => { clearInterval(voiceTimer); setVoiceProgress(100); if (auto) autoTimer = setTimeout(advance, 350); };
+    const finishVoice = () => { stopProgressClock(); setVoiceProgress(100); if (auto) startAdvanceTimer(350); };
     const reportPreviewCompletion = () => {
       if (typeof DECK.previewRevisionId !== 'string') return;
       const detail = {
@@ -1325,16 +1362,15 @@ export function renderPresentationHtml(
     };
     const scheduleAutoAdvance = () => {
       clearTimeout(autoTimer);
+      autoDeadline = null;
       if (!auto || !started) return;
       const current = DECK.slides[slide];
       const targetDuration = Math.max(1500, current.durationSeconds * 1000 / (current.revealSteps + 1));
       const delay = Math.max(500, targetDuration - (performance.now() - unitStartedAt));
-      const begin = performance.now();
       setSecondaryProgressLabel('自動送りまで');
       setVoiceProgress(0);
-      clearInterval(voiceTimer);
-      voiceTimer = setInterval(() => setVoiceProgress((performance.now() - begin) / delay * 100), 100);
-      autoTimer = setTimeout(() => { clearInterval(voiceTimer); setVoiceProgress(100); advance(); }, delay);
+      startProgressClock(delay);
+      startAdvanceTimer(delay);
     };
     const speakWithBrowser = (segment, fallback = false) => {
       if (!('speechSynthesis' in window)) { setVoiceStatus('failed', '音声を利用できません'); scheduleAutoAdvance(); return; }
@@ -1349,13 +1385,12 @@ export function renderPresentationHtml(
       utterance.pitch = clamp(1 + Number(tuning.pitchScale || 0) * 4, .5, 1.5);
       utterance.volume = clamp(Number(volume.value) * Number(tuning.volumeScale || 1), 0, 1);
       const estimated = Math.max(1.5, segment.text.length / (7 * utterance.rate));
-      const begin = performance.now();
-      voiceTimer = setInterval(() => setVoiceProgress((performance.now() - begin) / 10 / estimated), 100);
+      startProgressClock(estimated * 1000);
       utterance.onstart = () => { if (run === voiceRun) hideVoiceUnlock(); };
       utterance.onend = () => { if (run === voiceRun) finishVoice(); };
       utterance.onerror = (event) => {
         if (run !== voiceRun) return;
-        clearInterval(voiceTimer);
+        stopProgressClock();
         setVoiceProgress(0);
         if (event.error === 'not-allowed') showVoiceUnlock();
         else { setVoiceStatus('failed', 'ブラウザ音声の読み上げ失敗'); scheduleAutoAdvance(); }
@@ -2241,7 +2276,7 @@ export function renderPresentationHtml(
       auto = !auto;
       autoButton.setAttribute('aria-pressed', String(auto));
       autoButton.textContent = '自動 ' + (auto ? 'ON' : 'OFF');
-      if (!auto) { clearTimeout(autoTimer); clearInterval(voiceTimer); setVoiceProgress(0); setSecondaryProgressLabel('読み上げ進捗'); }
+      if (!auto) { clearTimeout(autoTimer); autoDeadline = null; stopProgressClock(); setVoiceProgress(0); setSecondaryProgressLabel('読み上げ進捗'); }
       else if (!activeAudio && (!('speechSynthesis' in window) || !speechSynthesis.speaking)) scheduleAutoAdvance();
     });
     volume.addEventListener('input', () => { showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
@@ -2471,11 +2506,17 @@ export function renderPresentationHtml(
       const paused = visibilityPause;
       visibilityPause = null;
       presentationResume.hidden = true;
-      unitStartedAt = performance.now();
+      unitStartedAt += performance.now() - paused.hiddenAt;
       if (paused.timer) setTimerRunning(true);
       if (paused.audio && activeAudio) activeAudio.play().catch(showVoiceUnlock);
-      if (paused.speech && 'speechSynthesis' in window) speechSynthesis.resume();
-      if (auto && !paused.audio && !paused.speech) scheduleAutoAdvance();
+      if (paused.speech && 'speechSynthesis' in window) {
+        if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed);
+        speechSynthesis.resume();
+      }
+      if (auto && paused.autoRemaining !== null) {
+        if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed);
+        startAdvanceTimer(paused.autoRemaining);
+      } else if (auto && !paused.audio && !paused.speech) scheduleAutoAdvance();
       stage?.focus();
     });
     restartButton?.addEventListener('click', () => {
@@ -2498,10 +2539,12 @@ export function renderPresentationHtml(
         const audioPlaying = Boolean(activeAudio && !activeAudio.paused);
         const speechPlaying = 'speechSynthesis' in window && speechSynthesis.speaking && !speechSynthesis.paused;
         if (!timerRunning && !audioPlaying && !speechPlaying && !auto) return;
-        visibilityPause = { timer: timerRunning, audio: audioPlaying, speech: speechPlaying, auto };
+        const autoRemaining = autoDeadline === null ? null : Math.max(0, autoDeadline - performance.now());
+        const progress = pauseProgressClock();
+        visibilityPause = { timer: timerRunning, audio: audioPlaying, speech: speechPlaying, auto, autoRemaining, progress, hiddenAt: performance.now() };
         if (timerRunning) setTimerRunning(false);
         clearTimeout(autoTimer);
-        clearInterval(voiceTimer);
+        autoDeadline = null;
         if (audioPlaying) activeAudio.pause();
         if (speechPlaying) speechSynthesis.pause();
       } else if (visibilityPause && presentationResume instanceof HTMLButtonElement) {
