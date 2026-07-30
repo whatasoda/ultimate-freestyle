@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@82";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@83";
 
 function escapeHtml(value: string): string {
   return value
@@ -500,6 +500,11 @@ export function renderPresentationHtml(
   const templates = new Map(
     (deck.templates ?? []).map((template) => [template.id, template])
   );
+  const firstSlide = deck.slides[0];
+  const firstTemplateId = firstSlide.template_id ?? deck.default_template_id ?? null;
+  const preludeHeadingFont = templateAppearance(
+    firstTemplateId === null ? null : templates.get(firstTemplateId)
+  ).heading_font;
   const templateCss = [...templates.values()]
     .map(
       (template) => {
@@ -672,16 +677,16 @@ export function renderPresentationHtml(
     .slide[data-body-font="textbook"] { --font-body: "UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN", serif; }
     .slide[data-body-font="handwritten"] { --font-body: Klee, "Hannotate SC", "YuKyokasho", cursive; }
     .slide[data-body-font="condensed"] { --font-body: "Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN", sans-serif; }
-    .slide[data-heading-font="system-sans"] { --font-heading: Inter, "Noto Sans JP", system-ui, sans-serif; }
-    .slide[data-heading-font="gothic"] { --font-heading: "BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif; }
-    .slide[data-heading-font="rounded"] { --font-heading: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", ui-rounded, sans-serif; }
-    .slide[data-heading-font="mincho"] { --font-heading: "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", serif; }
-    .slide[data-heading-font="serif"] { --font-heading: Georgia, "Noto Serif JP", "Yu Mincho", serif; }
-    .slide[data-heading-font="monospace"] { --font-heading: "BIZ UDGothic", "SFMono-Regular", Consolas, monospace; }
-    .slide[data-heading-font="display"] { --font-heading: "Arial Black", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif; }
-    .slide[data-heading-font="textbook"] { --font-heading: "UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN", serif; }
-    .slide[data-heading-font="handwritten"] { --font-heading: Klee, "Hannotate SC", "YuKyokasho", cursive; }
-    .slide[data-heading-font="condensed"] { --font-heading: "Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN", sans-serif; }
+    :is(.slide,.prelude)[data-heading-font="system-sans"] { --font-heading: Inter, "Noto Sans JP", system-ui, sans-serif; }
+    :is(.slide,.prelude)[data-heading-font="gothic"] { --font-heading: "BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif; }
+    :is(.slide,.prelude)[data-heading-font="rounded"] { --font-heading: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", ui-rounded, sans-serif; }
+    :is(.slide,.prelude)[data-heading-font="mincho"] { --font-heading: "Noto Serif JP", "Yu Mincho", "Hiragino Mincho ProN", serif; }
+    :is(.slide,.prelude)[data-heading-font="serif"] { --font-heading: Georgia, "Noto Serif JP", "Yu Mincho", serif; }
+    :is(.slide,.prelude)[data-heading-font="monospace"] { --font-heading: "BIZ UDGothic", "SFMono-Regular", Consolas, monospace; }
+    :is(.slide,.prelude)[data-heading-font="display"] { --font-heading: "Arial Black", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif; }
+    :is(.slide,.prelude)[data-heading-font="textbook"] { --font-heading: "UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN", serif; }
+    :is(.slide,.prelude)[data-heading-font="handwritten"] { --font-heading: Klee, "Hannotate SC", "YuKyokasho", cursive; }
+    :is(.slide,.prelude)[data-heading-font="condensed"] { --font-heading: "Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN", sans-serif; }
     .slide[data-user-template="false"][data-visual-preset="paper"] { --theme-background: #f7f3ea; --theme-surface: #ebe5d8; --theme-foreground: #1d2735; --theme-muted: #596474; --theme-border: #23304433; --slide-base: var(--theme-background); }
     .slide[data-user-template="false"][data-visual-preset="editorial"] { --theme-background: #f2eadb; --theme-surface: #e5d8c3; --theme-foreground: #201b18; --theme-muted: #665b52; --theme-border: #4d332d40; --slide-base: var(--theme-background); }
     .slide[data-user-template="false"][data-visual-preset="neon"] { --theme-background: #09071b; --theme-surface: #161130dd; --theme-foreground: #f4f2ff; --theme-muted: #b7afd6; --theme-border: color-mix(in srgb, var(--accent) 52%, transparent); --slide-base: var(--theme-background); }
@@ -886,14 +891,14 @@ export function renderPresentationHtml(
     [data-layout="cinematic"] .slide { grid-template-columns: 1fr; }
     .prelude { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; overflow: hidden; background: #080d15; color: #f8fafc; }
     .prelude[hidden] { display: none; }
-    .prelude-inner { position: relative; z-index: 1; display: grid; width: min(78%, 48rem); justify-items: center; gap: 1.4cqh; text-align: center; }
-    .prelude-kicker { margin: 0; color: var(--accent); font: 850 1.1cqw/1.2 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; }
-    .prelude h1 { max-width: 16ch; margin: 0; font-family: var(--font-heading, system-ui, sans-serif); font-size: 5.8cqw; line-height: .98; letter-spacing: -.05em; text-wrap: balance; overflow-wrap: anywhere; }
-    .prelude-message { margin: 0; color: #b9c6d6; font-size: 1.35cqw; }
+    .prelude-inner { --prelude-fit-scale: 1; position: relative; z-index: 1; display: grid; width: min(78%, 48rem); max-height: 88%; justify-items: center; gap: calc(1.4cqh * var(--prelude-fit-scale)); text-align: center; }
+    .prelude-kicker { margin: 0; color: var(--accent); font: 850 calc(1.1cqw * var(--prelude-fit-scale))/1.2 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; }
+    .prelude h1 { max-width: 16ch; margin: 0; font-family: var(--font-heading, system-ui, sans-serif); font-size: calc(5.8cqw * var(--prelude-fit-scale)); line-height: .98; letter-spacing: -.05em; text-wrap: balance; overflow-wrap: anywhere; }
+    .prelude-message { margin: 0; color: #b9c6d6; font-size: calc(1.35cqw * var(--prelude-fit-scale)); }
     .prelude-meter { width: min(100%, 32rem); height: .55cqh; overflow: hidden; border-radius: 99px; background: #ffffff18; }
     .prelude-meter i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, var(--accent), #65ccff); transition: width .2s ease; }
-    .prelude-status { min-height: 1.5em; margin: 0; color: #8fa0b5; font: 700 1cqw/1.4 ui-monospace, monospace; }
-    .prelude-help { margin: .35cqh 0 0; color: #8fa0b5; font-size: .9cqw; }
+    .prelude-status { min-height: 1.5em; margin: 0; color: #8fa0b5; font: 700 calc(1cqw * var(--prelude-fit-scale))/1.4 ui-monospace, monospace; }
+    .prelude-help { margin: .35cqh 0 0; color: #8fa0b5; font-size: calc(.9cqw * var(--prelude-fit-scale)); }
     .prelude-start { min-width: 10em; padding: .8em 1.4em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: var(--accent); font-weight: 850; }
     .prelude-start:disabled { cursor: wait; opacity: .45; }
     .voice-unlock, .presentation-resume { position: absolute; z-index: 45; left: 50%; bottom: 4%; translate: -50% 0; min-width: 12em; padding: .75em 1.1em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: #101827ee; box-shadow: 0 1em 3em #0009; font-weight: 850; }
@@ -990,7 +995,7 @@ export function renderPresentationHtml(
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
     <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p><p class="sr-only" data-slide-announcer aria-live="polite" aria-atomic="true"></p>
-      <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
+      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
           <h1>${escapeHtml(project.document.title)}</h1>
@@ -1064,6 +1069,7 @@ export function renderPresentationHtml(
     const previousButton = document.querySelector('#prev');
     const nextButton = document.querySelector('#next');
     const prelude = document.querySelector('[data-prelude]');
+    const preludeInner = prelude?.querySelector('.prelude-inner');
     const preludeStart = document.querySelector('[data-prelude-start]');
     const preludeProgress = document.querySelector('[data-prelude-progress]');
     const preludeMeter = preludeProgress?.parentElement;
@@ -1533,6 +1539,21 @@ export function renderPresentationHtml(
         overflow_y: Math.max(...hidden.map((rect) => rect.bottom - boundary.bottom), 0)
       };
     };
+    const fitPrelude = () => {
+      if (!(prelude instanceof HTMLElement) || !(preludeInner instanceof HTMLElement) || prelude.hidden) return;
+      preludeInner.style.setProperty('--prelude-fit-scale', '1');
+      const boundary = prelude.getBoundingClientRect();
+      let scale = 1;
+      let content = preludeInner.getBoundingClientRect();
+      while ((content.width > boundary.width * .92 || content.height > boundary.height * .9) && scale > .55) {
+        scale = Math.max(.55, Number((scale - .05).toFixed(2)));
+        preludeInner.style.setProperty('--prelude-fit-scale', String(scale));
+        content = preludeInner.getBoundingClientRect();
+      }
+      prelude.dataset.fitScale = String(scale);
+      prelude.dataset.overflow = String(content.width > boundary.width * .94 || content.height > boundary.height * .94);
+    };
+    const schedulePreludeFit = () => requestAnimationFrame(() => requestAnimationFrame(fitPrelude));
     const fitAndReport = () => {
       const currentSlide = slides[slide];
       const diagnostics = [];
@@ -2023,6 +2044,7 @@ export function renderPresentationHtml(
       stopVoice();
       hideVoiceUnlock();
       prelude.hidden = false;
+      schedulePreludeFit();
       slides.forEach((item) => { item.hidden = true; item.dataset.state = 'inactive'; });
       counter.textContent = '0 / ' + slides.length;
       progress.style.width = '0%';
@@ -2086,6 +2108,7 @@ export function renderPresentationHtml(
       if (preludeStatus) preludeStatus.textContent = completed < total
         ? completed + ' / ' + total + ' 件を準備中'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
+      schedulePreludeFit();
     };
     const preloadedResources = new Set();
     const preloadResource = (url, kind) => new Promise((resolve) => {
