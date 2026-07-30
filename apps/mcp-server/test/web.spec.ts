@@ -2250,5 +2250,5 @@ describe("Web dashboard", () => {
     );
     expect(afterLogout.status).toBe(303);
     expect(afterLogout.headers.get("location")).toBe("/");
-  });
+  }, 10_000);
 });

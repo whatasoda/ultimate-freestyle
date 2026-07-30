@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@76";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@77";
 
 function escapeHtml(value: string): string {
   return value
@@ -1405,7 +1405,6 @@ export function renderPresentationHtml(
         const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
         const required = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700) ? 3 : 4.5;
         const ratio = contrastRatio(foreground, background.color);
-        if (background.complex && ratio >= 2) continue;
         if (ratio + .05 >= required || (lowest && lowest.ratio <= ratio)) continue;
         const dark = { red: 17, green: 24, blue: 39, alpha: 1 };
         const light = { red: 248, green: 250, blue: 252, alpha: 1 };

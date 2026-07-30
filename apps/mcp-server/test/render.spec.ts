@@ -179,7 +179,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const collectOcclusions =");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@76");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@77");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -239,6 +239,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("DECK.preload.slides[slide + 1]");
     expect(html).toContain("const critical = DECK.preload.slides[requested]");
     expect(html).not.toContain("DECK.preload.images.map");
+    expect(html).not.toContain("background.complex && ratio >= 2");
     expect(html).toContain("else scheduleAutoAdvance();");
     expect(html).toContain("ultimate-freestyle:preview-fields");
     expect(html).toContain("ultimate-freestyle:preview-scene-component");
@@ -332,7 +333,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("ultimate-freestyle:render-diagnostics");
     expect(html).toContain("step, overflows: diagnostics, fits, contrasts");
     expect(html).toContain("const collectContrast = (target, slideElement)");
-    expect(html).toContain("background.complex && ratio >= 2");
+    expect(html).not.toContain("background.complex && ratio >= 2");
     expect(html).toContain("suggested_foreground");
     expect(html).toContain("ultimate-freestyle:set-position");
     expect(html).toContain("container: presentation-stage / size");
