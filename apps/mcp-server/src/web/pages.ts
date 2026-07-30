@@ -627,7 +627,7 @@ function shell(title: string, body: string): string {
       .step-control output { min-width: 6rem; color: var(--muted); text-align: center; font: 700 .8rem/1 ui-monospace, monospace; }
       .component-outline { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
       .component-outline li { overflow: hidden; border: 1px solid var(--line); border-radius: .55rem; color: #bdc9d8; font-size: .8rem; }
-      .component-outline-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .55rem; }
+      .component-outline-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .55rem .55rem .55rem calc(.55rem + var(--component-indent, 0rem)); }
       a.component-outline-row { color: inherit; text-decoration: none; }
       a.component-outline-row:hover, a.component-outline-row[aria-current="true"] { background: #8062df24; color: white; }
       .component-outline .component-outline { gap: .35rem; margin: 0 .45rem .45rem .85rem; padding-left: .65rem; border-left: 1px solid #52647c; }
@@ -1074,17 +1074,26 @@ function sceneComponentOutline(nodes: SlideSceneNode[], selectedId: string | nul
       (left, right) => left.order - right.order || left.id.localeCompare(right.id)
     );
   }
-  const renderChildren = (parentId: string | null): string => {
-    const items = (children.get(parentId) ?? [])
-      .map((node) => {
-        const descendants = renderChildren(node.id);
-        const href = `${slidePath}?component=${encodeURIComponent(node.id)}`;
-        return `<li><a class="component-outline-row" data-component-select="${escapeHtml(node.id)}" href="${escapeHtml(href)}"${node.id === selectedId ? ' aria-current="true"' : ""}><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>${node.frame === null || node.frame === undefined ? "自動配置" : "自由配置"}</small></span><span class="component-step">STEP ${node.at}</span></a>${descendants}</li>`;
-      })
-      .join("");
-    return items.length > 0 ? `<ul class="component-outline">${items}</ul>` : "";
-  };
-  return renderChildren(null);
+  const ordered: Array<{ node: SlideSceneNode; depth: number }> = [];
+  const seen = new Set<string>();
+  const pending = [...(children.get(null) ?? [])].reverse().map((node) => ({ node, depth: 0 }));
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (current === undefined || seen.has(current.node.id)) continue;
+    seen.add(current.node.id);
+    ordered.push(current);
+    for (const child of [...(children.get(current.node.id) ?? [])].reverse()) {
+      pending.push({ node: child, depth: current.depth + 1 });
+    }
+  }
+  for (const node of nodes) {
+    if (!seen.has(node.id)) ordered.push({ node, depth: 0 });
+  }
+  return `<ul class="component-outline">${ordered.map(({ node, depth }) => {
+    const href = `${slidePath}?component=${encodeURIComponent(node.id)}`;
+    const placement = node.frame === null || node.frame === undefined ? "自動配置" : "自由配置";
+    return `<li><a class="component-outline-row" data-component-select="${escapeHtml(node.id)}" data-component-depth="${depth}" href="${escapeHtml(href)}" style="--component-indent:${Math.min(depth, 8) * 0.5}rem"${node.id === selectedId ? ' aria-current="true"' : ""}><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>階層 ${depth} · ${placement}</small></span><span class="component-step">STEP ${node.at}</span></a></li>`;
+  }).join("")}</ul>`;
 }
 
 function canvasBlockEditor(options: {

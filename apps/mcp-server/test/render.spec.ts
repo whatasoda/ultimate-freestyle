@@ -1011,7 +1011,9 @@ describe("presentation artifact renderer", () => {
     }).text();
     expect(largeSceneHtml.match(/data-component-select=/g)).toHaveLength(200);
     expect(largeSceneHtml.match(/data-scene-component-editor/g)).toHaveLength(1);
+    expect(largeSceneHtml.match(/class="component-outline"/g)).toHaveLength(1);
     expect(largeSceneHtml).toContain('data-component-id="text-198"');
+    expect(largeSceneHtml).toContain('data-component-depth="1"');
     expect(new TextEncoder().encode(largeSceneHtml).byteLength).toBeLessThan(500_000);
 
     const largeCanvasProject = projectRecordSchema.parse({
