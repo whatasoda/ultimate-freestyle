@@ -593,7 +593,7 @@ function shell(title: string, body: string): string {
       main.workspace-main { width: min(96vw, 100rem); padding-top: 1rem; }
       .workspace-head { display: grid; gap: .75rem; margin-bottom: 1rem; }
       .workspace-head > div:first-child { min-width: 0; }
-      .workspace-head h1 { max-width: 24ch; font-size: clamp(1.65rem, 3vw, 2.8rem); line-height: 1.12; overflow-wrap: anywhere; text-wrap: balance; }
+      .workspace-head h1 { max-width: min(100%, 32ch); font-size: clamp(1.65rem, 3vw, 2.8rem); line-height: 1.12; overflow-wrap: anywhere; word-break: auto-phrase; text-wrap: balance; }
       .workspace-version { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: .55rem; color: var(--muted); }
       .slide-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
       .slide-actions button { min-height: 2.2rem; padding: .45rem .62rem; }

@@ -557,6 +557,8 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(".workspace-head { display: grid;");
+    expect(workspaceHtml).toContain("max-width: min(100%, 32ch)");
+    expect(workspaceHtml).toContain("word-break: auto-phrase");
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
     expect(workspaceHtml).toContain("内容を保存");
