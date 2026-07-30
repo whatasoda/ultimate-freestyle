@@ -20,27 +20,38 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 ## sceneの組み立て
 
 1. \`set_slide_scene\` で一枚をsceneへ切り替える。
-2. 最初に \`layer\`、\`stack\`、\`grid\` のいずれかをrootとして追加する。
-3. componentを一件ずつ追加し、\`parent_id\` で親layoutを指定する。rootは \`parent_id: null\`。
+2. \`create_slide_component\` で最初に \`layer\`、\`stack\`、\`grid\` のいずれかをrootとして追加する。
+3. componentを一件ずつ追加し、\`parent_id\` で親layoutを指定する。rootは \`parent_id: null\`。作成後はcomponent resourceを読み、内容を一項目ずつ更新する。
 4. \`order\` は同じ親の中の順番、\`at\` は表示step、\`animation\` は表示時の動き。
 5. \`stack\` と \`grid\` の子は自動配置されるため \`frame\` を付けない。\`layer\` の子には百分率の \`frame\` が必要。
 6. Web UIの一枚編集画面で実rendererを確認する。
 
 ## component一覧
 
-- layout: \`layer\`、\`stack\`、\`grid\` → \`upsert_slide_layout_component\`
-- text: \`hero\`、\`markdown\`、\`quote\` → \`upsert_slide_text_component\`
-- info: \`card\`、\`metric\`、\`callout\` → \`upsert_slide_info_component\`
-- data: \`bar_chart\`、\`timeline\` → \`upsert_slide_data_component\`
-- media: project内の \`image\`、\`shape\` → \`upsert_slide_media_component\`
+- 作成: 全13種類を \`create_slide_component\` で安全な既定値から一件ずつ追加する。imageだけはproject内の \`asset_id\` が必要。
+- 内容: \`update_slide_component_content\` で本文、数値、variant、layout固有値のうち一項目だけを更新する。
+- data item: \`edit_slide_data_item\` でbar chartまたはtimelineの項目を一件ずつ追加、更新、移動、削除する。
 - 配置・見た目の調整: \`update_slide_component\`。本文を再送せず、\`layout\`で親、順番、step、animation、frameを、\`style\`で指定した見た目だけを部分更新する。
 - 削除: \`delete_slide_component\`。子があるcomponentは削除できないため、子を移動または削除してから親を削除する。
+
+## 内容field
+
+- stack: \`direction\`、\`gap_px\`、\`align\`、\`justify\`、\`wrap\`
+- grid: \`columns\`、\`gap_px\`、\`align\`
+- hero: \`eyebrow\`、\`heading\`、\`subtitle\`、\`align\`
+- markdown: \`markdown\`、quote: \`quote\`、\`attribution\`
+- card: \`label\`、\`markdown\`、\`variant\`、metric: \`value\`、\`unit\`、\`caption\`、\`emphasis\`
+- callout: \`label\`、\`heading\`、\`markdown\`、\`variant\`
+- image: \`asset_id\`、\`alt_text\`、\`fit\`、\`caption\`、shape: \`shape\`、\`label\`
+- bar_chart本体: \`max_value\`。itemは \`at\`、\`label\`、\`value\`、\`color\`
+- timeline item: \`at\`、\`kicker\`、\`heading\`、\`detail\`
+- layerとtimeline本体に固有fieldはない。共通配置とstyleだけを変更する。
 
 ## 構成例
 
 rootにcolumn方向のstackを置き、その子にhero、row方向のstackを置く。内側のrow stackへmetricとcardを追加すると、見出し・主要数値・根拠を一枚にまとめられる。棒グラフやtimelineのitemもそれぞれ \`at\` を持つため、クリック進行に同期できる。
 
-一度に研究全体やscene全体を送り直さず、成功時に返るversionを次の\`expected_version\`へ渡して一件ずつ更新する。`;
+一度に研究全体やscene全体を送り直さず、\`research://projects/{id}/slides/{slideId}/elements/{elementId}\`で対象一件を読み、成功時に返るversionを次の\`expected_version\`へ渡して一項目ずつ更新する。`;
 
 const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガイド
 
@@ -318,6 +329,63 @@ export function registerResearchGuides(
                   version: project.version,
                   slide
                 };
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(body)
+          }
+        ]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-slide-element",
+    new ResourceTemplate(
+      "research://projects/{id}/slides/{slideId}/elements/{elementId}",
+      { list: undefined }
+    ),
+    {
+      title: "研究発表のcomponent一件",
+      description:
+        "部分更新前に読む、指定したscene component一件と現在versionです。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const elementId = variables.elementId;
+      const project =
+        !("error" in auth) && typeof id === "string"
+          ? await getProject(db, auth.ownerUserId, id)
+          : null;
+      const slide =
+        project !== null && typeof slideId === "string"
+          ? project.document.deck?.slides.find((item) => item.id === slideId)
+          : undefined;
+      const element =
+        slide?.composition?.mode === "scene" && typeof elementId === "string"
+          ? slide.composition.nodes.find((item) => item.id === elementId)
+          : undefined;
+      const body =
+        "error" in auth
+          ? { ok: false, error: { code: auth.error } }
+          : project === null
+            ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+            : slide === undefined
+              ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+              : element === undefined
+                ? { ok: false, error: { code: "COMPONENT_NOT_FOUND" } }
+                : {
+                    ok: true,
+                    project_id: project.project_id,
+                    version: project.version,
+                    slide_id: slide.id,
+                    element
+                  };
       return {
         contents: [
           {

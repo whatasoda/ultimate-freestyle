@@ -25,11 +25,7 @@ import {
   slideRoleSchema,
   slideTypographyPresetSchema,
   slideTypographySchema,
-  slideSceneDataNodeSchema,
-  slideSceneInfoNodeSchema,
-  slideSceneLayoutNodeSchema,
-  slideSceneMediaNodeSchema,
-  slideSceneTextNodeSchema,
+  slideSceneNodeSchema,
   visualPresetSchema,
   voicevoxProfileSchema,
   type PresentationTemplate,
@@ -414,6 +410,209 @@ function upsertSceneComponent(
       left.order - right.order || left.id.localeCompare(right.id)
   );
   recalculateSlideRevealSteps(slide);
+}
+
+const sceneComponentKindSchema = z.enum([
+  "layer",
+  "stack",
+  "grid",
+  "hero",
+  "markdown",
+  "image",
+  "shape",
+  "card",
+  "metric",
+  "quote",
+  "callout",
+  "bar_chart",
+  "timeline"
+]);
+
+const sceneComponentContentFieldSchema = z.enum([
+  "direction",
+  "gap_px",
+  "align",
+  "justify",
+  "wrap",
+  "columns",
+  "eyebrow",
+  "heading",
+  "subtitle",
+  "markdown",
+  "asset_id",
+  "alt_text",
+  "fit",
+  "caption",
+  "shape",
+  "label",
+  "variant",
+  "value",
+  "unit",
+  "emphasis",
+  "quote",
+  "attribution",
+  "max_value"
+]);
+
+const sceneComponentScalarSchema = z.union([
+  z.string().max(20_000),
+  z.number().finite(),
+  z.boolean(),
+  z.null()
+]);
+
+const sceneDataItemFieldSchema = z.enum([
+  "at",
+  "label",
+  "value",
+  "color",
+  "kicker",
+  "heading",
+  "detail"
+]);
+
+const SCENE_CONTENT_FIELDS: Record<SlideSceneNode["kind"], ReadonlySet<string>> = {
+  layer: new Set(),
+  stack: new Set(["direction", "gap_px", "align", "justify", "wrap"]),
+  grid: new Set(["columns", "gap_px", "align"]),
+  hero: new Set(["eyebrow", "heading", "subtitle", "align"]),
+  markdown: new Set(["markdown"]),
+  image: new Set(["asset_id", "alt_text", "fit", "caption"]),
+  shape: new Set(["shape", "label"]),
+  card: new Set(["label", "markdown", "variant"]),
+  metric: new Set(["value", "unit", "caption", "emphasis"]),
+  quote: new Set(["quote", "attribution"]),
+  callout: new Set(["label", "heading", "markdown", "variant"]),
+  bar_chart: new Set(["max_value"]),
+  timeline: new Set()
+};
+
+function createSceneComponent(options: {
+  id: string;
+  kind: z.infer<typeof sceneComponentKindSchema>;
+  parentId: string | null;
+  order: number;
+  at: number;
+  animation: z.infer<typeof animationSchema>;
+  frame?: z.infer<typeof slideBlockFrameSchema> | null;
+  text?: string;
+  assetId?: string;
+}): SlideSceneNode {
+  const base = {
+    id: options.id,
+    parent_id: options.parentId,
+    order: options.order,
+    at: options.at,
+    animation: options.animation,
+    frame: options.frame ?? null
+  };
+  const text = options.text?.trim();
+  switch (options.kind) {
+    case "layer":
+      return { ...base, kind: "layer" };
+    case "stack":
+      return {
+        ...base,
+        kind: "stack",
+        direction: "column",
+        gap_px: 24,
+        align: "stretch",
+        justify: "start",
+        wrap: false
+      };
+    case "grid":
+      return { ...base, kind: "grid", columns: 2, gap_px: 24, align: "stretch" };
+    case "hero":
+      return {
+        ...base,
+        kind: "hero",
+        eyebrow: null,
+        heading: text || "見出し",
+        subtitle: null,
+        align: "start"
+      };
+    case "markdown":
+      return { ...base, kind: "markdown", markdown: text || "本文" };
+    case "image":
+      if (options.assetId === undefined) {
+        throw new ProjectToolError(
+          "INVALID_CHANGE",
+          "An image component requires asset_id."
+        );
+      }
+      return {
+        ...base,
+        kind: "image",
+        asset_id: options.assetId,
+        alt_text: text || "画像",
+        fit: "contain",
+        caption: null
+      };
+    case "shape":
+      return { ...base, kind: "shape", shape: "rectangle", label: text ?? null };
+    case "card":
+      return {
+        ...base,
+        kind: "card",
+        label: null,
+        markdown: text || "本文",
+        variant: "plain"
+      };
+    case "metric":
+      return {
+        ...base,
+        kind: "metric",
+        value: text || "0",
+        unit: null,
+        caption: "指標",
+        emphasis: "normal"
+      };
+    case "quote":
+      return { ...base, kind: "quote", quote: text || "引用", attribution: null };
+    case "callout":
+      return {
+        ...base,
+        kind: "callout",
+        label: null,
+        heading: text || "ポイント",
+        markdown: null,
+        variant: "info"
+      };
+    case "bar_chart":
+      return {
+        ...base,
+        kind: "bar_chart",
+        max_value: 100,
+        items: [{ id: "item-1", at: options.at, label: "項目", value: 0, color: null }]
+      };
+    case "timeline":
+      return {
+        ...base,
+        kind: "timeline",
+        items: [{ id: "item-1", at: options.at, kicker: null, heading: text || "出来事", detail: null }]
+      };
+  }
+}
+
+function updateSceneComponentContent(
+  component: SlideSceneNode,
+  field: z.infer<typeof sceneComponentContentFieldSchema>,
+  value: z.infer<typeof sceneComponentScalarSchema>
+): SlideSceneNode {
+  if (!SCENE_CONTENT_FIELDS[component.kind].has(field)) {
+    throw new ProjectToolError(
+      "INVALID_CHANGE",
+      `The ${field} field is not available for ${component.kind}.`
+    );
+  }
+  const parsed = slideSceneNodeSchema.safeParse({ ...component, [field]: value });
+  if (!parsed.success) {
+    throw new ProjectToolError(
+      "INVALID_CHANGE",
+      parsed.error.issues[0]?.message ?? "The component value is invalid."
+    );
+  }
+  return parsed.data;
 }
 
 function findSceneComponent(
@@ -1113,7 +1312,7 @@ export function registerProjectMutationTools(
           if (slide.composition?.mode === "scene") {
             throw new ProjectToolError(
               "INVALID_COMPOSITION_MODE",
-              "This slide uses a component scene. Use the matching upsert_slide_*_component tool."
+              "This slide uses a component scene. Use create_slide_component and the component update tools."
             );
           }
           slide.composition ??= {
@@ -1238,15 +1437,23 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
-    "upsert_slide_layout_component",
+    "create_slide_component",
     {
-      title: "sceneのlayout componentを作成・更新",
+      title: "scene componentを既定値から作成",
       description:
-        "layer、stack、gridを一件だけ追加または置換します。子componentはparent_idでこのlayoutへ入れます。",
+        "kindと配置だけで一件を作成します。文章kindはinitial_text、imageはasset_idを指定し、詳細は部分更新します。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        component: slideSceneLayoutNodeSchema
+        component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        kind: sceneComponentKindSchema,
+        parent_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable(),
+        order: z.number().int().min(0).max(999).default(0),
+        at: z.number().int().nonnegative().max(100).default(0),
+        animation: animationSchema.default("none"),
+        frame: slideBlockFrameSchema.nullable().optional(),
+        initial_text: z.string().max(20_000).optional(),
+        asset_id: z.string().uuid().optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -1256,26 +1463,67 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, component }) =>
+    async ({
+      project_id,
+      expected_version,
+      slide_id,
+      component_id,
+      kind,
+      parent_id,
+      order,
+      at,
+      animation,
+      frame,
+      initial_text,
+      asset_id
+    }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
-        changedKind: "slide_component_upserted",
-        changedId: `${slide_id}:${component.id}`,
-        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+        changedKind: "slide_component_created",
+        changedId: `${slide_id}:${component_id}`,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          if (
+            slide.composition?.mode === "scene" &&
+            slide.composition.nodes.some((node) => node.id === component_id)
+          ) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "The slide component already exists."
+            );
+          }
+          upsertSceneComponent(
+            document,
+            slide_id,
+            createSceneComponent({
+              id: component_id,
+              kind,
+              parentId: parent_id,
+              order,
+              at,
+              animation,
+              frame,
+              text: initial_text,
+              assetId: asset_id
+            })
+          );
+        }
       })
   );
 
   server.registerTool(
-    "upsert_slide_text_component",
+    "update_slide_component_content",
     {
-      title: "sceneの文章componentを作成・更新",
+      title: "scene componentの内容を一項目更新",
       description:
-        "hero、markdown、quoteを一件だけ追加または置換します。",
+        "本文、数値、表示variant、layout固有値など一項目だけを更新します。配置と共通styleはupdate_slide_componentを使います。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        component: slideSceneTextNodeSchema
+        component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        field: sceneComponentContentFieldSchema,
+        value: sceneComponentScalarSchema
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -1285,26 +1533,41 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, component }) =>
+    async ({ project_id, expected_version, slide_id, component_id, field, value }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
-        changedKind: "slide_component_upserted",
-        changedId: `${slide_id}:${component.id}`,
-        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+        changedKind: "slide_component_content_updated",
+        changedId: `${slide_id}:${component_id}:${field}`,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          const component = findSceneComponent(document, slide_id, component_id);
+          const parsed = updateSceneComponentContent(component, field, value);
+          if (slide.composition?.mode !== "scene") return;
+          const index = slide.composition.nodes.findIndex(
+            (node) => node.id === component_id
+          );
+          slide.composition.nodes[index] = parsed;
+          recalculateSlideRevealSteps(slide);
+        }
       })
   );
 
   server.registerTool(
-    "upsert_slide_info_component",
+    "edit_slide_data_item",
     {
-      title: "sceneの情報componentを作成・更新",
+      title: "グラフ・タイムラインの項目を一件編集",
       description:
-        "card、metric、calloutを一件だけ追加または置換します。",
+        "bar_chartまたはtimelineのitemを追加、部分更新、移動、削除します。after_idがnullなら先頭、未指定なら末尾です。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        component: slideSceneInfoNodeSchema
+        component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        action: z.enum(["add", "update", "move", "delete"]),
+        item_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        after_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
+        field: sceneDataItemFieldSchema.optional(),
+        value: sceneComponentScalarSchema.optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -1314,71 +1577,129 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, component }) =>
+    async ({
+      project_id,
+      expected_version,
+      slide_id,
+      component_id,
+      action,
+      item_id,
+      after_id,
+      field,
+      value
+    }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
-        changedKind: "slide_component_upserted",
-        changedId: `${slide_id}:${component.id}`,
-        mutate: (document) => upsertSceneComponent(document, slide_id, component)
-      })
-  );
-
-  server.registerTool(
-    "upsert_slide_data_component",
-    {
-      title: "sceneのデータcomponentを作成・更新",
-      description:
-        "bar chartまたはtimelineを一件だけ追加または置換します。itemごとに表示stepを指定できます。",
-      inputSchema: {
-        ...projectIdInput,
-        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        component: slideSceneDataNodeSchema
-      },
-      outputSchema: mutationOutput,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, slide_id, component }) =>
-      executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: "slide_component_upserted",
-        changedId: `${slide_id}:${component.id}`,
-        mutate: (document) => upsertSceneComponent(document, slide_id, component)
-      })
-  );
-
-  server.registerTool(
-    "upsert_slide_media_component",
-    {
-      title: "sceneの画像・装飾componentを作成・更新",
-      description:
-        "project画像またはshapeを一件だけ追加または置換します。外部URLは受け付けません。",
-      inputSchema: {
-        ...projectIdInput,
-        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        component: slideSceneMediaNodeSchema
-      },
-      outputSchema: mutationOutput,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, slide_id, component }) =>
-      executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: "slide_component_upserted",
-        changedId: `${slide_id}:${component.id}`,
-        mutate: (document) => upsertSceneComponent(document, slide_id, component)
+        changedKind: `slide_data_item_${action}`,
+        changedId: `${slide_id}:${component_id}:${item_id}`,
+        mutate: (document) => {
+          const slide = findSlide(document, slide_id);
+          const component = findSceneComponent(document, slide_id, component_id);
+          if (component.kind !== "bar_chart" && component.kind !== "timeline") {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "Only bar_chart and timeline components have data items."
+            );
+          }
+          const items = [...component.items];
+          const itemIndex = items.findIndex((item) => item.id === item_id);
+          const hasField = field !== undefined;
+          const hasValue = value !== undefined;
+          if ((hasField && !hasValue) || (!hasField && hasValue)) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "Specify field and value together."
+            );
+          }
+          if ((action === "move" || action === "delete") && (hasField || hasValue)) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "Move and delete do not accept field or value."
+            );
+          }
+          if (action === "add") {
+            if (itemIndex !== -1 || items.length >= 12) {
+              throw new ProjectToolError(
+                "INVALID_CHANGE",
+                itemIndex !== -1
+                  ? "The data item already exists."
+                  : "A data component can contain at most 12 items."
+              );
+            }
+            const created = component.kind === "bar_chart"
+              ? { id: item_id, at: component.at, label: "項目", value: 0, color: null }
+              : { id: item_id, at: component.at, kicker: null, heading: "出来事", detail: null };
+            items.push(created);
+          } else if (itemIndex === -1) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "The data item does not exist."
+            );
+          } else if (action === "delete") {
+            if (items.length === 1) {
+              throw new ProjectToolError(
+                "INVALID_CHANGE",
+                "A data component must keep at least one item."
+              );
+            }
+            items.splice(itemIndex, 1);
+          }
+          if ((action === "add" || action === "update") && field !== undefined) {
+            const allowed = component.kind === "bar_chart"
+              ? new Set(["at", "label", "value", "color"])
+              : new Set(["at", "kicker", "heading", "detail"]);
+            if (!allowed.has(field)) {
+              throw new ProjectToolError(
+                "INVALID_CHANGE",
+                `The ${field} field is not available for ${component.kind} items.`
+              );
+            }
+            const targetIndex = items.findIndex((item) => item.id === item_id);
+            items[targetIndex] = { ...items[targetIndex], [field]: value };
+          } else if (action === "update") {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "Update requires field and value."
+            );
+          }
+          if (action === "move" || (action === "add" && after_id !== undefined)) {
+            if (after_id === item_id) {
+              throw new ProjectToolError("INVALID_CHANGE", "An item cannot follow itself.");
+            }
+            const sourceIndex = items.findIndex((item) => item.id === item_id);
+            const [moved] = items.splice(sourceIndex, 1);
+            if (moved === undefined) {
+              throw new ProjectToolError("INVALID_CHANGE", "The data item does not exist.");
+            }
+            let destinationIndex = items.length;
+            if (after_id === null) destinationIndex = 0;
+            else if (after_id !== undefined) {
+              const afterIndex = items.findIndex((item) => item.id === after_id);
+              if (afterIndex === -1) {
+                throw new ProjectToolError(
+                  "INVALID_CHANGE",
+                  "The after_id item does not exist."
+                );
+              }
+              destinationIndex = afterIndex + 1;
+            }
+            items.splice(destinationIndex, 0, moved);
+          }
+          const parsed = slideSceneNodeSchema.safeParse({ ...component, items });
+          if (!parsed.success) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              parsed.error.issues[0]?.message ?? "The data item value is invalid."
+            );
+          }
+          if (slide.composition?.mode !== "scene") return;
+          const componentIndex = slide.composition.nodes.findIndex(
+            (node) => node.id === component_id
+          );
+          slide.composition.nodes[componentIndex] = parsed.data;
+          recalculateSlideRevealSteps(slide);
+        }
       })
   );
 

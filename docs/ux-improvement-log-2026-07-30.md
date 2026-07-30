@@ -554,3 +554,9 @@
 - Web UIには履歴が見えても、主要利用者として想定するCodexやChatGPTは過去版を確認・復元できず、編集事故から自律復旧できない問題を解消した。
 - `research://projects/{id}/revisions` resourceと、小さな引数だけを受ける`restore_draft_revision` toolを追加した。
 - 復元は破壊的な巻き戻しではなく新versionを作り、監査イベントにもMCP経由であることを記録する。
+
+## 改善ループ230
+
+- scene componentを全objectで受け取る分類別5 toolがMCPの`tools/list`を肥大化させ、引数上限の小さいAI環境では接続や呼び出しを妨げる問題を見直した。
+- 5 toolを、安全な既定値から作る`create_slide_component`、内容一項目を変える`update_slide_component_content`、グラフ・timeline項目一件を扱う`edit_slide_data_item`へ置換した。
+- 配置とstyleは既存の部分更新toolを維持し、対象一件だけを再取得するelement resourceも追加した。wire上の値は小さく保ち、保存前にはkind別の正本schemaで再検証する。

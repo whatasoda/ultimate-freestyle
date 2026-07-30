@@ -57,11 +57,9 @@ describe("MCP contract", () => {
           "upsert_slide_block",
           "delete_slide_block",
           "set_slide_scene",
-          "upsert_slide_layout_component",
-          "upsert_slide_text_component",
-          "upsert_slide_info_component",
-          "upsert_slide_data_component",
-          "upsert_slide_media_component",
+          "create_slide_component",
+          "update_slide_component_content",
+          "edit_slide_data_item",
           "update_slide_component",
           "delete_slide_component",
           "update_project_fields",
@@ -90,8 +88,10 @@ describe("MCP contract", () => {
         ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
       );
       expect(largestInputSchema).toBeLessThan(12_000);
-      expect(tools.length).toBeLessThanOrEqual(38);
-      expect(JSON.stringify(tools).length).toBeLessThan(120_000);
+      expect(tools.length).toBeLessThanOrEqual(36);
+      expect(
+        new TextEncoder().encode(JSON.stringify(tools)).length
+      ).toBeLessThan(100_000);
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
@@ -461,6 +461,10 @@ describe("MCP contract", () => {
           }),
           expect.objectContaining({
             uriTemplate: "research://projects/{id}/slides/{slideId}"
+          }),
+          expect.objectContaining({
+            uriTemplate:
+              "research://projects/{id}/slides/{slideId}/elements/{elementId}"
           })
         ])
       );
@@ -678,25 +682,14 @@ describe("MCP contract", () => {
       });
       expect(scene.structuredContent).toMatchObject({ ok: true, version: 11 });
       const layoutComponent = await client.callTool({
-        name: "upsert_slide_layout_component",
+        name: "create_slide_component",
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 11,
           slide_id: "question",
-          component: {
-            id: "result-stack",
-            kind: "stack",
-            parent_id: null,
-            order: 0,
-            at: 0,
-            animation: "none",
-            frame: null,
-            direction: "column",
-            gap_px: 24,
-            align: "stretch",
-            justify: "center",
-            wrap: false
-          }
+          component_id: "result-stack",
+          kind: "stack",
+          parent_id: null
         }
       });
       expect(layoutComponent.structuredContent).toMatchObject({
@@ -704,55 +697,82 @@ describe("MCP contract", () => {
         version: 12
       });
       const infoComponent = await client.callTool({
-        name: "upsert_slide_info_component",
+        name: "create_slide_component",
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 12,
           slide_id: "question",
-          component: {
-            id: "trial-count",
-            kind: "metric",
-            parent_id: "result-stack",
-            order: 0,
-            at: 1,
-            animation: "zoom",
-            frame: null,
-            value: "12",
-            unit: "回",
-            caption: "試した回数",
-            emphasis: "signal"
-          }
+          component_id: "trial-count",
+          kind: "metric",
+          parent_id: "result-stack",
+          at: 1,
+          animation: "zoom",
+          initial_text: "12"
         }
       });
       expect(infoComponent.structuredContent).toMatchObject({
         ok: true,
         version: 13
       });
-      const dataComponent = await client.callTool({
-        name: "upsert_slide_data_component",
+      const metricCaption = await client.callTool({
+        name: "update_slide_component_content",
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 13,
           slide_id: "question",
-          component: {
-            id: "comparison",
-            kind: "bar_chart",
-            parent_id: "result-stack",
-            order: 1,
-            at: 1,
-            animation: "rise",
-            frame: null,
-            max_value: 100,
-            items: [
-              { id: "before", at: 1, label: "変更前", value: 42, color: null },
-              { id: "after", at: 2, label: "変更後", value: 91, color: "#ffcf32" }
-            ]
-          }
+          component_id: "trial-count",
+          field: "caption",
+          value: "試した回数"
+        }
+      });
+      expect(metricCaption.structuredContent).toMatchObject({
+        ok: true,
+        version: 14
+      });
+      const dataComponent = await client.callTool({
+        name: "create_slide_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 14,
+          slide_id: "question",
+          component_id: "comparison",
+          kind: "bar_chart",
+          parent_id: "result-stack",
+          order: 1,
+          at: 1,
+          animation: "rise"
         }
       });
       expect(dataComponent.structuredContent).toMatchObject({
         ok: true,
-        version: 14
+        version: 15
+      });
+      const dataItem = await client.callTool({
+        name: "edit_slide_data_item",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 15,
+          slide_id: "question",
+          component_id: "comparison",
+          action: "add",
+          item_id: "after",
+          after_id: "item-1",
+          field: "at",
+          value: 2
+        }
+      });
+      expect(dataItem.structuredContent).toMatchObject({
+        ok: true,
+        version: 16
+      });
+      const componentResource = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/elements/trial-count`
+      );
+      expect(componentResource).toMatchObject({
+        ok: true,
+        version: 16,
+        element: { id: "trial-count", kind: "metric", caption: "試した回数" }
       });
       const sceneSlide = await readJsonResource(
         client,
@@ -760,7 +780,7 @@ describe("MCP contract", () => {
       );
       expect(sceneSlide).toMatchObject({
         ok: true,
-        version: 14,
+        version: 16,
         slide: {
           reveal_steps: 2,
           composition: {
@@ -778,7 +798,7 @@ describe("MCP contract", () => {
         name: "update_slide_component",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 14,
+          expected_version: 16,
           slide_id: "question",
           component_id: "trial-count",
           layout: { order: 3, at: 2, animation: "pop" }
@@ -786,13 +806,13 @@ describe("MCP contract", () => {
       });
       expect(componentLayout.structuredContent).toMatchObject({
         ok: true,
-        version: 15
+        version: 17
       });
       const componentStyle = await client.callTool({
         name: "update_slide_component",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 15,
+          expected_version: 17,
           slide_id: "question",
           component_id: "trial-count",
           style: { background: "#102030", font_scale: 1.25 }
@@ -800,13 +820,13 @@ describe("MCP contract", () => {
       });
       expect(componentStyle.structuredContent).toMatchObject({
         ok: true,
-        version: 16
+        version: 18
       });
       const deleteParentComponent = await client.callTool({
         name: "delete_slide_component",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 16,
+          expected_version: 18,
           slide_id: "question",
           component_id: "result-stack"
         }
@@ -822,7 +842,7 @@ describe("MCP contract", () => {
       );
       expect(adjustedSceneSlide).toMatchObject({
         ok: true,
-        version: 16,
+        version: 18,
         slide: {
           reveal_steps: 2,
           composition: {
@@ -844,24 +864,24 @@ describe("MCP contract", () => {
       );
       expect(revisions).toMatchObject({
         ok: true,
-        current_version: 16,
+        current_version: 18,
         revisions: expect.arrayContaining([
-          expect.objectContaining({ version: 16, source: "edit" }),
-          expect.objectContaining({ version: 15, source: "edit" })
+          expect.objectContaining({ version: 18, source: "edit" }),
+          expect.objectContaining({ version: 17, source: "edit" })
         ])
       });
       const restoredDraft = await client.callTool({
         name: "restore_draft_revision",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 16,
+          expected_version: 18,
           target_version: 1
         }
       });
       expect(restoredDraft.structuredContent).toMatchObject({
         ok: true,
-        version: 17,
-        current_version: 17,
+        version: 19,
+        current_version: 19,
         restored_from_version: 1
       });
 
