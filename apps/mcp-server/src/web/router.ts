@@ -184,6 +184,14 @@ const sceneComponentActionRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   action: z.enum(["duplicate", "delete"])
 });
+const sceneComponentItemActionRequestSchema = z.discriminatedUnion("action", [
+  z.object({ expected_version: z.number().int().positive(), action: z.literal("add") }),
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("delete"),
+    item_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+  })
+]);
 const sceneComponentCreateRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   kind: z.enum(["layer", "stack", "grid", "hero", "markdown", "image", "shape", "card", "metric", "quote", "callout", "bar_chart", "timeline"]),
@@ -1829,6 +1837,101 @@ async function handleSceneComponentCreate(
   }
 }
 
+async function handleSceneComponentItemAction(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string,
+  componentId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = sceneComponentItemActionRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "データ項目の操作内容を確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  let resultItemId: string | null = null;
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "scene") {
+          const error = new Error("The slide does not use a component scene.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        const component = slide.composition.nodes.find((node) => node.id === componentId);
+        if (component === undefined) {
+          const error = new Error("The component does not exist.");
+          Object.assign(error, { code: "COMPONENT_NOT_FOUND" });
+          throw error;
+        }
+        if (component.kind !== "bar_chart" && component.kind !== "timeline") {
+          const error = new Error("The component does not contain editable data items.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        if (parsed.data.action === "delete") {
+          const itemId = parsed.data.item_id;
+          if (component.items.length <= 1) {
+            const error = new Error("A data component must keep at least one item.");
+            Object.assign(error, { code: "INVALID_FIELDS" });
+            throw error;
+          }
+          const index = component.items.findIndex((item) => item.id === itemId);
+          if (index === -1) {
+            const error = new Error("The data item does not exist.");
+            Object.assign(error, { code: "INVALID_FIELDS" });
+            throw error;
+          }
+          component.items.splice(index, 1);
+          return;
+        }
+        if (component.items.length >= 12) {
+          const error = new Error("The data item limit has been reached.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        const used = new Set(component.items.map((item) => item.id));
+        let suffix = 1;
+        while (used.has(`item-${suffix}`)) suffix += 1;
+        resultItemId = `item-${suffix}`;
+        const at = Math.min(slide.reveal_steps, Math.max(component.at, ...component.items.map((item) => item.at)));
+        if (component.kind === "bar_chart") {
+          component.items.push({ id: resultItemId, at, label: `項目${component.items.length + 1}`, value: Math.round(component.max_value / 2), color: null });
+        } else {
+          component.items.push({ id: resultItemId, at, kicker: null, heading: `出来事${component.items.length + 1}`, detail: "ここに詳細を入力します。" });
+        }
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_scene_component_item_changed",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, component_id: componentId, action: parsed.data.action, item_id: parsed.data.action === "delete" ? parsed.data.item_id : resultItemId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, component_id: componentId, result_item_id: resultItemId, action: parsed.data.action, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "データ項目を操作できませんでした。");
+  }
+}
+
 async function handleSceneComponentAction(
   request: Request,
   env: Env,
@@ -3469,6 +3572,22 @@ export async function handleWebRequest(
       canvasBlockMatch[1],
       canvasBlockMatch[2],
       canvasBlockMatch[3]
+    );
+  }
+  const sceneComponentItemActionMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/components/([a-z0-9][a-z0-9-]{0,63})/items$`)
+  );
+  if (
+    sceneComponentItemActionMatch?.[1] !== undefined &&
+    sceneComponentItemActionMatch[2] !== undefined &&
+    sceneComponentItemActionMatch[3] !== undefined
+  ) {
+    return handleSceneComponentItemAction(
+      request,
+      env,
+      sceneComponentItemActionMatch[1],
+      sceneComponentItemActionMatch[2],
+      sceneComponentItemActionMatch[3]
     );
   }
   const sceneComponentActionMatch = path.match(

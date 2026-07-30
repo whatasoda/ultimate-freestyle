@@ -750,6 +750,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("/components/comparison");
     expect(workspaceHtml).toContain("グラフの最大値");
     expect(workspaceHtml).toContain('data-component-item="before"');
+    expect(workspaceHtml).toContain('data-scene-item-action="add"');
+    expect(workspaceHtml).toContain('data-scene-item-action="delete"');
     expect(workspaceHtml).toContain("項目 1");
     expect(workspaceHtml).toContain("<label>ラベル");
     expect(workspaceHtml).toContain('data-component-path="items.0.value"');

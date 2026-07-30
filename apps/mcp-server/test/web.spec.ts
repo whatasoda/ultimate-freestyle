@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=81"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=82"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -728,6 +728,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-scene-component-editor");
     expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain("data-scene-component-create");
+    expect(dashboardScriptText).toContain("data-scene-item-action");
     expect(dashboardScriptText).toContain("updateContentStructure");
     expect(dashboardScriptText).toContain("spokenCharacters / 6");
     expect(dashboardScriptText).toContain("data-component-field");
@@ -1979,6 +1980,48 @@ describe("Web dashboard", () => {
     );
     expect(cycleSceneComponent.status).toBe(422);
     expect(await cycleSceneComponent.json()).toMatchObject({ ok: false, error: { code: "INVALID_FIELDS" } });
+    const createChartComponent = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 27, kind: "bar_chart", parent_id: "stack-1", asset_id: null })
+        }
+      ),
+      authEnv
+    );
+    expect(createChartComponent.status).toBe(200);
+    expect(await createChartComponent.json()).toMatchObject({ ok: true, version: 28, component_id: "bar-chart-1" });
+    const addChartItem = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components/bar-chart-1/items",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 28, action: "add" })
+        }
+      ),
+      authEnv
+    );
+    expect(addChartItem.status).toBe(200);
+    expect(await addChartItem.json()).toMatchObject({ ok: true, version: 29, result_item_id: "item-2" });
+    const deleteChartItem = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components/bar-chart-1/items",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 29, action: "delete", item_id: "item-1" })
+        }
+      ),
+      authEnv
+    );
+    expect(deleteChartItem.status).toBe(200);
+    expect(await deleteChartItem.json()).toMatchObject({ ok: true, version: 30, result_item_id: null });
     const updateComposition = await requestProvider(
       provider,
       new Request(
@@ -1991,7 +2034,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 27,
+            expected_version: 30,
             composition_background: "#223344",
             composition_clip_content: false
           })
@@ -2000,7 +2043,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(updateComposition.status).toBe(200);
-    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 28 });
+    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 31 });
     const recoloredDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();

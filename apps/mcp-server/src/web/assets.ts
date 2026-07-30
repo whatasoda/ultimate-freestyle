@@ -1039,6 +1039,42 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
+  for (const button of document.querySelectorAll("[data-scene-item-action]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", async () => {
+      const form = button.closest("form");
+      const feedback = form?.querySelector("[data-form-feedback]");
+      if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) return;
+      const action = button.dataset.sceneItemAction;
+      if (action === "delete" && !confirm("このデータ項目を削除しますか？このパーツ内の未保存変更も失われます。")) return;
+      if (action === "add" && form.dataset.dirty === "true" && !confirm("未保存の変更があります。項目を追加すると未保存内容は失われます。続けますか？")) return;
+      setButtonBusy(button, true);
+      feedback.textContent = action === "add" ? "データ項目を追加しています…" : "データ項目を削除しています…";
+      feedback.classList.remove("success", "warning");
+      try {
+        const response = await fetch(form.action + "/items", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-csrf-token": form.dataset.csrf || "" },
+          body: JSON.stringify({
+            expected_version: Number(form.dataset.version),
+            action,
+            ...(action === "delete" ? { item_id: button.dataset.itemId } : {})
+          })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "データ項目を操作できませんでした。"));
+        form.dataset.dirty = "false";
+        feedback.textContent = action === "add" ? "追加しました。画面を更新します…" : "削除しました。画面を更新します…";
+        feedback.classList.add("success");
+        location.reload();
+      } catch (error) {
+        feedback.textContent = caughtErrorMessage(error, "データ項目を操作できませんでした。");
+        feedback.classList.add("warning");
+        setButtonBusy(button, false);
+      }
+    });
+  }
+
   const syncSceneComponentDrafts = () => {
     if (!(slideFrame instanceof HTMLIFrameElement)) return;
     for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
