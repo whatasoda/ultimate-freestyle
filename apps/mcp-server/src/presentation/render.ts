@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@62";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@63";
 
 function escapeHtml(value: string): string {
   return value
@@ -643,6 +643,7 @@ export function renderPresentationHtml(
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node[data-positioned="true"]) { cursor: move; touch-action: none; user-select: none; }
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node):hover { outline: max(2px, .18cqw) dashed color-mix(in srgb, var(--accent) 78%, white); outline-offset: max(1px, .1cqw); }
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node)[data-editor-selected="true"] { outline: max(3px, .24cqw) solid var(--accent); outline-offset: max(1px, .12cqw); }
+    body[data-editor-frame="true"] :is(.canvas-block, .scene-node)[data-editor-selected="true"]::after { content: ""; position: absolute; right: max(-7px, -.45cqw); bottom: max(-7px, -.45cqw); width: max(12px, .9cqw); height: max(12px, .9cqw); z-index: 1000; border: max(2px, .12cqw) solid white; border-radius: 2px; background: var(--accent); box-shadow: 0 0 0 1px #111827; cursor: nwse-resize; }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
     .slide::before, .slide::after { content: ""; position: absolute; z-index: 0; pointer-events: none; }
     .slide > * { position: relative; z-index: 1; }
@@ -2011,22 +2012,29 @@ export function renderPresentationHtml(
         x: (targetRect.left - boundaryRect.left) / boundaryRect.width * 100,
         y: (targetRect.top - boundaryRect.top) / boundaryRect.height * 100,
         width: targetRect.width / boundaryRect.width * 100,
-        height: targetRect.height / boundaryRect.height * 100
+        height: targetRect.height / boundaryRect.height * 100,
+        mode: target.dataset.editorSelected === 'true' && targetRect.right - event.clientX <= 18 && targetRect.bottom - event.clientY <= 18 ? 'resize' : 'move'
       };
       target.setPointerCapture?.(event.pointerId);
       event.preventDefault();
     });
     stage?.addEventListener('pointermove', (event) => {
       if (!editorDrag || editorDrag.pointerId !== event.pointerId) return;
-      const x = clamp(editorDrag.x + (event.clientX - editorDrag.startX) / editorDrag.boundaryRect.width * 100, 0, 100 - editorDrag.width);
-      const y = clamp(editorDrag.y + (event.clientY - editorDrag.startY) / editorDrag.boundaryRect.height * 100, 0, 100 - editorDrag.height);
+      const deltaX = (event.clientX - editorDrag.startX) / editorDrag.boundaryRect.width * 100;
+      const deltaY = (event.clientY - editorDrag.startY) / editorDrag.boundaryRect.height * 100;
+      const x = editorDrag.mode === 'move' ? clamp(editorDrag.x + deltaX, 0, 100 - editorDrag.width) : editorDrag.x;
+      const y = editorDrag.mode === 'move' ? clamp(editorDrag.y + deltaY, 0, 100 - editorDrag.height) : editorDrag.y;
+      const width = editorDrag.mode === 'resize' ? clamp(editorDrag.width + deltaX, 5, 100 - editorDrag.x) : editorDrag.width;
+      const height = editorDrag.mode === 'resize' ? clamp(editorDrag.height + deltaY, 5, 100 - editorDrag.y) : editorDrag.height;
       editorDrag.target.style.left = x + '%';
       editorDrag.target.style.top = y + '%';
+      editorDrag.target.style.width = width + '%';
+      editorDrag.target.style.height = height + '%';
       parent.postMessage({
         type: 'ultimate-freestyle:move-component',
         component_type: editorDrag.target.hasAttribute('data-node-id') ? 'scene' : 'canvas',
         component_id: editorDrag.target.getAttribute('data-node-id') || editorDrag.target.getAttribute('data-block-id') || '',
-        frame: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }
+        frame: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, width: Math.round(width * 10) / 10, height: Math.round(height * 10) / 10 }
       }, location.origin);
       event.preventDefault();
     });
