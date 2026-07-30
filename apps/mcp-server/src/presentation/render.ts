@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@103";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@104";
 
 function escapeHtml(value: string): string {
   return value
@@ -1758,14 +1758,16 @@ export function renderPresentationHtml(
         target.dataset.fitScale = String(scale);
         fits.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', fit_scale: scale });
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
-        const contrast = collectContrast(target, currentSlide);
-        if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground });
-        const smallText = collectSmallText(target, currentSlide);
-        if (smallText) readability.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px });
+        if (editorFrame) {
+          const contrast = collectContrast(target, currentSlide);
+          if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground });
+          const smallText = collectSmallText(target, currentSlide);
+          if (smallText) readability.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px });
+        }
       });
-      const narrationClamp = collectNarrationClamp(currentSlide);
+      const narrationClamp = editorFrame ? collectNarrationClamp(currentSlide) : null;
       if (narrationClamp) clamps.push(narrationClamp);
-      const occlusions = collectOcclusions(currentSlide);
+      const occlusions = editorFrame ? collectOcclusions(currentSlide) : [];
       if (stage instanceof HTMLElement) delete stage.dataset.measuring;
       if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps, readability, occlusions }, location.origin);
     };
