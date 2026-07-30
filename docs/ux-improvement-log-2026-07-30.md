@@ -1418,3 +1418,9 @@
 - 初期表示とanchor clickでfragmentを直接`decodeURIComponent`へ渡していたため、不完全なpercent escapeを含むURLでは例外がdashboard script全体を止めた。fragment以外の保存・preview・音声操作まで初期化されなくなる。
 - fragment IDの安全な復号関数を共通化し、正常な日本語IDは復号、壊れたescapeは生値へ戻して対象なしとして継続する。
 - 例外を局所化するfallbackをscript契約へ追加し、dashboard assetを`v153`へ更新した。
+
+## 改善ループ373
+
+- 現在仕様の設計書に、改善ループ347より前のWeb JSON上限96 KiBと、MCP contractより緩い一入力12KBが残っていた。実装判断で余白を誤認する値だった。
+- Web JSONを現行128 KiB、MCP input schemaを自動テストと同じ8KB未満へ揃えた。全tool 36件・90KB未満の値は維持する。
+- 実装・契約テスト・設計書の三者で入力予算を同じ値にした。
