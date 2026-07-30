@@ -436,7 +436,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=112"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=113"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -458,6 +458,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
     expect(DASHBOARD_SCRIPT).toContain("大きな画像を圧縮しています");
     expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
+    expect(DASHBOARD_SCRIPT).toContain("templates[templateId]?.template_name");
+    expect(DASHBOARD_SCRIPT).toContain("activeFilmstrip.dataset.roleLabel = nextRole");
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
     expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");

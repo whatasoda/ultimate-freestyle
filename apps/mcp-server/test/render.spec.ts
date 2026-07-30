@@ -860,6 +860,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-current-slide-title");
     expect(workspaceHtml).toContain("data-filmstrip-title");
     expect(workspaceHtml).toContain("data-filmstrip-duration");
+    expect(workspaceHtml).toContain('data-role-label="通常"');
+    expect(workspaceHtml).toContain('&quot;template_name&quot;:&quot;');
     expect(workspaceHtml).toContain('data-setting-value="typography"');
     expect(workspaceHtml).toContain("プレビューを広げる");
     expect(workspaceHtml).toContain("別画面で開く");

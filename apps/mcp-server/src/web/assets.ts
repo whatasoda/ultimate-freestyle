@@ -934,16 +934,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     }
     if (form.matches("[data-appearance-editor]")) {
-      const templateLabel = selectedOptionLabel(form, "template_id").replace(/ · 発表全体の既定$/, "");
-      setSettingValue("template", templateLabel === "発表全体の既定を使う" ? "発表全体の既定" : templateLabel);
+      let templates = {};
+      try { templates = JSON.parse(form.dataset.previewTemplates || "{}"); } catch {}
+      const templateField = form.elements.namedItem("template_id");
+      const templateId = templateField instanceof HTMLSelectElement ? templateField.value : "";
+      const templateLabel = templates[templateId]?.template_name || selectedOptionLabel(form, "template_id").replace(/ · 発表全体の既定$/, "");
+      setSettingValue("template", templateLabel);
       setSettingValue("tone", selectedOptionLabel(form, "tone"));
       let animationLabel = selectedOptionLabel(form, "enter_animation");
       const animationField = form.elements.namedItem("enter_animation");
       if (animationField instanceof HTMLSelectElement && animationField.value === "") {
-        let templates = {};
-        try { templates = JSON.parse(form.dataset.previewTemplates || "{}"); } catch {}
-        const templateField = form.elements.namedItem("template_id");
-        const templateId = templateField instanceof HTMLSelectElement ? templateField.value : "";
         const effective = templates[templateId]?.enter_animation || templates[""]?.enter_animation;
         const effectiveOption = [...animationField.options].find((option) => option.value === effective);
         if (effectiveOption) animationLabel = effectiveOption.textContent + "（継承）";
@@ -952,6 +952,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (activeFilmstrip instanceof HTMLElement) {
         const roleField = form.elements.namedItem("role");
         const existing = activeFilmstrip.querySelector("[data-filmstrip-role]");
+        if (roleField instanceof HTMLSelectElement) {
+          const previousRole = activeFilmstrip.dataset.roleLabel || "";
+          const nextRole = roleField.value === "cover" ? "表紙" : "通常";
+          const searchText = activeFilmstrip.dataset.searchText || "";
+          activeFilmstrip.dataset.searchText = searchText.replace(" " + previousRole + " ", " " + nextRole + " ");
+          activeFilmstrip.dataset.roleLabel = nextRole;
+        }
         if (roleField instanceof HTMLSelectElement && roleField.value === "cover" && !(existing instanceof HTMLElement)) {
           const badge = document.createElement("small");
           badge.className = "stage";

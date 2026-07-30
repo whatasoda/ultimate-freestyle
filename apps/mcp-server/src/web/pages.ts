@@ -248,7 +248,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=112";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=113";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1940,7 +1940,7 @@ export function slideWorkspacePage(options: {
           ? "原稿なし"
           : `音声 ${readyVoiceSegments}/${narrationSegments.length}`;
         const searchText = `${item.title} ${item.role === "cover" ? "表紙" : "通常"} ${slideCompositionLabel(item)} ${voiceStatus}`.toLocaleLowerCase("ja");
-        return `<a class="filmstrip-link" data-filmstrip-slide data-search-text="${escapeHtml(searchText)}" data-slide-title="${escapeHtml(item.title.toLocaleLowerCase("ja"))}" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong><span data-filmstrip-title>${escapeHtml(item.title)}</span>${item.role === "cover" ? '<small class="stage" data-filmstrip-role>表紙</small>' : ""}<small class="filmstrip-meta"><span data-filmstrip-duration>${item.duration_seconds}秒</span> · ${item.reveal_steps + 1}段階 · ${escapeHtml(slideCompositionLabel(item))}<br>${voiceStatus}</small></strong></a>`;
+        return `<a class="filmstrip-link" data-filmstrip-slide data-search-text="${escapeHtml(searchText)}" data-slide-title="${escapeHtml(item.title.toLocaleLowerCase("ja"))}" data-role-label="${item.role === "cover" ? "表紙" : "通常"}" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong><span data-filmstrip-title>${escapeHtml(item.title)}</span>${item.role === "cover" ? '<small class="stage" data-filmstrip-role>表紙</small>' : ""}<small class="filmstrip-meta"><span data-filmstrip-duration>${item.duration_seconds}秒</span> · ${item.reveal_steps + 1}段階 · ${escapeHtml(slideCompositionLabel(item))}<br>${voiceStatus}</small></strong></a>`;
       }
     )
     .join("");
@@ -2086,6 +2086,7 @@ export function slideWorkspacePage(options: {
       (item) => item.id === resolvedTemplateId
     );
     return {
+      template_name: template?.name ?? "組み込み",
       template_id: template?.id ?? `builtin-${deck.layout}`,
       user_template: template !== undefined,
       region_layout: template?.region_layout ?? "sidebar-right",
