@@ -560,3 +560,9 @@
 - scene componentを全objectで受け取る分類別5 toolがMCPの`tools/list`を肥大化させ、引数上限の小さいAI環境では接続や呼び出しを妨げる問題を見直した。
 - 5 toolを、安全な既定値から作る`create_slide_component`、内容一項目を変える`update_slide_component_content`、グラフ・timeline項目一件を扱う`edit_slide_data_item`へ置換した。
 - 配置とstyleは既存の部分更新toolを維持し、対象一件だけを再取得するelement resourceも追加した。wire上の値は小さく保ち、保存前にはkind別の正本schemaで再検証する。
+
+## 改善ループ231
+
+- MCPだけがVOICEVOXの話者UUID、style ID、カタログrevisionを自由入力でき、Web UIの管理カタログを迂回して生成失敗する問題を解消した。
+- 118種類の話者・スタイルを`research://guide/voicevox-catalog` resourceとして公開し、`set_voicevox_profile`はカタログprofile IDと任意の表示名だけを受け取る。
+- 実際のspeaker UUID、style ID、style名、revisionは共有カタログからサーバー側で固定し、ずんだもん・ノーマルの推奨調声値もWeb UIと同じ経路で適用する。

@@ -51,7 +51,7 @@ describe("MCP contract", () => {
       expect(tools.map((tool) => tool.name)).toEqual(
         expect.arrayContaining([
           "get_project_outline",
-          "upsert_voicevox_profile",
+          "set_voicevox_profile",
           "update_voicevox_profile_tuning",
           "set_slide_canvas",
           "upsert_slide_block",
@@ -168,6 +168,11 @@ describe("MCP contract", () => {
           uri: "research://guide/presentation-style"
         })
       );
+      expect(resources).toContainEqual(
+        expect.objectContaining({
+          uri: "research://guide/voicevox-catalog"
+        })
+      );
 
       const result = await client.readResource({
         uri: "research://guide/overview"
@@ -208,6 +213,19 @@ describe("MCP contract", () => {
           text: expect.stringContaining("`museum`、`terminal`")
         })
       );
+      const voiceCatalog = await readJsonResource(
+        client,
+        "research://guide/voicevox-catalog"
+      );
+      expect(voiceCatalog).toMatchObject({
+        catalog_revision: "voicevox-engine-0.25.1",
+        profiles: expect.arrayContaining([
+          expect.objectContaining({
+            id: "voicevox-style-3",
+            label: "ずんだもん・ノーマル"
+          })
+        ])
+      });
     } finally {
       await client.close();
       await server.close();
@@ -1027,22 +1045,29 @@ describe("MCP contract", () => {
         }
       });
       await client.callTool({
-        name: "upsert_voicevox_profile",
+        name: "set_voicevox_profile",
         arguments: {
           project_id: projectId,
           expected_version: 5,
-          catalog_revision: "voicevox-test",
-          profile: {
-            id: "guide-voice",
-            label: "案内役",
-            speaker_uuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
-            speaker_name: "ずんだもん",
-            style_id: 3,
-            style_name: "ノーマル",
-            tuning: null
-          },
+          catalog_profile_id: "voicevox-style-3",
+          profile_id: "guide-voice",
+          label: "案内役",
           make_default: true
         }
+      });
+      const invalidCatalogProfile = await client.callTool({
+        name: "set_voicevox_profile",
+        arguments: {
+          project_id: projectId,
+          expected_version: 6,
+          catalog_profile_id: "voicevox-style-999999"
+        }
+      });
+      expect(invalidCatalogProfile.isError).toBe(true);
+      expect(invalidCatalogProfile.structuredContent).toMatchObject({
+        ok: false,
+        current_version: null,
+        error: { code: "INVALID_CHANGE" }
       });
       await client.callTool({
         name: "update_voicevox_profile_tuning",

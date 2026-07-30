@@ -2,6 +2,10 @@ import {
   ResourceTemplate,
   type McpServer
 } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  VOICEVOX_CATALOG,
+  VOICEVOX_CATALOG_REVISION
+} from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import { z } from "zod";
 
 import { twitchGrantPropsSchema } from "../auth/types";
@@ -84,6 +88,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - displayはADV枠の \`dialogue\`、実況風の \`commentary\`、全文追従の \`inline\`、映像字幕の \`subtitle\`、最小表示の \`minimal\`。
 - 枠は配置、寸法、文字揃え、話者表示、進捗表示、文字倍率、最大行数だけを安全なtokenで調整する。
 - 読み上げ本文は \`set_slide_narration\`、segmentの話者・VOICEVOX profile・調声値は \`update_slide_narration_voice\` で別々に更新する。
+- VOICEVOXの声は \`research://guide/voicevox-catalog\` から選び、\`set_voicevox_profile\`へ \`catalog_profile_id\` を渡す。話者UUIDやstyle IDは手入力しない。
 - profileの基準調声値だけを変える場合は \`update_voicevox_profile_tuning\` を使う。本文や音声設定が変わると、古い生成音声は無効になる。
 - 任意の音声URLは入力できない。音声fileの参照は管理された生成処理だけが設定する。
 
@@ -162,6 +167,34 @@ export function registerResearchGuides(
           uri: uri.href,
           mimeType: "text/markdown",
           text: PRESENTATION_STYLE_GUIDE
+        }
+      ]
+    })
+  );
+
+  server.registerResource(
+    "voicevox-catalog",
+    "research://guide/voicevox-catalog",
+    {
+      title: "VOICEVOX話者・スタイルカタログ",
+      description:
+        "set_voicevox_profileで選べる管理済みprofile ID、話者名、スタイル名の一覧です。",
+      mimeType: "application/json"
+    },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify({
+            catalog_revision: VOICEVOX_CATALOG_REVISION,
+            profiles: VOICEVOX_CATALOG.map((profile) => ({
+              id: profile.id,
+              label: profile.label,
+              speaker_name: profile.speakerName,
+              style_name: profile.styleName
+            }))
+          })
         }
       ]
     })

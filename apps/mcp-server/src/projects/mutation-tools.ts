@@ -1,4 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  VOICEVOX_ENGINE,
+  ZUNDAMON_NORMAL_PROFILE
+} from "@ultimate-freestyle/research-schema/voice-generation";
+import {
+  findVoicevoxCatalogProfile
+} from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import { z } from "zod";
 
 import { recordAuditEvent } from "../auth/repository";
@@ -27,7 +34,6 @@ import {
   slideTypographySchema,
   slideSceneNodeSchema,
   visualPresetSchema,
-  voicevoxProfileSchema,
   type PresentationTemplate,
   type ProjectDocument,
   type ProjectRecord,
@@ -962,15 +968,16 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
-    "upsert_voicevox_profile",
+    "set_voicevox_profile",
     {
-      title: "VOICEVOX音声profileを作成・更新",
+      title: "VOICEVOXカタログから音声profileを設定",
       description:
-        "話者・style・調声値をprofile一件として保存します。既存IDは更新され、segmentからはprofile IDだけを参照します。",
+        "research://guide/voicevox-catalogで選んだ声をprofileとして保存します。話者UUIDやstyle IDを手入力する必要はありません。",
       inputSchema: {
         ...projectIdInput,
-        catalog_revision: z.string().min(1).max(128),
-        profile: voicevoxProfileSchema,
+        catalog_profile_id: z.string().regex(/^voicevox-style-[0-9]+$/),
+        profile_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).optional(),
+        label: z.string().min(1).max(80).optional(),
         make_default: z.boolean().optional()
       },
       outputSchema: mutationOutput,
@@ -981,20 +988,46 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, catalog_revision, profile, make_default }) =>
+    async ({
+      project_id,
+      expected_version,
+      catalog_profile_id,
+      profile_id,
+      label,
+      make_default
+    }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
-        changedKind: "voicevox_profile_upserted",
-        changedId: profile.id,
+        changedKind: "voicevox_profile_set",
+        changedId: profile_id ?? catalog_profile_id,
         mutate: (document) => {
           const deck = requireDeck(document);
+          const catalogProfile = findVoicevoxCatalogProfile(catalog_profile_id);
+          if (catalogProfile === undefined) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "The VOICEVOX catalog profile does not exist."
+            );
+          }
+          const profile = {
+            id: profile_id ?? catalogProfile.id,
+            label: label ?? catalogProfile.label,
+            speaker_uuid: catalogProfile.speakerUuid,
+            speaker_name: catalogProfile.speakerName,
+            style_id: catalogProfile.styleId,
+            style_name: catalogProfile.styleName,
+            tuning:
+              catalogProfile.styleId === ZUNDAMON_NORMAL_PROFILE.styleId
+                ? { ...ZUNDAMON_NORMAL_PROFILE.tuning }
+                : null
+          };
           deck.voicevox ??= {
-            catalog_revision,
+            catalog_revision: VOICEVOX_ENGINE.catalogRevision,
             default_profile_id: profile.id,
             profiles: []
           };
-          deck.voicevox.catalog_revision = catalog_revision;
+          deck.voicevox.catalog_revision = VOICEVOX_ENGINE.catalogRevision;
           const index = deck.voicevox.profiles.findIndex(
             (item) => item.id === profile.id
           );
