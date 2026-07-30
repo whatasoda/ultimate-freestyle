@@ -817,3 +817,9 @@
 - 声の選択とトーン調整はブラウザ音声の近似しか試せず、ずんだもん等の実際の話者・スタイル、抑揚、間を全区間生成前に確認できなかった。音声仕上げ画面へ「選択中の声をVOICEVOXで試聴」を追加した。
 - 固定の短文を選択中catalog profileと7種の調声値でCloudflare Containerへ送り、MP3をその場で再生する。取得中、停止、失敗、cache再利用を日本語で表示し、Blob URL・Audio・AbortControllerを停止時に解放する。
 - 入力fingerprint単位でR2へ共有cacheし、同じ話者・スタイル・調声は再生成しない。新規組み合わせは認証利用者一人あたり24時間12件に制限し、project所有権とCSRFを確認する。通常の区間生成も同じMP3検証helperへ統一した。
+
+## 改善ループ273
+
+- Web UIだけが持っていたタイトル長、文章量、表の密度、読み上げ表示量、STEP想定時間の事前検査を`projects/quality.ts`へ抽出し、画面とRemote MCPで同じ判定を使うようにした。
+- `research://projects/{id}/quality`を追加し、版、renderer、警告総数、一枚ごとの警告と編集URL、次操作を返す。Agentは実表示を開く前に文章分割・組版・時間配分の明白な問題を修正できる。
+- DOM実寸、font、画像、animationに依存する6検査はMCPで完了したと偽らず、`available_in_mcp: false`、理由、Twitch sessionが必要な一括チェック導線を返す。静的警告がなくても実renderer確認を必須とする。

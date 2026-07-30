@@ -9,6 +9,7 @@ import {
 import { z } from "zod";
 
 import { twitchGrantPropsSchema } from "../auth/types";
+import { PRESENTATION_RENDERER_VERSION } from "../presentation/render";
 import {
   getPublicationStatus,
   MAX_PRESENTATION_DURATION_SECONDS
@@ -20,6 +21,7 @@ import {
   listProjectDraftRevisions
 } from "./repository";
 import { RUBRIC_MARKDOWN } from "./rubric";
+import { staticSlideQuality } from "./quality";
 
 const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 
@@ -633,6 +635,66 @@ export function registerResearchGuides(
                         : `research://projects/${current.project_id}/slides/${slideId}`
                     }
                   };
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(body)
+        }]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-quality",
+    new ResourceTemplate("research://projects/{id}/quality", {
+      list: undefined
+    }),
+    {
+      title: "研究発表の品質事前検査",
+      description:
+        "文章量、表、タイトル、読み上げ時間の静的警告と、実rendererで確認するWeb導線を取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const deck = project?.document.deck ?? null;
+      const slides = deck?.slides.map((slide, index) => ({
+        slide_id: slide.id,
+        slide_number: index + 1,
+        title: slide.title,
+        warnings: staticSlideQuality(slide, deck.aspect_ratio ?? "16:9", deck.voicevox),
+        web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${project?.project_id}/slides/${slide.id}`
+      })) ?? [];
+      const warningCount = slides.reduce((sum, slide) => sum + slide.warnings.length, 0);
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : project === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : {
+              ok: true,
+              project_id: project.project_id,
+              version: project.version,
+              renderer_version: PRESENTATION_RENDERER_VERSION,
+              static_checks: {
+                status: warningCount > 0 ? "needs_changes" : "ready_for_render_review",
+                warning_count: warningCount,
+                slides
+              },
+              rendered_checks: {
+                required: true,
+                available_in_mcp: false,
+                checks: ["見切れ", "自動縮小率", "文字コントラスト", "読み上げ文の省略", "実文字サイズ", "表示パーツの重なり"],
+                reason: "DOMの実寸、font、画像、アニメーションを含む検査は保存データだけでは確定できません。",
+                web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${project.project_id}`,
+                requires_session: true
+              },
+              next_action: warningCount > 0 ? "fix_static_warnings" : "run_rendered_quality_sweep"
+            };
       return {
         contents: [{
           uri: uri.href,

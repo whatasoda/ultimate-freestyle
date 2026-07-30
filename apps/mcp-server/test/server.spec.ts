@@ -534,6 +534,9 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/publication"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/quality"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/slides/{slideId}"
           }),
           expect.objectContaining({
@@ -554,6 +557,25 @@ describe("MCP contract", () => {
           text: expect.stringContaining(updatedQuestion)
         })
       );
+      const qualityResource = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/quality`
+      );
+      expect(qualityResource).toMatchObject({
+        ok: true,
+        project_id: firstProject.project_id,
+        version: 2,
+        static_checks: {
+          status: "ready_for_render_review",
+          warning_count: 0
+        },
+        rendered_checks: {
+          required: true,
+          available_in_mcp: false,
+          requires_session: true
+        },
+        next_action: "run_rendered_quality_sweep"
+      });
       const revisionResource = await readJsonResource(
         client,
         `research://projects/${firstProject.project_id}/revisions/1`
