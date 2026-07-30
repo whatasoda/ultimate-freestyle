@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@48";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@49";
 
 function escapeHtml(value: string): string {
   return value
@@ -1259,10 +1259,74 @@ export function renderPresentationHtml(
         y: target.dataset.fitScroll === 'true' ? 0 : Math.max(0, boundaryRect.top - top, bottom - boundaryRect.bottom)
       };
     };
+    const parseRenderedColor = (value) => {
+      const match = String(value).match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)$/i);
+      if (!match) return null;
+      return { red: Number(match[1]), green: Number(match[2]), blue: Number(match[3]), alpha: match[4] === undefined ? 1 : Number(match[4]) };
+    };
+    const compositeColor = (foreground, background) => {
+      const alpha = foreground.alpha + background.alpha * (1 - foreground.alpha);
+      if (alpha <= 0) return { red: 255, green: 255, blue: 255, alpha: 0 };
+      return {
+        red: (foreground.red * foreground.alpha + background.red * background.alpha * (1 - foreground.alpha)) / alpha,
+        green: (foreground.green * foreground.alpha + background.green * background.alpha * (1 - foreground.alpha)) / alpha,
+        blue: (foreground.blue * foreground.alpha + background.blue * background.alpha * (1 - foreground.alpha)) / alpha,
+        alpha
+      };
+    };
+    const renderedBackground = (target, slideElement) => {
+      let background = { red: 255, green: 255, blue: 255, alpha: 0 };
+      let current = target;
+      let complex = false;
+      while (current instanceof HTMLElement) {
+        const style = getComputedStyle(current);
+        if (style.backgroundImage && style.backgroundImage !== 'none') complex = true;
+        const color = parseRenderedColor(style.backgroundColor);
+        if (color) background = compositeColor(background, color);
+        if (background.alpha >= .99 || current === slideElement) break;
+        current = current.parentElement;
+      }
+      if (background.alpha < .99) background = compositeColor(background, { red: 255, green: 255, blue: 255, alpha: 1 });
+      return { color: background, complex };
+    };
+    const relativeLuminance = (color) => {
+      const channel = (value) => {
+        const normalized = value / 255;
+        return normalized <= .04045 ? normalized / 12.92 : Math.pow((normalized + .055) / 1.055, 2.4);
+      };
+      return .2126 * channel(color.red) + .7152 * channel(color.green) + .0722 * channel(color.blue);
+    };
+    const contrastRatio = (foreground, background) => {
+      const foregroundLuminance = relativeLuminance(foreground);
+      const backgroundLuminance = relativeLuminance(background);
+      return (Math.max(foregroundLuminance, backgroundLuminance) + .05) / (Math.min(foregroundLuminance, backgroundLuminance) + .05);
+    };
+    const collectContrast = (target, slideElement) => {
+      const candidates = [target, ...target.querySelectorAll('*')].filter((item) => {
+        if (!(item instanceof HTMLElement) || item.hidden || item.offsetParent === null) return false;
+        return [...item.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+      });
+      let lowest = null;
+      for (const candidate of candidates) {
+        const style = getComputedStyle(candidate);
+        const foreground = parseRenderedColor(style.color);
+        if (!foreground || foreground.alpha < .99 || Number(style.opacity) < .99) continue;
+        const background = renderedBackground(candidate, slideElement);
+        if (background.complex) continue;
+        const fontSize = Number.parseFloat(style.fontSize);
+        const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
+        const required = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700) ? 3 : 4.5;
+        const ratio = contrastRatio(foreground, background.color);
+        if (ratio + .05 >= required || (lowest && lowest.ratio <= ratio)) continue;
+        lowest = { ratio, required };
+      }
+      return lowest;
+    };
     const fitAndReport = () => {
       const currentSlide = slides[slide];
       const diagnostics = [];
       const fits = [];
+      const contrasts = [];
       currentSlide.querySelectorAll('[data-fit-content]').forEach((target) => {
         if (!(target instanceof HTMLElement) || target.hidden || target.offsetParent === null) return;
         target.style.setProperty('--fit-scale', '1');
@@ -1279,8 +1343,10 @@ export function renderPresentationHtml(
         target.dataset.fitScale = String(scale);
         fits.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', fit_scale: scale });
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
+        const contrast = collectContrast(target, currentSlide);
+        if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required });
       });
-      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, overflows: diagnostics, fits }, location.origin);
+      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, overflows: diagnostics, fits, contrasts }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
     const appendDraftInline = (target, text) => {

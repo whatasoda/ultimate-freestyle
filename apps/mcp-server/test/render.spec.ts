@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@48");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@49");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -298,7 +298,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('"speaker":"ずんだもん"');
     expect(html).toContain("segment?.speaker || DECK.slides[slide].narration?.speaker");
     expect(html).toContain("ultimate-freestyle:render-diagnostics");
-    expect(html).toContain("overflows: diagnostics, fits");
+    expect(html).toContain("overflows: diagnostics, fits, contrasts");
+    expect(html).toContain("const collectContrast = (target, slideElement)");
     expect(html).toContain("ultimate-freestyle:set-position");
     expect(html).toContain("container: presentation-stage / size");
     expect(html).not.toMatch(/\d(?:\.\d+)?vw/);

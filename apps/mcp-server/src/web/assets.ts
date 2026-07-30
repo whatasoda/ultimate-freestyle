@@ -216,13 +216,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const compressed = Array.isArray(data.fits)
         ? data.fits.filter((item) => Number.isFinite(item?.fit_scale) && item.fit_scale < 0.7)
         : [];
-      if (overflows.length || compressed.length) {
+      const contrasts = Array.isArray(data.contrasts)
+        ? data.contrasts.filter((item) => Number.isFinite(item?.ratio) && Number.isFinite(item?.required) && item.ratio < item.required)
+        : [];
+      if (overflows.length || compressed.length || contrasts.length) {
         sweepIssueCount += 1;
         const details = [
           overflows.length ? "見切れ" + overflows.length + "か所" : "",
-          compressed.length ? "70%未満の縮小" + compressed.length + "か所" : ""
+          compressed.length ? "70%未満の縮小" + compressed.length + "か所" : "",
+          contrasts.length ? "文字コントラスト不足" + contrasts.length + "か所" : ""
         ].filter(Boolean).join("、");
-        appendSweepResult(slide, details + "。個別画面で組版と文章量を調整してください。");
+        appendSweepResult(slide, details + "。個別画面で配色・組版・文章量を調整してください。");
       }
       if (qualitySweepProgress instanceof HTMLProgressElement) qualitySweepProgress.value = sweepIndex + 1;
       if (qualitySweepStatus instanceof HTMLElement) qualitySweepStatus.textContent = (sweepIndex + 1) + " / " + slides.length + "枚を確認";
@@ -1319,13 +1323,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const compressed = Array.isArray(data.fits)
         ? data.fits.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.fit_scale) && item.fit_scale < 0.7)
         : [];
+      const contrasts = Array.isArray(data.contrasts)
+        ? data.contrasts.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.ratio) && Number.isFinite(item.required) && item.ratio < item.required)
+        : [];
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = overflows.length
           ? overflows.length + "か所で文字が収まりません。品質確認から対象を確認してください。"
           : compressed.length
             ? compressed.length + "か所の文字を70%未満まで縮小しています。組版か文章量を見直してください。"
+          : contrasts.length
+            ? contrasts.length + "か所で文字と背景のコントラストが不足しています。配色を見直してください。"
           : "このSTEPの文字は" + (slideFrame.dataset.aspectRatio || "16:9") + "の枠内に収まっています。";
-        layoutStatus.dataset.level = overflows.length || compressed.length ? "warning" : "ok";
+        layoutStatus.dataset.level = overflows.length || compressed.length || contrasts.length ? "warning" : "ok";
       }
       if (qualityList instanceof HTMLElement) {
         qualityList.querySelectorAll("[data-layout-warning]").forEach((item) => item.remove());
@@ -1335,15 +1344,20 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         for (const item of compressed) {
           appendDiagnostic(item, item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。");
         }
+        for (const item of contrasts) {
+          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1です（目安" + item.required.toFixed(1) + ":1以上）。");
+        }
       }
       if (qualitySummary instanceof HTMLElement) {
         const baseCount = Number(qualitySummary.dataset.baseCount || 0);
-        const total = baseCount + overflows.length + compressed.length;
+        const total = baseCount + overflows.length + compressed.length + contrasts.length;
         qualitySummary.dataset.level = total ? "warning" : "ok";
         qualitySummary.textContent = overflows.length
           ? total + "件の確認事項があります（うち見切れ" + overflows.length + "件）。"
           : compressed.length
             ? total + "件の確認事項があります（うち過剰な自動縮小" + compressed.length + "件）。"
+          : contrasts.length
+            ? total + "件の確認事項があります（うち文字コントラスト不足" + contrasts.length + "件）。"
           : baseCount
             ? baseCount + "件の確認事項があります。"
             : "保存データ上の確認事項はありません。";
