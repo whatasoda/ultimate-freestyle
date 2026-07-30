@@ -803,6 +803,10 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('setMobilePane("edit")');
     expect(dashboardScriptText).toContain('event.key === "ArrowRight"');
     expect(dashboardScriptText).toContain('mobilePreviewPending');
+    expect(dashboardScriptText).toContain('const markMobilePreviewPending = (awaitDiagnostics = false)');
+    expect(dashboardScriptText).toContain('previewFrameLoadedGeneration === previewFrameGeneration');
+    expect(dashboardScriptText).toContain('confirmMobilePreview()');
+    expect(dashboardScriptText).not.toContain('if (pane === "preview") document.body.dataset.mobilePreviewPending = "false"');
     expect(dashboardScriptText).toContain("const apiErrorMessage =");
     expect(dashboardScriptText).toContain("別の画面またはAIから先に更新されました");
     expect(dashboardScriptText).toContain("サーバーと通信できませんでした");

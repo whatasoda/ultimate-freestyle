@@ -79,17 +79,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }, 700);
   };
   const saveState = document.querySelector("[data-save-state]");
+  const syncMobilePreviewBadge = () => {
+    const previewBadge = document.querySelector("[data-mobile-preview-badge]");
+    if (previewBadge instanceof HTMLElement) previewBadge.hidden = document.body.dataset.mobilePreviewPending !== "true";
+  };
+  const markMobilePreviewPending = (awaitDiagnostics = false) => {
+    document.body.dataset.mobilePreviewPending = "true";
+    if (awaitDiagnostics) document.body.dataset.mobilePreviewAwaiting = "true";
+    syncMobilePreviewBadge();
+  };
+  const confirmMobilePreview = () => {
+    document.body.dataset.mobilePreviewPending = "false";
+    document.body.dataset.mobilePreviewAwaiting = "false";
+    syncMobilePreviewBadge();
+  };
   const syncSaveState = () => {
     const dirtyCount = document.querySelectorAll('[data-dirty="true"]').length;
     if (saveState instanceof HTMLElement) {
       saveState.dataset.state = dirtyCount > 0 ? "dirty" : "saved";
       saveState.textContent = dirtyCount > 0 ? "未保存 " + dirtyCount + "件" : "保存済み";
-      if (dirtyCount > 0 && document.body.dataset.mobilePane !== "preview") document.body.dataset.mobilePreviewPending = "true";
-      if (dirtyCount === 0) document.body.dataset.mobilePreviewPending = "false";
+      if (dirtyCount > 0) markMobilePreviewPending(document.body.dataset.mobilePane === "preview");
     }
     syncPublicationDirtyState(dirtyCount);
-    const previewBadge = document.querySelector("[data-mobile-preview-badge]");
-    if (previewBadge instanceof HTMLElement) previewBadge.hidden = document.body.dataset.mobilePreviewPending !== "true";
+    syncMobilePreviewBadge();
   };
   const showSavingState = () => {
     if (!(saveState instanceof HTMLElement)) return;
@@ -397,6 +409,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const narrationSettingsEditor = document.querySelector("[data-narration-settings-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
+  let previewFrameGeneration = 0;
+  let previewFrameLoadedGeneration = -1;
   const contentCapacityField = slideEditor instanceof HTMLFormElement ? slideEditor.elements.namedItem("content_markdown") : null;
   let currentPreviewTypography = {};
   try { currentPreviewTypography = JSON.parse(typographyEditor?.dataset.effectiveTypography || "{}"); } catch {}
@@ -702,6 +716,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(slideFrame instanceof HTMLIFrameElement)) return;
     const frameUrl = new URL(slideFrame.src);
     frameUrl.searchParams.set("refresh", String(version));
+    previewFrameGeneration += 1;
+    markMobilePreviewPending(true);
     setFrameLoading(true);
     slideFrame.src = frameUrl.toString();
   };
@@ -2010,15 +2026,22 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const setMobilePane = (pane) => {
     if (!["preview", "edit", "slides"].includes(pane)) return;
     document.body.dataset.mobilePane = pane;
-    if (pane === "preview") document.body.dataset.mobilePreviewPending = "false";
+    if (pane === "preview" && document.body.dataset.mobilePreviewPending === "true") {
+      document.body.dataset.mobilePreviewAwaiting = "true";
+      requestAnimationFrame(() => {
+        if (!(slideFrame instanceof HTMLIFrameElement)) return;
+        const output = document.querySelector("[data-step-output]");
+        const step = output instanceof HTMLOutputElement ? Number(output.value.match(/STEP (\d+)/)?.[1] || 0) : 0;
+        slideFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: Number(new URL(slideFrame.src).searchParams.get("slide") || 1), step }, location.origin);
+      });
+    }
     for (const button of mobilePaneButtons) {
       if (!(button instanceof HTMLButtonElement)) continue;
       const selected = button.dataset.mobilePane === pane;
       button.setAttribute("aria-selected", String(selected));
       button.tabIndex = selected ? 0 : -1;
     }
-    const previewBadge = document.querySelector("[data-mobile-preview-badge]");
-    if (previewBadge instanceof HTMLElement) previewBadge.hidden = document.body.dataset.mobilePreviewPending !== "true";
+    syncMobilePreviewBadge();
     try { localStorage.setItem("ultimate-freestyle:workspace-mobile-pane", pane); } catch {}
   };
   if (mobilePaneButtons.length > 0) {
@@ -2144,6 +2167,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }, location.origin);
     };
     slideFrame.addEventListener("load", () => {
+      previewFrameLoadedGeneration = previewFrameGeneration;
       setFrameLoading(false);
       syncFramePosition();
       syncSlideDraft();
@@ -2285,6 +2309,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         return;
       }
       if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || !Array.isArray(data.overflows)) return;
+      if (document.body.dataset.mobilePane === "preview" && document.body.dataset.mobilePreviewAwaiting === "true" && previewFrameLoadedGeneration === previewFrameGeneration) confirmMobilePreview();
       const overflows = data.overflows.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.overflow_x) && Number.isFinite(item.overflow_y));
       const compressed = Array.isArray(data.fits)
         ? data.fits.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.fit_scale) && item.fit_scale < 0.7)
