@@ -1361,7 +1361,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           appendDiagnostic(item, item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。");
         }
         for (const item of contrasts) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1です（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
+          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1" + (item.estimated ? "（背景模様を除く概算）" : "") + "です（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
         }
       }
       if (qualitySummary instanceof HTMLElement) {

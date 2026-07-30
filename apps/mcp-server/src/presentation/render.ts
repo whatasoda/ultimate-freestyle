@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@50";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@51";
 
 function escapeHtml(value: string): string {
   return value
@@ -1312,13 +1312,13 @@ export function renderPresentationHtml(
         const foreground = parseRenderedColor(style.color);
         if (!foreground || foreground.alpha < .99 || Number(style.opacity) < .99) continue;
         const background = renderedBackground(candidate, slideElement);
-        if (background.complex) continue;
         const fontSize = Number.parseFloat(style.fontSize);
         const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
         const required = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700) ? 3 : 4.5;
         const ratio = contrastRatio(foreground, background.color);
+        if (background.complex && ratio >= 2) continue;
         if (ratio + .05 >= required || (lowest && lowest.ratio <= ratio)) continue;
-        lowest = { ratio, required };
+        lowest = { ratio, required, estimated: background.complex };
       }
       return lowest;
     };
@@ -1344,7 +1344,7 @@ export function renderPresentationHtml(
         fits.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', fit_scale: scale });
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
         const contrast = collectContrast(target, currentSlide);
-        if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required });
+        if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated });
       });
       if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, overflows: diagnostics, fits, contrasts }, location.origin);
     };
