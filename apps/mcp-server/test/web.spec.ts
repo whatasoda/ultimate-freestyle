@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=72"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=73"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -554,6 +554,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("updateRecommendedBodyLimit");
     expect(DASHBOARD_SCRIPT).toContain("data-component-color-hex");
     expect(workspaceHtml).toContain("自由配置 1パーツ");
+    expect(workspaceHtml).toContain("data-composition-editor");
+    expect(workspaceHtml).toContain("スライド枠外を隠す");
     expect(workspaceHtml).toContain("data-slide-frame");
     expect(workspaceHtml).toContain("data-content-structure");
     expect(workspaceHtml).toContain("「読み物」組版を試す");
@@ -710,6 +712,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("spokenCharacters / 6");
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-composition");
     expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("data-component-frame-toggle");
     expect(dashboardScriptText).toContain("component.frame = null");
@@ -1765,6 +1768,35 @@ describe("Web dashboard", () => {
       height: 72
     });
     expect(positionedNode.style).toBeUndefined();
+    const updateComposition = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 18,
+            composition_background: "#223344",
+            composition_clip_content: false
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(updateComposition.status).toBe(200);
+    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 19 });
+    const recoloredDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    expect(JSON.parse(recoloredDocument!.document_json).deck.slides[0].composition).toMatchObject({
+      background: "#223344",
+      clip_content: false
+    });
 
     const unsupportedUpload = await requestProvider(
       provider,

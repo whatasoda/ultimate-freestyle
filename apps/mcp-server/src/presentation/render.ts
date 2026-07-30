@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@57";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@58";
 
 function escapeHtml(value: string): string {
   return value
@@ -1694,6 +1694,13 @@ export function renderPresentationHtml(
       region.dataset.active = String(data.display === 'inline' || Boolean(narration()));
       scheduleFit();
     };
+    const previewComposition = (data) => {
+      const currentSlide = slides[slide];
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition === 'flow' || data.slide_id !== DECK.slides[slide].id) return;
+      if (/^#[0-9a-f]{6}$/i.test(String(data.background || ''))) currentSlide.style.setProperty('--canvas-background', String(data.background));
+      currentSlide.style.setProperty('--canvas-overflow', data.clip_content ? 'hidden' : 'visible');
+      scheduleFit();
+    };
     const previewAppearance = (data) => {
       const currentSlide = slides[slide];
       if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return;
@@ -1965,6 +1972,7 @@ export function renderPresentationHtml(
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-scene-component') previewSceneComponent(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-composition') previewComposition(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-template') previewTemplate(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-appearance') previewAppearance(event.data);

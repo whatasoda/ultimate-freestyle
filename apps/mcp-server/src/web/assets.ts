@@ -355,6 +355,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const typographyEditor = document.querySelector("[data-typography-editor]");
   const templateEditor = document.querySelector("[data-template-editor]");
   const appearanceEditor = document.querySelector("[data-appearance-editor]");
+  const compositionEditor = document.querySelector("[data-composition-editor]");
   const narrationSettingsEditor = document.querySelector("[data-narration-settings-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
@@ -414,6 +415,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   let draftAppearanceTimer;
   let draftNarrationTimer;
   let draftSceneTimer;
+  let draftCompositionTimer;
   let setWorkspaceStep = () => {};
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
@@ -710,6 +712,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       role: String(data.get("role") || "content"),
       cover_layout: String(data.get("cover_layout") || "center")
     });
+    if (form.matches("[data-composition-editor]")) Object.assign(body, {
+      composition_background: String(data.get("composition_background") || ""),
+      composition_clip_content: data.has("composition_clip_content")
+    });
     if (form.matches("[data-typography-editor]")) Object.assign(body, {
       typography: {
         preset: String(data.get("preset") || "standard"),
@@ -962,6 +968,25 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }, location.origin);
     }
   };
+  const syncCompositionDraft = () => {
+    if (!(compositionEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
+    const data = new FormData(compositionEditor);
+    slideFrame.contentWindow?.postMessage({
+      type: "ultimate-freestyle:preview-composition",
+      slide_id: compositionEditor.dataset.slideId || "",
+      background: String(data.get("composition_background") || ""),
+      clip_content: data.has("composition_clip_content")
+    }, location.origin);
+  };
+  compositionEditor?.addEventListener("input", () => {
+    clearTimeout(draftCompositionTimer);
+    draftCompositionTimer = setTimeout(syncCompositionDraft, 120);
+    const layoutStatus = document.querySelector("[data-layout-status]");
+    if (layoutStatus instanceof HTMLElement) {
+      layoutStatus.textContent = "構成全体の背景をプレビューへ反映しています…";
+      layoutStatus.dataset.level = "";
+    }
+  });
   for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
     const frameToggle = form.querySelector("[data-component-frame-toggle]");
     const frameFields = [...form.querySelectorAll("[data-component-frame-field]")].filter((field) => field instanceof HTMLInputElement);
@@ -1481,6 +1506,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncTypographyDraft();
       syncTemplateDraft();
       syncAppearanceDraft();
+      syncCompositionDraft();
       syncNarrationDrafts();
       syncSceneComponentDrafts();
     });

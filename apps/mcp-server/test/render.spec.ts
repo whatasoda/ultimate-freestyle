@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@57");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@58");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -215,6 +215,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("else scheduleAutoAdvance();");
     expect(html).toContain("ultimate-freestyle:preview-fields");
     expect(html).toContain("ultimate-freestyle:preview-scene-component");
+    expect(html).toContain("ultimate-freestyle:preview-composition");
     expect(html).toContain("const previewSceneComponent =");
     expect(html).toContain("const renderDraftMarkdown =");
     expect(html).toContain("data-flow-content");
@@ -712,6 +713,9 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('class="filmstrip-meta"');
     expect(workspaceHtml).toContain("60秒 · 3段階 · リッチ構成 6パーツ");
     expect(workspaceHtml).toContain("data-scene-component-editor");
+    expect(workspaceHtml).toContain("data-composition-editor");
+    expect(workspaceHtml).toContain('name="composition_background"');
+    expect(workspaceHtml).toContain("構成全体を保存");
     expect(workspaceHtml).toContain('data-component-id="headline"');
     expect(workspaceHtml).toContain('data-save-state data-state="saved"');
     expect(workspaceHtml).toContain("この表示パーツを保存");

@@ -141,6 +141,8 @@ const slideFieldsRequestSchema = z.object({
   enter_animation: animationSchema.nullable().optional(),
   role: slideRoleSchema.optional(),
   cover_layout: coverLayoutSchema.optional(),
+  composition_background: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  composition_clip_content: z.boolean().optional(),
   content_markdown: z.string().min(1).max(20_000).optional(),
   sidebar_markdown: z.string().max(10_000).optional()
 }).refine(
@@ -1086,7 +1088,13 @@ async function handleSlideFieldsUpdate(
     );
   }
   try {
-    const { expected_version, sidebar_markdown, ...fields } = parsed.data;
+    const {
+      expected_version,
+      sidebar_markdown,
+      composition_background,
+      composition_clip_content,
+      ...fields
+    } = parsed.data;
     const project = await mutateProject(env.DB, {
       ownerUserId: session.userId,
       projectId,
@@ -1110,6 +1118,15 @@ async function handleSlideFieldsUpdate(
           throw error;
         }
         Object.assign(slide, fields);
+        if (composition_background !== undefined || composition_clip_content !== undefined) {
+          if (slide.composition === null || slide.composition === undefined) {
+            const error = new Error("The slide does not use a free composition.");
+            Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+            throw error;
+          }
+          if (composition_background !== undefined) slide.composition.background = composition_background;
+          if (composition_clip_content !== undefined) slide.composition.clip_content = composition_clip_content;
+        }
         if (sidebar_markdown !== undefined) {
           slide.sidebar_markdown = sidebar_markdown.trim() || null;
         }
@@ -1147,6 +1164,8 @@ async function handleSlideFieldsUpdate(
         ? 404
         : code === "PROJECT_VERSION_CONFLICT"
           ? 409
+          : code === "INVALID_COMPOSITION_MODE"
+            ? 422
           : 500;
     return jsonResponse(
       {
@@ -1161,6 +1180,8 @@ async function handleSlideFieldsUpdate(
                 ? "スライドが見つかりません。"
                 : code === "TEMPLATE_NOT_FOUND"
                   ? "選択したtemplateが見つかりません。"
+                : code === "INVALID_COMPOSITION_MODE"
+                  ? "自由配置またはリッチ構成のスライドでのみ背景を変更できます。"
                 : code === "PROJECT_NOT_FOUND"
                   ? "研究が見つかりません。"
                   : "スライドを保存できませんでした。"
