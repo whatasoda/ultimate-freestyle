@@ -94,6 +94,7 @@ Web UI堅牢化、研究詳細、画像upload、VOICEVOX複数話者・調声、
 - `49f4fb0`: ADR 0003で、既存flowを維持しながらslide単位で安全なblock canvasを選べる方針を採用。
 - markdown、project画像、矩形・楕円・線を、百分率frame、重なり順、段階表示、animation preset、検証済みstyle tokenで配置できる。
 - `set_slide_canvas`、`upsert_slide_block`、`delete_slide_block`を追加し、AI clientはslide全体を送り直さず一blockずつ編集できる。
+- 2026-07-30に`upsert_slide_block`を`edit_slide_block`へ置換し、作成後の更新はblock全体ではなく一fieldだけを送る契約へ縮小した。
 - 任意HTML、JavaScript、CSS、外部画像URLは受け付けず、従来のnarration、進行、URL、自動送りは共通runtimeへ残した。
 
 ### previewと公開画像

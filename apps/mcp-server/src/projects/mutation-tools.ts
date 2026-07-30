@@ -387,6 +387,17 @@ function recalculateSlideRevealSteps(
   );
 }
 
+function parseSlideBlock(value: unknown) {
+  const parsed = slideBlockSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new ProjectToolError(
+      "INVALID_FIELDS",
+      parsed.error.issues[0]?.message ?? "The block field is invalid."
+    );
+  }
+  return parsed.data;
+}
+
 function upsertSceneComponent(
   document: ProjectDocument,
   slideId: string,
@@ -1316,15 +1327,46 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
-    "upsert_slide_block",
+    "edit_slide_block",
     {
-      title: "自由配置blockを作成・更新",
+      title: "自由配置blockを個別編集",
       description:
-        "markdown、project画像、図形のblockを一件だけ追加または置換します。frameは16:9 canvas内の百分率座標です。",
+        "canvasのblockを安全な既定配置で一件作成するか、内容・座標・見た目の一項目だけを更新します。createのvalueはmarkdown本文、画像asset UUID、または図形labelです。更新前は対象element resourceを読んでください。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        block: slideBlockSchema
+        action: z.enum(["create", "update_field"]),
+        block_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        kind: z.enum(["markdown", "image", "shape"]).optional(),
+        field: z
+          .enum([
+            "markdown",
+            "asset_id",
+            "alt_text",
+            "fit",
+            "shape",
+            "label",
+            "x",
+            "y",
+            "width",
+            "height",
+            "z_index",
+            "at",
+            "animation",
+            "background",
+            "foreground",
+            "border_color",
+            "border_width_px",
+            "corner_radius_px",
+            "padding_px",
+            "opacity",
+            "text_align",
+            "vertical_align",
+            "font_scale",
+            "shadow"
+          ])
+          .optional(),
+        value: z.union([z.string().max(20_000), z.number(), z.null()]).optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -1334,12 +1376,13 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, block }) =>
+    async ({ project_id, expected_version, slide_id, action, block_id, kind, field, value }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
-        changedKind: "slide_block_upserted",
-        changedId: `${slide_id}:${block.id}`,
+        changedKind:
+          action === "create" ? "slide_block_created" : "slide_block_field_updated",
+        changedId: `${slide_id}:${block_id}`,
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
           if (slide.composition?.mode === "scene") {
@@ -1355,10 +1398,113 @@ export function registerProjectMutationTools(
             blocks: []
           };
           const index = slide.composition.blocks.findIndex(
-            (item) => item.id === block.id
+            (item) => item.id === block_id
           );
-          if (index === -1) slide.composition.blocks.push(block);
-          else slide.composition.blocks[index] = block;
+          if (action === "create") {
+            if (index !== -1) {
+              throw new ProjectToolError(
+                "BLOCK_EXISTS",
+                "The block already exists. Use update_field."
+              );
+            }
+            if (kind === undefined) {
+              throw new ProjectToolError("INVALID_FIELDS", "kind is required for create.");
+            }
+            const base = {
+              id: block_id,
+              frame: { x: 10, y: 10, width: 80, height: 25 },
+              z_index: Math.min(
+                100,
+                slide.composition.blocks.reduce(
+                  (highest, item) => Math.max(highest, item.z_index + 1),
+                  0
+                )
+              ),
+              at: 0,
+              animation: "fade" as const
+            };
+            const block = kind === "markdown"
+              ? parseSlideBlock({
+                  ...base,
+                  kind,
+                  markdown:
+                    typeof value === "string" && value.trim().length > 0
+                      ? value
+                      : "# 新しいテキスト"
+                })
+              : kind === "image"
+                ? parseSlideBlock({
+                    ...base,
+                    kind,
+                    asset_id: value,
+                    alt_text: "",
+                    fit: "contain"
+                  })
+                : parseSlideBlock({
+                    ...base,
+                    kind,
+                    shape: "rectangle",
+                    label: typeof value === "string" ? value : null
+                  });
+            slide.composition.blocks.push(block);
+          } else {
+            if (index === -1) {
+              throw new ProjectToolError("BLOCK_NOT_FOUND", "The block does not exist.");
+            }
+            if (field === undefined || value === undefined) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                "field and value are required for update_field."
+              );
+            }
+            const current = slide.composition.blocks[index];
+            const contentFields: Record<typeof current.kind, string[]> = {
+              markdown: ["markdown"],
+              image: ["asset_id", "alt_text", "fit"],
+              shape: ["shape", "label"]
+            };
+            const contentField = [
+              "markdown",
+              "asset_id",
+              "alt_text",
+              "fit",
+              "shape",
+              "label"
+            ].includes(field);
+            if (contentField && !contentFields[current.kind].includes(field)) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                `The ${field} field cannot be used with a ${current.kind} block.`
+              );
+            }
+            const candidate = JSON.parse(JSON.stringify(current)) as Record<string, unknown>;
+            if (["x", "y", "width", "height"].includes(field)) {
+              const frame = candidate.frame as Record<string, unknown>;
+              frame[field] = value;
+            } else if (
+              [
+                "background",
+                "foreground",
+                "border_color",
+                "border_width_px",
+                "corner_radius_px",
+                "padding_px",
+                "opacity",
+                "text_align",
+                "vertical_align",
+                "font_scale",
+                "shadow"
+              ].includes(field)
+            ) {
+              const style = (candidate.style ?? {}) as Record<string, unknown>;
+              if (value === null) delete style[field];
+              else style[field] = value;
+              candidate.style = style;
+            } else {
+              candidate[field] = value;
+            }
+            slide.composition.blocks[index] = parseSlideBlock(candidate);
+          }
           slide.composition.blocks.sort(
             (a, b) => a.z_index - b.z_index || a.id.localeCompare(b.id)
           );

@@ -21,6 +21,13 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 - \`canvas\` は絶対位置が必要な単純な図版にだけ使う。sceneとcanvasを一枚の中で混在させることはできない。
 - 任意HTML、JavaScript、外部画像URLは入力しない。表示はプラットフォーム管理のrendererが担当する。
 
+## canvasの組み立て
+
+1. set_slide_canvasで一枚をcanvasへ切り替える。
+2. edit_slide_blockのcreateでmarkdown、image、shapeを安全な既定配置から一件作る。valueはそれぞれ本文、project内のasset UUID、任意のlabel。
+3. 同じtoolのupdate_fieldでframe、重なり順、表示step、animation、style、kind固有内容の一項目だけを変更する。
+4. 更新前後はelement resourceで対象blockと現在versionを読む。削除だけはdelete_slide_blockを使う。
+
 ## sceneの組み立て
 
 1. \`set_slide_scene\` で一枚をsceneへ切り替える。
@@ -381,9 +388,9 @@ export function registerResearchGuides(
       { list: undefined }
     ),
     {
-      title: "研究発表のcomponent一件",
+      title: "研究発表の表示要素一件",
       description:
-        "部分更新前に読む、指定したscene component一件と現在versionです。",
+        "部分更新前に読む、指定したscene componentまたはcanvas block一件と現在versionです。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -399,10 +406,13 @@ export function registerResearchGuides(
         project !== null && typeof slideId === "string"
           ? project.document.deck?.slides.find((item) => item.id === slideId)
           : undefined;
-      const element =
-        slide?.composition?.mode === "scene" && typeof elementId === "string"
+      const element = slide?.composition !== null &&
+          slide?.composition !== undefined &&
+          typeof elementId === "string"
+        ? slide.composition.mode === "scene"
           ? slide.composition.nodes.find((item) => item.id === elementId)
-          : undefined;
+          : slide.composition.blocks.find((item) => item.id === elementId)
+        : undefined;
       const body =
         "error" in auth
           ? { ok: false, error: { code: auth.error } }
@@ -411,12 +421,22 @@ export function registerResearchGuides(
             : slide === undefined
               ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
               : element === undefined
-                ? { ok: false, error: { code: "COMPONENT_NOT_FOUND" } }
+                ? {
+                    ok: false,
+                    error: {
+                      code:
+                        slide.composition?.mode === "canvas"
+                          ? "BLOCK_NOT_FOUND"
+                          : "COMPONENT_NOT_FOUND"
+                    }
+                  }
                 : {
                     ok: true,
                     project_id: project.project_id,
                     version: project.version,
                     slide_id: slide.id,
+                    element_type:
+                      slide.composition?.mode === "canvas" ? "block" : "component",
                     element
                   };
       return {

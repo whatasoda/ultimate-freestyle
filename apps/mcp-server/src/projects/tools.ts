@@ -26,6 +26,7 @@ const projectErrorCodeSchema = z.enum([
   "SLIDE_NOT_FOUND",
   "SLIDE_EXISTS",
   "BLOCK_NOT_FOUND",
+  "BLOCK_EXISTS",
   "COMPONENT_NOT_FOUND",
   "COMPONENT_HAS_CHILDREN",
   "INVALID_COMPOSITION_MODE",
@@ -34,6 +35,7 @@ const projectErrorCodeSchema = z.enum([
   "LOG_ENTRY_EXISTS",
   "INVALID_POSITION",
   "INVALID_CHANGE",
+  "INVALID_FIELDS",
   "LAST_SLIDE_REQUIRED",
   "INTERNAL_ERROR"
 ]);

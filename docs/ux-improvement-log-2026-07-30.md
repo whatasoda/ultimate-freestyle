@@ -579,3 +579,9 @@
 - 保存前の本文変更も分割対象に含め、見た目の設定は次のスライドへ継承する一方、読み上げと補足欄は意図せず二重再生・重複表示しないよう前のスライドへ残す。
 - 元の想定時間を文字数比で2枚へ配分し、合計時間を維持する。内容以外に未保存設定がある場合は分割を止め、分割後に保存済み本文のsession draftが誤って復元候補へ残らないようにした。
 - dashboard assetをv104へ更新した。
+
+## 改善ループ234
+
+- canvasの`upsert_slide_block`は一件とはいえframe、style、内容を含むblock全体を毎回要求し、小さい入力上限のMCP clientでは個別編集になっていなかった。
+- tool数を増やさず`edit_slide_block`へ置換し、安全な既定配置からの作成と、一fieldだけの更新を同じ小さな契約で扱うようにした。kindに存在しないfieldやcanvas外へ出る座標は安定した`INVALID_FIELDS`で拒否する。
+- element resourceをscene専用からcanvas blockにも拡張し、AI agentは対象一件と現在versionを読み直してから修正できる。作成、field更新、kind不一致、範囲外、個別resourceをcontract testで検証した。
