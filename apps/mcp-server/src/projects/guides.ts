@@ -1186,23 +1186,24 @@ export function registerResearchGuides(
                         sidebar_characters: sidebar_markdown?.length ?? 0,
                         uri: `${baseUri}/content`
                       },
-                      reveals: reveal_blocks.map((block) => ({
-                        at: block.at,
-                        preview: resourceTextPreview(block.markdown, 160),
-                        uri: `${baseUri}/reveals/${block.at}`
-                      })),
+                      reveals: {
+                        count: reveal_blocks.length,
+                        page_size: 20,
+                        pages: Math.ceil(reveal_blocks.length / 20),
+                        uri_template: `${baseUri}/reveals/pages/{page}`
+                      },
                       narration: narration === null
                         ? null
                         : {
                             display: narration.display,
                             speaker: narration.speaker,
                             appearance: narration.appearance,
-                            segments: narration.segments.map((segment) => ({
-                              at: segment.at,
-                              preview: resourceTextPreview(segment.text, 160),
-                              has_generated_audio: segment.audio_src !== null,
-                              uri: `${baseUri}/narration/${segment.at}`
-                            }))
+                            segments: {
+                              count: narration.segments.length,
+                              page_size: 20,
+                              pages: Math.ceil(narration.segments.length / 20),
+                              uri_template: `${baseUri}/narration/pages/{page}`
+                            }
                           },
                       composition: composition === null || composition === undefined
                         ? null
@@ -1210,24 +1211,12 @@ export function registerResearchGuides(
                             mode: composition.mode,
                             background: composition.background,
                             clip_content: composition.clip_content,
-                            elements: composition.mode === "scene"
-                              ? composition.nodes.map((element) => ({
-                                  id: element.id,
-                                  kind: element.kind,
-                                  at: element.at,
-                                  parent_id: element.parent_id,
-                                  order: element.order,
-                                  frame: element.frame,
-                                  uri: `${baseUri}/elements/${element.id}`
-                                }))
-                              : composition.blocks.map((element) => ({
-                                  id: element.id,
-                                  kind: element.kind,
-                                  at: element.at,
-                                  z_index: element.z_index,
-                                  frame: element.frame,
-                                  uri: `${baseUri}/elements/${element.id}`
-                                }))
+                            elements: {
+                              count: composition.mode === "scene" ? composition.nodes.length : composition.blocks.length,
+                              page_size: 20,
+                              pages: Math.ceil((composition.mode === "scene" ? composition.nodes.length : composition.blocks.length) / 20),
+                              uri_template: `${baseUri}/elements/pages/{page}`
+                            }
                           }
                     };
                   })()
@@ -1241,6 +1230,92 @@ export function registerResearchGuides(
           }
         ]
       };
+    }
+  );
+
+  server.registerResource(
+    "research-project-slide-collection-page",
+    new ResourceTemplate("research://projects/{id}/slides/{slideId}/{section}/pages/{page}", { list: undefined }),
+    {
+      title: "スライド内構成の1page",
+      description: "一枚にある段階表示、読み上げ、表示要素の軽量索引を20件ずつ取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const section = variables.section;
+      const page = typeof variables.page === "string" && /^\d+$/.test(variables.page)
+        ? Number(variables.page)
+        : 0;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const slide = project?.document.deck?.slides.find((item) => item.id === slideId);
+      const validSection = section === "reveals" || section === "narration" || section === "elements";
+      let body: unknown;
+      if ("error" in auth) body = { ok: false, error: { code: auth.error } };
+      else if (project === null) body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+      else if (slide === undefined) body = { ok: false, error: { code: "SLIDE_NOT_FOUND" } };
+      else if (!validSection || page < 1) body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+      else {
+        const baseUri = `research://projects/${project.project_id}/slides/${slide.id}`;
+        const items = section === "reveals"
+          ? slide.reveal_blocks.map((block) => ({
+              at: block.at,
+              preview: resourceTextPreview(block.markdown, 160),
+              uri: `${baseUri}/reveals/${block.at}`
+            }))
+          : section === "narration"
+            ? (slide.narration?.segments ?? []).map((segment) => ({
+                at: segment.at,
+                preview: resourceTextPreview(segment.text, 160),
+                has_generated_audio: segment.audio_src !== null,
+                uri: `${baseUri}/narration/${segment.at}`
+              }))
+            : slide.composition?.mode === "scene"
+              ? slide.composition.nodes.map((element) => ({
+                  id: element.id,
+                  kind: element.kind,
+                  at: element.at,
+                  parent_id: element.parent_id,
+                  order: element.order,
+                  frame: element.frame,
+                  uri: `${baseUri}/elements/${element.id}`
+                }))
+              : slide.composition?.mode === "canvas"
+                ? slide.composition.blocks.map((element) => ({
+                    id: element.id,
+                    kind: element.kind,
+                    at: element.at,
+                    z_index: element.z_index,
+                    frame: element.frame,
+                    uri: `${baseUri}/elements/${element.id}`
+                  }))
+                : [];
+        const pageSize = 20;
+        const totalPages = Math.ceil(items.length / pageSize);
+        if (page > Math.max(1, totalPages)) body = { ok: false, error: { code: "PAGE_NOT_FOUND" } };
+        else {
+          const start = (page - 1) * pageSize;
+          body = {
+            ok: true,
+            project_id: project.project_id,
+            version: project.version,
+            slide_id: slide.id,
+            section,
+            page,
+            page_size: pageSize,
+            total_items: items.length,
+            total_pages: totalPages,
+            previous_uri: page > 1 ? `${baseUri}/${section}/pages/${page - 1}` : null,
+            next_uri: page < totalPages ? `${baseUri}/${section}/pages/${page + 1}` : null,
+            items: items.slice(start, start + pageSize)
+          };
+        }
+      }
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
     }
   );
 

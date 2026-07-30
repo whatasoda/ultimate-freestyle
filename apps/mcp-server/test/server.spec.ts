@@ -612,6 +612,9 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/research/logs/{logId}"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/slides/{slideId}/{section}/pages/{page}"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/voice"
           }),
           expect.objectContaining({
@@ -1070,13 +1073,25 @@ describe("MCP contract", () => {
           composition: {
             mode: "canvas",
             background: "#101828",
-            elements: [{
-              id: "central-question",
-              kind: "markdown",
-              uri: `research://projects/${firstProject.project_id}/slides/question/elements/central-question`
-            }]
+            elements: {
+              count: 1,
+              uri_template: `research://projects/${firstProject.project_id}/slides/question/elements/pages/{page}`
+            }
           }
         }
+      });
+      const canvasElementsPage = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/elements/pages/1`
+      );
+      expect(canvasElementsPage).toMatchObject({
+        section: "elements",
+        total_items: 1,
+        items: [{
+          id: "central-question",
+          kind: "markdown",
+          uri: `research://projects/${firstProject.project_id}/slides/question/elements/central-question`
+        }]
       });
       const canvasElement = await readJsonResource(
         client,
@@ -1270,13 +1285,24 @@ describe("MCP contract", () => {
           reveal_steps: 2,
           composition: {
             mode: "scene",
-            elements: [
-              expect.objectContaining({ id: "result-stack", kind: "stack" }),
-              expect.objectContaining({ id: "trial-count", kind: "metric" }),
-              expect.objectContaining({ id: "comparison", kind: "bar_chart" })
-            ]
+            elements: {
+              count: 3,
+              uri_template: `research://projects/${firstProject.project_id}/slides/question/elements/pages/{page}`
+            }
           }
         }
+      });
+      const sceneElementsPage = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/elements/pages/1`
+      );
+      expect(sceneElementsPage).toMatchObject({
+        total_items: 3,
+        items: [
+          expect.objectContaining({ id: "result-stack", kind: "stack" }),
+          expect.objectContaining({ id: "trial-count", kind: "metric" }),
+          expect.objectContaining({ id: "comparison", kind: "bar_chart" })
+        ]
       });
       const componentLayout = await client.callTool({
         name: "update_slide_component",
@@ -1857,9 +1883,23 @@ describe("MCP contract", () => {
           narration: {
             display: "minimal",
             appearance: { placement: "bottom", text_scale: 1.1 },
-            segments: [{ at: 0 }]
+            segments: {
+              count: 1,
+              page_size: 20,
+              uri_template: `research://projects/${projectId}/slides/intro/narration/pages/{page}`
+            }
           }
         }
+      });
+      const narrationPage = await readJsonResource(
+        client,
+        `research://projects/${projectId}/slides/intro/narration/pages/1`
+      );
+      expect(narrationPage).toMatchObject({
+        ok: true,
+        section: "narration",
+        total_items: 1,
+        items: [{ at: 0, uri: `research://projects/${projectId}/slides/intro/narration/0` }]
       });
       const detailedNarration = await readJsonResource(
         client,
@@ -1973,6 +2013,20 @@ describe("MCP contract", () => {
     await server.connect(serverTransport);
     await client.connect(clientTransport);
     try {
+      const slideIndex = await readJsonResource(
+        client,
+        `research://projects/${projectId}/slides/selected`
+      ) as { slide: { narration: { segments: { count: number; pages: number } } } };
+      expect(slideIndex.slide.narration.segments).toMatchObject({ count: 101, pages: 6 });
+      expect(new TextEncoder().encode(JSON.stringify(slideIndex)).byteLength).toBeLessThan(16 * 1024);
+      const narrationIndexPage = await readJsonResource(
+        client,
+        `research://projects/${projectId}/slides/selected/narration/pages/1`
+      ) as { total_items: number; total_pages: number; items: object[] };
+      expect(narrationIndexPage).toMatchObject({ total_items: 101, total_pages: 6 });
+      expect(narrationIndexPage.items).toHaveLength(20);
+      expect(new TextEncoder().encode(JSON.stringify(narrationIndexPage)).byteLength).toBeLessThan(16 * 1024);
+
       const slideVoice = await readJsonResource(
         client,
         `research://projects/${projectId}/voice/slides/selected`

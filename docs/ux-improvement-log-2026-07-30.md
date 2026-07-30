@@ -1094,3 +1094,9 @@
 - 研究ログpageは10件固定だが、各ログ本文10,000文字・出典URL2,000文字をそのまま返すため、最大入力では100KiBを超え得た。一件を選びたいAgentにも10件分の全文を読ませていた。
 - ログpageをID、日時、種類、160字preview、文字数、出典、個別URIだけの索引へ変更し、`research/logs/{logId}`で選択した一件だけ全文を返す。発見と限界の既存page契約は維持する。
 - 10,000文字ログのfixtureで索引応答8KiB未満、文字数、個別URI、個別全文、安定したresource templateを固定した。
+
+## 改善ループ319
+
+- 一枚resourceは本文を分離済みでも、最大100段階・101読み上げ・200構成要素のpreview索引を同時に列挙し、個別編集前の一読だけで90KiB級になり得た。
+- 一枚には各collectionの件数・20件page数・URI templateだけを返し、`reveals / narration / elements/pages/{page}`で軽量索引を取得する。索引から既存の段階・読み上げ・要素一件resourceへ進む。
+- 101長文読み上げで一枚索引16KiB未満、全6page、一区切り20件・16KiB未満を固定し、Scene/Canvasの一件編集契約も維持した。
