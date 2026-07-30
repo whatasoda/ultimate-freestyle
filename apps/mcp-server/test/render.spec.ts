@@ -180,9 +180,11 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const collectOcclusions =");
     expect(html).toContain("document.createTreeWalker(candidate, NodeFilter.SHOW_TEXT)");
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
+    expect(html).toContain("const blockerSelector =");
+    expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@99");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@100");
     expect(html).toContain('--aspect-font-scale: 1;');
     expect(html).toContain('--aspect-font-scale: 1.3333;');
     expect(html).toContain('rendered * 1080 / slideHeight');

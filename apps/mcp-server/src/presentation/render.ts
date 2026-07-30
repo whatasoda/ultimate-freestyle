@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@99";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@100";
 
 function escapeHtml(value: string): string {
   return value
@@ -1608,6 +1608,46 @@ export function renderPresentationHtml(
             region: hidden.dataset.fitRegion || '',
             other_id: covering.dataset.fitId || '',
             other_region: covering.dataset.fitRegion || '',
+            overlap_ratio: Number(ratio.toFixed(2))
+          });
+        }
+      }
+      const blockerSelector = '.canvas-block[data-block-kind="image"], .canvas-block[data-shape], .scene-node[data-positioned="true"]:is([data-component="uf-image"],[data-component="uf-shape"])';
+      const blockers = [...slideElement.querySelectorAll(blockerSelector)].filter((item) => {
+        if (!(item instanceof HTMLElement) || item.offsetParent === null || Number(getComputedStyle(item).opacity) <= .1) return false;
+        if (item.matches('[data-block-kind="image"],[data-component="uf-image"]')) return true;
+        const style = getComputedStyle(item);
+        const background = parseRenderedColor(style.backgroundColor);
+        return (background?.alpha ?? 0) > .1 || style.backgroundImage !== 'none' || Number.parseFloat(style.borderWidth) > 0;
+      });
+      for (const blocker of blockers) {
+        const blockerRect = blocker.getBoundingClientRect();
+        for (const { candidate, rects } of candidateRects) {
+          if (candidate === blocker || candidate.contains(blocker) || blocker.contains(candidate)) continue;
+          let overlap = 0;
+          let sample = null;
+          for (const rect of rects) {
+            const width = Math.min(rect.right, blockerRect.right) - Math.max(rect.left, blockerRect.left);
+            const height = Math.min(rect.bottom, blockerRect.bottom) - Math.max(rect.top, blockerRect.top);
+            if (width <= 1 || height <= 1) continue;
+            overlap += width * height;
+            sample ??= { x: Math.max(rect.left, blockerRect.left) + width / 2, y: Math.max(rect.top, blockerRect.top) + height / 2 };
+          }
+          if (!sample) continue;
+          const textArea = rects.reduce((sum, rect) => sum + rect.width * rect.height, 0);
+          const ratio = textArea > 0 ? overlap / textArea : 0;
+          if (ratio < .2) continue;
+          const top = document.elementsFromPoint(sample.x, sample.y)
+            .map((element) => element.closest(blockerSelector) || element.closest('[data-fit-content]'))
+            .find((element) => element === blocker || element === candidate);
+          if (top !== blocker) continue;
+          const blockerId = blocker.getAttribute('data-block-id') || blocker.getAttribute('data-node-id') || '';
+          const blockerRegion = blocker.matches('[data-block-kind="image"],[data-component="uf-image"]') ? '画像' : '図形';
+          occlusions.push({
+            id: candidate.dataset.fitId || '',
+            region: candidate.dataset.fitRegion || '',
+            other_id: blockerId ? (blocker.hasAttribute('data-block-id') ? 'block:' : 'node:') + blockerId : '',
+            other_region: blockerRegion,
             overlap_ratio: Number(ratio.toFixed(2))
           });
         }
