@@ -2545,6 +2545,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const profileSelect = voicePage.querySelector("[data-voice-profile]");
     const setupFeedback = voicePage.querySelector("[data-voice-setup-feedback]");
     const profileTuningForm = voicePage.querySelector("[data-voice-profile-tuning]");
+    const voicevoxSampleButton = voicePage.querySelector("[data-voicevox-sample]");
+    const voicevoxSampleFeedback = voicePage.querySelector("[data-voicevox-sample-feedback]");
     const generateButton = voicePage.querySelector("[data-voice-generate]");
     const generateFeedback = voicePage.querySelector("[data-voice-generate-feedback]");
     const jobCard = voicePage.querySelector("[data-voice-job]");
@@ -2685,6 +2687,75 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     };
     let pollTimer;
     let pollFailures = 0;
+    let samplePlayer = null;
+    let sampleObjectUrl = "";
+    let sampleAbort = null;
+    const stopVoicevoxSample = (message = "") => {
+      sampleAbort?.abort();
+      sampleAbort = null;
+      if (samplePlayer) { samplePlayer.pause(); samplePlayer.removeAttribute("src"); samplePlayer.load(); samplePlayer = null; }
+      if (sampleObjectUrl) { URL.revokeObjectURL(sampleObjectUrl); sampleObjectUrl = ""; }
+      if (voicevoxSampleButton instanceof HTMLButtonElement) {
+        voicevoxSampleButton.setAttribute("aria-pressed", "false");
+        voicevoxSampleButton.textContent = "選択中の声をVOICEVOXで試聴";
+        setButtonBusy(voicevoxSampleButton, false);
+      }
+      if (message && voicevoxSampleFeedback instanceof HTMLElement) voicevoxSampleFeedback.textContent = message;
+    };
+    if (voicevoxSampleButton instanceof HTMLButtonElement) {
+      voicevoxSampleButton.addEventListener("click", async () => {
+        if (samplePlayer || sampleAbort) { stopVoicevoxSample("VOICEVOX試聴を停止しました。"); return; }
+        let tuning = {};
+        try { tuning = JSON.parse(voicePage.dataset.defaultTuning || "{}"); } catch {}
+        if (profileTuningForm instanceof HTMLFormElement) {
+          const data = new FormData(profileTuningForm);
+          for (const key of ["speedScale", "pitchScale", "intonationScale", "volumeScale", "pauseLengthScale", "prePhonemeLength", "postPhonemeLength"]) tuning[key] = Number(data.get("tuning_" + key));
+        }
+        sampleAbort = new AbortController();
+        setButtonBusy(voicevoxSampleButton, true);
+        voicevoxSampleButton.setAttribute("aria-pressed", "true");
+        voicevoxSampleButton.textContent = "VOICEVOXを準備中…";
+        if (voicevoxSampleFeedback instanceof HTMLElement) {
+          voicevoxSampleFeedback.textContent = "選択中の話者・スタイルとトーンで短い音声を準備しています…";
+          voicevoxSampleFeedback.classList.remove("warning", "success");
+        }
+        try {
+          const response = await fetch(voicevoxSampleButton.dataset.voicevoxSample || "", {
+            method: "POST",
+            headers: { "accept": "audio/mpeg", "content-type": "application/json", "x-csrf-token": csrf },
+            body: JSON.stringify({ profile_id: profileSelect instanceof HTMLSelectElement ? profileSelect.value : "voicevox-style-3", tuning }),
+            signal: sampleAbort.signal
+          });
+          if (!response.ok) {
+            let result = null;
+            try { result = await response.json(); } catch {}
+            throw new Error(apiErrorMessage(result, "VOICEVOX試聴を生成できませんでした。"));
+          }
+          const cacheHit = response.headers.get("x-voicevox-cache") === "hit";
+          const blob = await response.blob();
+          sampleObjectUrl = URL.createObjectURL(blob);
+          samplePlayer = new Audio(sampleObjectUrl);
+          sampleAbort = null;
+          voicevoxSampleButton.textContent = "試聴を停止";
+          setButtonBusy(voicevoxSampleButton, false);
+          samplePlayer.addEventListener("ended", () => stopVoicevoxSample("VOICEVOX試聴が終わりました。"), { once: true });
+          samplePlayer.addEventListener("error", () => stopVoicevoxSample("取得した試聴音声を再生できませんでした。"), { once: true });
+          await samplePlayer.play();
+          if (voicevoxSampleFeedback instanceof HTMLElement) {
+            voicevoxSampleFeedback.textContent = cacheHit ? "生成済みの同じ設定を再利用して再生しています。" : "VOICEVOXで生成した声を再生しています。次回は同じ設定を再利用します。";
+            voicevoxSampleFeedback.classList.add("success");
+          }
+        } catch (error) {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          stopVoicevoxSample();
+          if (voicevoxSampleFeedback instanceof HTMLElement) {
+            voicevoxSampleFeedback.textContent = caughtErrorMessage(error, "VOICEVOX試聴を生成できませんでした。");
+            voicevoxSampleFeedback.classList.add("warning");
+          }
+        }
+      });
+      profileSelect?.addEventListener("change", () => stopVoicevoxSample());
+    }
     const pollJob = async (statusUrl) => {
       const url = safeStatusUrl(statusUrl);
       if (url === null) return;

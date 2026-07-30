@@ -576,6 +576,9 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("7種の調声値");
     expect(voicePageHtml).toContain("既定のトーンを細かく調整");
     expect(voicePageHtml).toContain('data-voice-profile-tuning');
+    expect(voicePageHtml).toContain('data-voicevox-sample="/api/projects/10000000-0000-4000-8000-000000000001/voice/sample"');
+    expect(voicePageHtml).toContain("選択中の声をVOICEVOXで試聴");
+    expect(voicePageHtml).toContain("初回はContainer起動に時間がかかる場合があります");
     expect(voicePageHtml).toContain("/voice/profile/tuning");
     expect(voicePageHtml).toContain('name="tuning_speedScale"');
     expect(voicePageHtml).toContain("実効調声を確認");
@@ -795,6 +798,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-project-search-empty");
     expect(dashboardScriptText).toContain("filterProjects");
     expect(dashboardScriptText).toContain("ultimate-freestyle:quality-sweep:");
+    expect(dashboardScriptText).toContain("data-voicevox-sample");
+    expect(dashboardScriptText).toContain('response.headers.get("x-voicevox-cache")');
     expect(dashboardScriptText).toContain('persistQualitySweep("completed")');
     expect(dashboardScriptText).toContain("前回の確認結果：");
     expect(dashboardScriptText).toContain('card.dataset.needsAttention === "true"');

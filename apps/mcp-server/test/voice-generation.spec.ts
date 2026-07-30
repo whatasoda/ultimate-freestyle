@@ -6,6 +6,7 @@ import { createEmptyProject } from "../src/projects/schema";
 import {
   createVoiceGenerationJob,
   getVoiceGenerationJob,
+  getOrCreateVoiceSample,
   getVoiceProjectStatus,
   hydrateProjectVoice,
   processVoiceGenerationMessage,
@@ -15,6 +16,56 @@ import {
 } from "../src/voicevox/service";
 
 describe("VOICEVOX generation", () => {
+  it("generates an exact style sample once and reuses the shared cache", async () => {
+    const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x01]);
+    let synthesisCount = 0;
+    let synthesisBody: unknown;
+    const containerNamespace = {
+      getByName: () => ({
+        startAndWaitForPorts: async () => undefined,
+        fetch: async (_url: string, init: RequestInit) => {
+          synthesisCount += 1;
+          synthesisBody = JSON.parse(String(init.body));
+          return new Response(mp3, {
+            headers: { "content-type": "audio/mpeg", "content-length": String(mp3.byteLength) }
+          });
+        }
+      })
+    } as unknown as Env["VOICEVOX_CONTAINER"];
+    let cacheMissCount = 0;
+    const options = {
+      profileId: "voicevox-style-117",
+      tuning: {
+        speedScale: 1.13,
+        pitchScale: 0.07,
+        intonationScale: 1.2,
+        volumeScale: 0.9,
+        pauseLengthScale: 1.1,
+        prePhonemeLength: 0.12,
+        postPhonemeLength: 0.18
+      },
+      onCacheMiss: async () => { cacheMissCount += 1; }
+    };
+
+    const first = await getOrCreateVoiceSample(
+      { MEDIA_BUCKET: env.MEDIA_BUCKET, VOICEVOX_CONTAINER: containerNamespace },
+      options
+    );
+    const second = await getOrCreateVoiceSample(
+      { MEDIA_BUCKET: env.MEDIA_BUCKET, VOICEVOX_CONTAINER: containerNamespace },
+      options
+    );
+
+    expect(first).toMatchObject({ cached: false, profileLabel: "あんこもん・ささやき" });
+    expect(second).toMatchObject({ cached: true, fingerprint: first.fingerprint });
+    expect(synthesisCount).toBe(1);
+    expect(cacheMissCount).toBe(1);
+    expect(synthesisBody).toMatchObject({
+      style_id: 117,
+      tuning: { speedScale: 1.13, intonationScale: 1.2 }
+    });
+  });
+
   it("shows narration segments before a VOICEVOX profile is configured", async () => {
     const userId = "51000000-0000-4000-8000-000000000005";
     const projectId = "61000000-0000-4000-8000-000000000006";

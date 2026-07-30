@@ -8,7 +8,8 @@ import {
 import { findVoicevoxCatalogProfile } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import {
   mergeVoicevoxTuning,
-  type VoicevoxTuning
+  type VoicevoxTuning,
+  type VoicevoxTuningOverride
 } from "@ultimate-freestyle/research-schema/voice";
 import { z } from "zod";
 
@@ -771,6 +772,108 @@ function isMp3(bytes: Uint8Array): boolean {
   );
 }
 
+async function synthesizeVoicevoxMp3(
+  binding: Env["VOICEVOX_CONTAINER"],
+  input: Pick<VoiceGenerationInput, "text" | "styleId" | "tuning">
+): Promise<Uint8Array> {
+  const container = binding.getByName("voicevox-production");
+  await container.startAndWaitForPorts({
+    ports: [8080],
+    cancellationOptions: {
+      instanceGetTimeoutMS: 180_000,
+      portReadyTimeoutMS: 180_000,
+      waitInterval: 1_000
+    }
+  });
+  const response = await container.fetch("http://voicevox/synthesize", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      text: input.text,
+      style_id: input.styleId,
+      tuning: input.tuning
+    })
+  });
+  if (!response.ok) {
+    throw new VoiceGenerationError(
+      "VOICE_GENERATION_FAILED",
+      `VOICEVOX Container returned ${response.status}.`
+    );
+  }
+  const declaredLength = Number(response.headers.get("content-length") ?? 0);
+  if (declaredLength > MAX_AUDIO_BYTES) {
+    throw new VoiceGenerationError(
+      "VOICE_GENERATION_FAILED",
+      "生成音声がサイズ上限を超えました。"
+    );
+  }
+  const buffer = await response.arrayBuffer();
+  if (buffer.byteLength === 0 || buffer.byteLength > MAX_AUDIO_BYTES) {
+    throw new VoiceGenerationError(
+      "VOICE_GENERATION_FAILED",
+      "生成音声のサイズが不正です。"
+    );
+  }
+  const bytes = new Uint8Array(buffer);
+  if (!isMp3(bytes)) {
+    throw new VoiceGenerationError(
+      "VOICE_GENERATION_FAILED",
+      "生成結果がMP3ではありません。"
+    );
+  }
+  return bytes;
+}
+
+export async function getOrCreateVoiceSample(
+  env: Pick<Env, "MEDIA_BUCKET" | "VOICEVOX_CONTAINER">,
+  options: {
+    profileId: string;
+    tuning: VoicevoxTuningOverride;
+    onCacheMiss?: () => Promise<void>;
+  }
+): Promise<{
+  bytes: Uint8Array;
+  cached: boolean;
+  fingerprint: string;
+  profileLabel: string;
+}> {
+  const profile = findVoicevoxCatalogProfile(options.profileId);
+  if (profile === undefined) {
+    throw new VoiceGenerationError(
+      "VOICE_PROFILE_NOT_FOUND",
+      "選択したVOICEVOXの話者・スタイルが見つかりません。"
+    );
+  }
+  const input = createVoiceGenerationInput({
+    text: "これは最自由研究の読み上げテストです。聞き取りやすい速さと高さを確認してください。",
+    speakerUuid: profile.speakerUuid,
+    styleId: profile.styleId,
+    profileTuning: options.tuning
+  });
+  const fingerprint = await fingerprintVoiceGenerationInput(input);
+  const objectKey = `voice-samples/v1/${fingerprint.slice(0, 2)}/${fingerprint}.mp3`;
+  const stored = await env.MEDIA_BUCKET.get(objectKey);
+  if (stored !== null && stored.size > 0 && stored.size <= MAX_AUDIO_BYTES) {
+    const bytes = new Uint8Array(await stored.arrayBuffer());
+    if (isMp3(bytes)) return { bytes, cached: true, fingerprint, profileLabel: profile.label };
+  }
+  await options.onCacheMiss?.();
+  const bytes = await synthesizeVoicevoxMp3(env.VOICEVOX_CONTAINER, input);
+  await env.MEDIA_BUCKET.put(objectKey, bytes, {
+    httpMetadata: {
+      contentType: "audio/mpeg",
+      cacheControl: "private, max-age=31536000, immutable"
+    },
+    customMetadata: {
+      fingerprint,
+      profileId: profile.id,
+      engineVersion: VOICEVOX_ENGINE.version,
+      imageDigest: VOICEVOX_ENGINE.imageDigest
+    }
+  });
+  return { bytes, cached: false, fingerprint, profileLabel: profile.label };
+}
+
 async function refreshJobTotals(db: D1Database, jobId: string): Promise<void> {
   const now = new Date().toISOString();
   await db
@@ -857,51 +960,7 @@ export async function processVoiceGenerationMessage(
   let contentHash: string;
   const cached = existing !== null;
   if (existing === null) {
-    const container = env.VOICEVOX_CONTAINER.getByName("voicevox-production");
-    await container.startAndWaitForPorts({
-      ports: [8080],
-      cancellationOptions: {
-        instanceGetTimeoutMS: 180_000,
-        portReadyTimeoutMS: 180_000,
-        waitInterval: 1_000
-      }
-    });
-    const response = await container.fetch("http://voicevox/synthesize", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        text: input.text,
-        style_id: input.styleId,
-        tuning: input.tuning
-      })
-    });
-    if (!response.ok) {
-      throw new VoiceGenerationError(
-        "VOICE_GENERATION_FAILED",
-        `VOICEVOX Container returned ${response.status}.`
-      );
-    }
-    const declaredLength = Number(response.headers.get("content-length") ?? 0);
-    if (declaredLength > MAX_AUDIO_BYTES) {
-      throw new VoiceGenerationError(
-        "VOICE_GENERATION_FAILED",
-        "生成音声がサイズ上限を超えました。"
-      );
-    }
-    const buffer = await response.arrayBuffer();
-    if (buffer.byteLength === 0 || buffer.byteLength > MAX_AUDIO_BYTES) {
-      throw new VoiceGenerationError(
-        "VOICE_GENERATION_FAILED",
-        "生成音声のサイズが不正です。"
-      );
-    }
-    bytes = new Uint8Array(buffer);
-    if (!isMp3(bytes)) {
-      throw new VoiceGenerationError(
-        "VOICE_GENERATION_FAILED",
-        "生成結果がMP3ではありません。"
-      );
-    }
+    bytes = await synthesizeVoicevoxMp3(env.VOICEVOX_CONTAINER, input);
     const digest = await crypto.subtle.digest("SHA-256", bytes);
     contentHash = [...new Uint8Array(digest)]
       .map((byte) => byte.toString(16).padStart(2, "0"))

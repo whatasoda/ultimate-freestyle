@@ -67,13 +67,15 @@ import {
 } from "../publications/service";
 import {
   createVoiceGenerationJob,
+  getOrCreateVoiceSample,
   getVoiceGenerationJob,
   getVoiceProjectStatus,
   hydrateProjectVoice,
   readOwnerVoiceArtifact,
   resolveVoiceArtifacts,
   setupVoicevoxProfile,
-  VoiceGenerationError
+  VoiceGenerationError,
+  voicevoxTuningStatusSchema
 } from "../voicevox/service";
 import { z } from "zod";
 import { dashboardScriptResponse } from "./assets";
@@ -145,6 +147,11 @@ const voiceSetupRequestSchema = z.object({
 const voiceProfileTuningRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   tuning: narrationSegmentSchema.shape.voice_tuning.unwrap()
+});
+
+const voiceSampleRequestSchema = z.object({
+  profile_id: z.string().regex(/^voicevox-style-\d+$/),
+  tuning: voicevoxTuningStatusSchema
 });
 
 const voiceJobRequestSchema = voiceSetupRequestSchema.extend({
@@ -880,6 +887,80 @@ async function handleVoiceProfileTuning(
     });
   } catch (error) {
     return projectMutationErrorResponse(error, "既定のトーンを保存できませんでした。");
+  }
+}
+
+async function handleVoiceSample(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = voiceSampleRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_REQUEST", message: "声と調声値の範囲を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  const project = await getProject(env.DB, session.userId, projectId);
+  if (project === null) return new Response(null, { status: 404 });
+  try {
+    const sample = await getOrCreateVoiceSample(env, {
+      profileId: parsed.data.profile_id,
+      tuning: parsed.data.tuning,
+      onCacheMiss: async () => {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+        const usage = await env.DB.prepare(
+          `SELECT COUNT(*) AS count FROM audit_events
+           WHERE user_id = ? AND event_type = 'voicevox.sample_generated' AND created_at >= ?`
+        ).bind(session.userId, cutoff).first<{ count: number }>();
+        if (Number(usage?.count ?? 0) >= 12) {
+          throw new VoiceGenerationError(
+            "VOICE_JOB_LIMIT",
+            "新しいVOICEVOX試聴は24時間に12種類までです。生成済みの組み合わせは引き続き試聴できます。"
+          );
+        }
+        await recordAuditEvent(env.DB, {
+          userId: session.userId,
+          eventType: "voicevox.sample_generated",
+          outcome: "requested",
+          details: { project_id: projectId, profile_id: parsed.data.profile_id },
+          createdAt: new Date().toISOString()
+        });
+      }
+    });
+    return new Response(sample.bytes, {
+      headers: {
+        "cache-control": "private, no-store",
+        "content-disposition": "inline",
+        "content-type": "audio/mpeg",
+        "x-content-type-options": "nosniff",
+        "x-voicevox-cache": sample.cached ? "hit" : "miss",
+        "x-voicevox-profile": encodeURIComponent(sample.profileLabel)
+      }
+    });
+  } catch (error) {
+    return voiceErrorResponse(error);
   }
 }
 
@@ -4108,6 +4189,12 @@ export async function handleWebRequest(
   );
   if (voiceProfileTuningMatch?.[1] !== undefined) {
     return handleVoiceProfileTuning(request, env, voiceProfileTuningMatch[1]);
+  }
+  const voiceSampleMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/voice/sample$`, "i")
+  );
+  if (voiceSampleMatch?.[1] !== undefined) {
+    return handleVoiceSample(request, env, voiceSampleMatch[1]);
   }
   const voiceStatusMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/voice$`, "i")
