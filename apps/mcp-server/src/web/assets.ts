@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "141";
+export const DASHBOARD_ASSET_VERSION = "142";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const link of document.querySelectorAll(".project-section-nav a[href^='#']")) {
@@ -2176,17 +2176,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   const inspectorStateKey = "ultimate-freestyle:workspace-inspector";
+  let syncingInspectorPane = false;
   let inspectorState = {};
   try { inspectorState = JSON.parse(localStorage.getItem(inspectorStateKey) || "{}"); } catch {}
-  for (const details of document.querySelectorAll("[data-inspector-section]")) {
+  const inspectorSections = [...document.querySelectorAll("[data-inspector-section]")].filter((item) => item instanceof HTMLDetailsElement);
+  for (const details of inspectorSections) {
     if (!(details instanceof HTMLDetailsElement)) continue;
     const section = details.dataset.inspectorSection || "";
     if (typeof inspectorState[section] === "boolean") details.open = inspectorState[section];
     details.addEventListener("toggle", () => {
+      if (syncingInspectorPane) return;
       inspectorState[section] = details.open;
       try { localStorage.setItem(inspectorStateKey, JSON.stringify(inspectorState)); } catch {}
     });
   }
+  const desktopInspectorOpen = new Map(inspectorSections.map((details) => [details.dataset.inspectorSection || "", details.open]));
 
   const mobilePaneButtons = [...document.querySelectorAll("[data-mobile-pane]")];
   const setMobilePane = (pane) => {
@@ -2231,6 +2235,74 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         next.focus();
       });
     }
+  }
+
+  const mobileInspectorButtons = [...document.querySelectorAll("[data-inspector-pane]")];
+  const mobileInspectorMedia = matchMedia("(max-width: 48rem)");
+  if (mobileInspectorButtons.length > 0 && inspectorSections.length > 0) {
+    const activeInspectorKey = "ultimate-freestyle:workspace-inspector-active";
+    const selectInspectorPane = (name, focus = false, userInitiated = false) => {
+      const target = inspectorSections.find((details) => details.dataset.inspectorSection === name);
+      if (!(target instanceof HTMLDetailsElement)) return;
+      syncingInspectorPane = true;
+      for (const details of inspectorSections) details.open = details === target;
+      syncingInspectorPane = false;
+      for (const button of mobileInspectorButtons) {
+        if (!(button instanceof HTMLButtonElement)) continue;
+        const selected = button.dataset.inspectorPane === name;
+        button.setAttribute("aria-selected", String(selected));
+        button.tabIndex = selected ? 0 : -1;
+      }
+      if (userInitiated) {
+        setMobilePane("edit");
+        try { localStorage.setItem(activeInspectorKey, name); } catch {}
+      }
+      if (focus) requestAnimationFrame(() => {
+        const summary = target.querySelector(":scope > summary");
+        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        if (summary instanceof HTMLElement) summary.focus({ preventScroll: true });
+      });
+    };
+    let preferredInspector = "";
+    try { preferredInspector = localStorage.getItem(activeInspectorKey) || ""; } catch {}
+    if (new URLSearchParams(location.search).has("component")) preferredInspector = "structure";
+    else if (location.hash.startsWith("#narration-segment-") || new URLSearchParams(location.search).has("narration")) preferredInspector = "narration";
+    if (!inspectorSections.some((details) => details.dataset.inspectorSection === preferredInspector)) {
+      preferredInspector = inspectorSections.find((details) => details.open)?.dataset.inspectorSection || "content";
+    }
+    if (mobileInspectorMedia.matches) selectInspectorPane(preferredInspector);
+    for (const [index, button] of mobileInspectorButtons.entries()) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      button.addEventListener("click", () => selectInspectorPane(button.dataset.inspectorPane || "content", true, true));
+      button.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const nextIndex = event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? mobileInspectorButtons.length - 1
+            : (index + (event.key === "ArrowRight" ? 1 : -1) + mobileInspectorButtons.length) % mobileInspectorButtons.length;
+        const next = mobileInspectorButtons[nextIndex];
+        if (!(next instanceof HTMLButtonElement)) return;
+        selectInspectorPane(next.dataset.inspectorPane || "content", true, true);
+        next.focus({ preventScroll: true });
+      });
+    }
+    for (const details of inspectorSections) {
+      details.addEventListener("toggle", () => {
+        if (!mobileInspectorMedia.matches || syncingInspectorPane || !details.open) return;
+        selectInspectorPane(details.dataset.inspectorSection || "content");
+      });
+    }
+    mobileInspectorMedia.addEventListener("change", (event) => {
+      if (event.matches) {
+        selectInspectorPane(preferredInspector);
+        return;
+      }
+      syncingInspectorPane = true;
+      for (const details of inspectorSections) details.open = desktopInspectorOpen.get(details.dataset.inspectorSection || "") ?? details.open;
+      syncingInspectorPane = false;
+    });
   }
 
   const previewFocusButton = document.querySelector("[data-preview-focus]");
