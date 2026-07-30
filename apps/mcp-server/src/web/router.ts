@@ -53,6 +53,8 @@ import {
   presentationAspectRatioSchema,
   projectSlideSchema,
   projectStageSchema,
+  RESEARCH_LOG_LIMIT,
+  RESEARCH_LOG_PAGE_SIZE,
   slideRoleSchema,
   slideBlockSchema,
   slideSceneNodeSchema,
@@ -486,7 +488,7 @@ async function handleProjectDetail(
     draftRevisions,
     renderedQualityReport,
     selectedLogPage: Number.isInteger(requestedLogPage) && requestedLogPage > 0
-      ? Math.min(requestedLogPage, 25)
+      ? Math.min(requestedLogPage, Math.ceil(RESEARCH_LOG_LIMIT / RESEARCH_LOG_PAGE_SIZE))
       : 1,
     selectedResearchItem: selectedResearchItemMatch?.[1] !== undefined && selectedResearchItemMatch[2] !== undefined
       ? {
@@ -1501,7 +1503,7 @@ async function handleResearchLogDelete(
     });
     const availableLogPage = Math.min(
       returnLogPage,
-      Math.max(1, Math.ceil(project.document.logs.length / 20))
+      Math.max(1, Math.ceil(project.document.logs.length / RESEARCH_LOG_PAGE_SIZE))
     );
     return jsonResponse({
       ok: true,

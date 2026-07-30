@@ -718,6 +718,9 @@ export const researchLogEntrySchema = z.object({
   source_url: z.string().url().max(2_000).nullable()
 });
 
+export const RESEARCH_LOG_LIMIT = 500;
+export const RESEARCH_LOG_PAGE_SIZE = 20;
+
 export const projectDocumentSchema = z
   .object({
   schema_version: z.literal(1),
@@ -729,7 +732,7 @@ export const projectDocumentSchema = z
   method: z.string().max(20_000).nullable(),
   findings: z.array(z.string().min(1).max(4_000)).max(100),
   limitations: z.array(z.string().min(1).max(4_000)).max(100),
-  logs: z.array(researchLogEntrySchema).max(500),
+  logs: z.array(researchLogEntrySchema).max(RESEARCH_LOG_LIMIT),
     deck: z
       .object({
       short_title: z.string().min(1).max(60),

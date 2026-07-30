@@ -1,10 +1,11 @@
 import { escapeHtml } from "../auth/pages";
 import { PROJECT_IMAGE_LIMIT, type ProjectAsset } from "../assets/schema";
-import type {
-  ProjectRecord,
-  ProjectSummary,
-  SlideBlock,
-  SlideSceneNode
+import {
+  RESEARCH_LOG_PAGE_SIZE,
+  type ProjectRecord,
+  type ProjectSummary,
+  type SlideBlock,
+  type SlideSceneNode
 } from "../projects/schema";
 import type {
   DashboardProjectSummary,
@@ -1466,7 +1467,7 @@ export function projectDetailPage(options: {
     "限界・今後の課題",
     "まだ確かめられていないことや次に試すこと"
   );
-  const logPageSize = 20;
+  const logPageSize = RESEARCH_LOG_PAGE_SIZE;
   const logPageCount = Math.max(1, Math.ceil(document.logs.length / logPageSize));
   const logPage = Math.min(Math.max(1, options.selectedLogPage ?? 1), logPageCount);
   const logPageStart = (logPage - 1) * logPageSize;
