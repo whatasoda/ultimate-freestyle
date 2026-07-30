@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "162";
+export const DASHBOARD_ASSET_VERSION = "163";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
