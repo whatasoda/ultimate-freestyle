@@ -40,6 +40,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const dirtyCount = document.querySelectorAll('[data-dirty="true"]').length;
     saveState.dataset.state = dirtyCount > 0 ? "dirty" : "saved";
     saveState.textContent = dirtyCount > 0 ? "未保存 " + dirtyCount + "件" : "保存済み";
+    if (dirtyCount > 0 && document.body.dataset.mobilePane !== "preview") document.body.dataset.mobilePreviewPending = "true";
+    if (dirtyCount === 0) document.body.dataset.mobilePreviewPending = "false";
+    const previewBadge = document.querySelector("[data-mobile-preview-badge]");
+    if (previewBadge instanceof HTMLElement) previewBadge.hidden = document.body.dataset.mobilePreviewPending !== "true";
   };
   const showSavingState = () => {
     if (!(saveState instanceof HTMLElement)) return;
@@ -1691,17 +1695,37 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const setMobilePane = (pane) => {
     if (!["preview", "edit", "slides"].includes(pane)) return;
     document.body.dataset.mobilePane = pane;
+    if (pane === "preview") document.body.dataset.mobilePreviewPending = "false";
     for (const button of mobilePaneButtons) {
-      if (button instanceof HTMLButtonElement) button.setAttribute("aria-pressed", String(button.dataset.mobilePane === pane));
+      if (!(button instanceof HTMLButtonElement)) continue;
+      const selected = button.dataset.mobilePane === pane;
+      button.setAttribute("aria-selected", String(selected));
+      button.tabIndex = selected ? 0 : -1;
     }
+    const previewBadge = document.querySelector("[data-mobile-preview-badge]");
+    if (previewBadge instanceof HTMLElement) previewBadge.hidden = document.body.dataset.mobilePreviewPending !== "true";
     try { localStorage.setItem("ultimate-freestyle:workspace-mobile-pane", pane); } catch {}
   };
   if (mobilePaneButtons.length > 0) {
     let initialMobilePane = "preview";
     try { initialMobilePane = localStorage.getItem("ultimate-freestyle:workspace-mobile-pane") || "preview"; } catch {}
     setMobilePane(initialMobilePane);
-    for (const button of mobilePaneButtons) {
-      if (button instanceof HTMLButtonElement) button.addEventListener("click", () => setMobilePane(button.dataset.mobilePane || "preview"));
+    for (const [index, button] of mobilePaneButtons.entries()) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      button.addEventListener("click", () => setMobilePane(button.dataset.mobilePane || "preview"));
+      button.addEventListener("keydown", (event) => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const nextIndex = event.key === "Home"
+          ? 0
+          : event.key === "End"
+            ? mobilePaneButtons.length - 1
+            : (index + (event.key === "ArrowRight" ? 1 : -1) + mobilePaneButtons.length) % mobilePaneButtons.length;
+        const next = mobilePaneButtons[nextIndex];
+        if (!(next instanceof HTMLButtonElement)) return;
+        setMobilePane(next.dataset.mobilePane || "preview");
+        next.focus();
+      });
     }
   }
 
