@@ -137,6 +137,7 @@ describe("MCP contract", () => {
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
+      expect(JSON.stringify(narrationTool?.inputSchema)).toContain('"text_edit"');
       expect(
         (narrationTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("audio_src");
@@ -2057,6 +2058,137 @@ describe("MCP contract", () => {
       expect(
         new TextEncoder().encode(JSON.stringify(segmentVoice)).byteLength
       ).toBeLessThan(8 * 1024);
+    } finally {
+      await client.close();
+      await server.close();
+    }
+  });
+
+  it("partially edits one narration segment and invalidates its generated audio", async () => {
+    const subjectId = "57000000-0000-4000-8000-000000000007";
+    const projectId = "67000000-0000-4000-8000-000000000008";
+    const now = "2026-07-30T01:00:00.000Z";
+    const document = createEmptyProject("読み上げ部分編集テスト");
+    document.deck = {
+      short_title: "部分編集",
+      description: "",
+      author: "tester",
+      year: 2026,
+      accent: "#8bd450",
+      layout: "minimal",
+      narration_defaults: null,
+      voicevox: null,
+      slides: [{
+        id: "intro",
+        title: "はじめに",
+        duration_seconds: 30,
+        reveal_steps: 0,
+        tone: "dark",
+        content_markdown: "# はじめに",
+        reveal_blocks: [],
+        sidebar_markdown: null,
+        narration: {
+          display: "commentary",
+          speaker: null,
+          segments: [{
+            at: 0,
+            text: "古い説明から研究を始めます。",
+            audio_src: "/media/old-audio.mp3"
+          }]
+        }
+      }]
+    };
+    await env.DB.batch([
+      env.DB.prepare(
+        "INSERT INTO users (id, twitch_user_id, twitch_login, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"
+      ).bind(subjectId, "narration-edit-user", "narration-edit", now, now),
+      env.DB.prepare(
+        `INSERT INTO research_projects (
+           id, owner_user_id, title, stage, document_json, version,
+           idempotency_key, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      ).bind(
+        projectId,
+        subjectId,
+        document.title,
+        document.stage,
+        JSON.stringify(document),
+        "narration-edit-contract",
+        now,
+        now
+      )
+    ]);
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const server = createServer(eligibilityConfig, () => ({
+      subject_id: subjectId,
+      mcp_scopes: ["research:read", "research:write"],
+      identity: { user_id: subjectId, login: "narration-edit" },
+      eligibility: {
+        eligible: true,
+        reason: "subscriber",
+        checked_at: now,
+        expires_at: "2026-07-30T02:00:00.000Z",
+        followed_at: null,
+        follow_days: null,
+        subscribed: true,
+        override: null
+      },
+      twitch_tokens: {
+        access_token: "not-returned",
+        refresh_token: "not-returned",
+        expires_at: "2026-07-30T02:00:00.000Z",
+        scopes: []
+      }
+    }));
+    const client = new Client({ name: "narration-edit-test", version: "0.1.0" });
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+    try {
+      const edited = await client.callTool({
+        name: "set_slide_narration",
+        arguments: {
+          project_id: projectId,
+          expected_version: 1,
+          slide_id: "intro",
+          at: 0,
+          text_edit: {
+            operation: "replace_once",
+            old_text: "古い説明",
+            text: "新しい問い"
+          }
+        }
+      });
+      expect(edited.structuredContent).toMatchObject({ ok: true, version: 2 });
+
+      const narrationSegment = await readJsonResource(
+        client,
+        `research://projects/${projectId}/slides/intro/narration/0`
+      );
+      expect(narrationSegment).toMatchObject({
+        ok: true,
+        segment: {
+          at: 0,
+          text: "新しい問いから研究を始めます。",
+          audio_src: null
+        }
+      });
+
+      const ambiguous = await client.callTool({
+        name: "set_slide_narration",
+        arguments: {
+          project_id: projectId,
+          expected_version: 2,
+          slide_id: "intro",
+          at: 0,
+          text: "全体置換",
+          text_edit: { operation: "append", text: "追記" }
+        }
+      });
+      expect(ambiguous).toMatchObject({
+        isError: true,
+        structuredContent: { error: { code: "INVALID_FIELDS" } }
+      });
     } finally {
       await client.close();
       await server.close();

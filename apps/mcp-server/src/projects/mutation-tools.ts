@@ -739,7 +739,8 @@ function updateSceneComponentContent(
 
 function applyComponentTextEdit(
   currentValue: string | null,
-  edit: z.infer<typeof componentTextEditSchema>
+  edit: z.infer<typeof componentTextEditSchema>,
+  fieldLabel = "component field"
 ): string | null {
   const current = currentValue ?? "";
   if (edit.operation === "clear") return null;
@@ -757,8 +758,8 @@ function applyComponentTextEdit(
     throw new ProjectToolError(
       "INVALID_CHANGE",
       first === -1
-        ? "old_text was not found in the selected component field."
-        : "old_text must match exactly once in the selected component field."
+        ? `old_text was not found in the selected ${fieldLabel}.`
+        : `old_text must match exactly once in the selected ${fieldLabel}.`
     );
   }
   return current.slice(0, first) + edit.text + current.slice(first + edit.old_text.length);
@@ -2413,12 +2414,13 @@ export function registerProjectMutationTools(
     {
       title: "読み上げを一件編集",
       description:
-        "指定stepの表示・読み上げ文だけを追加・置換します。textをnullにすると削除します。表示枠と音声設定は専用toolで更新します。",
+        "指定stepの表示・読み上げ文だけを追加・置換します。短い全体はtext、既存の長文はtext_editで一部分だけを変更します。textをnullまたはtext_editのclearにすると削除します。表示枠と音声設定は専用toolで更新します。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         at: z.number().int().nonnegative().max(100),
-        text: z.string().min(1).max(2_000).nullable()
+        text: z.string().min(1).max(2_000).nullable().optional(),
+        text_edit: componentTextEditSchema.optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -2428,7 +2430,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, at, text }) =>
+    async ({ project_id, expected_version, slide_id, at, text, text_edit }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -2445,16 +2447,35 @@ export function registerProjectMutationTools(
           const index = slide.narration.segments.findIndex(
             (segment) => segment.at === at
           );
-          if (text === null) {
+          if ((text === undefined) === (text_edit === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_FIELDS",
+              "Specify exactly one of text or text_edit."
+            );
+          }
+          const nextText = text_edit === undefined
+            ? text
+            : applyComponentTextEdit(
+                index === -1 ? null : slide.narration.segments[index].text,
+                text_edit,
+                "narration text"
+              );
+          if (nextText === null) {
             if (index !== -1) slide.narration.segments.splice(index, 1);
           } else {
+            if (nextText === undefined || nextText.length === 0 || nextText.length > 2_000) {
+              throw new ProjectToolError(
+                "INVALID_FIELDS",
+                "Narration text must contain between 1 and 2000 characters."
+              );
+            }
             const previous = index === -1 ? null : slide.narration.segments[index];
             const segment = narrationSegmentSchema.parse({
               ...(previous ?? {}),
               at,
-              text,
+              text: nextText,
               audio_src:
-                previous?.text === text
+                previous?.text === nextText
                   ? (previous?.audio_src ?? null)
                   : null
             });
