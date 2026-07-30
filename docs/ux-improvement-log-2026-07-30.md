@@ -487,3 +487,9 @@
 - 既定profileの上書き調声値、区間ごとの7つの実効調声値、未設定時のnull profile名をschemaへ正しく含めた。
 - job状態を自由文字列からqueued、running、completed、partially_failed、failedへ固定し、生成失敗codeも契約化した。
 - service境界で返却値をparseし、Web UIでは通ってもMCP clientのstructuredContent検証だけが失敗するずれを早期検出するようにした。
+
+## 改善ループ220
+
+- scene componentガイドの削除説明を、子孫の暗黙削除から「子を移動または削除してから親を削除」へ実装と一致させた。
+- デザインガイドと構成計画のvisual preset数へmuseumとterminalを反映し、AIが古い7種類だけを候補にしないようにした。
+- guide resourceの契約テストで削除規則と新presetを直接検証し、schema・実装・AI向け説明の再ずれを検出できるようにした。

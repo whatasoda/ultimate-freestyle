@@ -34,7 +34,7 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 - data: \`bar_chart\`、\`timeline\` → \`upsert_slide_data_component\`
 - media: project内の \`image\`、\`shape\` → \`upsert_slide_media_component\`
 - 配置・見た目の調整: \`update_slide_component\`。本文を再送せず、\`layout\`で親、順番、step、animation、frameを、\`style\`で指定した見た目だけを部分更新する。
-- 削除: \`delete_slide_component\`。指定componentと子孫をまとめて削除する。
+- 削除: \`delete_slide_component\`。子があるcomponentは削除できないため、子を移動または削除してから親を削除する。
 
 ## 構成例
 
@@ -47,7 +47,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 ## template
 
 - 最初は \`create_presentation_template\` でvisual presetから一件作る。
-- visual presetは \`studio\`、\`paper\`、\`editorial\`、\`neon\`、\`retro-game\`、\`soft-pop\`、\`scientific\`。
+- visual presetは \`studio\`、\`paper\`、\`editorial\`、\`neon\`、\`retro-game\`、\`soft-pop\`、\`scientific\`、\`museum\`、\`terminal\`。
 - font presetは \`system-sans\`、\`gothic\`、\`rounded\`、\`mincho\`、\`serif\`、\`monospace\`、\`display\`、\`textbook\`、\`handwritten\`、\`condensed\`。任意font名やURLは入力しない。
 - 密度は \`spacious\`、\`comfortable\`、\`compact\`、動きの傾向は \`calm\`、\`snappy\`、\`dramatic\`。
 - 色、配置、font、密度、animationの調整は \`update_presentation_template_fields\` で変更項目だけを送る。

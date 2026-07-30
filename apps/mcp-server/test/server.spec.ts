@@ -195,7 +195,7 @@ describe("MCP contract", () => {
       expect(componentGuide.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "text/markdown",
-          text: expect.stringContaining("upsert_slide_layout_component")
+          text: expect.stringContaining("子を移動または削除してから親を削除する")
         })
       );
       const styleGuide = await client.readResource({
@@ -204,7 +204,7 @@ describe("MCP contract", () => {
       expect(styleGuide.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "text/markdown",
-          text: expect.stringContaining("configure_deck")
+          text: expect.stringContaining("`museum`、`terminal`")
         })
       );
     } finally {
