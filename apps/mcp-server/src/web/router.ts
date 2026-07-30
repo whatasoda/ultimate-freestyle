@@ -472,9 +472,11 @@ async function handleProjectDetail(
     listProjectDraftRevisions(env.DB, session.userId, projectId, 50),
     getRenderedQualityReport(env.DB, session.userId, projectId)
   ]);
-  const selectedResearchItemMatch = new URL(request.url).searchParams
+  const searchParams = new URL(request.url).searchParams;
+  const selectedResearchItemMatch = searchParams
     .get("research_item")
     ?.match(/^(findings|limitations):(\d{1,2})$/);
+  const requestedLogPage = Number(searchParams.get("log_page"));
   return projectDetailPage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
@@ -483,6 +485,9 @@ async function handleProjectDetail(
     publication: publication!,
     draftRevisions,
     renderedQualityReport,
+    selectedLogPage: Number.isInteger(requestedLogPage) && requestedLogPage > 0
+      ? Math.min(requestedLogPage, 25)
+      : 1,
     selectedResearchItem: selectedResearchItemMatch?.[1] !== undefined && selectedResearchItemMatch[2] !== undefined
       ? {
           list: selectedResearchItemMatch[1] as "findings" | "limitations",
@@ -1469,6 +1474,10 @@ async function handleResearchLogDelete(
     );
   }
   try {
+    const logPageValue = new URL(request.url).searchParams.get("log_page");
+    const returnLogPage = logPageValue !== null && /^(?:[1-9]|1\d|2[0-5])$/.test(logPageValue)
+      ? Number(logPageValue)
+      : 1;
     const project = await mutateProject(env.DB, {
       ownerUserId: session.userId,
       projectId,
@@ -1490,13 +1499,17 @@ async function handleResearchLogDelete(
       details: { project_id: projectId, entry_id: entryId, version: project.version },
       createdAt: new Date().toISOString()
     });
+    const availableLogPage = Math.min(
+      returnLogPage,
+      Math.max(1, Math.ceil(project.document.logs.length / 20))
+    );
     return jsonResponse({
       ok: true,
       project_id: projectId,
       entry_id: entryId,
       version: project.version,
       updated_at: project.updated_at,
-      next_url: `/dashboard/projects/${projectId}#research-log`,
+      next_url: `/dashboard/projects/${projectId}${availableLogPage > 1 ? `?log_page=${availableLogPage}` : ""}#research-log`,
       error: null,
       request_id: crypto.randomUUID()
     });

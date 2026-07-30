@@ -1226,6 +1226,15 @@ describe("Web dashboard", () => {
       text: "削除導線を確認する研究ログ",
       source_url: null
     });
+    for (let index = 1; index <= 20; index += 1) {
+      listItemDocument.logs.push({
+        id: `91${String(index).padStart(6, "0")}-0000-4000-8000-000000000019`,
+        occurred_at: now,
+        kind: "note",
+        text: `新しい研究ログ ${index}`,
+        source_url: null
+      });
+    }
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO research_projects (
@@ -1307,8 +1316,21 @@ describe("Web dashboard", () => {
     const selectedListItemHtml = await selectedListItemDetail.text();
     expect(selectedListItemHtml).toContain('id="basic-information" tabindex="-1" open');
     expect(selectedListItemHtml).toContain('id="research-item-findings-0" tabindex="-1"');
-    expect(selectedListItemHtml).toContain(`action="/api/projects/${listItemProjectId}/logs/${researchLogEntryId}"`);
-    expect(selectedListItemHtml).toContain("このログを削除");
+    expect(selectedListItemHtml).not.toContain(researchLogEntryId);
+    expect(selectedListItemHtml).toContain("1 / 2ページ · 全21件");
+    expect(selectedListItemHtml).toContain('href="?log_page=2#research-log">古いログ →</a>');
+    const olderLogPage = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${listItemProjectId}?log_page=2#research-log`,
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const olderLogHtml = await olderLogPage.text();
+    expect(olderLogHtml).toContain(`action="/api/projects/${listItemProjectId}/logs/${researchLogEntryId}?log_page=2"`);
+    expect(olderLogHtml).toContain("2 / 2ページ · 全21件");
+    expect(olderLogHtml).toContain("← 新しいログ");
     const deleteListItem = await mutateListItem({
       expected_version: 3,
       action: "delete",
@@ -1332,7 +1354,7 @@ describe("Web dashboard", () => {
     const deleteResearchLog = await requestProvider(
       provider,
       new Request(
-        `https://saijiyu-kenkyu.2764.moe/api/projects/${listItemProjectId}/logs/${researchLogEntryId}`,
+        `https://saijiyu-kenkyu.2764.moe/api/projects/${listItemProjectId}/logs/${researchLogEntryId}?log_page=2`,
         {
           method: "DELETE",
           headers: {
@@ -1358,7 +1380,7 @@ describe("Web dashboard", () => {
           "SELECT document_json FROM research_projects WHERE id = ?"
         ).bind(listItemProjectId).first<{ document_json: string }>())!.document_json
       ).logs
-    ).toEqual([]);
+    ).toHaveLength(20);
     const nearLimitDocument = createEmptyProject("容量境界の表示確認");
     while (nearLimitDocument.findings.length < 100) {
       const candidate = structuredClone(nearLimitDocument);

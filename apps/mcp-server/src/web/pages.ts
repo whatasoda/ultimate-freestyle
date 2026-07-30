@@ -1391,6 +1391,7 @@ export function projectDetailPage(options: {
   publication: PublicationStatus;
   draftRevisions: ProjectDraftRevisionSummary[];
   renderedQualityReport: RenderedQualityReport | null;
+  selectedLogPage?: number;
   selectedResearchItem?: {
     list: "findings" | "limitations";
     index: number;
@@ -1465,14 +1466,21 @@ export function projectDetailPage(options: {
     "限界・今後の課題",
     "まだ確かめられていないことや次に試すこと"
   );
-  const recentLogs = document.logs.slice(-20).reverse();
+  const logPageSize = 20;
+  const logPageCount = Math.max(1, Math.ceil(document.logs.length / logPageSize));
+  const logPage = Math.min(Math.max(1, options.selectedLogPage ?? 1), logPageCount);
+  const logPageStart = (logPage - 1) * logPageSize;
+  const recentLogs = document.logs.slice().reverse().slice(logPageStart, logPageStart + logPageSize);
   const logs = recentLogs.length
     ? recentLogs
         .map(
-          (entry) => `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p><form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="ghost danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`
+          (entry) => `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p><form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}?log_page=${logPage}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="ghost danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`
         )
         .join("")
     : `<p class="prose">まだ研究ログがありません。</p>`;
+  const logPager = document.logs.length <= logPageSize
+    ? ""
+    : `<nav class="voice-pager" aria-label="研究ログのページ">${logPage > 1 ? `<a class="button ghost" href="?log_page=${logPage - 1}#research-log">← 新しいログ</a>` : ""}<span>${logPage} / ${logPageCount}ページ · 全${document.logs.length}件</span>${logPage < logPageCount ? `<a class="button ghost" href="?log_page=${logPage + 1}#research-log">古いログ →</a>` : ""}</nav>`;
   const slides = document.deck?.slides ?? [];
   const deck = document.deck;
   const loadingScreen = {
@@ -2012,7 +2020,7 @@ export function projectDetailPage(options: {
                <p class="inherit-note">固定プレビューで実際に使う画像は30件・合計30MiBまでです。未使用画像は公開版へ複製されません。</p>
                <div class="copy-box"><code>接続したAIは画像本体を引数へ含めず、asset IDと説明の一覧を取得できます。</code><div class="actions"><button class="ghost" type="button" data-copy-text="${escapeHtml(imageAiPrompt)}">画像の使い方をAIへ相談</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div>
              </section>
-             <section class="panel" id="research-log" tabindex="-1"><h2>研究ログ</h2>${logs}${document.logs.length > recentLogs.length ? `<p class="meta">最新20件を表示 · 全${document.logs.length}件</p>` : ""}</section>
+             <section class="panel" id="research-log" tabindex="-1"><h2>研究ログ</h2>${logs}${logPager}</section>
            </div>
            <aside class="detail-column">
              <section class="panel"><h2>研究情報</h2><dl class="stat-list">
