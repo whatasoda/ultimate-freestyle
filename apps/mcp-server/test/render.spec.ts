@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@86");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@87");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
@@ -196,6 +196,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('.narration[data-active="true"][data-fit-content]:is([data-placement="overlay-bottom"],[data-placement="sidebar"])');
     expect(html).toContain('.slide-content > :is(h2,h3,h4):first-child');
     expect(html).not.toContain('.slide-content h2:first-child');
+    expect(html).toContain("String(value).match(/^rgba?[(][ ]*([0-9.]+)");
+    expect(html).not.toContain("rgba?(s*([d.]+)");
+    expect(html).toContain("const withoutStart = trimmed.startsWith('|')");
     expect(html).toContain('"previewRevisionId":"50000000-0000-4000-8000-000000000005"');
     expect(html).toContain("ultimate-freestyle:preview-completed:");
     expect(html).toContain("reportPreviewCompletion();");

@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@86";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@87";
 
 function escapeHtml(value: string): string {
   return value
@@ -1378,7 +1378,7 @@ export function renderPresentationHtml(
       };
     };
     const parseRenderedColor = (value) => {
-      const match = String(value).match(/^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*([\d.]+))?\s*\)$/i);
+      const match = String(value).match(/^rgba?[(][ ]*([0-9.]+)[, ]+([0-9.]+)[, ]+([0-9.]+)(?:[ ]*[,/][ ]*([0-9.]+))?[ ]*[)]$/i);
       if (!match) return null;
       return { red: Number(match[1]), green: Number(match[2]), blue: Number(match[3]), alpha: match[4] === undefined ? 1 : Number(match[4]) };
     };
@@ -1609,7 +1609,12 @@ export function renderPresentationHtml(
       let listTag = '';
       const flushList = () => { if (list) { target.append(list); list = null; } };
       const lines = String(markdown).split(String.fromCharCode(10));
-      const tableCells = (value) => value.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((cell) => cell.trim());
+      const tableCells = (value) => {
+        const trimmed = value.trim();
+        const withoutStart = trimmed.startsWith('|') ? trimmed.slice(1) : trimmed;
+        const withoutEdges = withoutStart.endsWith('|') ? withoutStart.slice(0, -1) : withoutStart;
+        return withoutEdges.split('|').map((cell) => cell.trim());
+      };
       for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
         const source = lines[lineIndex] || '';
         const line = source.trim();
