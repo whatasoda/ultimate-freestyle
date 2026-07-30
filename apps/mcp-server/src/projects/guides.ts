@@ -120,7 +120,7 @@ const EDIT_CONTRACT_GUIDE = `# 最自由研究 部分編集契約
 2. 研究本文はproject resource、スライドはslide resource、scene/canvasの一件はelement resourceを読み、変更対象と現在値を特定する。
 3. 一回のtool callでは一つの意図だけを変更し、成功応答のversionを次の \`expected_version\` へ渡す。
 4. \`PROJECT_VERSION_CONFLICT\` では古い入力をそのまま再送せず、resourceを読み直して利用者または別Agentの変更を残した差分を作り直す。
-5. 長文の一部は \`update_slide_fields.body_edits\` の \`replace_once\` と \`old_text\` を使う。scene本文は \`update_slide_component_content\`、グラフ・timelineの一件は \`edit_slide_data_item\` を使い、デッキやscene全体を再送しない。
+5. 研究本文は \`update_project_fields.text_edits\`、スライド長文は \`update_slide_fields.body_edits\` の \`replace_once\` と \`old_text\` を使う。scene本文は \`update_slide_component_content\`、グラフ・timelineの一件は \`edit_slide_data_item\` を使い、長文・デッキ・scene全体を再送しない。
 6. delete toolと \`edit_slide_data_item.action: delete\` は情報を取り除く。対象resourceを直前に確認し、利用者の意図に含まれる場合だけ実行する。
 7. Web UIの未保存入力はMCPから見えない。公開前に利用者へ保存と実表示診断を案内する。
 

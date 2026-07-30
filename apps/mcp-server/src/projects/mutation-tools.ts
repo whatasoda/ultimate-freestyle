@@ -128,6 +128,12 @@ const slideBodyEditSchema = z.object({
   old_text: z.string().min(1).max(20_000).optional(),
   text: z.string().max(20_000).optional()
 });
+const researchTextEditSchema = z.object({
+  target: z.enum(["summary", "question", "hypothesis", "method"]),
+  operation: z.enum(["replace", "replace_once", "append", "prepend", "clear"]),
+  old_text: z.string().min(1).max(2_000).optional(),
+  text: z.string().max(2_000).optional()
+});
 
 export type VisualPreset = z.infer<typeof visualPresetSchema>;
 
@@ -456,6 +462,42 @@ function applySlideBodyEdit(
   return current.slice(0, first) + edit.text + current.slice(first + edit.old_text.length);
 }
 
+function applyResearchTextEdit(
+  currentValue: string | null,
+  edit: z.infer<typeof researchTextEditSchema>
+): string | null {
+  const current = currentValue ?? "";
+  if (edit.operation === "clear") return edit.target === "summary" ? "" : null;
+  if (edit.text === undefined) {
+    throw new ProjectToolError("INVALID_FIELDS", "text is required for this research text edit.");
+  }
+  let next: string;
+  if (edit.operation === "replace") next = edit.text;
+  else if (edit.operation === "append") next = current + edit.text;
+  else if (edit.operation === "prepend") next = edit.text + current;
+  else {
+    if (edit.old_text === undefined) {
+      throw new ProjectToolError("INVALID_FIELDS", "old_text is required for replace_once.");
+    }
+    const first = current.indexOf(edit.old_text);
+    const second = first === -1 ? -1 : current.indexOf(edit.old_text, first + edit.old_text.length);
+    if (first === -1 || second !== -1) {
+      throw new ProjectToolError(
+        "INVALID_CHANGE",
+        first === -1
+          ? "old_text was not found in the selected research field."
+          : "old_text must match exactly once in the selected research field."
+      );
+    }
+    next = current.slice(0, first) + edit.text + current.slice(first + edit.old_text.length);
+  }
+  const limit = { summary: 2_000, question: 2_000, hypothesis: 4_000, method: 20_000 }[edit.target];
+  if (next.length > limit) {
+    throw new ProjectToolError("INVALID_FIELDS", `The edited ${edit.target} exceeds ${limit} characters.`);
+  }
+  return next;
+}
+
 function upsertSceneComponent(
   document: ProjectDocument,
   slideId: string,
@@ -724,15 +766,12 @@ export function registerProjectMutationTools(
     {
       title: "研究の基本項目だけを更新",
       description:
-        "指定した基本項目だけを変更します。研究全体やdeckを送り直す必要はありません。少なくとも一項目を指定してください。",
+        "題名・段階または研究本文の最大2か所だけを変更します。本文はtext_editsのreplace_onceで現在のold_textを一度だけ置換し、長文全体を送り直しません。追記・前置・消去も選べます。",
       inputSchema: {
         ...projectIdInput,
         stage: projectStageSchema.optional(),
         title: z.string().min(1).max(120).optional(),
-        summary: z.string().max(2_000).optional(),
-        question: z.string().max(2_000).nullable().optional(),
-        hypothesis: z.string().max(4_000).nullable().optional(),
-        method: z.string().max(20_000).nullable().optional()
+        text_edits: z.array(researchTextEditSchema).min(1).max(2).optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -742,8 +781,8 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, ...fields }) => {
-      if (Object.values(fields).every((value) => value === undefined)) {
+    async ({ project_id, expected_version, stage, title, text_edits }) => {
+      if (stage === undefined && title === undefined && text_edits === undefined) {
         return executeMutation(db, getAuthProps, {
           projectId: project_id,
           expectedVersion: expected_version,
@@ -760,8 +799,17 @@ export function registerProjectMutationTools(
         projectId: project_id,
         expectedVersion: expected_version,
         changedKind: "fields_updated",
+        changedId: [stage === undefined ? "" : "stage", title === undefined ? "" : "title", ...(text_edits?.map((edit) => edit.target) ?? [])].filter(Boolean).sort().join(","),
         mutate: (document) => {
-          Object.assign(document, fields);
+          if (stage !== undefined) document.stage = stage;
+          if (title !== undefined) document.title = title;
+          for (const edit of text_edits ?? []) {
+            const next = applyResearchTextEdit(document[edit.target], edit);
+            if (edit.target === "summary") document.summary = next ?? "";
+            else if (edit.target === "question") document.question = next;
+            else if (edit.target === "hypothesis") document.hypothesis = next;
+            else document.method = next;
+          }
         }
       });
     }

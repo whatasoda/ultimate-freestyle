@@ -114,6 +114,13 @@ describe("MCP contract", () => {
       expect(
         (slideFieldsTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("content_markdown");
+      const projectFieldsTool = tools.find(
+        (tool) => tool.name === "update_project_fields"
+      );
+      expect(JSON.stringify(projectFieldsTool?.inputSchema)).toContain('"text_edits"');
+      expect(
+        (projectFieldsTool?.inputSchema as { properties?: object }).properties
+      ).not.toHaveProperty("method");
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
@@ -407,7 +414,11 @@ describe("MCP contract", () => {
           project_id: firstProject.project_id,
           expected_version: 1,
           stage: "design",
-          question: updatedQuestion
+          text_edits: [{
+            target: "question",
+            operation: "replace",
+            text: updatedQuestion
+          }]
         }
       });
       expect(update.structuredContent).toMatchObject({
@@ -421,7 +432,11 @@ describe("MCP contract", () => {
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 1,
-          summary: "競合して保存されない概要"
+          text_edits: [{
+            target: "summary",
+            operation: "replace",
+            text: "競合して保存されない概要"
+          }]
         }
       });
       expect(conflict.isError).toBe(true);

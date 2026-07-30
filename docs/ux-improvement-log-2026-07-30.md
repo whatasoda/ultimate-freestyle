@@ -835,3 +835,9 @@
 - `research://projects/{id}/voice`が最大100区間の長い原稿、全調声、生成状態を一括返し、一枚だけを直すAgentにも研究全体の音声情報を要求していた。
 - 概要resourceは既定profile、生成要約、job、スライド別の区間・完成・失敗件数と一枚詳細URIだけを返す。`research://projects/{id}/voice/slides/{slideId}`を追加し、原稿・話者・profile・実効調声・生成状態を一枚単位で読む。
 - 状態取得toolへ一枚URI templateを追加した。Agentは概要→対象スライドの順に読み、他の読み上げ原稿をcontextへ入れずに個別編集できる。
+
+## 改善ループ276
+
+- `update_project_fields`が方法を最大2万字、仮説を4千字まるごと受け取り、短い文言修正でもAgentが長文全体をtool引数へ再送できる契約を小粒度化した。
+- 題名・研究段階は単一値のまま、概要・問い・仮説・方法は最大2件の`text_edits`だけを受ける。`replace_once`は現在の`old_text`が一度だけ一致する場合に限り、append、prepend、clear、短い全面replaceも各2千字以内で扱う。
+- 編集後に各fieldの保存上限を再検証し、競合時は既存のversion conflictで止める。tool数を増やさず旧長文引数をschemaから除き、部分編集契約とcontract testを更新した。
