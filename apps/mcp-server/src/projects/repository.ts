@@ -39,6 +39,10 @@ export type DashboardProjectSummary = ProjectSummary & {
   preview_reviewed_at: string | null;
   published_project_version: number | null;
   published_renderer_version: string | null;
+  quality_project_version: number | null;
+  quality_renderer_version: string | null;
+  quality_status: "completed" | "cancelled" | null;
+  quality_issue_count: number | null;
 };
 
 export class ProjectRepositoryError extends Error {
@@ -155,7 +159,11 @@ export async function listDashboardProjects(
               preview.renderer_version AS preview_renderer_version,
               preview.reviewed_at AS preview_reviewed_at,
               published.project_version AS published_project_version,
-              published.renderer_version AS published_renderer_version
+              published.renderer_version AS published_renderer_version,
+              quality.project_version AS quality_project_version,
+              quality.renderer_version AS quality_renderer_version,
+              quality.status AS quality_status,
+              quality.issue_count AS quality_issue_count
        FROM research_projects AS projects
        LEFT JOIN project_publications AS publications
          ON publications.project_id = projects.id AND publications.owner_user_id = projects.owner_user_id
@@ -163,6 +171,8 @@ export async function listDashboardProjects(
          ON preview.id = publications.latest_preview_revision_id AND preview.owner_user_id = projects.owner_user_id
        LEFT JOIN presentation_revisions AS published
          ON published.id = publications.published_revision_id AND published.owner_user_id = projects.owner_user_id
+       LEFT JOIN project_quality_reports AS quality
+         ON quality.project_id = projects.id AND quality.owner_user_id = projects.owner_user_id
        WHERE projects.owner_user_id = ?
        ORDER BY projects.updated_at DESC
        LIMIT ?`
@@ -180,6 +190,10 @@ export async function listDashboardProjects(
       preview_reviewed_at: string | null;
       published_project_version: number | null;
       published_renderer_version: string | null;
+      quality_project_version: number | null;
+      quality_renderer_version: string | null;
+      quality_status: "completed" | "cancelled" | null;
+      quality_issue_count: number | null;
     }>();
 
   return result.results.map((row) => ({
@@ -198,6 +212,10 @@ export async function listDashboardProjects(
     preview_reviewed_at: row.preview_reviewed_at,
     published_project_version: row.published_project_version,
     published_renderer_version: row.published_renderer_version,
+    quality_project_version: row.quality_project_version,
+    quality_renderer_version: row.quality_renderer_version,
+    quality_status: row.quality_status,
+    quality_issue_count: row.quality_issue_count,
     created_at: row.created_at,
     updated_at: row.updated_at
   }));

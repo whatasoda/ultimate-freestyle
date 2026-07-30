@@ -1194,10 +1194,22 @@ export function dashboardPage(options: {
         const publicationState = publishedCurrent ? "ready" : "attention";
         const cardState = !project.has_presentation ? "missing" : publishedCurrent ? "published" : "attention";
         const incompleteVoice = project.voice_segment_count > 0 && project.voice_ready_count < project.voice_segment_count;
+        const qualityCurrent = project.quality_project_version === project.version &&
+          project.quality_renderer_version === PRESENTATION_RENDERER_VERSION &&
+          project.quality_status === "completed";
+        const qualityState = qualityCurrent && project.quality_issue_count === 0 ? "ready" : "attention";
+        const qualityLabel = project.quality_project_version === null
+          ? "実表示 未確認"
+          : !qualityCurrent
+            ? "実表示 要再確認"
+            : project.quality_issue_count === 0
+              ? "実表示 確認済み"
+              : `実表示 要確認 ${project.quality_issue_count}件`;
         const attentionReasons = !project.has_presentation
           ? ["発表を構成"]
           : [
               ...(incompleteVoice ? [`音声をあと${project.voice_segment_count - project.voice_ready_count}区間生成`] : []),
+              ...(qualityState === "attention" ? [qualityLabel] : []),
               ...(!publishedCurrent ? [publicationLabel] : [])
             ];
         const voiceLabel = project.voice_segment_count === 0
@@ -1206,12 +1218,12 @@ export function dashboardPage(options: {
             ? `音声 ${project.voice_ready_count}/${project.voice_segment_count} 完成`
             : `音声 ${project.voice_ready_count}/${project.voice_segment_count}`;
         const voiceState = project.voice_segment_count > 0 && project.voice_ready_count === project.voice_segment_count ? "ready" : "attention";
-        const searchText = `${project.title} ${STAGE_LABELS[project.stage]} ${voiceLabel} ${publicationLabel} ${attentionReasons.join(" ")}`.toLocaleLowerCase("ja");
+        const searchText = `${project.title} ${STAGE_LABELS[project.stage]} ${voiceLabel} ${qualityLabel} ${publicationLabel} ${attentionReasons.join(" ")}`.toLocaleLowerCase("ja");
         return `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-project-state="${cardState}" data-needs-attention="${String(attentionReasons.length > 0)}" data-title="${escapeHtml(project.title)}" data-updated="${escapeHtml(project.updated_at)}" data-duration="${project.total_duration_seconds}" data-search-text="${escapeHtml(searchText)}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
         <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
         <p class="meta">${project.has_presentation ? `発表 ${project.slide_count}枚 · ${formatDuration(project.total_duration_seconds)}` : "発表は未構成"}</p>
-        ${project.has_presentation ? `<div class="project-statuses"><span class="project-status" data-state="${voiceState}">${voiceLabel}</span><span class="project-status" data-state="${publicationState}">${publicationLabel}</span></div>` : ""}
+        ${project.has_presentation ? `<div class="project-statuses"><span class="project-status" data-state="${voiceState}">${voiceLabel}</span><span class="project-status" data-state="${qualityState}">${qualityLabel}</span><span class="project-status" data-state="${publicationState}">${publicationLabel}</span></div>` : ""}
         ${attentionReasons.length > 0 ? `<p class="project-attention">次に：${escapeHtml(attentionReasons.join(" · "))}</p>` : ""}
         <p class="meta">最終更新 ${escapeHtml(formatDate(project.updated_at))}</p>
       </article></a>`;

@@ -409,7 +409,8 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain('data-project-state="attention"');
     expect(dashboardHtml).toContain('data-needs-attention="true"');
     expect(dashboardHtml).toContain("プレビュー未作成");
-    expect(dashboardHtml).toContain("次に：プレビュー未作成");
+    expect(dashboardHtml).toContain("実表示 未確認");
+    expect(dashboardHtml).toContain("次に：実表示 未確認 · プレビュー未作成");
     expect(dashboardHtml).toContain("音声 1/1 完成");
     expect(dashboardHtml).toContain("data-project-sort");
     expect(dashboardHtml).toContain("発表時間が長い順");
@@ -586,6 +587,14 @@ describe("Web dashboard", () => {
       issue_count: 1,
       results_json: expect.stringContaining("小さすぎる文字")
     });
+    const dashboardWithSavedQuality = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/dashboard", {
+        headers: { cookie: browserCookies }
+      }),
+      authEnv
+    );
+    expect(await dashboardWithSavedQuality.text()).toContain("実表示 要確認 1件");
     const detailWithSavedQuality = await requestProvider(
       provider,
       new Request(
