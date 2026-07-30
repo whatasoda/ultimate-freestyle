@@ -381,6 +381,7 @@ function shell(title: string, body: string): string {
       .project-status { padding: .22rem .45rem; border: 1px solid #52647c; border-radius: 999px; color: #c4cfdd; font-size: .7rem; font-weight: 750; }
       .project-status[data-state="ready"] { border-color: #36785b; background: #15312566; color: #9be6bd; }
       .project-status[data-state="attention"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
+      .project-attention { margin: .55rem 0 0; color: #ffdda0; font-size: .72rem; line-height: 1.5; }
       .empty { padding: clamp(1.5rem, 5vw, 3rem); text-align: center; }
       .empty h2 { margin-top: 0; }
       .empty p { color: var(--muted); line-height: 1.7; }
@@ -1146,31 +1147,47 @@ export function dashboardPage(options: {
   const cards = options.projects
     .map(
       (project) => {
-        const previewCurrent = project.preview_project_version === project.version && project.preview_renderer_version === PRESENTATION_RENDERER_VERSION;
-        const publishedCurrent = project.published_project_version === project.version && project.published_renderer_version === PRESENTATION_RENDERER_VERSION;
+        const previewProjectCurrent = project.preview_project_version === project.version;
+        const previewCurrent = previewProjectCurrent && project.preview_renderer_version === PRESENTATION_RENDERER_VERSION;
+        const publishedProjectCurrent = project.published_project_version === project.version;
+        const publishedCurrent = publishedProjectCurrent && project.published_renderer_version === PRESENTATION_RENDERER_VERSION;
         const publicationLabel = publishedCurrent
           ? "公開中"
+          : publishedProjectCurrent
+            ? "公開表示の更新あり"
           : project.published_project_version !== null
-            ? "公開後に変更あり"
+            ? "公開後に内容変更"
             : previewCurrent && project.preview_reviewed_at !== null
               ? "公開できます"
               : previewCurrent
                 ? "プレビュー確認待ち"
+                : previewProjectCurrent
+                  ? "プレビュー表示の更新あり"
+                  : project.preview_project_version !== null
+                    ? "プレビュー後に内容変更"
                 : "プレビュー未作成";
         const publicationState = publishedCurrent ? "ready" : "attention";
         const cardState = !project.has_presentation ? "missing" : publishedCurrent ? "published" : "attention";
+        const incompleteVoice = project.voice_segment_count > 0 && project.voice_ready_count < project.voice_segment_count;
+        const attentionReasons = !project.has_presentation
+          ? ["発表を構成"]
+          : [
+              ...(incompleteVoice ? [`音声をあと${project.voice_segment_count - project.voice_ready_count}区間生成`] : []),
+              ...(!publishedCurrent ? [publicationLabel] : [])
+            ];
         const voiceLabel = project.voice_segment_count === 0
           ? "音声原稿なし"
           : project.voice_ready_count === project.voice_segment_count
             ? `音声 ${project.voice_ready_count}/${project.voice_segment_count} 完成`
             : `音声 ${project.voice_ready_count}/${project.voice_segment_count}`;
         const voiceState = project.voice_segment_count > 0 && project.voice_ready_count === project.voice_segment_count ? "ready" : "attention";
-        const searchText = `${project.title} ${STAGE_LABELS[project.stage]} ${voiceLabel} ${publicationLabel}`.toLocaleLowerCase("ja");
-        return `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-project-state="${cardState}" data-title="${escapeHtml(project.title)}" data-updated="${escapeHtml(project.updated_at)}" data-duration="${project.total_duration_seconds}" data-search-text="${escapeHtml(searchText)}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
+        const searchText = `${project.title} ${STAGE_LABELS[project.stage]} ${voiceLabel} ${publicationLabel} ${attentionReasons.join(" ")}`.toLocaleLowerCase("ja");
+        return `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-project-state="${cardState}" data-needs-attention="${String(attentionReasons.length > 0)}" data-title="${escapeHtml(project.title)}" data-updated="${escapeHtml(project.updated_at)}" data-duration="${project.total_duration_seconds}" data-search-text="${escapeHtml(searchText)}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
         <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
         <p class="meta">${project.has_presentation ? `発表 ${project.slide_count}枚 · ${formatDuration(project.total_duration_seconds)}` : "発表は未構成"}</p>
         ${project.has_presentation ? `<div class="project-statuses"><span class="project-status" data-state="${voiceState}">${voiceLabel}</span><span class="project-status" data-state="${publicationState}">${publicationLabel}</span></div>` : ""}
+        ${attentionReasons.length > 0 ? `<p class="project-attention">次に：${escapeHtml(attentionReasons.join(" · "))}</p>` : ""}
         <p class="meta">最終更新 ${escapeHtml(formatDate(project.updated_at))}</p>
       </article></a>`;
       }

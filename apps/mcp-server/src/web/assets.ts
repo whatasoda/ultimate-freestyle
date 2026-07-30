@@ -166,9 +166,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!(card instanceof HTMLElement)) continue;
         const matchesText = query === "" || (card.dataset.searchText || "").includes(query);
         const matchesFilter = activeFilter === "all" ||
-          (["ready", "missing"].includes(activeFilter)
-            ? card.dataset.presentation === activeFilter
-            : card.dataset.projectState === activeFilter);
+          (activeFilter === "attention"
+            ? card.dataset.needsAttention === "true"
+            : ["ready", "missing"].includes(activeFilter)
+              ? card.dataset.presentation === activeFilter
+              : card.dataset.projectState === activeFilter);
         const matches = matchesText && matchesFilter;
         card.hidden = !matches;
         if (matches) visible += 1;

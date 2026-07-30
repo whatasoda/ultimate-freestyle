@@ -406,7 +406,9 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain('data-project-filter="attention"');
     expect(dashboardHtml).toContain('data-project-filter="missing"');
     expect(dashboardHtml).toContain('data-project-state="attention"');
+    expect(dashboardHtml).toContain('data-needs-attention="true"');
     expect(dashboardHtml).toContain("プレビュー未作成");
+    expect(dashboardHtml).toContain("次に：プレビュー未作成");
     expect(dashboardHtml).toContain("音声 1/1 完成");
     expect(dashboardHtml).toContain("data-project-sort");
     expect(dashboardHtml).toContain("発表時間が長い順");
@@ -791,6 +793,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
     expect(dashboardScriptText).toContain("data-project-search-empty");
     expect(dashboardScriptText).toContain("filterProjects");
+    expect(dashboardScriptText).toContain('card.dataset.needsAttention === "true"');
     expect(dashboardScriptText).toContain("updateImagePreview");
     expect(dashboardScriptText).toContain("URL.revokeObjectURL");
     expect(dashboardScriptText).toContain("画像の解像度を確認しています");
