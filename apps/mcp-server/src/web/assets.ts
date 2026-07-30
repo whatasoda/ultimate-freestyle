@@ -1124,6 +1124,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
   };
   for (const form of document.querySelectorAll("[data-scene-component-editor], [data-canvas-block-editor]")) {
+    for (const button of form.querySelectorAll("[data-component-order]")) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      button.addEventListener("click", () => {
+        const order = form.querySelector('[data-component-path="order"]');
+        if (!(order instanceof HTMLInputElement)) return;
+        order.value = button.dataset.componentOrder || order.value;
+        order.dispatchEvent(new Event("input", { bubbles: true }));
+        form.requestSubmit();
+      });
+    }
     const frameToggle = form.querySelector("[data-component-frame-toggle]");
     const frameFields = [...form.querySelectorAll("[data-component-frame-field]")].filter((field) => field instanceof HTMLInputElement);
     const frameFeedback = form.querySelector("[data-component-frame-feedback]");

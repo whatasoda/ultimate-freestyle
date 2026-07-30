@@ -238,7 +238,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=83";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=84";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -919,7 +919,11 @@ function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideScene
     .filter((candidate) => ["layer", "stack", "grid"].includes(candidate.kind) && candidate.id !== node.id && !descendants.has(candidate.id))
     .map((candidate) => `<option value="${escapeHtml(candidate.id)}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
     .join("");
-  return `<fieldset><legend>階層と並び順</legend><div class="editor-grid"><label>追加先<select name="parent_id" data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value=""${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。自分自身や子孫は追加先に選べません。</p></fieldset>`;
+  const siblings = nodes
+    .filter((candidate) => candidate.parent_id === node.parent_id)
+    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+  const siblingIndex = siblings.findIndex((candidate) => candidate.id === node.id);
+  return `<fieldset><legend>階層と並び順</legend><div class="editor-grid"><label>追加先<select name="parent_id" data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value=""${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。自分自身や子孫は追加先に選べません。</p></fieldset>`;
 }
 
 function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number): string {
