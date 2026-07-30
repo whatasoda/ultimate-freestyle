@@ -2301,6 +2301,27 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       navigateToComponent(link.dataset.componentSelect || "", link.href);
     });
   }
+  const componentSearch = document.querySelector("[data-component-search]");
+  const componentSearchCount = document.querySelector("[data-component-search-count]");
+  const componentSearchEmpty = document.querySelector("[data-component-search-empty]");
+  if (componentSearch instanceof HTMLInputElement && componentSearchCount instanceof HTMLOutputElement) {
+    const componentRows = [...document.querySelectorAll("[data-component-select]")]
+      .map((link) => link.closest("li"))
+      .filter((row) => row instanceof HTMLLIElement);
+    const filterComponents = () => {
+      const query = componentSearch.value.trim().toLocaleLowerCase("ja");
+      let visible = 0;
+      for (const row of componentRows) {
+        const matches = query.length === 0 || (row.textContent || "").toLocaleLowerCase("ja").includes(query);
+        row.hidden = !matches;
+        if (matches) visible += 1;
+      }
+      componentSearchCount.value = visible + " / " + componentRows.length + "件";
+      if (componentSearchEmpty instanceof HTMLElement) componentSearchEmpty.hidden = visible !== 0;
+    };
+    componentSearch.addEventListener("input", filterComponents);
+    filterComponents();
+  }
 
   if (slideFrame instanceof HTMLIFrameElement) {
     const syncFramePosition = () => {
