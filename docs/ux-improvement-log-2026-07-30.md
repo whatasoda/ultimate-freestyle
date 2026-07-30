@@ -799,3 +799,9 @@
 - Remote MCPの下書き履歴resourceだけが直近20版に限定され、Web UIと実保存上限50版の候補が一致していなかった。保持している全50版を返し、AI Agentと利用者が同じ復元候補を見られるようにした。
 - 履歴応答へ一版詳細、一枚詳細、現在版、復元toolの参照順を機械可読な`selection_workflow`として追加した。Agentが一覧だけで復元せず、長文全体を一度に取得せず必要な差へ段階的に進める。
 - 復元toolの説明にも詳細・一枚比較と`expected_version`の意味を明記した。現在版が履歴に残る非破壊動作は維持する。
+
+## 改善ループ270
+
+- `edit_slide_data_item`は追加・更新・移動に加えて削除もできる一方、MCP annotationが`destructiveHint: false`だった。削除を含むtoolとしてtrueへ正し、対応クライアントが利用者への確認判断に使えるようにした。
+- `research://guide/edit-contract`を追加し、outline→対象resource→一意図の変更→返却version継承という操作順、競合時に古い入力を再送しない規則、長文・component・data itemの部分編集toolをまとめた。
+- 発表構成promptも編集契約を先に読むよう更新した。MCPから見えないWeb UIの未保存入力、削除前確認、復元時の段階比較までAgent向けの境界を明文化した。

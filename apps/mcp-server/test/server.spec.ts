@@ -94,6 +94,12 @@ describe("MCP contract", () => {
       ).toBeLessThan(90_000);
       const blockTool = tools.find((tool) => tool.name === "edit_slide_block");
       expect(JSON.stringify(blockTool?.inputSchema)).not.toContain('"block"');
+      expect(tools).toContainEqual(
+        expect.objectContaining({
+          name: "edit_slide_data_item",
+          annotations: expect.objectContaining({ destructiveHint: true })
+        })
+      );
       const templateUpdateTool = tools.find(
         (tool) => tool.name === "update_presentation_template_fields"
       );
@@ -197,6 +203,9 @@ describe("MCP contract", () => {
         })
       );
       expect(resources).toContainEqual(
+        expect.objectContaining({ uri: "research://guide/edit-contract" })
+      );
+      expect(resources).toContainEqual(
         expect.objectContaining({
           uri: "research://guide/voicevox-catalog"
         })
@@ -239,6 +248,15 @@ describe("MCP contract", () => {
         expect.objectContaining({
           mimeType: "text/markdown",
           text: expect.stringContaining("`museum`、`terminal`")
+        })
+      );
+      const editContract = await client.readResource({
+        uri: "research://guide/edit-contract"
+      });
+      expect(editContract.contents).toContainEqual(
+        expect.objectContaining({
+          mimeType: "text/markdown",
+          text: expect.stringContaining("古い入力をそのまま再送せず")
         })
       );
       const voiceCatalog = await readJsonResource(

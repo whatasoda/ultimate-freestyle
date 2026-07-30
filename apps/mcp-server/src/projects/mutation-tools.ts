@@ -1863,7 +1863,7 @@ export function registerProjectMutationTools(
       outputSchema: mutationOutput,
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: false
       }

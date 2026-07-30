@@ -112,6 +112,18 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 
 各toolの成功時に返るversionを、次のtoolの\`expected_version\`へ渡す。`;
 
+const EDIT_CONTRACT_GUIDE = `# 最自由研究 部分編集契約
+
+1. 最初に \`get_project_outline\` で対象と現在versionを読む。
+2. 研究本文はproject resource、スライドはslide resource、scene/canvasの一件はelement resourceを読み、変更対象と現在値を特定する。
+3. 一回のtool callでは一つの意図だけを変更し、成功応答のversionを次の \`expected_version\` へ渡す。
+4. \`PROJECT_VERSION_CONFLICT\` では古い入力をそのまま再送せず、resourceを読み直して利用者または別Agentの変更を残した差分を作り直す。
+5. 長文の一部は \`update_slide_fields.body_edits\` の \`replace_once\` と \`old_text\` を使う。scene本文は \`update_slide_component_content\`、グラフ・timelineの一件は \`edit_slide_data_item\` を使い、デッキやscene全体を再送しない。
+6. delete toolと \`edit_slide_data_item.action: delete\` は情報を取り除く。対象resourceを直前に確認し、利用者の意図に含まれる場合だけ実行する。
+7. Web UIの未保存入力はMCPから見えない。公開前に利用者へ保存と実表示診断を案内する。
+
+復元は \`research://projects/{id}/revisions\` の \`selection_workflow\` に従い、候補の詳細と必要な一枚を比較してから \`restore_draft_revision\` を使う。`;
+
 function projectResourceBody(
   getAuthProps: () => Record<string, unknown> | undefined,
   requiredScope: "research:read"
@@ -190,6 +202,26 @@ export function registerResearchGuides(
           uri: uri.href,
           mimeType: "text/markdown",
           text: PRESENTATION_STYLE_GUIDE
+        }
+      ]
+    })
+  );
+
+  server.registerResource(
+    "research-edit-contract-guide",
+    "research://guide/edit-contract",
+    {
+      title: "最自由研究 部分編集契約",
+      description:
+        "AI Agentが小粒度toolを競合や意図しない削除なしに連続実行するための読取・version・部分編集規則です。",
+      mimeType: "text/markdown"
+    },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: EDIT_CONTRACT_GUIDE
         }
       ]
     })
@@ -928,7 +960,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけresearch://projects/${project_id}またはresearch://projects/${project_id}/slides/{slideId}から読んでください。research://guide/presentation-componentsとresearch://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけresearch://projects/${project_id}またはresearch://projects/${project_id}/slides/{slideId}から読んでください。research://guide/edit-contract、research://guide/presentation-components、research://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
           }
         }
       ]
