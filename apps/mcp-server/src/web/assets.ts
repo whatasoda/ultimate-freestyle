@@ -1960,7 +1960,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           : readability.length
             ? readability.length + "か所で文字が小さすぎます。自動縮小、文字倍率、枠の大きさを見直してください。"
           : occlusions.length
-            ? occlusions.length + "組の文字パーツが重なっています。自由配置の位置と大きさを確認してください。"
+            ? occlusions.length + "組の文字表示が重なっています。読み上げ枠または自由配置の位置と大きさを確認してください。"
           : "このSTEPの文字は" + (slideFrame.dataset.aspectRatio || "16:9") + "の枠内に収まっています。";
         layoutStatus.dataset.level = overflows.length || compressed.length || contrasts.length || clamps.length || readability.length || occlusions.length ? "warning" : "ok";
       }

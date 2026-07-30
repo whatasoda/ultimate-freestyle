@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@84";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@85";
 
 function escapeHtml(value: string): string {
   return value
@@ -1461,7 +1461,7 @@ export function renderPresentationHtml(
       return smallest;
     };
     const collectOcclusions = (slideElement) => {
-      const candidates = [...slideElement.querySelectorAll('.canvas-block[data-fit-content], .scene-node[data-positioned="true"][data-fit-content]')]
+      const candidates = [...slideElement.querySelectorAll('.slide-main[data-fit-content], .slide-sidebar[data-fit-content], .canvas-block[data-fit-content], .scene-node[data-positioned="true"][data-fit-content], .narration[data-active="true"][data-fit-content]:is([data-placement="overlay-bottom"],[data-placement="sidebar"])')]
         .filter((item) => item instanceof HTMLElement && item.offsetParent !== null && item.textContent?.trim() && Number(getComputedStyle(item).opacity) > .1);
       const textRects = (candidate) => {
         const boundary = candidate.getBoundingClientRect();
