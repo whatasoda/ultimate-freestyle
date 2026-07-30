@@ -1270,6 +1270,10 @@ describe("presentation artifact renderer", () => {
     expect(voiceLimitHtml).toContain("32,000字");
     expect(voiceLimitHtml).toContain("16区間は500文字を超えるため、区間を分けてください");
     expect(voiceLimitHtml).toContain('data-voice-generate="/api/projects/63ab1ec4-20a0-4cf6-a1a0-f74ced56778a/voice/jobs" disabled>500文字を超える原稿を分割してください</button>');
+    expect(voiceLimitHtml.match(/data-voice-preview data-audio-url/g)).toHaveLength(1);
+    expect(new TextEncoder().encode(voiceLimitHtml).byteLength).toBeLessThan(
+      250_000
+    );
 
     const pagedVoiceHtml = await voiceFinishPage({
       twitchLogin: "researcher",
@@ -1277,6 +1281,7 @@ describe("presentation artifact renderer", () => {
       project,
       page: 2,
       query: "区間",
+      selectedSegmentKey: "rich-result:55",
       status: "needs_generation",
       voice: {
         ok: true,
@@ -1309,6 +1314,12 @@ describe("presentation artifact renderer", () => {
       }
     }).text();
     expect(pagedVoiceHtml.match(/data-voice-segment /g)).toHaveLength(40);
+    expect(pagedVoiceHtml.match(/data-voice-preview data-audio-url/g)).toHaveLength(1);
+    expect(pagedVoiceHtml).toContain(
+      'id="voice-segment-rich-result-55" open data-voice-segment data-state="needs_generation"'
+    );
+    expect(pagedVoiceHtml).toContain('data-selected="true"');
+    expect(pagedVoiceHtml).toContain("segment=rich-result%3A40");
     expect(pagedVoiceHtml).toContain("2 / 3ページ · 81件");
     expect(pagedVoiceHtml).toContain('name="q" value="区間"');
     expect(pagedVoiceHtml).toContain('class="voice-search-row"');

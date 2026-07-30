@@ -2030,6 +2030,7 @@ export function voiceFinishPage(options: {
   voice: VoiceFinishState;
   page?: number;
   query?: string;
+  selectedSegmentKey?: string | null;
   status?: "all" | "ready" | "needs_generation" | "failed";
 }): Response {
   const projectId = escapeHtml(options.project.project_id);
@@ -2115,18 +2116,41 @@ export function voiceFinishPage(options: {
     const value = query.toString();
     return value.length > 0 ? `?${value}` : "?";
   };
+  const segmentKey = (segment: VoiceFinishState["segments"][number]) =>
+    `${segment.slide_id}:${segment.at}`;
+  const selectedSegment = pageSegments.find(
+    (segment) => segmentKey(segment) === options.selectedSegmentKey
+  ) ?? pageSegments.find((segment) =>
+    ["needs_generation", "failed"].includes(segment.status)
+  ) ?? pageSegments[0];
+  const voiceSegmentHref = (segment: VoiceFinishState["segments"][number]) => {
+    const query = new URLSearchParams();
+    if (voiceStatus !== "all") query.set("status", voiceStatus);
+    if (voiceQuery.length > 0) query.set("q", options.query?.trim() ?? "");
+    if (voicePage > 1) query.set("page", String(voicePage));
+    query.set("segment", segmentKey(segment));
+    return `?${query.toString()}#voice-segment-${encodeURIComponent(segment.slide_id)}-${segment.at}`;
+  };
   const segmentList = pageSegments.length
     ? pageSegments
         .map((segment, index) => {
           const statusLabel =
             VOICE_SEGMENT_STATUS_LABELS[segment.status] ?? segment.status;
           const generated = segment.audio_url !== null;
-          const tuningDetails = (Object.keys(TUNING_LABELS) as Array<keyof VoicevoxTuning>)
-            .map((key) => `<dt>${TUNING_LABELS[key]}</dt><dd>${segment.effective_tuning[key]}</dd>`)
-            .join("");
-          return `<details class="voice-review"${index === 0 ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}">
+          const selected = selectedSegment !== undefined &&
+            segmentKey(segment) === segmentKey(selectedSegment);
+          const tuningDetails = selected
+            ? (Object.keys(TUNING_LABELS) as Array<keyof VoicevoxTuning>)
+                .map((key) => `<dt>${TUNING_LABELS[key]}</dt><dd>${segment.effective_tuning[key]}</dd>`)
+                .join("")
+            : "";
+          const searchPreview = segment.text.replace(/\s+/g, " ").slice(0, 160);
+          const body = selected
+            ? `<div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}?step=${segment.at}&narration=${segment.at}#narration-segment-${segment.at}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>`
+            : `<div class="voice-review-body"><p class="inherit-note">${segment.text.length.toLocaleString("ja-JP")}文字の原稿です。選択すると全文・実効調声・試聴操作を表示します。</p><div class="actions"><a class="button ghost" href="${escapeHtml(voiceSegmentHref(segment))}">この区間を選択</a></div></div>`;
+          return `<details class="voice-review" id="voice-segment-${escapeHtml(segment.slide_id)}-${segment.at}"${selected ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${searchPreview} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}"${selected ? ' data-selected="true"' : ""}>
             <summary><span class="component-step">${String((voicePage - 1) * voicePageSize + index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
-            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}?step=${segment.at}&narration=${segment.at}#narration-segment-${segment.at}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
+            ${body}
           </details>`;
         })
         .join("")

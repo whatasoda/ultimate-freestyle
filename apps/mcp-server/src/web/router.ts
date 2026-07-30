@@ -786,6 +786,9 @@ async function handleVoicePage(
     voice: { ...voice, ok: true },
     page: Number.isInteger(page) && page > 0 ? page : 1,
     query: (url.searchParams.get("q") ?? "").slice(0, 100),
+    selectedSegmentKey: (url.searchParams.get("segment") ?? "").match(
+      /^[a-z0-9][a-z0-9-]{0,63}:\d{1,3}$/
+    )?.[0] ?? null,
     status: ["ready", "needs_generation", "failed"].includes(status ?? "")
       ? status as "ready" | "needs_generation" | "failed"
       : "all"
