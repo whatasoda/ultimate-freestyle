@@ -175,7 +175,9 @@ const VISUAL_LABELS = {
   neon: "ネオン",
   "retro-game": "レトロゲーム",
   "soft-pop": "ソフトポップ",
-  scientific: "サイエンス"
+  scientific: "サイエンス",
+  museum: "ミュージアム",
+  terminal: "ターミナル"
 } as const;
 
 const FONT_LABELS = {
@@ -468,6 +470,8 @@ function shell(title: string, body: string): string {
       .visual-pick[data-visual-pick="retro-game"] { --visual-swatch: #171a20; --visual-accent: #ffd166; }
       .visual-pick[data-visual-pick="soft-pop"] { --visual-swatch: #f7edf5; --visual-accent: #e879b7; }
       .visual-pick[data-visual-pick="scientific"] { --visual-swatch: #edf4f5; --visual-accent: #1b7b91; }
+      .visual-pick[data-visual-pick="museum"] { --visual-swatch: #f4efe2; --visual-accent: #a57b34; }
+      .visual-pick[data-visual-pick="terminal"] { --visual-swatch: #07110b; --visual-accent: #54f58a; }
       .color-control { display: grid; grid-template-columns: 3.2rem minmax(0, 1fr); gap: .45rem; }
       .editor .color-control input[type="color"] { min-height: 2.9rem; padding: .25rem; cursor: pointer; }
       .editor .color-control input[data-color-text] { min-width: 0; font-family: "SFMono-Regular", Consolas, monospace; text-transform: lowercase; }

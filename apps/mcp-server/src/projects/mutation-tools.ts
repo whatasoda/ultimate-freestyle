@@ -229,6 +229,44 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     heading_font: "gothic",
     density: "compact",
     motion_style: "calm"
+  },
+  museum: {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 32,
+    background: "#f4efe2",
+    surface: "#18283d",
+    foreground: "#1b293c",
+    muted: "#f2e6ca",
+    accent: "#a57b34",
+    corner_radius_px: 2,
+    spacing_scale: 1.1,
+    font_scale: 1,
+    enter_animation: "fade",
+    reveal_animation: "rise",
+    visual_preset: "museum",
+    body_font: "mincho",
+    heading_font: "serif",
+    density: "spacious",
+    motion_style: "calm"
+  },
+  terminal: {
+    region_layout: "sidebar-right",
+    sidebar_width_percent: 34,
+    background: "#07110b",
+    surface: "#0c1e13",
+    foreground: "#d8ffe5",
+    muted: "#8bc99d",
+    accent: "#54f58a",
+    corner_radius_px: 4,
+    spacing_scale: 0.9,
+    font_scale: 0.92,
+    enter_animation: "slide-left",
+    reveal_animation: "wipe",
+    visual_preset: "terminal",
+    body_font: "monospace",
+    heading_font: "monospace",
+    density: "compact",
+    motion_style: "snappy"
   }
 };
 

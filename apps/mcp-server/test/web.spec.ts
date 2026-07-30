@@ -619,6 +619,10 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("data-workspace-duration");
     expect(workspaceHtml).toContain("実験ノート");
     expect(workspaceHtml).toContain("サイエンス");
+    expect(workspaceHtml).toContain("ミュージアム");
+    expect(workspaceHtml).toContain("ターミナル");
+    expect(workspaceHtml).toContain('data-visual-pick="museum"');
+    expect(workspaceHtml).toContain('data-visual-pick="terminal"');
     expect(workspaceHtml).toContain("強調見出し");
     expect(workspaceHtml).toContain("data-template-editor");
     expect(workspaceHtml).toContain("data-template-delete");

@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@80");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@81");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
     expect(html).not.toContain("target.scrollHeight - target.clientHeight");
     expect(html).toContain('"previewRevisionId":"50000000-0000-4000-8000-000000000005"');
@@ -957,7 +957,9 @@ describe("presentation artifact renderer", () => {
       "neon",
       "retro-game",
       "soft-pop",
-      "scientific"
+      "scientific",
+      "museum",
+      "terminal"
     ] as const;
     const fonts = [
       "system-sans",
@@ -1017,8 +1019,8 @@ describe("presentation artifact renderer", () => {
             enter_animation: index === 0 ? "slide-left" : "fade",
             reveal_animation: index === 1 ? "blur" : "pop",
             visual_preset: visual,
-            body_font: fonts[index],
-            heading_font: fonts[fonts.length - index - 1],
+            body_font: fonts[index % fonts.length],
+            heading_font: fonts[(fonts.length - index - 1 + fonts.length) % fonts.length],
             density: index % 2 === 0 ? "spacious" : "compact",
             motion_style: index % 2 === 0 ? "dramatic" : "calm"
           })),

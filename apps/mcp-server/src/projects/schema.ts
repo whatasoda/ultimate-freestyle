@@ -33,7 +33,9 @@ export const visualPresetSchema = z.enum([
   "neon",
   "retro-game",
   "soft-pop",
-  "scientific"
+  "scientific",
+  "museum",
+  "terminal"
 ]);
 
 export const fontPresetSchema = z.enum([
