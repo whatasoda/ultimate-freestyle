@@ -1196,3 +1196,9 @@
 - 一覧・詳細・音声・一枚編集の全HTMLへ約40 KiBの共通CSSを毎回埋め込んでいた。画面遷移のたびに同一内容を転送し、`no-store`のHTMLと一緒に捨てるため、version付きscriptだけをcacheしても再訪負荷が残っていた。
 - 共通CSSを`/assets/dashboard.css`へ分離し、HTMLは単一定数の`v132`を付けて参照する。現在versionとの完全一致だけ一年間immutable、versionなし・古いversionは再検証とし、CSPは同一originのstylesheetを許可した。
 - CSSは専用定数から直接配信してHTML生成時の文字列抽出を避ける。HTMLにinline style blockが残らないこと、主要responsive規則、CSP、30 KiB超の実体、version付き・なし双方のcache契約をWebテストで固定した。
+
+## 改善ループ336
+
+- 長い研究詳細・音声仕上げ・一枚編集でも、キーボード利用者はページ遷移のたびにブランド、アカウント、ログアウトを順に通過しないと本文操作へ着けなかった。
+- 全Web画面の先頭へ「本文へ移動」を追加し、Tabでフォーカスした時だけ高コントラストで表示する。各画面の`main`を一意なfragment targetかつプログラム的なフォーカス対象に揃えた。
+- 共通CSSを変更したためdashboard assetを`v133`へ更新し、研究詳細のリンク・本文targetと、外部CSSに含まれるfocus表示規則をWeb契約テストへ追加した。

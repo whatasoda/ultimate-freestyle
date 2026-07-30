@@ -307,6 +307,8 @@ const DASHBOARD_STYLE = String.raw`
       .lead { max-width: 42rem; margin: 1.5rem 0 0; color: #bdc9d8; font-size: clamp(1rem, 2vw, 1.2rem); line-height: 1.8; }
       .button, button { display: inline-flex; align-items: center; justify-content: center; min-height: 2.8rem; padding: .7rem 1rem; border: 0; border-radius: .7rem; background: var(--accent); color: white; font: inherit; font-weight: 780; text-decoration: none; cursor: pointer; }
       :where(a, button, input, textarea, select, summary):focus-visible { outline: .2rem solid #91ddff; outline-offset: .18rem; }
+      .skip-link { position: fixed; z-index: 1000; top: .65rem; left: .65rem; translate: 0 calc(-100% - 1rem); padding: .7rem 1rem; border-radius: .65rem; background: #f8fafc; color: #090f18; font-weight: 850; text-decoration: none; transition: translate .15s ease; }
+      .skip-link:focus { translate: 0; }
       .button.primary { margin-top: 1.7rem; padding: .9rem 1.25rem; }
       .ghost { border: 1px solid var(--line); background: #152131; color: #d6dfeb; }
       .section-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1.25rem; }
@@ -779,7 +781,7 @@ function shell(title: string, body: string): string {
     <title>${escapeHtml(title)}</title>
     <link rel="stylesheet" href="/assets/dashboard.css?v=${DASHBOARD_ASSET_VERSION}">
   </head>
-  <body>${body}</body>
+  <body><a class="skip-link" href="#main-content">本文へ移動</a>${body}</body>
 </html>`;
 }
 
@@ -1166,7 +1168,7 @@ export function landingPage(options: {
     shell(
       "最自由研究",
       `<header class="site-header"><a class="brand" href="/">最自由研究</a></header>
-       <main><section class="hero">
+       <main id="main-content" tabindex="-1"><section class="hero">
          <div class="hero-copy"><p class="eyebrow">Ultimate freestyle research</p>
          <h1>気になったことを、<span class="keep-word">研究にする。</span></h1>
          <p class="lead">AIとの対話で自由研究を育て、発表用のWebスライドまで一つの場所で管理します。Twitchで本人確認すると、自分の研究一覧を確認できます。</p>
@@ -1255,7 +1257,7 @@ export function dashboardPage(options: {
     shell(
       "自分の研究 — 最自由研究",
       `${accountHeader(options.twitchLogin, options.csrfToken)}
-       <main>
+       <main id="main-content" tabindex="-1">
          <div class="section-head"><div><p class="eyebrow">My research</p><h1>自分の研究</h1></div><span class="count">${options.projects.length} / 20 件</span></div>
          ${content}
          ${connectionGuide}
@@ -1343,7 +1345,7 @@ export function draftRevisionPage(options: {
     shell(
       `v${options.revision.version}を確認 — ${selected.title}`,
       `${accountHeader(options.twitchLogin, options.csrfToken)}
-       <main><a class="back" href="/dashboard/projects/${escapeHtml(options.current.project_id)}">← 研究詳細へ戻る</a>
+       <main id="main-content" tabindex="-1"><a class="back" href="/dashboard/projects/${escapeHtml(options.current.project_id)}">← 研究詳細へ戻る</a>
          <div class="section-head"><div><p class="eyebrow">Draft revision</p><h1>v${options.revision.version}を復元前に確認</h1></div><span class="stage">${sourceLabel}</span></div>
          <div class="detail-grid"><div class="detail-column">
            <section class="panel"><h2>${escapeHtml(selected.title)}</h2><p class="meta">${escapeHtml(new Date(options.revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(STAGE_LABELS[selected.stage])} · ${selectedSlides.length}枚 · ${formatDuration(selectedDuration)}</p></section>
@@ -1824,7 +1826,7 @@ export function projectDetailPage(options: {
     shell(
       `${document.title} — 最自由研究`,
       `${accountHeader(options.twitchLogin, options.csrfToken)}
-       <main>
+       <main id="main-content" tabindex="-1">
          <a class="back" href="/dashboard">← 自分の研究へ戻る</a>
          <div class="card-top"><span class="stage">${STAGE_LABELS[document.stage]}</span><span class="version">v${options.project.version}</span></div>
          <h1 class="detail-title">${escapeHtml(document.title)}</h1>
@@ -2075,7 +2077,7 @@ export function voiceFinishPage(options: {
     shell(
       `音声を仕上げる — ${options.project.document.title}`,
       `${accountHeader(options.twitchLogin, options.csrfToken)}
-         <main class="voice-main" data-voice-page data-project-id="${projectId}" data-version="${options.voice.version}" data-voice-configured="${String(options.voice.configured)}" data-voice-ready="${summary.ready}" data-csrf="${escapeHtml(options.csrfToken)}" data-summary-url="/api/projects/${projectId}/voice" data-default-tuning="${escapeHtml(JSON.stringify(DEFAULT_VOICEVOX_TUNING))}">
+         <main id="main-content" tabindex="-1" class="voice-main" data-voice-page data-project-id="${projectId}" data-version="${options.voice.version}" data-voice-configured="${String(options.voice.configured)}" data-voice-ready="${summary.ready}" data-csrf="${escapeHtml(options.csrfToken)}" data-summary-url="/api/projects/${projectId}/voice" data-default-tuning="${escapeHtml(JSON.stringify(DEFAULT_VOICEVOX_TUNING))}">
          <a class="back" href="/dashboard/projects/${projectId}">← 研究詳細へ戻る</a>
          <section class="voice-hero"><div><p class="eyebrow">Voice finishing</p><h1>音声を仕上げる</h1><p class="lead">VOICEVOXの話者とスタイルを選び、不足している読み上げ音声を生成して、区間ごとに確認できます。</p></div><a class="button ghost" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ</a></section>
          <div class="voice-flow">
@@ -2542,7 +2544,7 @@ export function slideWorkspacePage(options: {
     shell(
       `${slide.title} — スライド編集`,
       `${accountHeader(options.twitchLogin, options.csrfToken)}
-       <main class="workspace-main">
+       <main id="main-content" tabindex="-1" class="workspace-main">
          <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
          <div class="workspace-head"><div><p class="eyebrow">スライド編集 · ${slideIndex + 1} / ${deck.slides.length}</p><h1 data-current-slide-title>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a><div class="slide-actions" role="group" aria-label="スライド構成の操作"><button class="ghost" type="button" data-slide-action="move" data-position="${Math.max(0, slideIndex - 1)}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-slide-action="move" data-position="${slideIndex + 1}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === deck.slides.length - 1 ? " disabled" : ""}>↓ 後へ</button><button class="ghost" type="button" data-slide-action="duplicate" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}">複製</button><button class="ghost danger" type="button" data-slide-action="delete" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${deck.slides.length === 1 ? " disabled" : ""}>削除</button></div><span class="feedback" data-slide-action-feedback aria-live="polite"></span></div></div>
          ${effectiveSummary}
@@ -2592,7 +2594,7 @@ export function projectNotFoundPage(): Response {
   return new Response(
     shell(
       "研究が見つかりません — 最自由研究",
-      `<main><section class="panel notice"><p class="eyebrow">Not found</p><h1 class="detail-title">研究が見つかりません</h1><p class="lead">削除されたか、このアカウントでは表示できない研究です。</p><a class="button primary" href="/dashboard">自分の研究へ戻る</a></section></main>`
+      `<main id="main-content" tabindex="-1"><section class="panel notice"><p class="eyebrow">Not found</p><h1 class="detail-title">研究が見つかりません</h1><p class="lead">削除されたか、このアカウントでは表示できない研究です。</p><a class="button primary" href="/dashboard">自分の研究へ戻る</a></section></main>`
     ),
     { status: 404, headers: headers() }
   );
