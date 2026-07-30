@@ -9,6 +9,7 @@ import {
 import { z } from "zod";
 
 import { twitchGrantPropsSchema } from "../auth/types";
+import { getPublicationStatus } from "../publications/service";
 import { getProject, listProjectDraftRevisions } from "./repository";
 import { RUBRIC_MARKDOWN } from "./rubric";
 
@@ -331,6 +332,73 @@ export function registerResearchGuides(
             text: JSON.stringify(body)
           }
         ]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-publication",
+    new ResourceTemplate("research://projects/{id}/publication", {
+      list: undefined
+    }),
+    {
+      title: "研究発表の公開状態",
+      description:
+        "固定プレビュー、確認、公開中版と再確認要否を小さく取得します。公開操作はWeb UIで行います。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const status =
+        !("error" in auth) && typeof id === "string"
+          ? await getPublicationStatus(db, auth.ownerUserId, id)
+          : null;
+      const latest = status?.latest_preview ?? null;
+      const previewCurrent = status !== null && latest !== null &&
+        latest.project_version === status.draft_version &&
+        latest.renderer_version === status.current_renderer_version;
+      const body =
+        "error" in auth
+          ? { ok: false, error: { code: auth.error } }
+          : status === null
+            ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+            : {
+                ok: true,
+                project_id: status.project_id,
+                draft_version: status.draft_version,
+                current_renderer_version: status.current_renderer_version,
+                slug: status.slug,
+                latest_preview: latest === null ? null : {
+                  revision_id: latest.revision_id,
+                  project_version: latest.project_version,
+                  renderer_version: latest.renderer_version,
+                  created_at: latest.created_at,
+                  reviewed_at: latest.reviewed_at
+                },
+                published: status.published === null ? null : {
+                  revision_id: status.published.revision_id,
+                  project_version: status.published.project_version,
+                  renderer_version: status.published.renderer_version,
+                  published_at: status.published.published_at
+                },
+                readiness: {
+                  needs_preview: !previewCurrent,
+                  needs_review: previewCurrent && latest.reviewed_at === null,
+                  can_publish: previewCurrent && latest.reviewed_at !== null,
+                  published_current:
+                    status.published !== null &&
+                    status.published.project_version === status.draft_version &&
+                    status.published.renderer_version === status.current_renderer_version
+                },
+                recent_events: status.events.slice(0, 5)
+              };
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(body)
+        }]
       };
     }
   );

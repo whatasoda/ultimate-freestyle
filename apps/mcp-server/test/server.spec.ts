@@ -154,7 +154,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.14.0",
-        renderer_version: "uf-renderer@89",
+        renderer_version: "uf-renderer@90",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -506,6 +506,9 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/revisions"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/publication"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/slides/{slideId}"
           }),
           expect.objectContaining({
@@ -526,6 +529,24 @@ describe("MCP contract", () => {
           text: expect.stringContaining(updatedQuestion)
         })
       );
+      const publicationResource = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/publication`
+      );
+      expect(publicationResource).toMatchObject({
+        ok: true,
+        project_id: firstProject.project_id,
+        slug: null,
+        latest_preview: null,
+        published: null,
+        readiness: {
+          needs_preview: true,
+          needs_review: false,
+          can_publish: false,
+          published_current: false
+        },
+        recent_events: []
+      });
 
       const { prompts } = await client.listPrompts();
       expect(prompts.map((prompt) => prompt.name)).toEqual(

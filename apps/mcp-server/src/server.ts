@@ -58,7 +58,7 @@ export function createServer(
     },
     {
       instructions:
-        "最自由研究の制作を支援するサーバーです。接続直後はhealth、get_access_status、list_projectsの順に呼んでください。既存研究を扱う場合は一覧のproject_idでget_project_outlineを呼び、全体はresearch://projects/{id}、一枚はresearch://projects/{id}/slides/{slideId}から必要な範囲だけ読みます。一覧が空ならテーマを推測で決めず、start_research promptに沿って一問ずつ対話し、題名と目的が合意できてからcreate_projectを呼んでください。変更は目的に合う小粒度toolへ現在のexpected_versionを渡してください。リッチな発表はresearch://guide/presentation-componentsを読んでscene componentを一件ずつ構成してください。競合時は該当範囲を再取得し、ユーザーの変更を失わないでください。読み上げ編集後はget_voice_generation_statusで差分を確認し、ユーザーの合意後にgenerate_voice_audioを呼んでください。画像binaryの追加、実表示の確認、固定preview、公開はWeb UIを案内します。"
+        "最自由研究の制作を支援するサーバーです。接続直後はhealth、get_access_status、list_projectsの順に呼んでください。既存研究を扱う場合は一覧のproject_idでget_project_outlineを呼び、全体はresearch://projects/{id}、一枚はresearch://projects/{id}/slides/{slideId}から必要な範囲だけ読みます。一覧が空ならテーマを推測で決めず、start_research promptに沿って一問ずつ対話し、題名と目的が合意できてからcreate_projectを呼んでください。変更は目的に合う小粒度toolへ現在のexpected_versionを渡してください。リッチな発表はresearch://guide/presentation-componentsを読んでscene componentを一件ずつ構成してください。競合時は該当範囲を再取得し、ユーザーの変更を失わないでください。読み上げ編集後はget_voice_generation_statusで差分を確認し、ユーザーの合意後にgenerate_voice_audioを呼んでください。公開前後の状態はresearch://projects/{id}/publicationで確認し、画像binaryの追加、実表示の確認、固定preview、公開操作はWeb UIを案内します。"
     }
   );
 
@@ -199,6 +199,7 @@ export function createServer(
             "## 読み取りと変更",
             "",
             "- 研究全体は`research://projects/{id}`、一枚だけなら`research://projects/{id}/slides/{slideId}`を読む。",
+            "- 公開準備と公開中版は`research://projects/{id}/publication`で確認し、固定previewの生成・確認・公開操作はWeb UIで行う。",
             "- 変更前に得たversionを`expected_version`へ渡し、成功時に返るversionを次の変更へ引き継ぐ。",
             "- 研究全体やdeck全体を送り直さず、目的別の小粒度toolで一項目・一componentずつ変更する。",
             "- version競合時は対象resourceを読み直し、本人または別画面の変更を上書きしない。",
