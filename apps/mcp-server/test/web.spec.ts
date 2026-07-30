@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=88"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=89"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -732,6 +732,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('["x", "y", "width", "height"]');
     expect(dashboardScriptText).toContain("ultimate-freestyle:set-editor-options");
     expect(dashboardScriptText).toContain("ultimate-freestyle:grid-snap");
+    expect(dashboardScriptText).toContain("data-component-frame-reset");
+    expect(dashboardScriptText).toContain("form.dataset.component = JSON.stringify");
     expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain("data-scene-component-create");
     expect(dashboardScriptText).toContain("data-scene-item-action");

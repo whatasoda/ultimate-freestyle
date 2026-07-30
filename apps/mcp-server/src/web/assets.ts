@@ -883,6 +883,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         form.dataset.dirty = "false";
         removeDraft();
         syncPageVersion(result.version);
+        if (form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) {
+          form.dataset.component = JSON.stringify(sceneComponentFromForm(form));
+        }
         if (form.matches("[data-template-create], [data-narration-segment-create], [data-canvas-block-create], [data-scene-component-create]")) {
           location.reload();
           return;
@@ -1179,6 +1182,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         frameFields.forEach((field, index) => { field.value = String(values[index]); });
         validateFrame();
         frameFields.at(-1)?.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+    const frameReset = form.querySelector("[data-component-frame-reset]");
+    if (frameReset instanceof HTMLButtonElement && frameToggle instanceof HTMLInputElement) {
+      frameReset.addEventListener("click", () => {
+        let original = null;
+        try { original = JSON.parse(form.dataset.component || "{}").frame ?? null; } catch {}
+        frameToggle.checked = original !== null;
+        syncFrameControls();
+        if (original !== null) {
+          for (const field of frameFields) {
+            const axis = (field.dataset.componentPath || "").split(".").at(-1);
+            if (axis && Number.isFinite(original[axis])) field.value = String(original[axis]);
+          }
+        }
+        frameToggle.dispatchEvent(new Event("input", { bubbles: true }));
+        validateFrame();
       });
     }
     const styleReset = form.querySelector("[data-component-style-reset]");

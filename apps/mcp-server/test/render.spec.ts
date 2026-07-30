@@ -753,6 +753,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('data-component-frame-toggle');
     expect(workspaceHtml).toContain('data-component-path="frame.x"');
     expect(workspaceHtml).toContain('data-component-frame-preset="5,10,43,80"');
+    expect(workspaceHtml).toContain("data-component-frame-reset");
+    expect(workspaceHtml).toContain("保存時の配置に戻す");
     expect(workspaceHtml).toContain('data-component-path="style.foreground"');
     expect(workspaceHtml).toContain('data-component-color-preview="style.background"');
     expect(workspaceHtml).toContain('data-component-path="animation"');
