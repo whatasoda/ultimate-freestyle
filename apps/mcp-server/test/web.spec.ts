@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=94"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=95"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -680,6 +680,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("qualitySummary.dataset.baseCount");
     expect(dashboardScriptText).toContain("Array.isArray(data.fits)");
     expect(dashboardScriptText).toContain("70%未満まで縮小");
+    expect(dashboardScriptText).toContain("小さすぎる文字");
     expect(dashboardScriptText).toContain("syncPageVersion(result.version)");
     expect(dashboardScriptText).toContain('addEventListener("beforeunload"');
     expect(dashboardScriptText).toContain("ultimate-freestyle:form-draft:");

@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@69";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@70";
 
 function escapeHtml(value: string): string {
   return value
@@ -1406,6 +1406,23 @@ export function renderPresentationHtml(
       }
       return lowest;
     };
+    const collectSmallText = (target, slideElement) => {
+      const slideWidth = slideElement.clientWidth;
+      if (slideWidth <= 0) return null;
+      const candidates = [target, ...target.querySelectorAll('*')].filter((item) => {
+        if (!(item instanceof HTMLElement) || item.hidden || item.offsetParent === null) return false;
+        return [...item.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+      });
+      let smallest = null;
+      for (const candidate of candidates) {
+        const rendered = Number.parseFloat(getComputedStyle(candidate).fontSize);
+        if (!Number.isFinite(rendered) || rendered <= 0) continue;
+        const normalized = rendered * 1920 / slideWidth;
+        if (normalized >= 18 || (smallest && smallest.font_size_px <= normalized)) continue;
+        smallest = { font_size_px: normalized, recommended_px: 18 };
+      }
+      return smallest;
+    };
     const collectNarrationClamp = (slideElement) => {
       const region = slideElement.querySelector('.narration[data-active="true"]:not([data-display="inline"])');
       const text = region?.querySelector('.narration-text');
@@ -1431,6 +1448,7 @@ export function renderPresentationHtml(
       const fits = [];
       const contrasts = [];
       const clamps = [];
+      const readability = [];
       currentSlide.querySelectorAll('[data-fit-content]').forEach((target) => {
         if (!(target instanceof HTMLElement) || target.hidden || target.offsetParent === null) return;
         target.style.setProperty('--fit-scale', '1');
@@ -1449,10 +1467,12 @@ export function renderPresentationHtml(
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
         const contrast = collectContrast(target, currentSlide);
         if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground });
+        const smallText = collectSmallText(target, currentSlide);
+        if (smallText) readability.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px });
       });
       const narrationClamp = collectNarrationClamp(currentSlide);
       if (narrationClamp) clamps.push(narrationClamp);
-      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps }, location.origin);
+      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps, readability }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
     const appendDraftInline = (target, text) => {
