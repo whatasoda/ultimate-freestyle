@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=71"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=72"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -716,6 +716,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("左位置と幅の合計を100%以内にしてください");
     expect(dashboardScriptText).toContain("スライド枠を越えています");
     expect(dashboardScriptText).toContain("data-component-frame-preset");
+    expect(dashboardScriptText).toContain("data-component-style-reset");
+    expect(dashboardScriptText).toContain("delete owner[key]");
     expect(dashboardScriptText).toContain("changingConfiguredVoice");
     expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
 
@@ -1755,12 +1757,14 @@ describe("Web dashboard", () => {
     const positionedDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
-    expect(JSON.parse(positionedDocument!.document_json).deck.slides[0].composition.nodes[0].frame).toEqual({
+    const positionedNode = JSON.parse(positionedDocument!.document_json).deck.slides[0].composition.nodes[0];
+    expect(positionedNode.frame).toEqual({
       x: 8,
       y: 12,
       width: 84,
       height: 72
     });
+    expect(positionedNode.style).toBeUndefined();
 
     const unsupportedUpload = await requestProvider(
       provider,

@@ -716,6 +716,9 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('data-save-state data-state="saved"');
     expect(workspaceHtml).toContain("この表示パーツを保存");
     expect(workspaceHtml).toContain("パーツの見た目");
+    expect(workspaceHtml).toContain("見た目をすべて継承へ戻す");
+    expect(workspaceHtml).toContain('data-component-optional="true"');
+    expect(workspaceHtml).toContain("継承（左）");
     expect(workspaceHtml).toContain("親の自動配置から外し、位置と大きさを指定する");
     expect(workspaceHtml).toContain('data-component-frame-toggle');
     expect(workspaceHtml).toContain('data-component-path="frame.x"');

@@ -678,6 +678,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (!owner || typeof owner !== "object") continue;
       const key = path.at(-1);
       if (key === undefined) continue;
+      if (field.dataset.componentOptional === "true" && field.value.trim() === "") {
+        delete owner[key];
+        continue;
+      }
       owner[key] = field instanceof HTMLInputElement && field.type === "checkbox"
         ? field.checked
         : field.dataset.componentNumber === "true"
@@ -1004,6 +1008,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         frameFields.forEach((field, index) => { field.value = String(values[index]); });
         validateFrame();
         frameFields.at(-1)?.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
+    const styleReset = form.querySelector("[data-component-style-reset]");
+    if (styleReset instanceof HTMLButtonElement) {
+      styleReset.addEventListener("click", () => {
+        const fields = [...form.querySelectorAll("[data-component-style-field]")].filter((field) => field instanceof HTMLInputElement || field instanceof HTMLSelectElement);
+        for (const field of fields) field.value = "";
+        fields.at(-1)?.dispatchEvent(new Event("input", { bubbles: true }));
       });
     }
     syncFrameControls();
