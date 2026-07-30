@@ -238,7 +238,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=79";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=80";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1749,7 +1749,7 @@ export function slideWorkspacePage(options: {
           const kindControls = sceneComponentKindControls(node, options.assets ?? []);
           const appearanceControls = sceneComponentAppearanceControls(node, slide.reveal_steps);
           const assetUrls = Object.fromEntries((options.assets ?? []).map((asset) => [asset.asset_id, asset.content_url]));
-          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-asset-urls="${escapeHtml(JSON.stringify(assetUrls))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-asset-urls="${escapeHtml(JSON.stringify(assetUrls))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><button class="ghost" type="button" data-scene-component-action="duplicate" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">複製</button><button class="ghost danger" type="button" data-scene-component-action="delete" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
         .join("")
     : "";

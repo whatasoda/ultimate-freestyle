@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=79"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=80"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -726,6 +726,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("button.dataset.effectiveTuning");
     expect(dashboardScriptText).toContain("workspace-inspector");
     expect(dashboardScriptText).toContain("data-scene-component-editor");
+    expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain("updateContentStructure");
     expect(dashboardScriptText).toContain("spokenCharacters / 6");
     expect(dashboardScriptText).toContain("data-component-field");
@@ -1880,6 +1881,34 @@ describe("Web dashboard", () => {
       height: 72
     });
     expect(positionedNode.style).toBeUndefined();
+    const duplicateSceneComponent = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components/web-note/actions",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 22, action: "duplicate" })
+        }
+      ),
+      authEnv
+    );
+    expect(duplicateSceneComponent.status).toBe(200);
+    expect(await duplicateSceneComponent.json()).toMatchObject({ ok: true, version: 23, result_component_id: "web-note-copy" });
+    const deleteSceneComponent = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components/web-note-copy/actions",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 23, action: "delete" })
+        }
+      ),
+      authEnv
+    );
+    expect(deleteSceneComponent.status).toBe(200);
+    expect(await deleteSceneComponent.json()).toMatchObject({ ok: true, version: 24, result_component_id: null });
     const updateComposition = await requestProvider(
       provider,
       new Request(
@@ -1892,7 +1921,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 22,
+            expected_version: 24,
             composition_background: "#223344",
             composition_clip_content: false
           })
@@ -1901,7 +1930,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(updateComposition.status).toBe(200);
-    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 23 });
+    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 25 });
     const recoloredDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();

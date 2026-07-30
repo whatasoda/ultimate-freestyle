@@ -179,6 +179,10 @@ const sceneComponentRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   component: slideSceneNodeSchema
 });
+const sceneComponentActionRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  action: z.enum(["duplicate", "delete"])
+});
 const canvasBlockRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   block: slideBlockSchema
@@ -1678,6 +1682,89 @@ async function handleCanvasBlockUpdate(
   }
 }
 
+async function handleSceneComponentAction(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string,
+  componentId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = sceneComponentActionRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "表示パーツの操作内容を確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  let resultComponentId: string | null = null;
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "scene") {
+          const error = new Error("The slide does not use a component scene.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        const index = slide.composition.nodes.findIndex((node) => node.id === componentId);
+        const component = slide.composition.nodes[index];
+        if (component === undefined) {
+          const error = new Error("The component does not exist.");
+          Object.assign(error, { code: "COMPONENT_NOT_FOUND" });
+          throw error;
+        }
+        if (parsed.data.action === "delete") {
+          if (slide.composition.nodes.some((node) => node.parent_id === componentId)) {
+            const error = new Error("The component still has children.");
+            Object.assign(error, { code: "COMPONENT_HAS_CHILDREN" });
+            throw error;
+          }
+          slide.composition.nodes.splice(index, 1);
+          return;
+        }
+        const used = new Set(slide.composition.nodes.map((node) => node.id));
+        const base = `${component.id.slice(0, 48)}-copy`;
+        let candidate = base;
+        for (let suffix = 2; used.has(candidate); suffix += 1) candidate = `${base.slice(0, 58)}-${suffix}`;
+        const copy = structuredClone(component);
+        copy.id = candidate;
+        const siblings = slide.composition.nodes.filter((node) => node.parent_id === component.parent_id);
+        copy.order = Math.min(999, Math.max(-1, ...siblings.map((node) => node.order)) + 1);
+        if (copy.frame) {
+          copy.frame.x = Math.min(100 - copy.frame.width, copy.frame.x + 3);
+          copy.frame.y = Math.min(100 - copy.frame.height, copy.frame.y + 3);
+        }
+        slide.composition.nodes.splice(index + 1, 0, copy);
+        resultComponentId = candidate;
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: `project.slide_component_${parsed.data.action}d`,
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, component_id: componentId, result_component_id: resultComponentId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, component_id: componentId, result_component_id: resultComponentId, action: parsed.data.action, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "表示パーツを操作できませんでした。");
+  }
+}
+
 async function handleCanvasBlockCreate(
   request: Request,
   env: Env,
@@ -1860,6 +1947,7 @@ function projectMutationErrorResponse(
     INVALID_NARRATION_STEP: "表示段階の範囲内からSTEPを選んでください。",
     VOICE_PROFILE_NOT_FOUND: "VOICEVOX profileが見つかりません。",
     COMPONENT_NOT_FOUND: "componentが見つかりません。",
+    COMPONENT_HAS_CHILDREN: "子パーツを先に削除または別の親へ移動してください。",
     BLOCK_NOT_FOUND: "表示パーツが見つかりません。",
     INVALID_COMPOSITION_MODE: "このスライドの構成形式では操作できません。",
     INVALID_FIELDS: "入力内容を確認してください。",
@@ -1880,6 +1968,7 @@ function projectMutationErrorResponse(
           code === "TEMPLATE_EXISTS" ||
           code === "DECK_REQUIRED" ||
           code === "INVALID_COMPOSITION_MODE" ||
+          code === "COMPONENT_HAS_CHILDREN" ||
           code === "NARRATION_SEGMENT_EXISTS" ||
           code === "LAST_SLIDE_REQUIRED"
         ? 409
@@ -3233,6 +3322,22 @@ export async function handleWebRequest(
       canvasBlockMatch[1],
       canvasBlockMatch[2],
       canvasBlockMatch[3]
+    );
+  }
+  const sceneComponentActionMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/components/([a-z0-9][a-z0-9-]{0,63})/actions$`)
+  );
+  if (
+    sceneComponentActionMatch?.[1] !== undefined &&
+    sceneComponentActionMatch[2] !== undefined &&
+    sceneComponentActionMatch[3] !== undefined
+  ) {
+    return handleSceneComponentAction(
+      request,
+      env,
+      sceneComponentActionMatch[1],
+      sceneComponentActionMatch[2],
+      sceneComponentActionMatch[3]
     );
   }
   const sceneComponentMatch = path.match(

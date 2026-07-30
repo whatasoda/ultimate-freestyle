@@ -723,6 +723,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('data-component-id="headline"');
     expect(workspaceHtml).toContain('data-save-state data-state="saved"');
     expect(workspaceHtml).toContain("この表示パーツを保存");
+    expect(workspaceHtml).toContain('data-scene-component-action="duplicate"');
+    expect(workspaceHtml).toContain('data-scene-component-action="delete"');
     expect(workspaceHtml).toContain("パーツの見た目");
     expect(workspaceHtml).toContain("見た目をすべて継承へ戻す");
     expect(workspaceHtml).toContain('data-component-optional="true"');
