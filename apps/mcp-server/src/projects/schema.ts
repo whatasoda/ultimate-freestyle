@@ -132,14 +132,14 @@ export const narrationAppearanceSchema = z.object({
   corner_radius_px: z.number().int().min(0).max(64).optional()
 });
 
-const slideBlockFrameSchema = z.object({
+export const slideBlockFrameSchema = z.object({
   x: percentSchema,
   y: percentSchema,
   width: z.number().positive().max(100).multipleOf(0.01),
   height: z.number().positive().max(100).multipleOf(0.01)
 });
 
-const slideBlockStyleSchema = z.object({
+export const slideBlockStyleSchema = z.object({
   background: hexColorSchema.nullable().optional(),
   foreground: hexColorSchema.nullable().optional(),
   border_color: hexColorSchema.nullable().optional(),

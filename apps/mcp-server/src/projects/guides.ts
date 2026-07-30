@@ -33,6 +33,7 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 - info: \`card\`、\`metric\`、\`callout\` → \`upsert_slide_info_component\`
 - data: \`bar_chart\`、\`timeline\` → \`upsert_slide_data_component\`
 - media: project内の \`image\`、\`shape\` → \`upsert_slide_media_component\`
+- 配置・見た目の調整: \`update_slide_component\`。本文を再送せず、\`layout\`で親、順番、step、animation、frameを、\`style\`で指定した見た目だけを部分更新する。
 - 削除: \`delete_slide_component\`。指定componentと子孫をまとめて削除する。
 
 ## 構成例
@@ -55,7 +56,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 
 ## 発表枠・表紙・0ページ目
 
-- \`configure_presentation_stage\` で発表全体の \`16:9\`／\`4:3\`と、開始前の0ページ目だけを部分更新する。
+- \`configure_deck\` で発表全体の \`16:9\`／\`4:3\`と、開始前の0ページ目だけを部分更新する。
 - 0ページ目は画像、生成音声、利用可能なfontをpreloadし、開始クリック後に経過時間と初回読み上げを始める。slide数と進捗には含めない。
 - 表紙相当の一枚は \`update_slide_fields\` で \`role: "cover"\` とし、中央の\`center\`、左右分割の\`split\`、写真向けの\`poster\`、余白重視の\`minimal\`、一言強調の\`statement\`、中央帯の\`band\`、左下配置の\`corner\`、額縁の\`frame\`から \`cover_layout\` を選ぶ。sceneやcanvasがある場合は、その自由構成を優先する。
 
@@ -68,7 +69,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 
 ## 読み上げ表示
 
-- 発表全体の既定値は \`configure_deck_narration\`、一枚の表示方式と枠は \`configure_slide_narration\` で設定する。
+- 発表全体の既定値は \`configure_deck\` の \`narration\`、一枚の表示方式と枠は \`configure_slide_narration\` で設定する。
 - displayはADV枠の \`dialogue\`、実況風の \`commentary\`、全文追従の \`inline\`、映像字幕の \`subtitle\`、最小表示の \`minimal\`。
 - 枠は配置、寸法、文字揃え、話者表示、進捗表示、文字倍率、最大行数だけを安全なtokenで調整する。
 - 読み上げ本文は \`set_slide_narration\`、segmentの話者・VOICEVOX profile・調声値は \`update_slide_narration_voice\` で別々に更新する。

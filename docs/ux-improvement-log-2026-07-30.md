@@ -312,3 +312,12 @@
 - 公開API側でも確認済みかを検証し、画面を迂回した未確認プレビューの公開をPREVIEW_NOT_REVIEWEDで拒否するようにした。
 - 確認操作を監査ログへ記録し、公開前チェックの固定プレビュー項目も確認済みになった時点で完了とするようにした。
 - dashboard scriptをv94へ更新した。
+
+## 改善ループ196
+
+- MCPでscene componentの位置や色を少し変えるだけでも本文を含むcomponent全体が必要だったため、配置と見た目の部分更新toolを追加した。
+- `update_slide_component`の`layout`は親、順番、表示step、animation、frameのうち指定項目だけを変更し、変更後もscene全体の親子・frame制約を共通schemaで検証する。
+- 同じtoolの`style`は既存styleへ指定項目だけをマージし、必要な場合だけ`replace_style`で未指定項目を消去できるようにした。
+- どちらもcomponent IDと現在versionだけで対象を特定し、成功時のversion、変更種別、request IDを既存toolと同じ形式で返す。
+- componentガイドと設計正本へ、作成後の微調整では部分更新toolを使う方針を追記した。
+- MCPクライアントへ公開するtool数を増やさないため、配置と見た目を一つの部分更新toolへまとめ、発表比率、0ページ目、発表全体の読み上げ既定値は既存`configure_deck`へ統合した。

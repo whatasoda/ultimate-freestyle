@@ -62,10 +62,10 @@ describe("MCP contract", () => {
           "upsert_slide_info_component",
           "upsert_slide_data_component",
           "upsert_slide_media_component",
+          "update_slide_component",
           "delete_slide_component",
           "update_project_fields",
           "configure_deck",
-          "configure_deck_narration",
           "create_presentation_template",
           "update_presentation_template_fields",
           "create_slide",
@@ -204,7 +204,7 @@ describe("MCP contract", () => {
       expect(styleGuide.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "text/markdown",
-          text: expect.stringContaining("configure_presentation_stage")
+          text: expect.stringContaining("configure_deck")
         })
       );
     } finally {
@@ -759,6 +759,58 @@ describe("MCP contract", () => {
           }
         }
       });
+      const componentLayout = await client.callTool({
+        name: "update_slide_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 14,
+          slide_id: "question",
+          component_id: "trial-count",
+          layout: { order: 3, at: 2, animation: "pop" }
+        }
+      });
+      expect(componentLayout.structuredContent).toMatchObject({
+        ok: true,
+        version: 15,
+        changed: { kind: "slide_component_updated" }
+      });
+      const componentStyle = await client.callTool({
+        name: "update_slide_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 15,
+          slide_id: "question",
+          component_id: "trial-count",
+          style: { background: "#102030", font_scale: 1.25 }
+        }
+      });
+      expect(componentStyle.structuredContent).toMatchObject({
+        ok: true,
+        version: 16,
+        changed: { kind: "slide_component_updated" }
+      });
+      const adjustedSceneSlide = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question`
+      );
+      expect(adjustedSceneSlide).toMatchObject({
+        ok: true,
+        version: 16,
+        slide: {
+          reveal_steps: 2,
+          composition: {
+            nodes: expect.arrayContaining([
+              expect.objectContaining({
+                id: "trial-count",
+                order: 3,
+                at: 2,
+                animation: "pop",
+                style: { background: "#102030", font_scale: 1.25 }
+              })
+            ])
+          }
+        }
+      });
 
       const otherSubjectId = "twitch-other-project-owner";
       await env.DB.prepare(
@@ -885,17 +937,19 @@ describe("MCP contract", () => {
         }
       });
       await client.callTool({
-        name: "configure_deck_narration",
+        name: "configure_deck",
         arguments: {
           project_id: projectId,
           expected_version: 4,
-          display: "subtitle",
-          speaker: "案内役",
-          appearance: {
-            placement: "overlay-bottom",
-            size: "compact",
-            progress_visible: true,
-            max_lines: 3
+          narration: {
+            display: "subtitle",
+            speaker: "案内役",
+            appearance: {
+              placement: "overlay-bottom",
+              size: "compact",
+              progress_visible: true,
+              max_lines: 3
+            }
           }
         }
       });
@@ -977,7 +1031,7 @@ describe("MCP contract", () => {
       });
 
       await client.callTool({
-        name: "configure_presentation_stage",
+        name: "configure_deck",
         arguments: {
           project_id: projectId,
           expected_version: 11,

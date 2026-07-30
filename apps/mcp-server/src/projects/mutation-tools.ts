@@ -19,6 +19,8 @@ import {
   projectSlideSchema,
   projectStageSchema,
   researchLogEntrySchema,
+  slideBlockFrameSchema,
+  slideBlockStyleSchema,
   slideBlockSchema,
   slideRoleSchema,
   slideTypographyPresetSchema,
@@ -390,6 +392,30 @@ function upsertSceneComponent(
   recalculateSlideRevealSteps(slide);
 }
 
+function findSceneComponent(
+  document: ProjectDocument,
+  slideId: string,
+  componentId: string
+): SlideSceneNode {
+  const slide = findSlide(document, slideId);
+  if (slide.composition?.mode !== "scene") {
+    throw new ProjectToolError(
+      "INVALID_COMPOSITION_MODE",
+      "This slide does not use a component scene."
+    );
+  }
+  const component = slide.composition.nodes.find(
+    (node) => node.id === componentId
+  );
+  if (component === undefined) {
+    throw new ProjectToolError(
+      "COMPONENT_NOT_FOUND",
+      "The slide component does not exist."
+    );
+  }
+  return component;
+}
+
 export function registerProjectMutationTools(
   server: McpServer,
   db: D1Database,
@@ -542,6 +568,15 @@ export function registerProjectMutationTools(
         year: z.number().int().min(2021).max(2100).optional(),
         accent: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
         layout: z.enum(["cinematic", "biim", "minimal"]).optional(),
+        aspect_ratio: presentationAspectRatioSchema.optional(),
+        loading_screen: loadingScreenSchema.partial().optional(),
+        narration: z.object({
+          enabled: z.boolean().optional(),
+          display: narrationDisplaySchema.optional(),
+          speaker: z.string().max(80).nullable().optional(),
+          credit: z.string().max(500).nullable().optional(),
+          appearance: narrationAppearanceSchema.nullable().optional()
+        }).optional(),
         default_template_id: z
           .string()
           .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
@@ -556,7 +591,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, ...fields }) =>
+    async ({ project_id, expected_version, loading_screen, narration, ...fields }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -583,121 +618,36 @@ export function registerProjectMutationTools(
             slides: []
           };
           Object.assign(document.deck, fields);
-        }
-      })
-  );
-
-  server.registerTool(
-    "configure_presentation_stage",
-    {
-      title: "発表画面と0ページ目を設定",
-      description:
-        "スライド本文を再送せず、16:9／4:3の比率と、画像・音声・fontを事前読込する0ページ目だけを部分更新します。",
-      inputSchema: {
-        ...projectIdInput,
-        aspect_ratio: presentationAspectRatioSchema.optional(),
-        loading_screen: loadingScreenSchema.partial().optional()
-      },
-      outputSchema: mutationOutput,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, aspect_ratio, loading_screen }) =>
-      executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: "presentation_stage_configured",
-        mutate: (document) => {
-          const deck = requireDeck(document);
-          if (aspect_ratio === undefined && loading_screen === undefined) {
-            throw new ProjectToolError(
-              "INVALID_CHANGE",
-              "At least one presentation stage field must be supplied."
-            );
-          }
-          if (aspect_ratio !== undefined) deck.aspect_ratio = aspect_ratio;
           if (loading_screen !== undefined) {
-            deck.loading_screen = {
+            document.deck.loading_screen = {
               enabled: true,
               style: "pulse",
               message: "発表の準備をしています",
               show_progress: true,
               minimum_duration_ms: 500,
-              ...(deck.loading_screen ?? {}),
+              ...(document.deck.loading_screen ?? {}),
               ...loading_screen
             };
           }
-        }
-      })
-  );
-
-  server.registerTool(
-    "configure_deck_narration",
-    {
-      title: "発表全体の読み上げ表示を設定",
-      description:
-        "読み上げ枠の既定表示、話者、credit、外観だけを部分更新します。enabled=falseで既定設定を解除します。",
-      inputSchema: {
-        ...projectIdInput,
-        enabled: z.boolean().optional(),
-        display: narrationDisplaySchema.optional(),
-        speaker: z.string().max(80).nullable().optional(),
-        credit: z.string().max(500).nullable().optional(),
-        appearance: narrationAppearanceSchema.nullable().optional()
-      },
-      outputSchema: mutationOutput,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, enabled, ...fields }) =>
-      executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: "deck_narration_configured",
-        mutate: (document) => {
-          const deck = requireDeck(document);
-          if (
-            enabled === undefined &&
-            Object.values(fields).every((value) => value === undefined)
-          ) {
-            throw new ProjectToolError(
-              "INVALID_CHANGE",
-              "At least one narration default must be supplied."
-            );
-          }
-          if (enabled === false) {
-            deck.narration_defaults = null;
-            return;
-          }
-          deck.narration_defaults ??= {
-            display: fields.display ?? "commentary",
-            speaker: fields.speaker ?? null,
-            credit: fields.credit ?? null
-          };
-          if (fields.display !== undefined) {
-            deck.narration_defaults.display = fields.display;
-          }
-          if (fields.speaker !== undefined) {
-            deck.narration_defaults.speaker = fields.speaker;
-          }
-          if (fields.credit !== undefined) {
-            deck.narration_defaults.credit = fields.credit;
-          }
-          if (fields.appearance === null) {
-            delete deck.narration_defaults.appearance;
-          } else if (fields.appearance !== undefined) {
-            deck.narration_defaults.appearance = {
-              ...(deck.narration_defaults.appearance ?? {}),
-              ...fields.appearance
+          if (narration?.enabled === false) {
+            document.deck.narration_defaults = null;
+          } else if (narration !== undefined) {
+            document.deck.narration_defaults ??= {
+              display: narration.display ?? "commentary",
+              speaker: narration.speaker ?? null,
+              credit: narration.credit ?? null
             };
+            if (narration.display !== undefined) document.deck.narration_defaults.display = narration.display;
+            if (narration.speaker !== undefined) document.deck.narration_defaults.speaker = narration.speaker;
+            if (narration.credit !== undefined) document.deck.narration_defaults.credit = narration.credit;
+            if (narration.appearance === null) {
+              delete document.deck.narration_defaults.appearance;
+            } else if (narration.appearance !== undefined) {
+              document.deck.narration_defaults.appearance = {
+                ...(document.deck.narration_defaults.appearance ?? {}),
+                ...narration.appearance
+              };
+            }
           }
         }
       })
@@ -1405,6 +1355,67 @@ export function registerProjectMutationTools(
         changedKind: "slide_component_upserted",
         changedId: `${slide_id}:${component.id}`,
         mutate: (document) => upsertSceneComponent(document, slide_id, component)
+      })
+  );
+
+  server.registerTool(
+    "update_slide_component",
+    {
+      title: "scene componentを部分更新",
+      description:
+        "既存componentの配置または見た目だけを変更します。本文を送り直す必要はありません。layoutとstyleはどちらか一方だけでも指定できます。",
+      inputSchema: {
+        ...projectIdInput,
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        layout: z.object({
+          parent_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
+          order: z.number().int().min(0).max(999).optional(),
+          at: z.number().int().nonnegative().max(100).optional(),
+          animation: animationSchema.optional(),
+          frame: slideBlockFrameSchema.nullable().optional()
+        }).optional(),
+        style: slideBlockStyleSchema.optional(),
+        replace_style: z.boolean().optional()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, slide_id, component_id, layout, style, replace_style }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "slide_component_updated",
+        changedId: `${slide_id}:${component_id}`,
+        mutate: (document) => {
+          if (layout === undefined && style === undefined) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "Specify layout, style, or both."
+            );
+          }
+          const component = findSceneComponent(document, slide_id, component_id);
+          if (layout?.parent_id !== undefined) component.parent_id = layout.parent_id;
+          if (layout?.order !== undefined) component.order = layout.order;
+          if (layout?.at !== undefined) component.at = layout.at;
+          if (layout?.animation !== undefined) component.animation = layout.animation;
+          if (layout?.frame !== undefined) component.frame = layout.frame;
+          if (style !== undefined) {
+            component.style = replace_style ? style : { ...component.style, ...style };
+          }
+          const slide = findSlide(document, slide_id);
+          if (slide.composition?.mode === "scene") {
+            slide.composition.nodes.sort(
+              (left, right) => left.order - right.order || left.id.localeCompare(right.id)
+            );
+          }
+          recalculateSlideRevealSteps(slide);
+        }
       })
   );
 
