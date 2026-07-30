@@ -1417,11 +1417,21 @@ async function handleProjectListItemUpdate(
       },
       createdAt: new Date().toISOString()
     });
+    const itemIndex = parsed.data.action === "delete"
+      ? null
+      : "index" in parsed.data
+        ? parsed.data.index
+        : project.document[parsed.data.list].length - 1;
+    const listAnchor = `research-list-${parsed.data.list}`;
     return jsonResponse({
       ok: true,
       project_id: projectId,
       version: project.version,
       updated_at: project.updated_at,
+      item_index: itemIndex,
+      next_url: itemIndex === null
+        ? `/dashboard/projects/${projectId}#${listAnchor}`
+        : `/dashboard/projects/${projectId}?research_item=${parsed.data.list}:${itemIndex}#${listAnchor}`,
       error: null,
       request_id: crypto.randomUUID()
     });

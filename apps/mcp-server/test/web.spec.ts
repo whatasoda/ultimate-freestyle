@@ -444,8 +444,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=144"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=144"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=145"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=145"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -766,7 +766,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=144"'
+      'href="/assets/dashboard.css?v=145"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -938,7 +938,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=144"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=145"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -947,7 +947,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=144"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=145"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1228,7 +1228,12 @@ describe("Web dashboard", () => {
       value: "追加した発見"
     });
     expect(addListItem.status).toBe(200);
-    expect(await addListItem.json()).toMatchObject({ ok: true, version: 2 });
+    expect(await addListItem.json()).toMatchObject({
+      ok: true,
+      version: 2,
+      item_index: 0,
+      next_url: `/dashboard/projects/${listItemProjectId}?research_item=findings:0#research-list-findings`
+    });
     const updateListItem = await mutateListItem({
       expected_version: 2,
       action: "update",
@@ -1237,7 +1242,11 @@ describe("Web dashboard", () => {
       value: "更新した発見"
     });
     expect(updateListItem.status).toBe(200);
-    expect(await updateListItem.json()).toMatchObject({ ok: true, version: 3 });
+    expect(await updateListItem.json()).toMatchObject({
+      ok: true,
+      version: 3,
+      item_index: 0
+    });
     const deleteListItem = await mutateListItem({
       expected_version: 3,
       action: "delete",
@@ -1245,7 +1254,12 @@ describe("Web dashboard", () => {
       index: 0
     });
     expect(deleteListItem.status).toBe(200);
-    expect(await deleteListItem.json()).toMatchObject({ ok: true, version: 4 });
+    expect(await deleteListItem.json()).toMatchObject({
+      ok: true,
+      version: 4,
+      item_index: null,
+      next_url: `/dashboard/projects/${listItemProjectId}#research-list-findings`
+    });
     expect(
       JSON.parse(
         (await env.DB.prepare(

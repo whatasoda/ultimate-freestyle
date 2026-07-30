@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "144";
+export const DASHBOARD_ASSET_VERSION = "145";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const projectSectionLinks = [...document.querySelectorAll(".project-section-nav a[href^='#']")];
@@ -1295,6 +1295,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           feedback.classList.add("warning");
         }
         markDraftChanged();
+        if (form.matches("[data-project-list-item]") && result.next_url) {
+          location.href = result.next_url;
+          return;
+        }
         if (form.matches("[data-project-editor], [data-project-list-item]")) {
           setTimeout(() => location.reload(), 500);
           return;
