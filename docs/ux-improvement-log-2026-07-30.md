@@ -1130,3 +1130,9 @@
 - 現在版の一枚は本文・段階表示・読み上げ・構成要素を分割済みだが、過去版の一枚resourceだけは最大100段階・101読み上げ・200要素の全データを一括返却していた。復元前の差分確認でMCPの入力上限へ再び近づく非対称が残っていた。
 - 過去版の一枚も基本フィールド、各collectionの件数、20件page、URI templateだけの軽量索引へ変更した。本文、collection page、一件のresourceを追加し、復元対象の必要箇所だけを段階的に読める。
 - 履歴一覧のselection workflowに新しいURI templateを明示し、過去版の読み上げについて索引に全文を含めないこと、個別resourceで全文を取得できることを契約テストへ追加した。
+
+## 改善ループ325
+
+- 音声jobのMCP応答にWeb APIの相対`status_url`が含まれていたが、Remote MCPクライアントはTwitchのブラウザsession cookieを持たず、そのURLをpollできない。resource URIと人が開く画面の認証条件も応答内で区別されていなかった。
+- jobにはMCPから読める`poll_resource_uri`を返し、音声仕上げ画面は絶対URLと`requires_session: true`を持つ`web_voice_finish`へ分離した。研究全体の音声状態にも同じWeb導線を付ける。
+- tool説明と固定output schemaを更新し、`status_url`がMCP応答から消え、poll URIと認証条件が公開schemaへ現れることを契約テストで固定した。内部Web APIのjob URLはWeb UI用serviceとして維持する。

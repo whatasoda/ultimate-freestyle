@@ -45,8 +45,13 @@ const compactVoiceJobSchema = voiceJobStatusSchema.pick({
   completed_segments: true,
   failed_segments: true,
   cached_segments: true,
-  error: true,
-  status_url: true
+  error: true
+}).extend({
+  poll_resource_uri: z.string(),
+  web_voice_finish: z.object({
+    url: z.string().url(),
+    requires_session: z.literal(true)
+  })
 });
 const compactVoiceStatusSchema = z.object({
   project_id: z.string().uuid(),
@@ -62,7 +67,11 @@ const compactVoiceStatusSchema = z.object({
   active_job: compactVoiceJobSchema.nullable(),
   latest_job: compactVoiceJobSchema.nullable(),
   details_uri: z.string(),
-  slide_details_uri_template: z.string()
+  slide_details_uri_template: z.string(),
+  web_voice_finish: z.object({
+    url: z.string().url(),
+    requires_session: z.literal(true)
+  })
 });
 const voiceSegmentSummarySchema = z.object({
   at: z.number().int().nonnegative().max(100),
@@ -97,7 +106,14 @@ const voiceSegmentDetailSchema = z.object({
 
 function compactVoiceJob(job: z.infer<typeof voiceJobStatusSchema> | null) {
   if (job === null) return null;
-  return compactVoiceJobSchema.parse(job);
+  return compactVoiceJobSchema.parse({
+    ...job,
+    poll_resource_uri: `research://projects/${job.project_id}/voice`,
+    web_voice_finish: {
+      url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${job.project_id}/voice`,
+      requires_session: true
+    }
+  });
 }
 
 function compactVoiceStatus(
@@ -119,7 +135,11 @@ function compactVoiceStatus(
     active_job: compactVoiceJob(voice.active_job),
     latest_job: compactVoiceJob(voice.latest_job),
     details_uri: `research://projects/${voice.project_id}/voice`,
-    slide_details_uri_template: `research://projects/${voice.project_id}/voice/slides/{slideId}`
+    slide_details_uri_template: `research://projects/${voice.project_id}/voice/slides/{slideId}`,
+    web_voice_finish: {
+      url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${voice.project_id}/voice`,
+      requires_session: true
+    }
   };
 }
 
@@ -352,7 +372,7 @@ export function registerVoiceTools(
     {
       title: "VOICEVOX音声の生成状態を取得",
       description:
-        "研究全体の音声設定と生成数の要約、進行中または直近のjob、詳細resource URIを返します。details_uriから一枚と一区間を順に選ぶと、原稿全文と調声値を小さく取得できます。",
+        "研究全体の音声設定と生成数の要約、進行中または直近のjob、詳細resource URIを返します。details_uriから一枚と一区間を順に選ぶと、原稿全文と調声値を小さく取得できます。jobはpoll_resource_uriで追跡し、web_voice_finishはTwitchログイン済みブラウザで開きます。",
       inputSchema: { project_id: z.string().uuid() },
       outputSchema: {
         ok: z.boolean(),

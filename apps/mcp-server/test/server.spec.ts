@@ -157,6 +157,9 @@ describe("MCP contract", () => {
       expect(JSON.stringify(voiceStatusTool?.outputSchema).length).toBeLessThan(
         6_000
       );
+      expect(JSON.stringify(voiceStatusTool?.outputSchema)).toContain('"poll_resource_uri"');
+      expect(JSON.stringify(voiceStatusTool?.outputSchema)).toContain('"requires_session"');
+      expect(JSON.stringify(voiceStatusTool?.outputSchema)).not.toContain('"status_url"');
       expect(tools).toContainEqual(
         expect.objectContaining({
           name: "delete_project_image",
@@ -1753,7 +1756,11 @@ describe("MCP contract", () => {
           },
           summary: { total: 1, ready: 0, needs_generation: 1 },
           details_uri: `research://projects/${projectId}/voice`,
-          slide_details_uri_template: `research://projects/${projectId}/voice/slides/{slideId}`
+          slide_details_uri_template: `research://projects/${projectId}/voice/slides/{slideId}`,
+          web_voice_finish: {
+            url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${projectId}/voice`,
+            requires_session: true
+          }
         }
       });
       const voiceDetails = await readJsonResource(
