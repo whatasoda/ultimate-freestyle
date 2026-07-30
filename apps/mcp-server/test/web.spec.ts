@@ -554,6 +554,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("ワイド 16:9");
     expect(detailHtml).toContain("標準 4:3");
     expect(detailHtml).toContain("完成までの流れ");
+    expect(detailHtml).toContain("VOICEVOX<small>0/1区間</small>");
+    expect(detailHtml).toContain('<progress max="6" value="1">1 / 6</progress>');
     expect(detailHtml).toContain("プレビュー<small>未作成</small>");
     expect(detailHtml).toContain("研究の問いと方法を整理する");
     expect(detailHtml).toContain("現在の下書きをプレビュー");

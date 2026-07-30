@@ -1667,6 +1667,13 @@ export function projectDetailPage(options: {
     { label: "研究内容", detail: "問いと方法", complete: researchReady },
     { label: "発表構成", detail: `${slides.length}枚`, complete: slidesReady },
     { label: "実表示", detail: renderedQualityLabel, complete: renderedQualityState === "clean" },
+    ...(voiceConfigured
+      ? [{
+          label: "VOICEVOX",
+          detail: previewCurrent ? "固定版へ保存済み" : `${readyVoiceSegments}/${narrationSegments.length}区間`,
+          complete: !voiceIncomplete || previewCurrent
+        }]
+      : []),
     {
       label: "プレビュー",
       detail: previewReviewed
