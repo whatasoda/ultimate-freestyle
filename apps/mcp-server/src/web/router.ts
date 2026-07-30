@@ -101,7 +101,7 @@ import {
 } from "./pages";
 
 const MAX_FORM_BYTES = 16 * 1024;
-const MAX_JSON_BYTES = 96 * 1024;
+const MAX_JSON_BYTES = 128 * 1024;
 const UUID_PATH =
   "([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const IMAGE_CLIENT_ERROR_CODES = new Set([
@@ -120,9 +120,7 @@ const projectFieldsRequestSchema = z.object({
   summary: z.string().max(2_000).optional(),
   question: z.string().max(2_000).optional(),
   hypothesis: z.string().max(4_000).optional(),
-  method: z.string().max(20_000).optional(),
-  findings: z.array(z.string().min(1).max(4_000)).max(100).optional(),
-  limitations: z.array(z.string().min(1).max(4_000)).max(100).optional()
+  method: z.string().max(20_000).optional()
 }).strict().refine(
   (value) => Object.keys(value).some((key) => key !== "expected_version"),
   { message: "更新する項目を1つ以上指定してください。" }
@@ -1296,8 +1294,6 @@ async function handleProjectFieldsUpdate(
         if (fields.question !== undefined) document.question = fields.question.trim() || null;
         if (fields.hypothesis !== undefined) document.hypothesis = fields.hypothesis.trim() || null;
         if (fields.method !== undefined) document.method = fields.method.trim() || null;
-        if (fields.findings !== undefined) document.findings = fields.findings;
-        if (fields.limitations !== undefined) document.limitations = fields.limitations;
       }
     });
     await recordWebAudit(env.DB, {

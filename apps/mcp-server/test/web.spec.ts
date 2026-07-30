@@ -444,8 +444,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=139"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=139"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=140"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=140"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -760,7 +760,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=139"'
+      'href="/assets/dashboard.css?v=140"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -932,7 +932,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=139"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=140"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -941,7 +941,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=139"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=140"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1356,9 +1356,7 @@ describe("Web dashboard", () => {
             title: "Webで微調整した研究",
             stage: "design",
             summary: "Webから保存した概要",
-            question: "微調整後の問い？",
-            findings: ["Webで整理した結果"],
-            limitations: ["追加の測定が必要"]
+            question: "微調整後の問い？"
           })
         }
       ),
@@ -1366,6 +1364,79 @@ describe("Web dashboard", () => {
     );
     expect(fieldUpdate.status).toBe(200);
     expect(await fieldUpdate.json()).toMatchObject({ ok: true, version: 2 });
+
+    const bulkListUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/fields",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 2,
+            findings: ["一括更新は受け付けない"]
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(bulkListUpdate.status).toBe(422);
+    expect(await bulkListUpdate.json()).toMatchObject({
+      error: { code: "INVALID_FIELDS" }
+    });
+
+    const requestOverFormerLimit = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/fields",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 2,
+            method: "x".repeat(20_000),
+            unsupported: "x".repeat(80_000)
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(requestOverFormerLimit.status).toBe(422);
+    expect(await requestOverFormerLimit.json()).toMatchObject({
+      error: { code: "INVALID_FIELDS" }
+    });
+
+    const requestOverCurrentLimit = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/fields",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 2,
+            unsupported: "x".repeat(132 * 1024)
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(requestOverCurrentLimit.status).toBe(413);
+    expect(await requestOverCurrentLimit.json()).toMatchObject({
+      error: { code: "REQUEST_TOO_LARGE" }
+    });
 
     const conflictUpdate = await requestProvider(
       provider,

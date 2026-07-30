@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "139";
+export const DASHBOARD_ASSET_VERSION = "140";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const link of document.querySelectorAll(".project-section-nav a[href^='#']")) {
@@ -876,10 +876,6 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (form.matches("[data-project-editor]")) {
       for (const name of ["title", "stage", "summary", "question", "hypothesis", "method"]) {
         if (data.has(name)) body[name] = String(data.get(name) || "");
-      }
-      for (const name of ["findings", "limitations"]) {
-        if (!data.has(name)) continue;
-        body[name] = String(data.get(name) || "").split(/\n+/).map((value) => value.trim()).filter(Boolean);
       }
     }
     if (form.matches("[data-project-list-item]")) {
