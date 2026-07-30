@@ -745,6 +745,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       kind: String(data.get("kind") || "markdown"),
       asset_id: String(data.get("asset_id") || "") || null
     });
+    if (form.matches("[data-scene-component-create]")) Object.assign(body, {
+      kind: String(data.get("kind") || "markdown"),
+      parent_id: String(data.get("parent_id") || "") || null,
+      asset_id: String(data.get("asset_id") || "") || null
+    });
     if (form.matches("[data-deck-editor]")) Object.assign(body, {
       aspect_ratio: String(data.get("aspect_ratio") || "16:9"),
       loading_screen: {
@@ -878,7 +883,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         form.dataset.dirty = "false";
         removeDraft();
         syncPageVersion(result.version);
-        if (form.matches("[data-template-create], [data-narration-segment-create], [data-canvas-block-create]")) {
+        if (form.matches("[data-template-create], [data-narration-segment-create], [data-canvas-block-create], [data-scene-component-create]")) {
           location.reload();
           return;
         }

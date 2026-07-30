@@ -38,6 +38,7 @@ import {
   slideRoleSchema,
   slideBlockSchema,
   slideSceneNodeSchema,
+  type SlideSceneNode,
   slideTypographySchema,
   visualPresetSchema
 } from "../projects/schema";
@@ -182,6 +183,12 @@ const sceneComponentRequestSchema = z.object({
 const sceneComponentActionRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   action: z.enum(["duplicate", "delete"])
+});
+const sceneComponentCreateRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  kind: z.enum(["layer", "stack", "grid", "hero", "markdown", "image", "shape", "card", "metric", "quote", "callout", "bar_chart", "timeline"]),
+  parent_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable(),
+  asset_id: z.string().uuid().nullable().optional()
 });
 const canvasBlockRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -1679,6 +1686,112 @@ async function handleCanvasBlockUpdate(
     return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, block_id: blockId, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
   } catch (error) {
     return projectMutationErrorResponse(error, "表示パーツを保存できませんでした。");
+  }
+}
+
+async function handleSceneComponentCreate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = sceneComponentCreateRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "追加する表示パーツを確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  let imageAsset: ProjectAsset | undefined;
+  if (parsed.data.kind === "image") {
+    const assets = await listProjectAssets(env.DB, session.userId, projectId);
+    imageAsset = assets.find((asset) => asset.asset_id === parsed.data.asset_id);
+    if (imageAsset === undefined) {
+      return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "この研究で利用できる画像を選んでください。" }, request_id: crypto.randomUUID() }, 422);
+    }
+  }
+  let createdComponentId = "";
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "scene") {
+          const error = new Error("The slide does not use a component scene.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        if (slide.composition.nodes.length >= 200) {
+          const error = new Error("The scene component limit has been reached.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        if (parsed.data.parent_id !== null) {
+          const parent = slide.composition.nodes.find((node) => node.id === parsed.data.parent_id);
+          if (parent === undefined || !["layer", "stack", "grid"].includes(parent.kind)) {
+            const error = new Error("The selected parent cannot contain components.");
+            Object.assign(error, { code: "INVALID_FIELDS" });
+            throw error;
+          }
+        }
+        const used = new Set(slide.composition.nodes.map((node) => node.id));
+        const base = parsed.data.kind.replaceAll("_", "-");
+        let suffix = 1;
+        while (used.has(`${base}-${suffix}`)) suffix += 1;
+        createdComponentId = `${base}-${suffix}`;
+        const siblings = slide.composition.nodes.filter((node) => node.parent_id === parsed.data.parent_id);
+        const common = {
+          id: createdComponentId,
+          parent_id: parsed.data.parent_id,
+          order: Math.min(999, Math.max(-1, ...siblings.map((node) => node.order)) + 1),
+          at: 0,
+          animation: "fade" as const,
+          frame: parsed.data.parent_id === null
+            ? { x: 10 + Math.min(10, siblings.length * 2), y: 12 + Math.min(10, siblings.length * 2), width: 80, height: 72 }
+            : null
+        };
+        let component: SlideSceneNode;
+        switch (parsed.data.kind) {
+          case "layer": component = { ...common, kind: "layer" }; break;
+          case "stack": component = { ...common, kind: "stack", direction: "column", gap_px: 16, align: "stretch", justify: "start", wrap: false }; break;
+          case "grid": component = { ...common, kind: "grid", columns: 2, gap_px: 16, align: "stretch" }; break;
+          case "hero": component = { ...common, kind: "hero", eyebrow: null, heading: "新しい見出し", subtitle: "ここに補足文を入力します。", align: "start" }; break;
+          case "markdown": component = { ...common, kind: "markdown", markdown: "## 新しいテキスト\n\nここに内容を入力します。" }; break;
+          case "image": component = { ...common, kind: "image", asset_id: imageAsset!.asset_id, alt_text: imageAsset!.alt_text, fit: "contain", caption: null }; break;
+          case "shape": component = { ...common, kind: "shape", shape: "rectangle", label: "新しい図形" }; break;
+          case "card": component = { ...common, kind: "card", label: "カード", markdown: "ここに内容を入力します。", variant: "plain" }; break;
+          case "metric": component = { ...common, kind: "metric", value: "100", unit: null, caption: "数値の説明", emphasis: "strong" }; break;
+          case "quote": component = { ...common, kind: "quote", quote: "ここに引用文を入力します。", attribution: null }; break;
+          case "callout": component = { ...common, kind: "callout", label: "POINT", heading: "伝えたいこと", markdown: "ここに補足を入力します。", variant: "info" }; break;
+          case "bar_chart": component = { ...common, kind: "bar_chart", max_value: 100, items: [{ id: "item-1", at: 0, label: "項目1", value: 50, color: null }] }; break;
+          case "timeline": component = { ...common, kind: "timeline", items: [{ id: "item-1", at: 0, kicker: null, heading: "出来事1", detail: "ここに詳細を入力します。" }] }; break;
+        }
+        slide.composition.nodes.push(component);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_scene_component_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, component_id: createdComponentId, kind: parsed.data.kind, parent_id: parsed.data.parent_id, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, component_id: createdComponentId, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "表示パーツを追加できませんでした。");
   }
 }
 
@@ -3338,6 +3451,17 @@ export async function handleWebRequest(
       sceneComponentActionMatch[1],
       sceneComponentActionMatch[2],
       sceneComponentActionMatch[3]
+    );
+  }
+  const sceneComponentCreateMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/components$`)
+  );
+  if (sceneComponentCreateMatch?.[1] !== undefined && sceneComponentCreateMatch[2] !== undefined) {
+    return handleSceneComponentCreate(
+      request,
+      env,
+      sceneComponentCreateMatch[1],
+      sceneComponentCreateMatch[2]
     );
   }
   const sceneComponentMatch = path.match(

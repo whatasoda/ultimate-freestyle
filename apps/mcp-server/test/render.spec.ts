@@ -725,6 +725,9 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("この表示パーツを保存");
     expect(workspaceHtml).toContain('data-scene-component-action="duplicate"');
     expect(workspaceHtml).toContain('data-scene-component-action="delete"');
+    expect(workspaceHtml).toContain("data-scene-component-create");
+    expect(workspaceHtml).toContain("リッチ表示パーツを追加");
+    expect(workspaceHtml).toContain('<option value="bar_chart">棒グラフ</option>');
     expect(workspaceHtml).toContain("パーツの見た目");
     expect(workspaceHtml).toContain("見た目をすべて継承へ戻す");
     expect(workspaceHtml).toContain('data-component-optional="true"');
