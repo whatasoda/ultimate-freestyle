@@ -358,6 +358,16 @@ export function registerResearchGuides(
       const previewCurrent = status !== null && latest !== null &&
         latest.project_version === status.draft_version &&
         latest.renderer_version === status.current_renderer_version;
+      const publishedCurrent = status !== null && status.published !== null &&
+        status.published.project_version === status.draft_version &&
+        status.published.renderer_version === status.current_renderer_version;
+      const nextAction = !previewCurrent
+        ? "create_preview"
+        : latest?.reviewed_at === null
+          ? "review_preview"
+          : publishedCurrent
+            ? "complete"
+            : "publish";
       const body =
         "error" in auth
           ? { ok: false, error: { code: auth.error } }
@@ -385,11 +395,19 @@ export function registerResearchGuides(
                 readiness: {
                   needs_preview: !previewCurrent,
                   needs_review: previewCurrent && latest.reviewed_at === null,
-                  can_publish: previewCurrent && latest.reviewed_at !== null,
-                  published_current:
-                    status.published !== null &&
-                    status.published.project_version === status.draft_version &&
-                    status.published.renderer_version === status.current_renderer_version
+                  can_publish: previewCurrent && latest.reviewed_at !== null && !publishedCurrent,
+                  published_current: publishedCurrent,
+                  next_action: nextAction
+                },
+                web: {
+                  requires_session: true,
+                  dashboard_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${status.project_id}`,
+                  preview_url: latest === null
+                    ? null
+                    : `https://saijiyu-kenkyu.2764.moe/preview/${latest.revision_id}`,
+                  public_url: status.published === null || status.slug === null
+                    ? null
+                    : `https://saijiyu-kenkyu.2764.moe/p/${status.slug}`
                 },
                 recent_events: status.events.slice(0, 5)
               };

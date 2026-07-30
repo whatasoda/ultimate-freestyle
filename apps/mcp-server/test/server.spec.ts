@@ -543,7 +543,14 @@ describe("MCP contract", () => {
           needs_preview: true,
           needs_review: false,
           can_publish: false,
-          published_current: false
+          published_current: false,
+          next_action: "create_preview"
+        },
+        web: {
+          requires_session: true,
+          dashboard_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${firstProject.project_id}`,
+          preview_url: null,
+          public_url: null
         },
         recent_events: []
       });
