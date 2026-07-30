@@ -312,6 +312,10 @@ const DASHBOARD_STYLE = String.raw`
       .button.primary { margin-top: 1.7rem; padding: .9rem 1.25rem; }
       .ghost { border: 1px solid var(--line); background: #152131; color: #d6dfeb; }
       .section-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1.25rem; }
+      .project-section-nav { position: sticky; z-index: 14; top: .5rem; display: flex; gap: .35rem; margin: 1rem 0; padding: .45rem; overflow-x: auto; border: 1px solid var(--line); border-radius: .85rem; background: #090f18eb; box-shadow: 0 .4rem 1rem #02060c55; backdrop-filter: blur(14px); scrollbar-width: thin; }
+      .project-section-nav a { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 2.75rem; padding: .5rem .7rem; border-radius: .55rem; color: var(--muted); font-size: .78rem; font-weight: 760; text-decoration: none; white-space: nowrap; }
+      .project-section-nav a:hover, .project-section-nav a:focus-visible { background: #ffffff12; color: var(--text); }
+      #journey, #basic-information, #presentation-structure, #research-images, #voice-finishing, #publication { scroll-margin-top: 5rem; }
       .section-head h1 { font-size: clamp(2rem, 5vw, 3.6rem); }
       .count { color: var(--muted); }
       .dashboard-tools { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1rem; }
@@ -1680,7 +1684,7 @@ export function projectDetailPage(options: {
                 ? `<a class="button ghost" href="#publication">公開状態を確認</a>`
                 : `<a class="button ghost" href="/p/${escapeHtml(options.publication.slug)}" target="_blank" rel="noopener">公開ページを開く</a>`
             };
-  const workflowPanel = `<section class="journey" aria-labelledby="journey-title">
+  const workflowPanel = `<section class="journey" id="journey" tabindex="-1" aria-labelledby="journey-title">
     <div class="journey-head"><div><p class="eyebrow">Next action</p><h2 id="journey-title">完成までの流れ</h2><p>研究内容から公開まで、現在地と次の操作をまとめています。</p></div><div class="journey-progress"><strong>${journeyCompleted} / ${journeySteps.length}</strong><progress max="${journeySteps.length}" value="${journeyCompleted}">${journeyCompleted} / ${journeySteps.length}</progress></div></div>
     <ol class="journey-steps">${journeySteps.map((step) => `<li class="journey-step" data-complete="${String(step.complete)}"><span>${step.label}<small>${step.detail}</small></span></li>`).join("")}</ol>
     <div class="journey-next"><div><h3>${nextJourneyAction.title}</h3><p>${nextJourneyAction.description}${voiceIncomplete ? ` VOICEVOXは${readyVoiceSegments}/${narrationSegments.length}区間まで生成済みですが、ブラウザ音声でプレビューできます。` : ""}</p></div><div class="actions">${nextJourneyAction.action}</div></div>
@@ -1792,7 +1796,7 @@ export function projectDetailPage(options: {
   const corePreflightItems = preflightItems.filter((item) => !item.recommended);
   const recommendedPreflightItems = preflightItems.filter((item) => item.recommended);
   const preflightChecklist = `<details${previewCurrent ? "" : " open"}><summary>公開前チェック · 基本 ${corePreflightItems.filter((item) => item.complete).length}/${corePreflightItems.length} · おすすめ ${recommendedPreflightItems.filter((item) => item.complete).length}/${recommendedPreflightItems.length}</summary><ul class="preflight-list">${preflightItems.map((item) => `<li class="preflight-item" data-state="${item.complete ? "complete" : item.recommended ? "recommendation" : "attention"}"><span><strong>${escapeHtml(item.label)}${item.recommended ? " · おすすめ" : ""}</strong><small>${escapeHtml(item.detail)}</small></span>${item.complete ? "" : `<a class="preflight-action" href="${item.href}">${item.recommended ? "確認へ" : "修正へ"} →</a>`}</li>`).join("")}</ul></details>`;
-  const publicationPanel = `<section class="panel publish-state" id="publication" data-publication>
+  const publicationPanel = `<section class="panel publish-state" id="publication" tabindex="-1" data-publication>
     <h2>プレビューと公開</h2>
     <p class="feedback warning" data-publication-dirty aria-live="polite" hidden></p>
     ${preflightChecklist}
@@ -1815,7 +1819,7 @@ export function projectDetailPage(options: {
     </div>
     <p class="feedback${!durationWithinLimit || voiceIncomplete || (preview !== null && !previewCurrent) || (previewCurrent && !previewReviewed) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : !durationWithinLimit ? `想定発表時間が${formatDuration(totalDurationSeconds)}です。20分以内に短縮してから公開してください。プレビューは短縮前でも確認できます。` : previewCurrent && !previewReviewed ? "固定プレビューを最後の終了画面まで進めると、自動で確認済みになります。" : voiceIncomplete ? `VOICEVOX音声は ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成済みです。未生成区間はブラウザ音声で代替してプレビューできます。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
-  const voicePanel = `<section class="panel publish-state"><h2>読み上げ音声</h2>
+  const voicePanel = `<section class="panel publish-state" id="voice-finishing" tabindex="-1"><h2>読み上げ音声</h2>
     <div class="status-row"><span>読み上げ区間</span><strong>${narrationSegments.length}件</strong></div>
     <div class="status-row"><span>VOICEVOX生成済み</span><strong>${readyVoiceSegments} / ${narrationSegments.length}</strong></div>
     <a class="button" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/voice">音声を仕上げる</a>
@@ -1887,10 +1891,11 @@ export function projectDetailPage(options: {
          <div class="card-top"><span class="stage">${STAGE_LABELS[document.stage]}</span><span class="version">v${options.project.version}</span></div>
          <h1 class="detail-title">${escapeHtml(document.title)}</h1>
          <p class="lead">${escapeHtml(document.summary || "概要はまだ記入されていません。")}</p>
+         <nav class="project-section-nav" aria-label="この研究の編集項目"><a href="#journey">現在地</a><a href="#basic-information">研究内容</a><a href="#presentation-structure">スライド</a><a href="#research-images">画像</a><a href="#voice-finishing">音声</a><a href="#publication">プレビューと公開</a></nav>
          ${workflowPanel}
          <div class="detail-grid">
            <div class="detail-column">
-             <details class="panel panel-disclosure" id="basic-information"${researchReady ? "" : " open"}><summary>研究内容を編集</summary><div class="disclosure-body">
+             <details class="panel panel-disclosure" id="basic-information" tabindex="-1"${researchReady ? "" : " open"}><summary>研究内容を編集</summary><div class="disclosure-body">
                <form class="editor" data-project-editor action="${projectFieldsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <fieldset><legend>題名と概要</legend><div class="editor-grid">
                    <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label>
@@ -1920,7 +1925,7 @@ export function projectDetailPage(options: {
              </div></details>
              ${presentationSettingsPanel}
              ${qualitySweepPanel}
-             <section class="panel" id="research-images"><h2>研究画像</h2><p class="meta">${options.assets.length} / ${PROJECT_IMAGE_LIMIT}件 · 圧縮後 ${assetTotalSize} を保存中</p>
+             <section class="panel" id="research-images" tabindex="-1"><h2>研究画像</h2><p class="meta">${options.assets.length} / ${PROJECT_IMAGE_LIMIT}件 · 圧縮後 ${assetTotalSize} を保存中</p>
                <form class="upload" action="/api/projects/${escapeHtml(options.project.project_id)}/images" data-image-upload data-csrf="${escapeHtml(options.csrfToken)}">
                  <label class="upload-dropzone" data-upload-dropzone><span>画像を選択、またはここへドロップ</span><small>JPEG / PNG / 静止WebP</small><input type="file" accept="image/jpeg,image/png,image/webp" required></label>
                  <div class="upload-preview" data-upload-preview hidden><img data-upload-preview-image alt="選択した画像の確認"><p><strong data-upload-preview-name></strong><small data-upload-preview-meta></small></p></div>
@@ -1944,7 +1949,7 @@ export function projectDetailPage(options: {
                <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
              </dl></section>
              ${draftHistoryPanel}
-             <section class="panel" id="presentation-structure"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
+             <section class="panel" id="presentation-structure" tabindex="-1"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
              ${evaluationPanel}
              ${voicePanel}
              ${publicationPanel}

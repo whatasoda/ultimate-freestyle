@@ -1,6 +1,13 @@
-export const DASHBOARD_ASSET_VERSION = "137";
+export const DASHBOARD_ASSET_VERSION = "138";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  for (const link of document.querySelectorAll(".project-section-nav a[href^='#']")) {
+    if (!(link instanceof HTMLAnchorElement)) continue;
+    link.addEventListener("click", () => {
+      const target = document.querySelector(link.hash);
+      if (target instanceof HTMLElement) requestAnimationFrame(() => target.focus({ preventScroll: true }));
+    });
+  }
   const apiErrorMessage = (result, fallback) => {
     const messages = {
       AUTH_REQUIRED: "ログインの有効期限が切れました。研究一覧からログインし直してください。",
