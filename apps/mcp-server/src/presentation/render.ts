@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@94";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@95";
 
 function escapeHtml(value: string): string {
   return value
@@ -924,6 +924,7 @@ export function renderPresentationHtml(
     .prelude-start:disabled { cursor: wait; opacity: .45; }
     .voice-unlock, .presentation-resume { position: absolute; z-index: 45; left: 50%; bottom: 4%; translate: -50% 0; min-width: 12em; padding: .75em 1.1em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: #101827ee; box-shadow: 0 1em 3em #0009; font-weight: 850; }
     .voice-unlock[hidden], .presentation-resume[hidden] { display: none; }
+    body[data-resume-pending="true"] .stage::after { content: ""; position: absolute; z-index: 44; inset: 0; background: #02061799; backdrop-filter: blur(2px); }
     .completion { position: absolute; z-index: 50; inset: 0; display: grid; place-items: center; padding: 8%; background: #05080dcc; backdrop-filter: blur(.45cqw); }
     .completion[hidden] { display: none; }
     .completion-card { width: min(34em, 78%); max-height: 90%; overflow: auto; padding: 2.4em; border: 1px solid color-mix(in srgb, var(--accent) 55%, #ffffff33); border-radius: 1.2em; background: #101827f2; box-shadow: 0 1.5em 5em #000b; text-align: center; }
@@ -1113,6 +1114,7 @@ export function renderPresentationHtml(
     const voiceStatus = document.querySelector('[data-voice-status]');
     const voiceAnnouncer = document.querySelector('[data-voice-announcer]');
     const presentationResume = document.querySelector('[data-presentation-resume]');
+    const presenterFooter = document.querySelector('footer');
     const completion = document.querySelector('[data-completion]');
     const restartButton = document.querySelector('[data-restart]');
     const dismissCompletionButton = document.querySelector('[data-dismiss-completion]');
@@ -2289,18 +2291,19 @@ export function renderPresentationHtml(
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
       schedulePreludeFit();
     };
-    document.querySelector('#next').addEventListener('click', () => { if (started) advance(); });
-    document.querySelector('#prev').addEventListener('click', () => { if (!started) return; if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
-    speechButton.addEventListener('click', () => { speech = !speech; speechButton.setAttribute('aria-pressed', String(speech)); speechButton.textContent = '音声 ' + (speech ? 'ON' : 'OFF'); render(); });
+    document.querySelector('#next').addEventListener('click', () => { if (visibilityPause) return; if (started) advance(); });
+    document.querySelector('#prev').addEventListener('click', () => { if (visibilityPause || !started) return; if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
+    speechButton.addEventListener('click', () => { if (visibilityPause) return; speech = !speech; speechButton.setAttribute('aria-pressed', String(speech)); speechButton.textContent = '音声 ' + (speech ? 'ON' : 'OFF'); render(); });
     autoButton.addEventListener('click', () => {
+      if (visibilityPause) return;
       auto = !auto;
       autoButton.setAttribute('aria-pressed', String(auto));
       autoButton.textContent = '自動 ' + (auto ? 'ON' : 'OFF');
       if (!auto) { clearTimeout(autoTimer); autoDeadline = null; stopProgressClock(); setVoiceProgress(0); setSecondaryProgressLabel('読み上げ進捗'); }
       else if (!activeAudio && (!('speechSynthesis' in window) || !speechSynthesis.speaking)) scheduleAutoAdvance();
     });
-    volume.addEventListener('input', () => { showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
-    timerButton?.addEventListener('click', () => { if (started) setTimerRunning(!timerRunning); });
+    volume.addEventListener('input', () => { if (visibilityPause) return; showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
+    timerButton?.addEventListener('click', () => { if (visibilityPause) return; if (started) setTimerRunning(!timerRunning); });
     helpButton?.addEventListener('click', showShortcuts);
     dismissShortcutsButton?.addEventListener('click', hideShortcuts);
     const syncFullscreen = () => {
@@ -2483,6 +2486,7 @@ export function renderPresentationHtml(
     stage?.addEventListener('pointerup', endEditorDrag);
     stage?.addEventListener('pointercancel', endEditorDrag);
     stage?.addEventListener('pointerdown', (event) => {
+      if (visibilityPause) return;
       if (!started || editorFrame || event.pointerType === 'mouse' || !event.isPrimary) return;
       if (shortcuts instanceof HTMLElement && !shortcuts.hidden) return;
       if (completion instanceof HTMLElement && !completion.hidden) return;
@@ -2491,6 +2495,7 @@ export function renderPresentationHtml(
       stage.setPointerCapture?.(event.pointerId);
     });
     stage?.addEventListener('pointerup', (event) => {
+      if (visibilityPause) { swipeStart = null; return; }
       if (!swipeStart || swipeStart.pointerId !== event.pointerId) return;
       const deltaX = event.clientX - swipeStart.x;
       const deltaY = event.clientY - swipeStart.y;
@@ -2503,6 +2508,7 @@ export function renderPresentationHtml(
     });
     stage?.addEventListener('pointercancel', () => { swipeStart = null; });
     stage?.addEventListener('click', (event) => {
+      if (visibilityPause) return;
       if (suppressStageClick) { suppressStageClick = false; return; }
       if (editorFrame) {
         const target = event.target instanceof Element ? event.target.closest('[data-node-id], [data-block-id]') : null;
@@ -2520,12 +2526,15 @@ export function renderPresentationHtml(
       if (voiceUnlock instanceof HTMLButtonElement && !voiceUnlock.hidden) { speak(); return; }
       advance();
     });
-    voiceUnlock?.addEventListener('click', () => { if (started) speak(); });
+    voiceUnlock?.addEventListener('click', () => { if (visibilityPause) return; if (started) speak(); });
     presentationResume?.addEventListener('click', () => {
       if (!visibilityPause) return;
       const paused = visibilityPause;
       visibilityPause = null;
       presentationResume.hidden = true;
+      document.body.dataset.resumePending = 'false';
+      if (presenterFooter instanceof HTMLElement) presenterFooter.inert = false;
+      if (timerButton instanceof HTMLButtonElement) timerButton.disabled = false;
       unitStartedAt += performance.now() - paused.hiddenAt;
       if (paused.timer) setTimerRunning(true);
       if (paused.audio && activeAudio) activeAudio.play().catch(showVoiceUnlock);
@@ -2569,6 +2578,9 @@ export function renderPresentationHtml(
         if (speechPlaying) speechSynthesis.pause();
       } else if (visibilityPause && presentationResume instanceof HTMLButtonElement) {
         presentationResume.hidden = false;
+        document.body.dataset.resumePending = 'true';
+        if (presenterFooter instanceof HTMLElement) presenterFooter.inert = true;
+        if (timerButton instanceof HTMLButtonElement) timerButton.disabled = true;
         presentationResume.focus();
       }
     });

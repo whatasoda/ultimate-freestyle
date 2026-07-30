@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@94");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@95");
     expect(html).toContain("const pauseProgressClock = () =>");
     expect(html).toContain("const autoRemaining = autoDeadline === null");
     expect(html).toContain("unitStartedAt += performance.now() - paused.hiddenAt");
@@ -277,6 +277,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("addEventListener('visibilitychange'");
     expect(html).toContain("speechSynthesis.pause()");
     expect(html).toContain("presentationResume.focus()");
+    expect(html).toContain("if (visibilityPause) return; if (started) advance()");
+    expect(html).toContain("presenterFooter.inert = true");
+    expect(html).toContain("document.body.dataset.resumePending = 'true'");
+    expect(html).toContain('body[data-resume-pending="true"] .stage::after');
     expect(html).toContain('data-region="narration"');
     expect(html).toContain('aria-live="off"');
     expect(html).toContain("setAttribute('aria-valuetext'");
@@ -952,7 +956,7 @@ describe("presentation artifact renderer", () => {
     expect(overLimitHtml).toContain("20分以内を3分20秒超えています");
     expect(overLimitHtml).toContain('<dt>想定時間</dt><dd data-state="warning">23分20秒 · 20分超過</dd>');
     expect(overLimitHtml).toContain("発表を20分以内に収める");
-    expect(overLimitHtml).toContain('data-duration-valid="false" data-preview-reviewed="false" data-published-current="false" disabled');
+    expect(overLimitHtml).toContain('data-duration-valid="false" data-preview-current="false" data-preview-reviewed="false" data-published-current="false" disabled');
 
     const voiceLimitHtml = await voiceFinishPage({
       twitchLogin: "researcher",
