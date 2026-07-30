@@ -182,8 +182,11 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@95");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@96");
     expect(html).toContain("const pauseProgressClock = () =>");
+    expect(html).toContain("progressClock?.kind === 'auto'");
+    expect(html).toContain("startProgressClock(delay, 0, 'auto')");
+    expect(html).toContain("startProgressClock(estimated * 1000, 0, 'voice')");
     expect(html).toContain("const autoRemaining = autoDeadline === null");
     expect(html).toContain("unitStartedAt += performance.now() - paused.hiddenAt");
     expect(html).toContain("container: presentation-space / size");
@@ -315,7 +318,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const updateControls = () =>");
     expect(html).toContain("previousButton.disabled = !started || (slide === 0 && step === 0)");
     expect(html).toContain("setSecondaryProgressLabel('自動送りまで')");
-    expect(html).toContain("startProgressClock(delay)");
+    expect(html).toContain("startProgressClock(delay, 0, 'auto')");
     expect(html).toContain("<ol><li>手順A</li><li>手順B</li></ol>");
     expect(html).toContain("document.createElement('ol')");
     expect(html).toContain("ultimate-freestyle:preview-narration-settings");

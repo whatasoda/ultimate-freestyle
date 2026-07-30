@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@95";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@96";
 
 function escapeHtml(value: string): string {
   return value
@@ -1269,10 +1269,10 @@ export function renderPresentationHtml(
       voiceTimer = undefined;
       progressClock = null;
     };
-    const startProgressClock = (durationMilliseconds, elapsedMilliseconds = 0) => {
+    const startProgressClock = (durationMilliseconds, elapsedMilliseconds = 0, kind = 'voice') => {
       stopProgressClock();
       const duration = Math.max(1, durationMilliseconds);
-      progressClock = { duration, elapsed: clamp(elapsedMilliseconds, 0, duration), startedAt: performance.now() };
+      progressClock = { kind, duration, elapsed: clamp(elapsedMilliseconds, 0, duration), startedAt: performance.now() };
       const tick = () => {
         if (!progressClock) return;
         setVoiceProgress((progressClock.elapsed + performance.now() - progressClock.startedAt) / progressClock.duration * 100);
@@ -1283,6 +1283,7 @@ export function renderPresentationHtml(
     const pauseProgressClock = () => {
       if (!progressClock) { clearInterval(voiceTimer); voiceTimer = undefined; return null; }
       const paused = {
+        kind: progressClock.kind,
         duration: progressClock.duration,
         elapsed: clamp(progressClock.elapsed + performance.now() - progressClock.startedAt, 0, progressClock.duration)
       };
@@ -1385,7 +1386,7 @@ export function renderPresentationHtml(
       const delay = Math.max(500, targetDuration - (performance.now() - unitStartedAt));
       setSecondaryProgressLabel('自動送りまで');
       setVoiceProgress(0);
-      startProgressClock(delay);
+      startProgressClock(delay, 0, 'auto');
       startAdvanceTimer(delay);
     };
     const speakWithBrowser = (segment, fallback = false) => {
@@ -1401,7 +1402,7 @@ export function renderPresentationHtml(
       utterance.pitch = clamp(1 + Number(tuning.pitchScale || 0) * 4, .5, 1.5);
       utterance.volume = clamp(Number(volume.value) * Number(tuning.volumeScale || 1), 0, 1);
       const estimated = Math.max(1.5, segment.text.length / (7 * utterance.rate));
-      startProgressClock(estimated * 1000);
+      startProgressClock(estimated * 1000, 0, 'voice');
       utterance.onstart = () => { if (run === voiceRun) hideVoiceUnlock(); };
       utterance.onend = () => { if (run === voiceRun) finishVoice(); };
       utterance.onerror = (event) => {
@@ -2299,7 +2300,15 @@ export function renderPresentationHtml(
       auto = !auto;
       autoButton.setAttribute('aria-pressed', String(auto));
       autoButton.textContent = '自動 ' + (auto ? 'ON' : 'OFF');
-      if (!auto) { clearTimeout(autoTimer); autoDeadline = null; stopProgressClock(); setVoiceProgress(0); setSecondaryProgressLabel('読み上げ進捗'); }
+      if (!auto) {
+        clearTimeout(autoTimer);
+        autoDeadline = null;
+        if (progressClock?.kind === 'auto') {
+          stopProgressClock();
+          setVoiceProgress(0);
+          setSecondaryProgressLabel('読み上げ進捗');
+        }
+      }
       else if (!activeAudio && (!('speechSynthesis' in window) || !speechSynthesis.speaking)) scheduleAutoAdvance();
     });
     volume.addEventListener('input', () => { if (visibilityPause) return; showVolume(); try { localStorage.setItem(volumeKey, volume.value); } catch {} });
@@ -2539,11 +2548,11 @@ export function renderPresentationHtml(
       if (paused.timer) setTimerRunning(true);
       if (paused.audio && activeAudio) activeAudio.play().catch(showVoiceUnlock);
       if (paused.speech && 'speechSynthesis' in window) {
-        if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed);
+        if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed, paused.progress.kind);
         speechSynthesis.resume();
       }
       if (auto && paused.autoRemaining !== null) {
-        if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed);
+        if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed, paused.progress.kind);
         startAdvanceTimer(paused.autoRemaining);
       } else if (auto && !paused.audio && !paused.speech) scheduleAutoAdvance();
       stage?.focus();
