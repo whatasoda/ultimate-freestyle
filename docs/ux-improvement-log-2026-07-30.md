@@ -1178,3 +1178,9 @@
 - 2026-07-30更新のCloudflare Workers best practicesと最新`@cloudflare/workers-types`を再取得し、binding型生成、secret分離、Queue、body stream上限、`waitUntil`、構造化log、observabilityを現行実装へ照合した。これらは適合していた。
 - compatibility date・Wrangler・Workers型を本日版へ一組で上げる検証では、リポジトリの7日間minimum-release-ageが新規依存を拒否し、既存workerdも2026-07-21より新しいcompatibility dateで14 test workerを起動しなかった。
 - 供給網保護を迂回せず、`2026-07-21`と許可済み依存を維持する判断とした。設定を完全に戻した後、14 files・55 testsとContainer込みdry-run buildが成功することを再確認した。更新は新しい依存が待機期間を満たした時点で一括して行う。
+
+## 改善ループ333
+
+- Web UI JSON、画像、Twitch API応答にはstreaming上限がある一方、Remote MCPのPOST本体だけはSDKのJSON parseへ無制限に渡っていた。小粒度toolの正規入力は十分小さいため、巨大bodyは利便性を増やさずmemory負荷だけを増やす。
+- 認証済みMCP handlerの入口でPOST bodyを256 KiBまでstreaming読取し、上限到達時は直ちにstreamをcancelする。過大入力はHTTP 413、読取不能は400とし、JSON-RPC `-32600`、安定したerror code、request IDを返す。
+- 通常のinitializeが再構成後のRequestでもStreamable HTTP handlerへ届くこと、上限超過がSDKより前にcancelされることをWorker契約テストへ追加した。

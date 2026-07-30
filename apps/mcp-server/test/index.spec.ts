@@ -1,7 +1,77 @@
 import { exports } from "cloudflare:workers";
+import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
+import { handleMcpRequest, MAX_MCP_REQUEST_BYTES } from "../src/index";
+
 describe("MCP Worker", () => {
+  it("passes a bounded MCP request to the Streamable HTTP handler", async () => {
+    const response = await handleMcpRequest(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: {
+          accept: "application/json, text/event-stream",
+          "content-type": "application/json"
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "initialize",
+          params: {
+            protocolVersion: "2025-06-18",
+            capabilities: {},
+            clientInfo: { name: "bounded-request-test", version: "0.1.0" }
+          }
+        })
+      }),
+      env,
+      {
+        waitUntil() {},
+        passThroughOnException() {}
+      } as ExecutionContext
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("protocolVersion");
+  });
+
+  it("rejects oversized MCP bodies before the SDK parses them", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new Uint8Array(MAX_MCP_REQUEST_BYTES + 1));
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+    const response = await handleMcpRequest(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: stream
+      }),
+      env,
+      {} as ExecutionContext
+    );
+    const body = await response.json<{
+      jsonrpc: string;
+      error: { code: number; data: { code: string; request_id: string } };
+    }>();
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(body).toMatchObject({
+      jsonrpc: "2.0",
+      error: {
+        code: -32600,
+        data: { code: "MCP_REQUEST_TOO_LARGE" }
+      }
+    });
+    expect(body.error.data.request_id).toBeTruthy();
+    expect(cancelled).toBe(true);
+  });
+
   it("returns machine-readable health information", async () => {
     const response = await exports.default.fetch("https://example.com/healthz");
     const body = await response.json<{

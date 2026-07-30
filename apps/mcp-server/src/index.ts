@@ -13,8 +13,11 @@ import {
   processVoiceGenerationMessage,
   type VoiceGenerationMessage
 } from "./voicevox/service";
+import { readBytesCapped } from "./lib/http";
 
 export { VoicevoxContainer } from "./voicevox/container";
+
+export const MAX_MCP_REQUEST_BYTES = 256 * 1024;
 
 function isVoiceGenerationMessage(value: unknown): value is VoiceGenerationMessage {
   if (value === null || typeof value !== "object") return false;
@@ -39,16 +42,50 @@ function jsonResponse(body: object, init?: ResponseInit): Response {
   });
 }
 
-async function handleMcpRequest(
+function mcpRequestError(status: number, code: string, message: string): Response {
+  return Response.json(
+    {
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32600,
+        message,
+        data: { code, request_id: crypto.randomUUID() }
+      }
+    },
+    {
+      status,
+      headers: { "cache-control": "no-store" }
+    }
+  );
+}
+
+export async function handleMcpRequest(
   request: Request,
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
+  let boundedRequest = request;
+  if (request.method === "POST") {
+    const read = await readBytesCapped(request, MAX_MCP_REQUEST_BYTES);
+    if (!read.ok) {
+      return read.reason === "over_cap"
+        ? mcpRequestError(413, "MCP_REQUEST_TOO_LARGE", "The MCP request exceeds the 256 KiB limit.")
+        : mcpRequestError(400, "INVALID_MCP_REQUEST_BODY", "The MCP request body could not be read.");
+    }
+    const headers = new Headers(request.headers);
+    headers.set("content-length", String(read.value.byteLength));
+    boundedRequest = new Request(request.url, {
+      method: request.method,
+      headers,
+      body: read.value
+    });
+  }
   const server = createServer(env);
   return createMcpHandler(server, {
     route: "/mcp",
     enableJsonResponse: true
-  })(request, env, ctx);
+  })(boundedRequest, env, ctx);
 }
 
 export default {
