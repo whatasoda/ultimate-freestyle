@@ -1370,3 +1370,9 @@
 - 固定プレビューAPIは生成artifactを参照できても、研究詳細の進捗が同じartifactで完了へ変わることを直接検証していなかった。画面だけ`0/1`に残ると、APIが通る状態でも利用者は音声生成を繰り返す。
 - VOICEVOX artifact登録後・固定プレビュー作成前に研究詳細を再取得し、完成フローが`1/1区間`、固定プレビュー作成が`data-can-preview=true`かつ有効になることをWeb統合テストへ追加した。
 - 固定プレビュー作成後に元cacheを削除しても、複製済み音声を持つ確認済み固定版は公開できる既存テストと合わせ、生成前・生成後・snapshot後の三状態を固定した。
+
+## 改善ループ365
+
+- 発表UIの現在仕様として読む`docs/設計.md`に、廃止済みのGitHub Pages、静的researches、音声Actions、React sidebarが現行手順の形で残り、CodexやClaudeが誤った構成を再導入し得た。
+- URL・公開方式・保存先・BIIM補足・Web component編集・VOICEVOX生成を、D1、private R2 revision、Web UI、Queue、Cloudflare Containerの実装へ更新した。音声生成前後と固定snapshot後の扱いも改善ループ362〜364の契約へ揃えた。
+- すでに実装済みのノーコード編集・theme・音声pipelineを将来範囲から外し、PDF、発表者画面、第三者template配布、隔離user code、少人数実運用を残課題として整理した。
