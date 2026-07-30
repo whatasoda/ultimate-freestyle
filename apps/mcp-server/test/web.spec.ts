@@ -427,6 +427,9 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("全スライドの実表示を一括確認");
     expect(detailHtml).toContain("data-quality-sweep");
+    expect(detailHtml).toContain("段階を順番に描画");
+    expect(DASHBOARD_SCRIPT).toContain("advanceQualitySweep");
+    expect(DASHBOARD_SCRIPT).toContain("Number(data.step) !== sweepStep");
     expect(detailHtml).toContain("data-quality-sweep-cancel");
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:set-position");
     expect(detailHtml).toContain("data-copy-public");

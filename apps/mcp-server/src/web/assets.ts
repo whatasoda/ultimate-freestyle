@@ -161,9 +161,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let slides = [];
     try { slides = JSON.parse(qualitySweepButton.dataset.slides || "[]"); } catch {}
     let sweepIndex = 0;
+    let sweepStep = 0;
     let sweepRunning = false;
     let sweepIssueCount = 0;
+    let completedCheckpoints = 0;
+    let currentSlideFindings = [];
     let sweepTimer;
+    const totalCheckpoints = slides.reduce((total, slide) => total + Number(slide.max_step || 0) + 1, 0);
     const appendSweepResult = (slide, message, warning = true) => {
       if (!(qualitySweepResults instanceof HTMLOListElement)) return;
       const item = document.createElement("li");
@@ -185,33 +189,50 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (qualitySweepStatus instanceof HTMLElement) {
         qualitySweepStatus.textContent = sweepIssueCount
           ? sweepIssueCount + "枚に確認事項があります。"
-          : "全" + slides.length + "枚が発表枠内に収まっています。";
+          : "全" + slides.length + "枚・" + totalCheckpoints + "段階が発表枠内に収まっています。";
         qualitySweepStatus.classList.toggle("warning", sweepIssueCount > 0);
         qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0);
       }
-      if (sweepIssueCount === 0) appendSweepResult(null, "見切れや過剰な自動縮小は見つかりませんでした。", false);
+      if (sweepIssueCount === 0) appendSweepResult(null, "全段階で見切れ、過剰な自動縮小、文字コントラスト不足は見つかりませんでした。", false);
+    };
+    const requestSweepPosition = () => {
+      const slide = slides[sweepIndex];
+      if (!slide) { finishQualitySweep(); return; }
+      qualitySweepFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: sweepIndex + 1, step: sweepStep }, location.origin);
+      waitForSweepResult();
+    };
+    const advanceQualitySweep = () => {
+      completedCheckpoints += 1;
+      if (qualitySweepProgress instanceof HTMLProgressElement) qualitySweepProgress.value = completedCheckpoints;
+      const slide = slides[sweepIndex];
+      if (sweepStep < Number(slide?.max_step || 0)) {
+        sweepStep += 1;
+      } else {
+        if (currentSlideFindings.length) {
+          sweepIssueCount += 1;
+          appendSweepResult(slide, [...new Set(currentSlideFindings)].join(" / ") + "。個別画面で配色・組版・文章量を調整してください。");
+        }
+        currentSlideFindings = [];
+        sweepIndex += 1;
+        sweepStep = 0;
+      }
+      if (qualitySweepStatus instanceof HTMLElement) qualitySweepStatus.textContent = completedCheckpoints + " / " + totalCheckpoints + "段階を確認";
+      if (sweepIndex >= slides.length) finishQualitySweep();
+      else requestSweepPosition();
     };
     const waitForSweepResult = () => {
       clearTimeout(sweepTimer);
       sweepTimer = setTimeout(() => {
         if (!sweepRunning) return;
-        const slide = slides[sweepIndex];
-        sweepIssueCount += 1;
-        appendSweepResult(slide, "描画結果を取得できませんでした。個別画面で確認してください。");
-        if (qualitySweepProgress instanceof HTMLProgressElement) qualitySweepProgress.value = sweepIndex + 1;
-        sweepIndex += 1;
-        if (sweepIndex >= slides.length) finishQualitySweep();
-        else {
-          qualitySweepFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: sweepIndex + 1, step: 0 }, location.origin);
-          waitForSweepResult();
-        }
+        currentSlideFindings.push("STEP " + sweepStep + ": 描画結果を取得できませんでした");
+        advanceQualitySweep();
       }, 5000);
     };
     addEventListener("message", (event) => {
       if (!sweepRunning || event.origin !== location.origin || event.source !== qualitySweepFrame.contentWindow) return;
       const data = event.data;
       const slide = slides[sweepIndex];
-      if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || data.slide_id !== slide?.id) return;
+      if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || data.slide_id !== slide?.id || Number(data.step) !== sweepStep) return;
       clearTimeout(sweepTimer);
       const overflows = Array.isArray(data.overflows) ? data.overflows : [];
       const compressed = Array.isArray(data.fits)
@@ -221,28 +242,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         ? data.contrasts.filter((item) => Number.isFinite(item?.ratio) && Number.isFinite(item?.required) && item.ratio < item.required)
         : [];
       if (overflows.length || compressed.length || contrasts.length) {
-        sweepIssueCount += 1;
         const details = [
           overflows.length ? "見切れ" + overflows.length + "か所" : "",
           compressed.length ? "70%未満の縮小" + compressed.length + "か所" : "",
           contrasts.length ? "文字コントラスト不足" + contrasts.length + "か所" : ""
         ].filter(Boolean).join("、");
-        appendSweepResult(slide, details + "。個別画面で配色・組版・文章量を調整してください。");
+        currentSlideFindings.push("STEP " + sweepStep + ": " + details);
       }
-      if (qualitySweepProgress instanceof HTMLProgressElement) qualitySweepProgress.value = sweepIndex + 1;
-      if (qualitySweepStatus instanceof HTMLElement) qualitySweepStatus.textContent = (sweepIndex + 1) + " / " + slides.length + "枚を確認";
-      sweepIndex += 1;
-      if (sweepIndex >= slides.length) finishQualitySweep();
-      else {
-        qualitySweepFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:set-position", slide: sweepIndex + 1, step: 0 }, location.origin);
-        waitForSweepResult();
-      }
+      advanceQualitySweep();
     });
     qualitySweepButton.addEventListener("click", () => {
       if (sweepRunning || slides.length === 0) return;
       sweepRunning = true;
       sweepIndex = 0;
+      sweepStep = 0;
       sweepIssueCount = 0;
+      completedCheckpoints = 0;
+      currentSlideFindings = [];
       setButtonBusy(qualitySweepButton, true);
       qualitySweepButton.textContent = "確認中…";
       if (qualitySweepCancel instanceof HTMLButtonElement) qualitySweepCancel.hidden = false;
@@ -271,7 +287,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         setButtonBusy(qualitySweepButton, false);
         qualitySweepButton.textContent = "最初からチェック";
         if (qualitySweepStatus instanceof HTMLElement) {
-          qualitySweepStatus.textContent = sweepIndex + " / " + slides.length + "枚で中断しました。途中結果は下に残しています。";
+          qualitySweepStatus.textContent = completedCheckpoints + " / " + totalCheckpoints + "段階で中断しました。途中結果は下に残しています。";
           qualitySweepStatus.classList.remove("success", "warning");
         }
       });

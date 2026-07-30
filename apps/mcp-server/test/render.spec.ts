@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@54");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@55");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -301,7 +301,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('"speaker":"ずんだもん"');
     expect(html).toContain("segment?.speaker || DECK.slides[slide].narration?.speaker");
     expect(html).toContain("ultimate-freestyle:render-diagnostics");
-    expect(html).toContain("overflows: diagnostics, fits, contrasts");
+    expect(html).toContain("step, overflows: diagnostics, fits, contrasts");
     expect(html).toContain("const collectContrast = (target, slideElement)");
     expect(html).toContain("background.complex && ratio >= 2");
     expect(html).toContain("ultimate-freestyle:set-position");
