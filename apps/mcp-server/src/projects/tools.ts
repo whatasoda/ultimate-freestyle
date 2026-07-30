@@ -8,8 +8,10 @@ import {
   getProject,
   listProjects,
   ProjectRepositoryError,
+  projectStorageUsage,
   restoreProjectDraftRevision
 } from "./repository";
+import type { ProjectSizeDetails } from "./repository";
 import {
   createEmptyProject,
   projectSummarySchema
@@ -45,6 +47,13 @@ export const projectErrorSchema = z.object({
   message: z.string()
 });
 
+export const projectStorageUsageSchema = z.object({
+  current_bytes: z.number().int().nonnegative(),
+  limit_bytes: z.number().int().positive(),
+  remaining_bytes: z.number().int().nonnegative(),
+  usage_percent: z.number().nonnegative()
+});
+
 export type RequiredScope =
   | "research:read"
   | "research:write"
@@ -54,7 +63,8 @@ export class ProjectToolError extends Error {
   constructor(
     readonly code: z.infer<typeof projectErrorCodeSchema>,
     message: string,
-    readonly currentVersion: number | null = null
+    readonly currentVersion: number | null = null,
+    readonly size?: ProjectSizeDetails
   ) {
     super(message);
   }
@@ -88,7 +98,8 @@ export function normalizeProjectToolError(error: unknown): ProjectToolError {
     return new ProjectToolError(
       error.code,
       error.message,
-      error.currentVersion ?? null
+      error.currentVersion ?? null,
+      error.size
     );
   }
   console.error(
@@ -185,6 +196,7 @@ export function registerProjectTools(
             aspect_ratio: z.enum(["16:9", "4:3"]).nullable(),
             total_duration_seconds: z.number().int().nonnegative(),
             within_submission_limit: z.boolean(),
+            storage: projectStorageUsageSchema,
             template_ids: z.array(z.string()),
             slides: z.array(
               z.object({
@@ -240,6 +252,7 @@ export function registerProjectTools(
             total_duration_seconds: totalDurationSeconds,
             within_submission_limit:
               (deck?.slides.length ?? 0) > 0 && totalDurationSeconds <= 20 * 60,
+            storage: projectStorageUsage(project.document),
             template_ids:
               deck?.templates?.map((template) => template.id) ?? [],
             slides:
@@ -286,6 +299,7 @@ export function registerProjectTools(
         ok: z.boolean(),
         request_id: z.string().uuid(),
         project: projectSummarySchema.nullable(),
+        storage: projectStorageUsageSchema.nullable(),
         replayed: z.boolean().nullable(),
         error: projectErrorSchema.nullable()
       },
@@ -334,6 +348,7 @@ export function registerProjectTools(
             created_at: result.project.created_at,
             updated_at: result.project.updated_at
           },
+          storage: projectStorageUsage(result.project.document),
           replayed: result.replayed,
           error: null
         });
@@ -344,6 +359,7 @@ export function registerProjectTools(
             ok: false,
             request_id: requestId,
             project: null,
+            storage: null,
             replayed: null,
             error: { code: normalized.code, message: normalized.message }
           },
@@ -370,6 +386,7 @@ export function registerProjectTools(
         version: z.number().int().positive().nullable(),
         current_version: z.number().int().positive().nullable(),
         restored_from_version: z.number().int().positive().nullable(),
+        storage: projectStorageUsageSchema.nullable(),
         error: projectErrorSchema.nullable()
       },
       annotations: {
@@ -407,6 +424,7 @@ export function registerProjectTools(
           version: project.version,
           current_version: project.version,
           restored_from_version: target_version,
+          storage: projectStorageUsage(project.document),
           error: null
         });
       } catch (error) {
@@ -418,6 +436,7 @@ export function registerProjectTools(
             version: null,
             current_version: normalized.currentVersion,
             restored_from_version: null,
+            storage: null,
             error: { code: normalized.code, message: normalized.message }
           },
           true

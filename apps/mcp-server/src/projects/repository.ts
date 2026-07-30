@@ -18,6 +18,13 @@ export type ProjectSizeDetails = {
   exceeded_by_bytes: number;
 };
 
+export type ProjectStorageUsage = {
+  current_bytes: number;
+  limit_bytes: number;
+  remaining_bytes: number;
+  usage_percent: number;
+};
+
 export type ProjectDraftRevisionSummary = {
   project_id: string;
   version: number;
@@ -81,6 +88,16 @@ export const PROJECT_DRAFT_REVISION_BYTE_BUDGET = 8 * 1024 * 1024;
 
 export function projectDocumentBytes(document: ProjectDocument): number {
   return new TextEncoder().encode(JSON.stringify(document)).length;
+}
+
+export function projectStorageUsage(document: ProjectDocument): ProjectStorageUsage {
+  const currentBytes = projectDocumentBytes(document);
+  return {
+    current_bytes: currentBytes,
+    limit_bytes: MAX_PROJECT_DOCUMENT_BYTES,
+    remaining_bytes: Math.max(0, MAX_PROJECT_DOCUMENT_BYTES - currentBytes),
+    usage_percent: Math.round(currentBytes / MAX_PROJECT_DOCUMENT_BYTES * 1_000) / 10
+  };
 }
 
 function assertProjectSize(document: ProjectDocument, current?: ProjectDocument): void {

@@ -484,6 +484,12 @@ describe("MCP contract", () => {
           aspect_ratio: null,
           total_duration_seconds: 0,
           within_submission_limit: false,
+          storage: {
+            current_bytes: expect.any(Number),
+            limit_bytes: 512 * 1024,
+            remaining_bytes: expect.any(Number),
+            usage_percent: expect.any(Number)
+          },
           slides: []
         }
       });
