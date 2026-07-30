@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@109");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@110");
     expect(html).toContain("const isEditorTargetVisible = (item)");
     expect(html).toContain(
       "item.closest('.reveal-block[aria-hidden=\"true\"]') === null"
@@ -203,7 +203,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("unitStartedAt += performance.now() - paused.hiddenAt");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
-    expect(html).toContain("let overflow = collectClippedOverflow(target)");
+    expect(html).toContain("const probeOverflow = createClippedOverflowProbe(target)");
     expect(html).not.toContain("target.scrollHeight - target.clientHeight");
     expect(html).toContain("data-heading-font=\"system-sans\"");
     expect(html).toContain("const fitPrelude = () =>");
@@ -829,7 +829,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("item.scrollIntoView");
     expect(html).toContain("target.dataset.overflow = String(overflowing)");
     expect(html).not.toContain("Math.max(0, target.scrollWidth - target.clientWidth)");
-    expect(html).toContain("const collectClippedOverflow = (target)");
+    expect(html).toContain("const createClippedOverflowProbe = (target)");
     expect(html).toContain("target.matches('uf-image small[data-fit-content], uf-shape span[data-fit-content]')");
     expect(html).toContain("document.createTreeWalker(target, NodeFilter.SHOW_TEXT)");
     expect(html).toContain("const narrationClamp = editorFrame ? collectNarrationClamp(currentSlide) : null");
@@ -842,8 +842,13 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("preloadResources(deferredAudio, () => {}, 1)");
     expect(html).toContain("preludeMeter.setAttribute('aria-valuetext'");
     expect(html).toContain("boundary.getBoundingClientRect()");
-    expect(html).toContain("overflow.x > 1 || overflow.y > 1");
-    expect(html).toContain("scale > .45");
+    expect(html).toContain("initialOverflow.x > 1 || initialOverflow.y > 1");
+    expect(html).toContain(
+      "const scales = [1, .95, .9, .85, .8, .75, .7, .65, .6, .55, .5, .45]"
+    );
+    expect(html).toContain("while (lower <= upper)");
+    expect(html).toContain("const measured = new Map()");
+    expect(html).not.toContain("scale = Math.max(.45");
     expect(html).toContain("setTimeout(scheduleFit, 300)");
     expect(html).toContain("uf-card h4");
     expect(html).toContain('data-fit-region="画像キャプション"');

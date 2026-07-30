@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@109";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@110";
 
 function escapeHtml(value: string): string {
   return value
@@ -1485,31 +1485,38 @@ export function renderPresentationHtml(
         fallback();
       });
     };
-    const collectClippedOverflow = (target) => {
+    const createClippedOverflowProbe = (target) => {
       const boundary = target.matches('uf-image small[data-fit-content], uf-shape span[data-fit-content]')
         ? target.parentElement || target
         : target;
-      const boundaryRect = boundary.getBoundingClientRect();
-      const contentRects = [...target.querySelectorAll('*')]
-        .map((item) => item.getBoundingClientRect())
-        .filter((rect) => rect.width > 0 && rect.height > 0);
+      const elements = [...target.querySelectorAll('*')];
+      const textNodes = [];
       const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT);
       while (walker.nextNode()) {
         const node = walker.currentNode;
         if (!node.textContent?.trim()) continue;
-        const range = document.createRange();
-        range.selectNodeContents(node);
-        contentRects.push(...[...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0));
-        range.detach();
+        textNodes.push(node);
       }
-      if (contentRects.length === 0) contentRects.push(target.getBoundingClientRect());
-      const left = Math.min(...contentRects.map((rect) => rect.left));
-      const right = Math.max(...contentRects.map((rect) => rect.right));
-      const top = Math.min(...contentRects.map((rect) => rect.top));
-      const bottom = Math.max(...contentRects.map((rect) => rect.bottom));
-      return {
-        x: Math.max(0, boundaryRect.left - left, right - boundaryRect.right),
-        y: target.dataset.fitScroll === 'true' ? 0 : Math.max(0, boundaryRect.top - top, bottom - boundaryRect.bottom)
+      return () => {
+        const boundaryRect = boundary.getBoundingClientRect();
+        const contentRects = elements
+          .map((item) => item.getBoundingClientRect())
+          .filter((rect) => rect.width > 0 && rect.height > 0);
+        for (const node of textNodes) {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          contentRects.push(...[...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0));
+          range.detach();
+        }
+        if (contentRects.length === 0) contentRects.push(target.getBoundingClientRect());
+        const left = Math.min(...contentRects.map((rect) => rect.left));
+        const right = Math.max(...contentRects.map((rect) => rect.right));
+        const top = Math.min(...contentRects.map((rect) => rect.top));
+        const bottom = Math.max(...contentRects.map((rect) => rect.bottom));
+        return {
+          x: Math.max(0, boundaryRect.left - left, right - boundaryRect.right),
+          y: target.dataset.fitScroll === 'true' ? 0 : Math.max(0, boundaryRect.top - top, bottom - boundaryRect.bottom)
+        };
       };
     };
     const parseRenderedColor = (value) => {
@@ -1804,15 +1811,34 @@ export function renderPresentationHtml(
       if (stage instanceof HTMLElement) stage.dataset.measuring = 'true';
       currentSlide.querySelectorAll('[data-fit-content]').forEach((target) => {
         if (!(target instanceof HTMLElement) || target.hidden || target.offsetParent === null) return;
-        target.style.setProperty('--fit-scale', '1');
-        let scale = 1;
-        let overflow = collectClippedOverflow(target);
-        while ((overflow.x > 1 || overflow.y > 1) && scale > .45 && target.dataset.fitScroll !== 'true') {
-          scale = Math.max(.45, Number((scale - .05).toFixed(2)));
+        const probeOverflow = createClippedOverflowProbe(target);
+        const scales = [1, .95, .9, .85, .8, .75, .7, .65, .6, .55, .5, .45];
+        const measured = new Map();
+        const measureScale = (scale) => {
           target.style.setProperty('--fit-scale', String(scale));
-          overflow = collectClippedOverflow(target);
+          const overflow = probeOverflow();
+          measured.set(scale, overflow);
+          return overflow;
+        };
+        let scale = 1;
+        const initialOverflow = measureScale(scale);
+        if ((initialOverflow.x > 1 || initialOverflow.y > 1) && target.dataset.fitScroll !== 'true') {
+          let lower = 1;
+          let upper = scales.length - 1;
+          let best = upper;
+          while (lower <= upper) {
+            const middle = Math.floor((lower + upper) / 2);
+            const candidate = scales[middle];
+            const overflow = measureScale(candidate);
+            if (overflow.x <= 1 && overflow.y <= 1) {
+              best = middle;
+              upper = middle - 1;
+            } else lower = middle + 1;
+          }
+          scale = scales[best];
+          target.style.setProperty('--fit-scale', String(scale));
         }
-        const clippedOverflow = collectClippedOverflow(target);
+        const clippedOverflow = measured.get(scale) ?? measureScale(scale);
         const overflowing = clippedOverflow.x > 1 || clippedOverflow.y > 1;
         target.dataset.overflow = String(overflowing);
         target.dataset.fitScale = String(scale);
