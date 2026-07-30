@@ -907,3 +907,9 @@
 - MCPのprojectとdeck resourceは保存上限512KiBの文書全体を返し、一枚または一つの記録だけを直すAgentにも全スライド・全ログ・全原稿をcontextへ入れさせていた。
 - project resourceをID、version、題名、段階、件数、各詳細URIだけのoverviewへ変更した。研究本文は`/research`、発見・限界・ログは10件ずつのpage resource、発表は設定と一枚ごとのoutlineだけの`/deck`から段階取得する。
 - deckの各outlineは既存slide resourceへ直接つなぎ、collection pageは前後URIと通し位置を返す。評価・発表構成promptと部分編集ガイドも新しい読取順へ更新し、全量応答の互換層は作らない。
+
+## 改善ループ288
+
+- 一枚のslide resourceも本文、補足、全段階表示、全読み上げ区間、scene/canvas要素をまとめて返しており、短い修正ほど不要な応答が大きかった。
+- 一枚の入口は題名・時間・組版などのscalarと、本文文字数、各STEP・読み上げ区間の短いpreview、構成要素の配置要約と個別URIだけを返すindexへ変更した。本文と補足、指定STEP、指定読み上げ区間をそれぞれ直接読むresourceを追加した。
+- scene/canvasの詳細は既存の要素resourceへ統一した。Agentは一枚indexから必要なURIだけを選べるため、長文原稿や多数の要素を他の編集へ巻き込まず、現在versionも各応答で確認できる。

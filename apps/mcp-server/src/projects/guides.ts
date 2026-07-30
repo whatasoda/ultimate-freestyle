@@ -1073,7 +1073,68 @@ export function registerResearchGuides(
                   ok: true,
                   project_id: project.project_id,
                   version: project.version,
-                  slide
+                  slide: (() => {
+                    const {
+                      content_markdown,
+                      sidebar_markdown,
+                      reveal_blocks,
+                      narration,
+                      composition,
+                      ...fields
+                    } = slide;
+                    const baseUri = `research://projects/${project.project_id}/slides/${slide.id}`;
+                    return {
+                      ...fields,
+                      content: {
+                        content_characters: content_markdown.length,
+                        sidebar_characters: sidebar_markdown?.length ?? 0,
+                        uri: `${baseUri}/content`
+                      },
+                      reveals: reveal_blocks.map((block) => ({
+                        at: block.at,
+                        preview: resourceTextPreview(block.markdown, 160),
+                        uri: `${baseUri}/reveals/${block.at}`
+                      })),
+                      narration: narration === null
+                        ? null
+                        : {
+                            display: narration.display,
+                            speaker: narration.speaker,
+                            appearance: narration.appearance,
+                            segments: narration.segments.map((segment) => ({
+                              at: segment.at,
+                              preview: resourceTextPreview(segment.text, 160),
+                              has_generated_audio: segment.audio_src !== null,
+                              uri: `${baseUri}/narration/${segment.at}`
+                            }))
+                          },
+                      composition: composition === null || composition === undefined
+                        ? null
+                        : {
+                            mode: composition.mode,
+                            background: composition.background,
+                            clip_content: composition.clip_content,
+                            elements: composition.mode === "scene"
+                              ? composition.nodes.map((element) => ({
+                                  id: element.id,
+                                  kind: element.kind,
+                                  at: element.at,
+                                  parent_id: element.parent_id,
+                                  order: element.order,
+                                  frame: element.frame,
+                                  uri: `${baseUri}/elements/${element.id}`
+                                }))
+                              : composition.blocks.map((element) => ({
+                                  id: element.id,
+                                  kind: element.kind,
+                                  at: element.at,
+                                  z_index: element.z_index,
+                                  frame: element.frame,
+                                  uri: `${baseUri}/elements/${element.id}`
+                                }))
+                          }
+                    };
+                  })()
                 };
       return {
         contents: [
@@ -1084,6 +1145,102 @@ export function registerResearchGuides(
           }
         ]
       };
+    }
+  );
+
+  server.registerResource(
+    "research-project-slide-content",
+    new ResourceTemplate("research://projects/{id}/slides/{slideId}/content", { list: undefined }),
+    {
+      title: "スライド本文と補足",
+      description: "指定した一枚の画面本文と読み上げない補足だけを取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const slide = project?.document.deck?.slides.find((item) => item.id === slideId);
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : project === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : slide === undefined
+            ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+            : {
+                ok: true,
+                project_id: project.project_id,
+                version: project.version,
+                slide_id: slide.id,
+                content_markdown: slide.content_markdown,
+                sidebar_markdown: slide.sidebar_markdown
+              };
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
+    }
+  );
+
+  server.registerResource(
+    "research-project-slide-reveal",
+    new ResourceTemplate("research://projects/{id}/slides/{slideId}/reveals/{at}", { list: undefined }),
+    {
+      title: "段階表示一件",
+      description: "指定した一枚・STEPの段階表示本文だけを取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const at = typeof variables.at === "string" && /^\d+$/.test(variables.at) ? Number(variables.at) : -1;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const slide = project?.document.deck?.slides.find((item) => item.id === slideId);
+      const reveal = slide?.reveal_blocks.find((item) => item.at === at);
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : project === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : slide === undefined
+            ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+            : reveal === undefined
+              ? { ok: false, error: { code: "REVEAL_NOT_FOUND" } }
+              : { ok: true, project_id: project.project_id, version: project.version, slide_id: slide.id, reveal };
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
+    }
+  );
+
+  server.registerResource(
+    "research-project-slide-narration-segment",
+    new ResourceTemplate("research://projects/{id}/slides/{slideId}/narration/{at}", { list: undefined }),
+    {
+      title: "読み上げ区間一件",
+      description: "指定した一枚・STEPの読み上げ文、声、調声、生成音声参照だけを取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const at = typeof variables.at === "string" && /^\d+$/.test(variables.at) ? Number(variables.at) : -1;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const slide = project?.document.deck?.slides.find((item) => item.id === slideId);
+      const segment = slide?.narration?.segments.find((item) => item.at === at);
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : project === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : slide === undefined
+            ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+            : segment === undefined
+              ? { ok: false, error: { code: "NARRATION_SEGMENT_NOT_FOUND" } }
+              : { ok: true, project_id: project.project_id, version: project.version, slide_id: slide.id, segment };
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
     }
   );
 

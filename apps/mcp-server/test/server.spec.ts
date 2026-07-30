@@ -571,6 +571,15 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/slides/{slideId}"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/slides/{slideId}/content"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/slides/{slideId}/reveals/{at}"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/slides/{slideId}/narration/{at}"
+          }),
+          expect.objectContaining({
             uriTemplate:
               "research://projects/{id}/slides/{slideId}/elements/{elementId}"
           }),
@@ -889,6 +898,34 @@ describe("MCP contract", () => {
           }]
         }
       });
+      const slideContent = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/content`
+      );
+      expect(slideContent).toMatchObject({
+        ok: true,
+        version: 8,
+        content_markdown: "# どこまで丸くできる？",
+        sidebar_markdown: "読み上げない作者コメント"
+      });
+      const revealBlock = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/reveals/1`
+      );
+      expect(revealBlock).toMatchObject({
+        ok: true,
+        version: 8,
+        reveal: { at: 1, markdown: "- 記憶だけで作る" }
+      });
+      const narrationSegment = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/narration/0`
+      );
+      expect(narrationSegment).toMatchObject({
+        ok: true,
+        version: 8,
+        segment: { at: 0, text: "まず研究の問いを説明します。" }
+      });
 
       const canvas = await client.callTool({
         name: "set_slide_canvas",
@@ -925,7 +962,11 @@ describe("MCP contract", () => {
           composition: {
             mode: "canvas",
             background: "#101828",
-            blocks: [{ id: "central-question", kind: "markdown" }]
+            elements: [{
+              id: "central-question",
+              kind: "markdown",
+              uri: `research://projects/${firstProject.project_id}/slides/question/elements/central-question`
+            }]
           }
         }
       });
@@ -1121,11 +1162,10 @@ describe("MCP contract", () => {
           reveal_steps: 2,
           composition: {
             mode: "scene",
-            runtime_version: "uf-runtime@1",
-            nodes: [
-              { id: "result-stack", kind: "stack" },
-              { id: "trial-count", kind: "metric" },
-              { id: "comparison", kind: "bar_chart" }
+            elements: [
+              expect.objectContaining({ id: "result-stack", kind: "stack" }),
+              expect.objectContaining({ id: "trial-count", kind: "metric" }),
+              expect.objectContaining({ id: "comparison", kind: "bar_chart" })
             ]
           }
         }
@@ -1174,24 +1214,17 @@ describe("MCP contract", () => {
       });
       const adjustedSceneSlide = await readJsonResource(
         client,
-        `research://projects/${firstProject.project_id}/slides/question`
+        `research://projects/${firstProject.project_id}/slides/question/elements/trial-count`
       );
       expect(adjustedSceneSlide).toMatchObject({
         ok: true,
         version: 19,
-        slide: {
-          reveal_steps: 2,
-          composition: {
-            nodes: expect.arrayContaining([
-              expect.objectContaining({
-                id: "trial-count",
-                order: 3,
-                at: 2,
-                animation: "pop",
-                style: { background: "#102030", font_scale: 1.25 }
-              })
-            ])
-          }
+        element: {
+          id: "trial-count",
+          order: 3,
+          at: 2,
+          animation: "pop",
+          style: { background: "#102030", font_scale: 1.25 }
         }
       });
       const revisions = await readJsonResource(
@@ -1657,15 +1690,24 @@ describe("MCP contract", () => {
           narration: {
             display: "minimal",
             appearance: { placement: "bottom", text_scale: 1.1 },
-            segments: [{
-              at: 0,
-              text: "研究のきっかけから始めます。",
-              speaker: "ずんだもん",
-              voice_profile_id: "guide-voice",
-              voice_tuning: { pitchScale: -0.02 },
-              audio_src: null
-            }]
+            segments: [{ at: 0 }]
           }
+        }
+      });
+      const detailedNarration = await readJsonResource(
+        client,
+        `research://projects/${projectId}/slides/intro/narration/0`
+      );
+      expect(detailedNarration).toMatchObject({
+        ok: true,
+        version: 15,
+        segment: {
+          at: 0,
+          text: "研究のきっかけから始めます。",
+          speaker: "ずんだもん",
+          voice_profile_id: "guide-voice",
+          voice_tuning: { pitchScale: -0.02 },
+          audio_src: null
         }
       });
     } finally {
