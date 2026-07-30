@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=98"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=99"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -485,6 +485,10 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("終了画面の到達待ち");
     expect(DASHBOARD_SCRIPT).not.toContain("固定プレビューを最後の終了画面まで確認しましたか？");
     expect(detailHtml).toContain("data-public-link");
+    expect(detailHtml).toContain("data-unpublish");
+    expect(detailHtml).toContain("公開を停止");
+    expect(DASHBOARD_SCRIPT).toContain('method: "DELETE"');
+    expect(DASHBOARD_SCRIPT).toContain("固定プレビューと編集内容は残っています");
     expect(detailHtml).toContain("data-upload-preview");
     expect(detailHtml).toContain("保存時に最大2560pxのWebPへ圧縮");
     expect(detailHtml).toContain("data-delete-feedback");
@@ -1304,6 +1308,32 @@ describe("Web dashboard", () => {
     expect(publishedAudio.status).toBe(200);
     expect(publishedAudio.headers.get("cache-control")).toContain("immutable");
     expect(new Uint8Array(await publishedAudio.arrayBuffer())).toEqual(voiceBytes);
+
+    const unpublish = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/publish",
+        {
+          method: "DELETE",
+          headers: {
+            cookie: browserCookies,
+            "x-csrf-token": csrfToken ?? ""
+          }
+        }
+      ),
+      authEnv
+    );
+    expect(unpublish.status).toBe(200);
+    expect(await unpublish.json()).toMatchObject({
+      publication: { published: null },
+      public_url: null
+    });
+    const unpublishedPage = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${publishResult.public_url}`),
+      authEnv
+    );
+    expect(unpublishedPage.status).toBe(404);
 
     const templateUpdate = await requestProvider(
       provider,

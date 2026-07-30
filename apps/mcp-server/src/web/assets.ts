@@ -2559,6 +2559,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const publicLink = document.querySelector("[data-public-link]");
   const copyPublicButton = document.querySelector("[data-copy-public]");
   const copyPublicFeedback = document.querySelector("[data-copy-public-feedback]");
+  const unpublishButton = document.querySelector("[data-unpublish]");
   if (previewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     previewButton.addEventListener("click", async () => {
       previewButton.disabled = true;
@@ -2598,6 +2599,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.classList.add("success");
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.revision = result.revision.revision_id;
+          publishButton.dataset.previewReviewed = "false";
           publishButton.disabled = true;
         }
         if (reviewButton instanceof HTMLButtonElement) {
@@ -2651,7 +2653,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!response.ok) throw new Error(apiErrorMessage(result, "確認状態を記録できませんでした。"));
         reviewButton.textContent = "プレビュー確認済み";
         if (previewReviewStatus instanceof HTMLElement) previewReviewStatus.textContent = "確認済み";
-        if (publishButton instanceof HTMLButtonElement) publishButton.disabled = publishButton.dataset.durationValid !== "true" || publishButton.dataset.publishedCurrent === "true";
+        if (publishButton instanceof HTMLButtonElement) {
+          publishButton.dataset.previewReviewed = "true";
+          publishButton.disabled = publishButton.dataset.durationValid !== "true" || publishButton.dataset.publishedCurrent === "true";
+        }
         publishFeedback.textContent = "この固定プレビューを公開できます。";
         publishFeedback.classList.add("success");
       } catch (error) {
@@ -2712,10 +2717,49 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishButton.dataset.publishedCurrent = "true";
         publishButton.textContent = "この版は公開済み";
         if (copyPublicButton instanceof HTMLButtonElement) copyPublicButton.hidden = false;
+        if (unpublishButton instanceof HTMLButtonElement) {
+          unpublishButton.disabled = false;
+          unpublishButton.hidden = false;
+        }
       } catch (error) {
         publishFeedback.textContent = caughtErrorMessage(error, "公開できませんでした。");
         publishFeedback.classList.add("warning");
         publishButton.disabled = false;
+      }
+    });
+  }
+  if (unpublishButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
+    unpublishButton.addEventListener("click", async () => {
+      if (!confirm("公開ページを停止しますか？ 固定プレビューと下書きは残ります。")) return;
+      unpublishButton.disabled = true;
+      publishFeedback.textContent = "公開を停止しています…";
+      publishFeedback.classList.remove("warning", "success");
+      try {
+        const response = await fetch(unpublishButton.dataset.unpublish || "", {
+          method: "DELETE",
+          headers: { "x-csrf-token": unpublishButton.dataset.csrf || "" }
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "公開を停止できませんでした。"));
+        unpublishButton.disabled = false;
+        unpublishButton.hidden = true;
+        if (publishedStatus instanceof HTMLElement) publishedStatus.textContent = "未公開";
+        if (publicLink instanceof HTMLAnchorElement) {
+          publicLink.href = "#";
+          publicLink.hidden = true;
+        }
+        if (copyPublicButton instanceof HTMLButtonElement) copyPublicButton.hidden = true;
+        if (publishButton instanceof HTMLButtonElement) {
+          publishButton.dataset.publishedCurrent = "false";
+          publishButton.textContent = "確認した版を公開";
+          publishButton.disabled = publishButton.dataset.durationValid !== "true" || publishButton.dataset.previewReviewed !== "true";
+        }
+        publishFeedback.textContent = "公開を停止しました。固定プレビューと編集内容は残っています。";
+        publishFeedback.classList.add("success");
+      } catch (error) {
+        unpublishButton.disabled = false;
+        publishFeedback.textContent = caughtErrorMessage(error, "公開を停止できませんでした。");
+        publishFeedback.classList.add("warning");
       }
     });
   }

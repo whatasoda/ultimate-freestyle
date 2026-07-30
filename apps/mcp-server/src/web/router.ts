@@ -49,6 +49,7 @@ import {
   markPresentationPreviewReviewed,
   PublicationError,
   publishPresentationPreview,
+  unpublishPresentation,
   readOwnerPresentationAudio,
   readOwnerPreview,
   readOwnerPresentationAsset,
@@ -3261,11 +3262,32 @@ async function handlePreviewPublish(
   env: Env,
   projectId: string
 ): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  if (request.method !== "POST" && request.method !== "DELETE") {
+    return new Response(null, { status: 405, headers: { allow: "POST, DELETE" } });
   }
   const session = await requireWebSessionAndCsrf(request, env);
   if (session === null) return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  if (request.method === "DELETE") {
+    try {
+      const status = await unpublishPresentation(env.DB, session.userId, projectId);
+      await recordWebAudit(env.DB, {
+        userId: session.userId,
+        eventType: "presentation.unpublished",
+        outcome: "succeeded",
+        details: { project_id: projectId },
+        createdAt: new Date().toISOString()
+      });
+      return jsonResponse({
+        ok: true,
+        publication: status,
+        public_url: null,
+        error: null,
+        request_id: crypto.randomUUID()
+      });
+    } catch (error) {
+      return publicationErrorResponse(error);
+    }
+  }
   const read = await readRequestJson(request);
   if (!read.ok) return read.response;
   const parsed = publishRequestSchema.safeParse(read.value);

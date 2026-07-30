@@ -593,6 +593,27 @@ export async function publishPresentationPreview(
   return updated;
 }
 
+export async function unpublishPresentation(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string
+): Promise<PublicationStatus> {
+  const result = await db
+    .prepare(
+      `UPDATE project_publications
+       SET published_revision_id = NULL, updated_at = ?
+       WHERE project_id = ? AND owner_user_id = ?`
+    )
+    .bind(new Date().toISOString(), projectId, ownerUserId)
+    .run();
+  if (result.meta.changes === 0) {
+    throw new PublicationError("PROJECT_NOT_FOUND", "研究が見つかりません。");
+  }
+  const updated = await getPublicationStatus(db, ownerUserId, projectId);
+  if (updated === null) throw new Error("Unpublished project could not be read.");
+  return updated;
+}
+
 export async function markPresentationPreviewReviewed(
   db: D1Database,
   ownerUserId: string,
