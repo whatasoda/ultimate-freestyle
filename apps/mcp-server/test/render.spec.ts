@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@106");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@107");
     expect(html).toContain("effectiveOpacity *=");
     expect(html).toContain("background.complex || effectiveOpacity < .99");
     expect(html).toContain('--aspect-font-scale: 1;');
@@ -382,7 +382,7 @@ describe("presentation artifact renderer", () => {
     expect(html).not.toContain('"/presentation-assets/revision/image"');
     expect(html).toContain('"/audio/result-0.mp3"');
     expect(html).toContain("const preloadResources = async");
-    expect(html).toContain("Math.min(4, resources.length)");
+    expect(html).toContain("Math.min(concurrency, resources.length)");
     expect(html).not.toContain("].slice(0, 2)");
     expect(html).toContain("history.pushState(null, '', '?slide=1&step=0')");
     expect(html).toContain('data-template-id="my-biim"');
@@ -830,6 +830,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("item.tabIndex = item === active ? 0 : -1");
     expect(html).toContain('aria-labelledby="prelude-title"');
     expect(html).toContain("stage?.focus({ preventScroll: true })");
+    expect(html).toContain("critical.audio.filter((item) => item.at === 0)");
+    expect(html).toContain("preloadResources(deferredAudio, () => {}, 1)");
+    expect(html).toContain("preludeMeter.setAttribute('aria-valuetext'");
     expect(html).toContain("boundary.getBoundingClientRect()");
     expect(html).toContain("overflow.x > 1 || overflow.y > 1");
     expect(html).toContain("scale > .45");

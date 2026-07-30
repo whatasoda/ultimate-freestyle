@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@106";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@107";
 
 function escapeHtml(value: string): string {
   return value
@@ -438,7 +438,7 @@ export function renderPresentationHtml(
         : [];
     return {
       images: [...new Set(assetIds.map((assetId) => options.assetUrls?.[assetId] ?? `/media/${encodeURIComponent(assetId)}`))],
-      audio: [...new Set(slide.narration?.segments.flatMap((segment) => segment.audio_src === null ? [] : [segment.audio_src]) ?? [])]
+      audio: [...new Map(slide.narration?.segments.flatMap((segment) => segment.audio_src === null ? [] : [[segment.audio_src, { url: segment.audio_src, at: segment.at }] as const]) ?? []).values()]
     };
   });
   const voiceCredits = [
@@ -2330,9 +2330,12 @@ export function renderPresentationHtml(
     const markPreloadProgress = (completed, total, failed = 0) => {
       const percent = total === 0 ? 100 : completed / total * 100;
       if (preludeProgress) preludeProgress.style.width = percent + '%';
-      if (preludeMeter) preludeMeter.setAttribute('aria-valuenow', String(Math.round(percent)));
-      if (preludeStatus) preludeStatus.textContent = completed < total
-        ? completed + ' / ' + total + ' 件を準備中'
+      if (preludeMeter) {
+        preludeMeter.setAttribute('aria-valuenow', String(Math.round(percent)));
+        preludeMeter.setAttribute('aria-valuetext', completed + ' / ' + total + '件');
+      }
+      if (preludeStatus && (completed === 0 || completed === total)) preludeStatus.textContent = completed < total
+        ? '発表に必要な素材を準備しています'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
       if (prelude instanceof HTMLElement) {
         prelude.dataset.preloadCompleted = String(completed);
@@ -2352,7 +2355,7 @@ export function renderPresentationHtml(
       media.src = url;
       if (kind === 'audio') media.load();
     });
-    const preloadResources = async (resources, onComplete) => {
+    const preloadResources = async (resources, onComplete, concurrency = 4) => {
       let cursor = 0;
       const worker = async () => {
         while (cursor < resources.length) {
@@ -2363,7 +2366,7 @@ export function renderPresentationHtml(
           finally { onComplete(succeeded); }
         }
       };
-      const workerCount = Math.min(4, resources.length);
+      const workerCount = Math.min(concurrency, resources.length);
       await Promise.allSettled(Array.from({ length: workerCount }, worker));
     };
     const scheduleUpcomingPreload = () => {
@@ -2371,10 +2374,11 @@ export function renderPresentationHtml(
       if (!upcoming) return;
       const resources = [
         ...upcoming.images.map((url) => [url, 'image']),
-        ...upcoming.audio.map((url) => [url, 'audio'])
+        ...upcoming.audio.filter((item) => item.at === 0).map((item) => [item.url, 'audio'])
       ];
-      if (resources.length === 0) return;
-      const load = () => { void preloadResources(resources, () => {}); };
+      const deferredAudio = upcoming.audio.filter((item) => item.at !== 0).map((item) => [item.url, 'audio']);
+      if (resources.length === 0 && deferredAudio.length === 0) return;
+      const load = () => { void preloadResources(resources, () => {}, 2).then(() => preloadResources(deferredAudio, () => {}, 1)); };
       if ('requestIdleCallback' in window) window.requestIdleCallback(load, { timeout: 2000 });
       else setTimeout(load, 600);
     };
@@ -2384,8 +2388,9 @@ export function renderPresentationHtml(
       const resources = [
         ['fonts', 'font'],
         ...critical.images.map((url) => [url, 'image']),
-        ...critical.audio.map((url) => [url, 'audio'])
+        ...critical.audio.filter((item) => item.at === 0).map((item) => [item.url, 'audio'])
       ];
+      const deferredAudio = critical.audio.filter((item) => item.at !== 0).map((item) => [item.url, 'audio']);
       let completed = 0, failed = 0;
       markPreloadProgress(completed, resources.length, failed);
       const startedLoadingAt = performance.now();
@@ -2401,6 +2406,9 @@ export function renderPresentationHtml(
       if (preludeStatus) preludeStatus.textContent = completed < resources.length
         ? '一部を読み込みながら開始できます'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
+      const loadDeferredAudio = () => { void preloadResources(deferredAudio, () => {}, 1); };
+      if ('requestIdleCallback' in window) window.requestIdleCallback(loadDeferredAudio, { timeout: 2500 });
+      else setTimeout(loadDeferredAudio, 800);
       schedulePreludeFit();
     };
     document.querySelector('#next').addEventListener('click', () => { if (visibilityPause) return; if (started) advance(); });

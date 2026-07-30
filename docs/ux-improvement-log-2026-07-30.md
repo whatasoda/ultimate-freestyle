@@ -1082,3 +1082,9 @@
 - `list_project_images`は最大100画像の長いファイル名・説明・URLを常に一括返却し、数件のasset IDを選びたいAgentにも不要なcontextを消費させていた。
 - 既定20件・最大50件の`limit`と`offset`を追加し、続きがある場合だけ`next_offset`を返す。Web UIや公開処理で全画像を読む既存repository関数は変えず、MCP応答だけを部分化した。
 - 2画像を1件ずつ取得するMCP契約で順序、次offset、終端nullを固定し、成功・error応答とも固定schemaへ揃えた。
+
+## 改善ループ317
+
+- 0ページ目は最初のスライドにある最大101音声を画像・fontと同じ優先度・4並列で読み込み、一件ごとに`aria-live`文を更新した。開始に不要な後半音声が画像と競合し、支援技術へ進捗を連打していた。
+- 開始前はfont・画像・STEP 0音声だけをcriticalとし、残り音声は開始可能になった後のidle時間へ一並列で送る。次スライドも画像とSTEP 0を二並列で先行し、後半音声を一並列で続ける。
+- 逐次件数はprogressbarの`aria-valuetext`へ置き、live statusは開始・開始可能・完了/失敗だけへ抑えた。rendererを`uf-renderer@107`へ更新した。
