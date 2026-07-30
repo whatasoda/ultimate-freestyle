@@ -2784,6 +2784,34 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
   }
+  for (const rollbackButton of document.querySelectorAll("[data-publish-rollback]")) {
+    if (!(rollbackButton instanceof HTMLButtonElement) || !(publishFeedback instanceof HTMLElement)) continue;
+    rollbackButton.addEventListener("click", async () => {
+      if (!confirm("以前に公開したこの版へ戻しますか？ 現在の下書きは変更されません。")) return;
+      setButtonBusy(rollbackButton, true, "切替中…");
+      publishFeedback.textContent = "以前の公開版へ切り替えています…";
+      publishFeedback.classList.remove("warning", "success");
+      try {
+        const response = await fetch(rollbackButton.dataset.publishRollback || "", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": rollbackButton.dataset.csrf || ""
+          },
+          body: JSON.stringify({ revision_id: rollbackButton.dataset.revision || "" })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "以前の公開版へ戻せませんでした。"));
+        publishFeedback.textContent = "以前の公開版へ戻しました。下書きは変更していません。";
+        publishFeedback.classList.add("success");
+        location.reload();
+      } catch (error) {
+        setButtonBusy(rollbackButton, false);
+        publishFeedback.textContent = caughtErrorMessage(error, "以前の公開版へ戻せませんでした。");
+        publishFeedback.classList.add("warning");
+      }
+    });
+  }
   if (copyPublicButton instanceof HTMLButtonElement && publicLink instanceof HTMLAnchorElement) {
     copyPublicButton.addEventListener("click", async () => {
       if (publicLink.hidden || publicLink.getAttribute("href") === "#") return;

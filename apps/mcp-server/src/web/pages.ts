@@ -240,7 +240,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=100";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=101";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -587,6 +587,9 @@ function shell(title: string, body: string): string {
       .status-row { display: flex; justify-content: space-between; gap: 1rem; padding: .65rem 0; border-top: 1px solid var(--line); }
       .status-row:first-of-type { border-top: 0; }
       .status-row span { color: var(--muted); }
+      .publication-history { display: grid; gap: .35rem; margin-top: .65rem; }
+      .publication-history .status-row { align-items: center; padding: .55rem .65rem; border: 1px solid var(--line); border-radius: .55rem; }
+      .publication-history .status-row span, .publication-history .status-row small { display: grid; gap: .12rem; }
       .success { color: #74e6b2 !important; }
       .warning { color: #ffd681 !important; }
       .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
@@ -1242,6 +1245,15 @@ export function projectDetailPage(options: {
   const publishedCurrent =
     published?.project_version === options.project.version &&
     published.renderer_version === options.publication.current_renderer_version;
+  const publicationHistory = options.publication.published_history.length === 0
+    ? ""
+    : `<details class="component-detail"><summary>公開履歴 · ${options.publication.published_history.length}件</summary><div class="publication-history">${options.publication.published_history.map((revision) => {
+        const active = revision.revision_id === published?.revision_id;
+        const publishedAt = revision.published_at === null
+          ? revision.created_at
+          : revision.published_at;
+        return `<article class="status-row"><span><strong>v${revision.project_version} · ${escapeHtml(revision.renderer_version)}</strong><small>${escapeHtml(new Date(publishedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></span>${active ? '<strong class="success">公開中</strong>' : `<button class="ghost" type="button" data-publish-rollback="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(revision.revision_id)}" data-csrf="${escapeHtml(options.csrfToken)}">この版へ戻す</button>`}</article>`;
+      }).join("")}</div></details>`;
   const researchReady =
     (document.question?.trim().length ?? 0) > 0 &&
     (document.method?.trim().length ?? 0) > 0;
@@ -1462,6 +1474,7 @@ export function projectDetailPage(options: {
     <a class="button ghost" data-public-link href="${published !== null && options.publication.slug !== null ? `/p/${escapeHtml(options.publication.slug)}` : "#"}" target="_blank" rel="noopener"${published === null || options.publication.slug === null ? " hidden" : ""}>公開ページを開く</a>
     <button class="ghost" type="button" data-copy-public${published === null || options.publication.slug === null ? " hidden" : ""}>公開URLをコピー</button><span class="feedback" data-copy-public-feedback aria-live="polite"></span>
     <button class="danger ghost" type="button" data-unpublish="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-csrf="${escapeHtml(options.csrfToken)}"${published === null ? " hidden" : ""}>公開を停止</button>
+    ${publicationHistory}
     <div class="actions">
       <button type="button" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 ? " disabled" : ""}>現在の下書きをプレビュー</button>
       <button class="ghost" type="button" data-review-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews/${escapeHtml(preview?.revision_id ?? "")}/review" data-project="${escapeHtml(options.project.project_id)}" data-version="${options.project.version}" data-renderer="${escapeHtml(options.publication.current_renderer_version)}" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}" disabled>${previewReviewed ? "プレビュー確認済み" : "終了画面の到達待ち"}</button>

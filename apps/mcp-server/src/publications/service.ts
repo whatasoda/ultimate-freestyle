@@ -51,6 +51,7 @@ export type PresentationRevision = {
   byte_size: number;
   created_at: string;
   reviewed_at: string | null;
+  published_at: string | null;
 };
 
 export type PublicationStatus = {
@@ -60,6 +61,7 @@ export type PublicationStatus = {
   slug: string | null;
   latest_preview: PresentationRevision | null;
   published: PresentationRevision | null;
+  published_history: PresentationRevision[];
 };
 
 type RevisionRow = {
@@ -72,6 +74,7 @@ type RevisionRow = {
   byte_size: number;
   created_at: string;
   reviewed_at: string | null;
+  published_at?: string | null;
 };
 
 function toRevision(row: RevisionRow): PresentationRevision {
@@ -84,7 +87,8 @@ function toRevision(row: RevisionRow): PresentationRevision {
     content_hash: row.content_hash,
     byte_size: row.byte_size,
     created_at: row.created_at,
-    reviewed_at: row.reviewed_at
+    reviewed_at: row.reviewed_at,
+    published_at: row.published_at ?? null
   };
 }
 
@@ -302,7 +306,7 @@ export async function getPublicationStatus(
     const row = await db
       .prepare(
         `SELECT id, project_id, project_version, renderer_version, object_key, content_hash,
-                byte_size, created_at, reviewed_at
+                byte_size, created_at, reviewed_at, published_at
          FROM presentation_revisions
          WHERE id = ? AND owner_user_id = ?`
       )
@@ -310,6 +314,17 @@ export async function getPublicationStatus(
       .first<RevisionRow>();
     if (row !== null) revisions.set(row.id, toRevision(row));
   }
+  const historyRows = await db
+    .prepare(
+      `SELECT id, project_id, project_version, renderer_version, object_key, content_hash,
+              byte_size, created_at, reviewed_at, published_at
+       FROM presentation_revisions
+       WHERE project_id = ? AND owner_user_id = ? AND published_at IS NOT NULL
+       ORDER BY published_at DESC
+       LIMIT 10`
+    )
+    .bind(projectId, ownerUserId)
+    .all<RevisionRow>();
   return {
     project_id: projectId,
     draft_version: project.version,
@@ -324,7 +339,8 @@ export async function getPublicationStatus(
       state?.published_revision_id === null ||
       state?.published_revision_id === undefined
         ? null
-        : (revisions.get(state.published_revision_id) ?? null)
+        : (revisions.get(state.published_revision_id) ?? null),
+    published_history: historyRows.results.map(toRevision)
   };
 }
 
@@ -506,7 +522,8 @@ export async function createPresentationPreview(
         content_hash: contentHash,
         byte_size: bytes.byteLength,
         created_at: now,
-        reviewed_at: null
+        reviewed_at: null,
+        published_at: null
       },
       slug
     };
@@ -530,20 +547,10 @@ export async function publishPresentationPreview(
   if (project === null) {
     throw new PublicationError("PROJECT_NOT_FOUND", "研究が見つかりません。");
   }
-  const totalDurationSeconds = project.document.deck?.slides.reduce(
-    (total, slide) => total + slide.duration_seconds,
-    0
-  ) ?? 0;
-  if (totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS) {
-    throw new PublicationError(
-      "PRESENTATION_DURATION_EXCEEDED",
-      `想定発表時間が${Math.floor(totalDurationSeconds / 60)}分${String(totalDurationSeconds % 60).padStart(2, "0")}秒です。20分以内に短縮してから公開してください。`
-    );
-  }
   const revision = await db
     .prepare(
       `SELECT id, project_id, project_version, renderer_version, object_key, content_hash,
-              byte_size, created_at, reviewed_at
+              byte_size, created_at, reviewed_at, published_at
        FROM presentation_revisions
        WHERE id = ? AND project_id = ? AND owner_user_id = ?`
     )
@@ -555,34 +562,50 @@ export async function publishPresentationPreview(
       "確認対象のプレビューが見つかりません。"
     );
   }
-  if (revision.project_version !== status.draft_version) {
-    throw new PublicationError(
-      "PREVIEW_STALE",
-      `プレビューは v${revision.project_version}、現在の下書きは v${status.draft_version} です。新しいプレビューを確認してください。`
-    );
-  }
-  if (revision.renderer_version !== PRESENTATION_RENDERER_VERSION) {
-    throw new PublicationError(
-      "PREVIEW_STALE",
-      `プレビューは ${revision.renderer_version}、現在は ${PRESENTATION_RENDERER_VERSION} です。新しいプレビューを確認してください。`
-    );
-  }
-  if (revision.reviewed_at === null) {
-    throw new PublicationError(
-      "PREVIEW_NOT_REVIEWED",
-      "固定プレビューを最後まで確認し、確認済みにしてから公開してください。"
-    );
+  if (revision.published_at === null) {
+    const totalDurationSeconds = project.document.deck?.slides.reduce(
+      (total, slide) => total + slide.duration_seconds,
+      0
+    ) ?? 0;
+    if (totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS) {
+      throw new PublicationError(
+        "PRESENTATION_DURATION_EXCEEDED",
+        `想定発表時間が${Math.floor(totalDurationSeconds / 60)}分${String(totalDurationSeconds % 60).padStart(2, "0")}秒です。20分以内に短縮してから公開してください。`
+      );
+    }
+    if (revision.project_version !== status.draft_version) {
+      throw new PublicationError(
+        "PREVIEW_STALE",
+        `プレビューは v${revision.project_version}、現在の下書きは v${status.draft_version} です。新しいプレビューを確認してください。`
+      );
+    }
+    if (revision.renderer_version !== PRESENTATION_RENDERER_VERSION) {
+      throw new PublicationError(
+        "PREVIEW_STALE",
+        `プレビューは ${revision.renderer_version}、現在は ${PRESENTATION_RENDERER_VERSION} です。新しいプレビューを確認してください。`
+      );
+    }
+    if (revision.reviewed_at === null) {
+      throw new PublicationError(
+        "PREVIEW_NOT_REVIEWED",
+        "固定プレビューを最後まで確認し、確認済みにしてから公開してください。"
+      );
+    }
   }
   const now = new Date().toISOString();
-  const result = await db
-    .prepare(
+  const [publicationResult] = await db.batch([
+    db.prepare(
       `UPDATE project_publications
        SET published_revision_id = ?, updated_at = ?
        WHERE project_id = ? AND owner_user_id = ?`
-    )
-    .bind(revisionId, now, projectId, ownerUserId)
-    .run();
-  if (result.meta.changes === 0) {
+    ).bind(revisionId, now, projectId, ownerUserId),
+    db.prepare(
+      `UPDATE presentation_revisions
+       SET published_at = ?
+       WHERE id = ? AND project_id = ? AND owner_user_id = ?`
+    ).bind(now, revisionId, projectId, ownerUserId)
+  ]);
+  if (publicationResult.meta.changes === 0) {
     throw new PublicationError(
       "PREVIEW_NOT_FOUND",
       "公開状態が見つかりません。"

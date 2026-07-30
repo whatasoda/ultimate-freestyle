@@ -890,7 +890,8 @@ describe("presentation artifact renderer", () => {
         current_renderer_version: PRESENTATION_RENDERER_VERSION,
         slug: null,
         latest_preview: null,
-        published: null
+        published: null,
+        published_history: []
       }
     }).text();
     expect(overLimitHtml).toContain("23分20秒");

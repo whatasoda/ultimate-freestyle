@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=100"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=101"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -1291,7 +1291,35 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(publish.status).toBe(200);
-    const publishResult = (await publish.json()) as { public_url: string };
+    const publishResult = (await publish.json()) as {
+      public_url: string;
+      publication: { published_history: Array<{ revision_id: string }> };
+    };
+    expect(publishResult.publication.published_history).toContainEqual({
+      revision_id: previewResult.revision.revision_id,
+      project_id: "10000000-0000-4000-8000-000000000001",
+      project_version: 4,
+      renderer_version: PRESENTATION_RENDERER_VERSION,
+      object_key: expect.any(String),
+      content_hash: expect.any(String),
+      byte_size: expect.any(Number),
+      created_at: expect.any(String),
+      reviewed_at: expect.any(String),
+      published_at: expect.any(String)
+    });
+    const publishedDetail = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const publishedDetailHtml = await publishedDetail.text();
+    expect(publishedDetailHtml).toContain("公開履歴 · 1件");
+    expect(publishedDetailHtml).toContain("公開中");
+    expect(DASHBOARD_SCRIPT).toContain("data-publish-rollback");
+    expect(DASHBOARD_SCRIPT).toContain("以前の公開版へ戻しました");
     const publicPage = await requestProvider(
       provider,
       new Request(`https://saijiyu-kenkyu.2764.moe${publishResult.public_url}`),
@@ -2249,6 +2277,37 @@ describe("Web dashboard", () => {
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
     const convertedSlide = JSON.parse(documentWithComposition!.document_json).deck.slides.find((item: { id: string }) => item.id === createFlowResult.slide_id);
     expect(convertedSlide.composition).toMatchObject({ mode: "canvas", blocks: [{ id: "main-text", kind: "markdown" }] });
+
+    const rollbackPublish = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/publish",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ revision_id: previewResult.revision.revision_id })
+        }
+      ),
+      authEnv
+    );
+    expect(rollbackPublish.status).toBe(200);
+    expect(await rollbackPublish.json()).toMatchObject({
+      publication: {
+        draft_version: 35,
+        published: { revision_id: previewResult.revision.revision_id, project_version: 4 }
+      }
+    });
+    const rolledBackPage = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${publishResult.public_url}`),
+      authEnv
+    );
+    expect(rolledBackPage.status).toBe(200);
+    expect(await rolledBackPage.text()).toContain("Webで微調整した研究");
 
     const unsupportedUpload = await requestProvider(
       provider,
