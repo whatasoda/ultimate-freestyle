@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@71";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@72";
 
 function escapeHtml(value: string): string {
   return value
@@ -1290,6 +1290,7 @@ export function renderPresentationHtml(
       if (!speech || !segment) { hideVoiceUnlock(); scheduleAutoAdvance(); return; }
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
+      const run = voiceRun;
       setSecondaryProgressLabel('読み上げ進捗');
       activeAudio = player;
       player.preload = 'auto';
@@ -1297,7 +1298,11 @@ export function renderPresentationHtml(
       player.addEventListener('timeupdate', () => {
         if (Number.isFinite(player.duration) && player.duration > 0) setVoiceProgress(player.currentTime / player.duration * 100);
       });
-      player.addEventListener('ended', finishVoice, { once: true });
+      player.addEventListener('ended', () => {
+        if (run !== voiceRun || activeAudio !== player) return;
+        activeAudio = null;
+        finishVoice();
+      }, { once: true });
       const fallback = () => {
         if (activeAudio !== player) return;
         player.pause(); activeAudio = null; setVoiceProgress(0); speakWithBrowser(segment);
