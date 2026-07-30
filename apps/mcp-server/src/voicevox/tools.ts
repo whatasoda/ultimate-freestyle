@@ -56,7 +56,8 @@ const compactVoiceStatusSchema = z.object({
   summary: voiceProjectStatusSchema.shape.summary,
   active_job: compactVoiceJobSchema.nullable(),
   latest_job: compactVoiceJobSchema.nullable(),
-  details_uri: z.string()
+  details_uri: z.string(),
+  slide_details_uri_template: z.string()
 });
 
 function compactVoiceJob(job: z.infer<typeof voiceJobStatusSchema> | null) {
@@ -82,7 +83,8 @@ function compactVoiceStatus(
     summary: voice.summary,
     active_job: compactVoiceJob(voice.active_job),
     latest_job: compactVoiceJob(voice.latest_job),
-    details_uri: `research://projects/${voice.project_id}/voice`
+    details_uri: `research://projects/${voice.project_id}/voice`,
+    slide_details_uri_template: `research://projects/${voice.project_id}/voice/slides/{slideId}`
   };
 }
 
@@ -126,7 +128,7 @@ export function registerVoiceTools(
     {
       title: "研究のVOICEVOX詳細",
       description:
-        "既定profileの調声値、区間ごとの原稿・実効調声・生成状態、進行中と直近のjobを返します。",
+        "既定profile、生成数、jobとスライド別区間数を返します。原稿・実効調声は一枚resourceから取得します。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -137,9 +139,72 @@ export function registerVoiceTools(
         const voice = typeof id === "string"
           ? await getVoiceProjectStatus(env.DB, ownerUserId, id)
           : null;
-        body = voice === null
-          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
-          : { ok: true, voice };
+        if (voice === null) {
+          body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+        } else {
+          const { segments, ...overview } = voice;
+          const slides = [...new Map(segments.map((segment) => [segment.slide_id, segment.slide_title])).entries()]
+            .map(([slideId, title]) => {
+              const entries = segments.filter((segment) => segment.slide_id === slideId);
+              return {
+                slide_id: slideId,
+                title,
+                segment_count: entries.length,
+                ready_count: entries.filter((segment) => segment.status === "ready").length,
+                failed_count: entries.filter((segment) => segment.status === "failed").length,
+                details_uri: `research://projects/${voice.project_id}/voice/slides/${slideId}`
+              };
+            });
+          body = { ok: true, voice: overview, slides };
+        }
+      } catch (error) {
+        body = { ok: false, error: normalizeVoiceError(error) };
+      }
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(body)
+        }]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-slide-voice",
+    new ResourceTemplate("research://projects/{id}/voice/slides/{slideId}", { list: undefined }),
+    {
+      title: "研究の一枚分のVOICEVOX詳細",
+      description:
+        "指定スライドの読み上げ原稿、話者、profile、実効調声、生成状態だけを返します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const id = variables.id;
+      const slideId = variables.slideId;
+      let body: Record<string, unknown>;
+      try {
+        const ownerUserId = requireSubject(getAuthProps, "research:read");
+        const voice = typeof id === "string"
+          ? await getVoiceProjectStatus(env.DB, ownerUserId, id)
+          : null;
+        if (voice === null) {
+          body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+        } else if (typeof slideId !== "string") {
+          body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+        } else {
+          const segments = voice.segments.filter((segment) => segment.slide_id === slideId);
+          body = segments.length === 0
+            ? { ok: false, error: { code: "SLIDE_VOICE_NOT_FOUND" } }
+            : {
+                ok: true,
+                project_id: voice.project_id,
+                version: voice.version,
+                slide_id: slideId,
+                slide_title: segments[0]?.slide_title,
+                segments
+              };
+        }
       } catch (error) {
         body = { ok: false, error: normalizeVoiceError(error) };
       }

@@ -545,6 +545,9 @@ describe("MCP contract", () => {
           }),
           expect.objectContaining({
             uriTemplate: "research://projects/{id}/voice"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/voice/slides/{slideId}"
           })
         ])
       );
@@ -1440,7 +1443,8 @@ describe("MCP contract", () => {
             label: "案内役"
           },
           summary: { total: 1, ready: 0, needs_generation: 1 },
-          details_uri: `research://projects/${projectId}/voice`
+          details_uri: `research://projects/${projectId}/voice`,
+          slide_details_uri_template: `research://projects/${projectId}/voice/slides/{slideId}`
         }
       });
       const voiceDetails = await readJsonResource(
@@ -1453,20 +1457,37 @@ describe("MCP contract", () => {
           version: 15,
           default_profile: {
             tuning: { speedScale: 1.1, intonationScale: 1.2 }
-          },
-          segments: [{
-            profile_label: "案内役",
-            effective_tuning: {
-              speedScale: 1.1,
-              pitchScale: -0.02,
-              intonationScale: 1.2,
-              volumeScale: 1,
-              pauseLengthScale: 1,
-              prePhonemeLength: 0.1,
-              postPhonemeLength: 0.1
-            }
-          }]
-        }
+          }
+        },
+        slides: [{
+          slide_id: "intro",
+          segment_count: 1,
+          ready_count: 0,
+          details_uri: `research://projects/${projectId}/voice/slides/intro`
+        }]
+      });
+      expect((voiceDetails as { voice: object }).voice).not.toHaveProperty("segments");
+      const slideVoiceDetails = await readJsonResource(
+        client,
+        `research://projects/${projectId}/voice/slides/intro`
+      );
+      expect(slideVoiceDetails).toMatchObject({
+        ok: true,
+        project_id: projectId,
+        version: 15,
+        slide_id: "intro",
+        segments: [{
+          profile_label: "案内役",
+          effective_tuning: {
+            speedScale: 1.1,
+            pitchScale: -0.02,
+            intonationScale: 1.2,
+            volumeScale: 1,
+            pauseLengthScale: 1,
+            prePhonemeLength: 0.1,
+            postPhonemeLength: 0.1
+          }
+        }]
       });
       const voiceBlockedPublication = await readJsonResource(
         client,
