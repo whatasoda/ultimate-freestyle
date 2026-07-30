@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "154";
+export const DASHBOARD_ASSET_VERSION = "155";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
@@ -30,11 +30,20 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
   const projectSectionLinks = [...document.querySelectorAll(".project-section-nav a[href^='#']")];
+  let currentProjectSectionId = "";
   const setCurrentProjectSection = (id) => {
+    if (currentProjectSectionId === id) return;
+    currentProjectSectionId = id;
     for (const link of projectSectionLinks) {
       if (!(link instanceof HTMLAnchorElement)) continue;
-      if (link.hash === "#" + id) link.setAttribute("aria-current", "location");
-      else link.removeAttribute("aria-current");
+      if (link.hash === "#" + id) {
+        link.setAttribute("aria-current", "location");
+        link.scrollIntoView({
+          block: "nearest",
+          inline: "nearest",
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+        });
+      } else link.removeAttribute("aria-current");
     }
   };
   for (const link of projectSectionLinks) {
