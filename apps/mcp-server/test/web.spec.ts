@@ -439,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=128"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=129"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントがこの端末になく");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントの代替表示");
@@ -586,6 +586,22 @@ describe("Web dashboard", () => {
       issue_count: 1,
       results_json: expect.stringContaining("小さすぎる文字")
     });
+    const detailWithSavedQuality = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const detailWithSavedQualityHtml = await detailWithSavedQuality.text();
+    expect(detailWithSavedQualityHtml).toContain("0ページ目と全スライドの実表示を一括確認 · 要確認 1件");
+    expect(detailWithSavedQualityHtml).toContain('data-rendered-quality-state>要確認 1件');
+    expect(detailWithSavedQualityHtml).toContain('data-saved-quality-result');
+    expect(detailWithSavedQualityHtml).toContain("STEP 1: 小さすぎる文字1か所");
+    expect(detailWithSavedQualityHtml).toContain(
+      'href="/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro">1. はじめに</a>'
+    );
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
     );

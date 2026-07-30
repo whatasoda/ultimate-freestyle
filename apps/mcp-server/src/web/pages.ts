@@ -220,7 +220,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=128";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=129";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1772,9 +1772,24 @@ export function projectDetailPage(options: {
     }))
   ];
   const qualitySweepStepCount = qualitySweepSlides.reduce((total, slide) => total + slide.max_step + 1, 0);
+  const savedRenderedQualityItems = renderedQualityCurrent
+    ? (options.renderedQualityReport?.results ?? [])
+        .filter((result) => result.warning)
+        .map((result) => {
+          const slide = qualitySweepSlides.find((item) => item.id === result.slide_id);
+          const label = result.slide_id === "__prelude__"
+            ? "0ページ目"
+            : slide === undefined
+              ? result.slide_id
+              : `${slide.number}. ${slide.title}`;
+          const href = slide?.href ?? "#rendered-quality";
+          return `<li data-saved-quality-result><a href="${escapeHtml(href)}">${escapeHtml(label)}</a> — ${escapeHtml(result.message)}</li>`;
+        })
+        .join("")
+    : "";
   const qualitySweepPanel = qualitySweepSlides.length === 0
     ? ""
-    : `<details class="panel panel-disclosure" id="rendered-quality"${renderedQualityState === "clean" ? "" : " open"}><summary>0ページ目と全スライドの実表示を一括確認 · ${escapeHtml(renderedQualityLabel)}</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で${loadingScreen.enabled ? "0ページ目と" : ""}全${slides.length}枚・${qualitySweepStepCount}段階を順番に描画し、見切れ、70%未満の自動縮小、文字コントラスト、読み上げ文の省略、文字サイズ、重なり、代替フォントを探します。完了結果は同じ研究へ接続したAIからも確認できます。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-project-id="${escapeHtml(options.project.project_id)}" data-project-version="${options.project.version}" data-renderer-version="${escapeHtml(PRESENTATION_RENDERER_VERSION)}" data-report-url="/api/projects/${escapeHtml(options.project.project_id)}/quality-report" data-csrf="${escapeHtml(options.csrfToken)}" data-prelude-minimum-ms="${loadingScreen.minimum_duration_ms}" data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`/dashboard/projects/${options.project.project_id}/slides/${slides[0]?.id}/frame?slide=1&step=0`)}">${renderedQualityState === "missing" ? "一括チェックを開始" : "一括チェックをやり直す"}</button><button class="ghost" type="button" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">${escapeHtml(renderedQualityLabel)}</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="0ページ目と全スライドの表示確認"></iframe></div></div></details>`;
+    : `<details class="panel panel-disclosure" id="rendered-quality"${renderedQualityState === "clean" ? "" : " open"}><summary>0ページ目と全スライドの実表示を一括確認 · ${escapeHtml(renderedQualityLabel)}</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で${loadingScreen.enabled ? "0ページ目と" : ""}全${slides.length}枚・${qualitySweepStepCount}段階を順番に描画し、見切れ、70%未満の自動縮小、文字コントラスト、読み上げ文の省略、文字サイズ、重なり、代替フォントを探します。完了結果は同じ研究へ接続したAIからも確認できます。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-project-id="${escapeHtml(options.project.project_id)}" data-project-version="${options.project.version}" data-renderer-version="${escapeHtml(PRESENTATION_RENDERER_VERSION)}" data-report-url="/api/projects/${escapeHtml(options.project.project_id)}/quality-report" data-csrf="${escapeHtml(options.csrfToken)}" data-prelude-minimum-ms="${loadingScreen.minimum_duration_ms}" data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`/dashboard/projects/${options.project.project_id}/slides/${slides[0]?.id}/frame?slide=1&step=0`)}">${renderedQualityState === "missing" ? "一括チェックを開始" : "一括チェックをやり直す"}</button><button class="ghost" type="button" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">${escapeHtml(renderedQualityLabel)}</span></div><ol class="quality-sweep-results" data-quality-sweep-results>${savedRenderedQualityItems}</ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="0ページ目と全スライドの表示確認"></iframe></div></div></details>`;
 
   return new Response(
     shell(

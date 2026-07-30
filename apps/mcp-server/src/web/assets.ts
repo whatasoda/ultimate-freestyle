@@ -477,6 +477,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     try {
       const saved = JSON.parse(sessionStorage.getItem(sweepStorageKey) || "null");
       if (saved && saved.total_checkpoints === totalCheckpoints && Array.isArray(saved.results)) {
+        if (qualitySweepResults instanceof HTMLOListElement) qualitySweepResults.replaceChildren();
         sweepResults = saved.results.filter((result) => result && typeof result.message === "string" && typeof result.href === "string" && typeof result.label === "string" && typeof result.warning === "boolean");
         sweepResults.forEach(renderSweepResult);
         completedCheckpoints = Math.min(Math.max(Number(saved.completed_checkpoints) || 0, 0), totalCheckpoints);
