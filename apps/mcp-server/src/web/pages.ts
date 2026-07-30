@@ -1574,7 +1574,17 @@ export function projectDetailPage(options: {
     { label: "研究内容", detail: "問いと方法", complete: researchReady },
     { label: "発表構成", detail: `${slides.length}枚`, complete: slidesReady },
     { label: "実表示", detail: renderedQualityLabel, complete: renderedQualityState === "clean" },
-    { label: "プレビュー", detail: previewCurrent ? "確認可能" : "未確認", complete: previewCurrent },
+    {
+      label: "プレビュー",
+      detail: previewReviewed
+        ? "確認済み"
+        : previewCurrent
+          ? "確認待ち"
+          : preview === null
+            ? "未作成"
+            : "要再生成",
+      complete: previewReviewed
+    },
     { label: "公開", detail: publishedCurrent ? "最新版" : "未反映", complete: publishedCurrent }
   ];
   const journeyCompleted = journeySteps.filter((step) => step.complete).length;
@@ -1611,6 +1621,12 @@ export function projectDetailPage(options: {
             description: "固定された確認用URLを開き、文字・音声・ページ送りを通して確認します。",
             action: `<a class="button" href="#publication">プレビューへ進む</a>`
           }
+        : !previewReviewed
+          ? {
+              title: "固定プレビューを最後まで確認する",
+              description: "文字の見切れ、読み上げ、自動送りを確認し、最後の終了画面まで進めます。",
+              action: `<a class="button" href="/preview/${escapeHtml(preview.revision_id)}" target="_blank" rel="noopener">プレビューを確認</a>`
+            }
         : !publishedCurrent
           ? {
               title: "確認したプレビューを公開する",

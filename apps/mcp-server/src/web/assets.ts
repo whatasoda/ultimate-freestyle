@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "133";
+export const DASHBOARD_ASSET_VERSION = "134";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const apiErrorMessage = (result, fallback) => {
@@ -3581,6 +3581,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         pendingReviewDetail = null;
         reviewRetryCount = 0;
         clearTimeout(reviewRetryTimer);
+        reloadPublicationWhenSafe(publishFeedback);
       } catch (error) {
         reviewRetryCount += 1;
         reviewButton.textContent = reviewRetryCount <= 3 ? "到達記録を再試行中…" : "到達記録を再試行";
