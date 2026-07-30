@@ -1331,6 +1331,7 @@ describe("presentation artifact renderer", () => {
     );
     expect(pagedVoiceHtml).toContain('data-selected="true"');
     expect(pagedVoiceHtml).toContain("segment=rich-result%3A40");
+    expect(pagedVoiceHtml).toContain('data-voice-select="voice-segment-rich-result-40"');
     expect(pagedVoiceHtml).toContain("2 / 3ページ · 81件");
     expect(pagedVoiceHtml).toContain('name="q" value="区間"');
     expect(pagedVoiceHtml).toContain('class="voice-search-row"');

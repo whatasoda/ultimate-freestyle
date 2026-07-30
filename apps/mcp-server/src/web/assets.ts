@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "140";
+export const DASHBOARD_ASSET_VERSION = "141";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const link of document.querySelectorAll(".project-section-nav a[href^='#']")) {
@@ -2346,12 +2346,26 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     url.searchParams.set("step", String(step));
     return url;
   };
+  const navigationFocusKey = "ultimate-freestyle:navigation-focus";
+  const rememberNavigationFocus = (kind, target, destination) => {
+    const url = new URL(destination, location.origin);
+    try {
+      sessionStorage.setItem(navigationFocusKey, JSON.stringify({
+        kind,
+        target,
+        destination: url.pathname + url.search,
+        created_at: Date.now()
+      }));
+    } catch {}
+  };
   const navigateToComponent = (componentId, href) => {
     const workspace = document.querySelector(".slide-workspace");
     if (workspace instanceof HTMLElement && workspace.dataset.selectedComponent === componentId) return false;
     dispatchEvent(new Event("ultimate-freestyle:persist-drafts"));
     document.body.dataset.internalNavigation = "true";
-    location.assign(componentSelectionUrl(componentId, href));
+    const destination = componentSelectionUrl(componentId, href);
+    rememberNavigationFocus("component", componentId, destination);
+    location.assign(destination);
     return true;
   };
   for (const link of document.querySelectorAll("[data-component-select]")) {
@@ -2360,6 +2374,55 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       navigateToComponent(link.dataset.componentSelect || "", link.href);
+    });
+  }
+  for (const link of document.querySelectorAll("[data-voice-select]")) {
+    if (!(link instanceof HTMLAnchorElement)) continue;
+    link.addEventListener("click", (event) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      rememberNavigationFocus("voice", link.dataset.voiceSelect || "", link.href);
+    });
+  }
+  let navigationFocus = null;
+  try {
+    navigationFocus = JSON.parse(sessionStorage.getItem(navigationFocusKey) || "null");
+    sessionStorage.removeItem(navigationFocusKey);
+  } catch {
+    try { sessionStorage.removeItem(navigationFocusKey); } catch {}
+  }
+  if (
+    navigationFocus &&
+    navigationFocus.destination === location.pathname + location.search &&
+    Date.now() - Number(navigationFocus.created_at) < 30_000
+  ) {
+    let focusTarget = null;
+    if (navigationFocus.kind === "component") {
+      const sceneForm = document.querySelector('[data-scene-component-editor][data-component-id="' + CSS.escape(String(navigationFocus.target)) + '"]');
+      const canvasForm = [...document.querySelectorAll("[data-canvas-block-editor]")].find((form) => {
+        if (!(form instanceof HTMLFormElement)) return false;
+        try { return JSON.parse(form.dataset.component || "{}").id === navigationFocus.target; } catch { return false; }
+      });
+      const form = sceneForm instanceof HTMLFormElement ? sceneForm : canvasForm;
+      const section = document.querySelector('[data-inspector-section="structure"]');
+      if (section instanceof HTMLDetailsElement) section.open = true;
+      if (form instanceof HTMLFormElement) {
+        const detail = form.closest("details.component-detail");
+        if (detail instanceof HTMLDetailsElement) {
+          detail.open = true;
+          focusTarget = detail.querySelector(":scope > summary");
+        }
+      }
+      setMobilePane("edit");
+    } else if (navigationFocus.kind === "voice") {
+      const detail = document.getElementById(String(navigationFocus.target));
+      if (detail instanceof HTMLDetailsElement) {
+        detail.open = true;
+        focusTarget = detail.querySelector(":scope > summary");
+      }
+    }
+    if (focusTarget instanceof HTMLElement) requestAnimationFrame(() => {
+      focusTarget.scrollIntoView({ block: "center" });
+      focusTarget.focus({ preventScroll: true });
     });
   }
   const componentSearch = document.querySelector("[data-component-search]");
