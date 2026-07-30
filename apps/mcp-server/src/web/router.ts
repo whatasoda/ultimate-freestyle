@@ -1431,7 +1431,7 @@ async function handleProjectListItemUpdate(
       item_index: itemIndex,
       next_url: itemIndex === null
         ? `/dashboard/projects/${projectId}#${listAnchor}`
-        : `/dashboard/projects/${projectId}?research_item=${parsed.data.list}:${itemIndex}#${listAnchor}`,
+        : `/dashboard/projects/${projectId}?research_item=${parsed.data.list}:${itemIndex}#research-item-${parsed.data.list}-${itemIndex}`,
       error: null,
       request_id: crypto.randomUUID()
     });

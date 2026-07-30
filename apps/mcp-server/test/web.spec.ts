@@ -592,6 +592,7 @@ describe("Web dashboard", () => {
     const selectedFindingHtml = await selectedFindingDetail.text();
     expect(selectedFindingHtml.match(/data-project-list-item/g)).toHaveLength(3);
     expect(selectedFindingHtml).toContain('name="index" value="0"');
+    expect(selectedFindingHtml).toContain('id="research-item-findings-0" tabindex="-1"');
     expect(selectedFindingHtml).toContain(
       'data-project-list-action="update"'
     );
@@ -1232,7 +1233,7 @@ describe("Web dashboard", () => {
       ok: true,
       version: 2,
       item_index: 0,
-      next_url: `/dashboard/projects/${listItemProjectId}?research_item=findings:0#research-list-findings`
+      next_url: `/dashboard/projects/${listItemProjectId}?research_item=findings:0#research-item-findings-0`
     });
     const updateListItem = await mutateListItem({
       expected_version: 2,
