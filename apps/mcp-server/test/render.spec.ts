@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@112");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@113");
     expect(html).toContain("const isEditorTargetVisible = (item)");
     expect(html).toContain(
       "item.closest('.reveal-block[aria-hidden=\"true\"]') === null"
@@ -415,6 +415,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("return lowest ?? manualReview");
     expect(html).toContain("manual_review: true");
     expect(html).toContain("const imageBehindText = (candidate, slideElement)");
+    expect(html).toContain("!['canvas', 'scene'].includes(slideElement.dataset.composition || '')");
     expect(html).toContain("document.elementsFromPoint");
     expect(html).toContain("suggested_foreground: estimated ? null");
     expect(html).toContain("reason: manualReason");

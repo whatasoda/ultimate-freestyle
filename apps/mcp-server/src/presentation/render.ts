@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@112";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@113";
 
 function escapeHtml(value: string): string {
   return value
@@ -1556,6 +1556,7 @@ export function renderPresentationHtml(
       return { color: background, estimated, manualReason };
     };
     const imageBehindText = (candidate, slideElement) => {
+      if (!['canvas', 'scene'].includes(slideElement.dataset.composition || '')) return false;
       const textRects = [];
       for (const node of candidate.childNodes) {
         if (node.nodeType !== Node.TEXT_NODE || !node.textContent?.trim()) continue;
