@@ -1091,6 +1091,35 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (/^#[0-9a-f]{6}$/i.test(text.value)) color.value = text.value;
     });
   }
+  for (const button of document.querySelectorAll("[data-narration-color-pick]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      if (!(form instanceof HTMLFormElement)) return;
+      let palette = {};
+      try { palette = JSON.parse(button.dataset.narrationColorPick || "{}"); } catch {}
+      for (const [fieldName, key] of [["appearance_background", "background"], ["appearance_foreground", "foreground"], ["appearance_border_color", "border_color"], ["appearance_accent", "accent"], ["appearance_corner_radius_px", "corner_radius_px"]]) {
+        const field = form.elements.namedItem(fieldName);
+        if (!(field instanceof HTMLInputElement) || palette[key] === undefined) continue;
+        field.value = String(palette[key]);
+        field.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    });
+  }
+  for (const button of document.querySelectorAll("[data-narration-color-reset]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      if (!(form instanceof HTMLFormElement)) return;
+      const names = ["appearance_background", "appearance_foreground", "appearance_border_color", "appearance_accent", "appearance_corner_radius_px"];
+      for (const name of names) {
+        const field = form.elements.namedItem(name);
+        if (field instanceof HTMLInputElement) field.value = "";
+      }
+      const last = form.elements.namedItem("appearance_corner_radius_px");
+      if (last instanceof HTMLInputElement) last.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
 
   for (const field of document.querySelectorAll('textarea[maxlength], input[maxlength]:not([type]):not([data-component-color-hex]), input[type="text"][maxlength]:not([data-color-text]):not([data-component-color-hex]):not([data-narration-color-text])')) {
     if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement)) continue;

@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=75"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=76"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -569,6 +569,9 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("読み上げ枠の色");
     expect(workspaceHtml).toContain('name="appearance_background"');
     expect(workspaceHtml).toContain("話者・進捗色");
+    expect(workspaceHtml).toContain("夜のパネル");
+    expect(workspaceHtml).toContain("ずんだ色");
+    expect(workspaceHtml).toContain("形式の既定");
     expect(workspaceHtml).toContain("data-segment-speech-preview");
     expect(workspaceHtml).toContain("data-segment-duration");
     expect(workspaceHtml).toContain("data-profile-tunings");
@@ -702,6 +705,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("まだ画像がありません");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-narration-settings");
     expect(dashboardScriptText).toContain("data-narration-color-preview");
+    expect(dashboardScriptText).toContain("data-narration-color-pick");
+    expect(dashboardScriptText).toContain("data-narration-color-reset");
     expect(dashboardScriptText).toContain('item.id === "narration" ? "appearance_foreground"');
     expect(dashboardScriptText).toContain("読み上げ枠をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("説明を保存しています");
