@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@66";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@67";
 
 function escapeHtml(value: string): string {
   return value
@@ -622,6 +622,7 @@ export function renderPresentationHtml(
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; overflow: hidden; background: #090d14; color: #f8fafc; }
     button, input { font: inherit; }
+    .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
     .app { width: 100%; min-width: 0; height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; padding: 12px; }
     body[data-editor-frame="true"] .app { grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0; }
     body[data-editor-frame="true"] header, body[data-editor-frame="true"] footer { display: none; }
@@ -977,7 +978,7 @@ export function renderPresentationHtml(
 <body data-layout="${escapeHtml(deck.layout)}" data-aspect-ratio="${aspectRatio}" data-editor-frame="${String(options.editorFrame ?? false)}" data-renderer-version="${PRESENTATION_RENDERER_VERSION}">
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
-    <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}">
+    <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p>
       <section class="prelude" data-prelude data-style="${loadingScreen.style}"${loadingScreen.enabled && !options.editorFrame ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
@@ -1063,6 +1064,7 @@ export function renderPresentationHtml(
     const completionTime = document.querySelector('[data-completion-time]');
     const shortcuts = document.querySelector('[data-shortcuts]');
     const dismissShortcutsButton = document.querySelector('[data-dismiss-shortcuts]');
+    const editorAnnouncer = document.querySelector('[data-editor-announcer]');
     const volumeKey = 'ultimate-freestyle:narration-volume';
     const editorFrame = document.body.dataset.editorFrame === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1071,6 +1073,31 @@ export function renderPresentationHtml(
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
+    const announceEditor = (message) => {
+      if (editorAnnouncer instanceof HTMLElement) editorAnnouncer.textContent = message;
+    };
+    const selectEditorTarget = (target) => {
+      if (!editorFrame || !(target instanceof HTMLElement)) return;
+      document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
+      target.dataset.editorSelected = 'true';
+      target.focus({ preventScroll: true });
+      const id = target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '';
+      announceEditor('表示パーツ「' + id + '」を選択しました。');
+      parent.postMessage({
+        type: 'ultimate-freestyle:select-component',
+        component_type: target.hasAttribute('data-node-id') ? 'scene' : 'canvas',
+        component_id: id
+      }, location.origin);
+    };
+    if (editorFrame) {
+      document.querySelectorAll('[data-block-id], [data-node-id]').forEach((target) => {
+        if (!(target instanceof HTMLElement)) return;
+        const id = target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '';
+        const positioned = target.hasAttribute('data-block-id') || target.dataset.positioned === 'true';
+        target.tabIndex = 0;
+        target.setAttribute('aria-label', '表示パーツ ' + id + '（' + (positioned ? '自由配置' : '自動配置') + '）');
+      });
+    }
     const normalizeVolume = (value) => Number.isFinite(Number(value)) ? clamp(Number(value), 0, 1) : 1;
     const showVolume = () => {
       const value = normalizeVolume(volume.value);
@@ -1995,8 +2022,24 @@ export function renderPresentationHtml(
     showVolume();
     addEventListener('keydown', (event) => {
       if (editorFrame) {
+        if (event.key === 'Escape') {
+          document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
+          stage?.focus();
+          announceEditor('表示パーツの選択を解除しました。');
+          event.preventDefault();
+          return;
+        }
+        if (['Enter', ' '].includes(event.key) && event.target instanceof HTMLElement && event.target.matches('[data-block-id], [data-node-id]')) {
+          selectEditorTarget(event.target);
+          event.preventDefault();
+          return;
+        }
         if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return;
         const target = document.querySelector('[data-editor-selected="true"]');
+        if (target instanceof HTMLElement && target.hasAttribute('data-node-id') && target.dataset.positioned !== 'true') {
+          announceEditor('自動配置のパーツです。自由配置へ切り替えると矢印キーで調整できます。');
+          return;
+        }
         const boundary = target instanceof HTMLElement ? target.offsetParent : null;
         if (!(target instanceof HTMLElement) || !(boundary instanceof HTMLElement)) return;
         const targetRect = target.getBoundingClientRect();
@@ -2028,6 +2071,7 @@ export function renderPresentationHtml(
           component_id: target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '',
           frame: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, width: Math.round(width * 10) / 10, height: Math.round(height * 10) / 10 }
         }, location.origin);
+        announceEditor('x ' + Math.round(x * 10) / 10 + '%、y ' + Math.round(y * 10) / 10 + '%、幅 ' + Math.round(width * 10) / 10 + '%、高さ ' + Math.round(height * 10) / 10 + '%。');
         event.preventDefault();
         return;
       }
@@ -2130,15 +2174,7 @@ export function renderPresentationHtml(
       if (editorFrame) {
         const target = event.target instanceof Element ? event.target.closest('[data-node-id], [data-block-id]') : null;
         if (!(target instanceof HTMLElement)) return;
-        document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
-        target.dataset.editorSelected = 'true';
-        target.tabIndex = 0;
-        target.focus({ preventScroll: true });
-        parent.postMessage({
-          type: 'ultimate-freestyle:select-component',
-          component_type: target.hasAttribute('data-node-id') ? 'scene' : 'canvas',
-          component_id: target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || ''
-        }, location.origin);
+        selectEditorTarget(target);
         return;
       }
       if (getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
