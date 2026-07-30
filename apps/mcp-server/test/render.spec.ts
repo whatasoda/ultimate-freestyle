@@ -179,7 +179,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const collectOcclusions =");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@75");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@76");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -235,6 +235,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('aria-live="off"');
     expect(html).toContain("setAttribute('aria-valuetext'");
     expect(html).not.toContain('<span id="counter" aria-live="polite">');
+    expect(html).toContain("const scheduleUpcomingPreload =");
+    expect(html).toContain("DECK.preload.slides[slide + 1]");
+    expect(html).toContain("const critical = DECK.preload.slides[requested]");
+    expect(html).not.toContain("DECK.preload.images.map");
     expect(html).toContain("else scheduleAutoAdvance();");
     expect(html).toContain("ultimate-freestyle:preview-fields");
     expect(html).toContain("ultimate-freestyle:preview-scene-component");
@@ -303,7 +307,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('--slide-column-gap:2.4em');
     expect(html).toContain('--template-accent-secondary: #65ccff');
     expect(html).toContain('--template-border: #334155');
-    expect(html).toContain('"/presentation-assets/revision/image"');
+    expect(html).not.toContain('"/presentation-assets/revision/image"');
     expect(html).toContain('"/audio/result-0.mp3"');
     expect(html).toContain("const preloadResources = async");
     expect(html).toContain("Math.min(4, resources.length)");

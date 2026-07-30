@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@75";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@76";
 
 function escapeHtml(value: string): string {
   return value
@@ -414,17 +414,17 @@ export function renderPresentationHtml(
     minimum_duration_ms: 500,
     ...(deck.loading_screen ?? {})
   };
-  const preloadImages = [...new Set(Object.values(options.assetUrls ?? {}))];
-  const preloadAudio = [
-    ...new Set(
-      deck.slides.flatMap(
-        (slide) =>
-          slide.narration?.segments.flatMap((segment) =>
-            segment.audio_src === null ? [] : [segment.audio_src]
-          ) ?? []
-      )
-    )
-  ];
+  const preloadSlides = deck.slides.map((slide) => {
+    const assetIds = slide.composition?.mode === "canvas"
+      ? slide.composition.blocks.flatMap((block) => block.kind === "image" ? [block.asset_id] : [])
+      : slide.composition?.mode === "scene"
+        ? slide.composition.nodes.flatMap((node) => node.kind === "image" ? [node.asset_id] : [])
+        : [];
+    return {
+      images: [...new Set(assetIds.flatMap((assetId) => options.assetUrls?.[assetId] ? [options.assetUrls[assetId]] : []))],
+      audio: [...new Set(slide.narration?.segments.flatMap((segment) => segment.audio_src === null ? [] : [segment.audio_src]) ?? [])]
+    };
+  });
   const voiceCredits = [
     ...new Set(
       deck.slides.flatMap(
@@ -450,7 +450,7 @@ export function renderPresentationHtml(
     aspectRatio,
     accent: deck.accent,
     loadingScreen,
-    preload: { images: preloadImages, audio: preloadAudio },
+    preload: { slides: preloadSlides },
     voiceCredits,
     slides: deck.slides.map((slide) => {
       const segments = slide.narration?.segments.map((segment) => {
@@ -2013,7 +2013,7 @@ export function renderPresentationHtml(
       progress.parentElement?.setAttribute('aria-valuenow', String(Math.round(progressPercent)));
       progress.parentElement?.setAttribute('aria-valuetext', 'スライド ' + (slide + 1) + ' / ' + slides.length + '、段階 ' + (step + 1) + ' / ' + (DECK.slides[slide].revealSteps + 1));
       expected.textContent = format(expectedElapsed());
-      scheduleFit(); speak();
+      scheduleFit(); speak(); scheduleUpcomingPreload();
     };
     const restore = () => {
       const query = new URLSearchParams(location.search);
@@ -2033,7 +2033,10 @@ export function renderPresentationHtml(
         ? completed + ' / ' + total + ' 件を準備中'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
     };
+    const preloadedResources = new Set();
     const preloadResource = (url, kind) => new Promise((resolve) => {
+      if (preloadedResources.has(url)) { resolve({ url, ok: true }); return; }
+      preloadedResources.add(url);
       const media = kind === 'image' ? new Image() : new Audio();
       media.addEventListener(kind === 'image' ? 'load' : 'canplay', () => resolve({ url, ok: true }), { once: true });
       media.addEventListener('error', () => resolve({ url, ok: false }), { once: true });
@@ -2055,11 +2058,25 @@ export function renderPresentationHtml(
       const workerCount = Math.min(4, resources.length);
       await Promise.allSettled(Array.from({ length: workerCount }, worker));
     };
+    const scheduleUpcomingPreload = () => {
+      const upcoming = DECK.preload.slides[slide + 1];
+      if (!upcoming) return;
+      const resources = [
+        ...upcoming.images.map((url) => [url, 'image']),
+        ...upcoming.audio.map((url) => [url, 'audio'])
+      ];
+      if (resources.length === 0) return;
+      const load = () => { void preloadResources(resources, () => {}); };
+      if ('requestIdleCallback' in window) window.requestIdleCallback(load, { timeout: 2000 });
+      else setTimeout(load, 600);
+    };
     const preparePrelude = async () => {
+      const requested = Math.min(Math.max(Number(new URLSearchParams(location.search).get('slide') ?? 1) - 1, 0), DECK.slides.length - 1);
+      const critical = DECK.preload.slides[requested] ?? { images: [], audio: [] };
       const resources = [
         ['fonts', 'font'],
-        ...DECK.preload.images.map((url) => [url, 'image']),
-        ...DECK.preload.audio.map((url) => [url, 'audio'])
+        ...critical.images.map((url) => [url, 'image']),
+        ...critical.audio.map((url) => [url, 'audio'])
       ];
       let completed = 0, failed = 0;
       markPreloadProgress(completed, resources.length, failed);
