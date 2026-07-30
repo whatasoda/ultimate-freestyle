@@ -220,7 +220,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=129";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=130";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -615,6 +615,8 @@ function shell(title: string, body: string): string {
       body[data-preview-focus="true"] .workspace-preview { width: min(100%, 96rem); margin: 0 auto; }
       .filmstrip, .inspector { display: grid; gap: .65rem; align-content: start; max-height: calc(100vh - 10rem); overflow: auto; }
       .filmstrip-search { position: sticky; z-index: 2; top: 0; display: grid; gap: .3rem; padding-bottom: .35rem; background: linear-gradient(var(--bg) 80%, transparent); color: var(--muted); font-size: .72rem; font-weight: 700; }
+      .filmstrip-search-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+      .filmstrip-search output { color: #cbd6e4; font-variant-numeric: tabular-nums; }
       .filmstrip-search input { min-height: 2.35rem; padding: .5rem .65rem; font-size: .8rem; }
       .filmstrip-empty { margin: .4rem; color: var(--muted); font-size: .8rem; }
       .filmstrip-link { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: .55rem; padding: .7rem; border: 1px solid var(--line); border-radius: .65rem; color: #bdc9d8; text-decoration: none; }
@@ -2519,7 +2521,7 @@ export function slideWorkspacePage(options: {
          ${effectiveSummary}
          <nav class="mobile-workspace-tabs" role="tablist" aria-label="モバイル編集表示"><button class="ghost" id="mobile-tab-preview" type="button" role="tab" data-mobile-pane="preview" aria-selected="true" aria-controls="workspace-preview-pane">プレビュー<span class="tab-badge" data-mobile-preview-badge hidden>未確認</span></button><button class="ghost" id="mobile-tab-edit" type="button" role="tab" data-mobile-pane="edit" aria-selected="false" aria-controls="workspace-edit-pane" tabindex="-1">編集</button><button class="ghost" id="mobile-tab-slides" type="button" role="tab" data-mobile-pane="slides" aria-selected="false" aria-controls="workspace-slides-pane" tabindex="-1">スライド一覧</button></nav>
          <div class="slide-workspace" data-workspace-asset-urls="${escapeHtml(JSON.stringify(workspaceAssetUrls))}" data-selected-component="${escapeHtml(selectedComponentId ?? "")}" data-selected-narration="${selectedNarrationSegment?.at ?? ""}">
-           <nav class="filmstrip" id="workspace-slides-pane" role="tabpanel" aria-labelledby="mobile-tab-slides"><label class="filmstrip-search">${deck.slides.length}枚から検索<input type="search" data-filmstrip-search placeholder="タイトル・構成・音声状態" autocomplete="off"></label>${filmstrip}<p class="filmstrip-empty" data-filmstrip-empty hidden>一致するスライドはありません。</p></nav>
+           <nav class="filmstrip" id="workspace-slides-pane" role="tabpanel" aria-labelledby="mobile-tab-slides" data-filmstrip-project="${escapeHtml(options.project.project_id)}"><label class="filmstrip-search"><span class="filmstrip-search-head"><span>${deck.slides.length}枚から検索</span><output data-filmstrip-search-count aria-live="polite">${deck.slides.length} / ${deck.slides.length}枚</output></span><input type="search" data-filmstrip-search placeholder="タイトル・構成・音声状態" autocomplete="off"></label>${filmstrip}<p class="filmstrip-empty" data-filmstrip-empty hidden>一致するスライドはありません。Escキーで検索を解除できます。</p></nav>
            <section class="panel workspace-preview" id="workspace-preview-pane" role="tabpanel" aria-labelledby="mobile-tab-preview">
              <div class="workspace-frame" style="--workspace-aspect:${(deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame data-aspect-ratio="${deck.aspect_ratio ?? "16:9"}"></iframe></div>
              <div class="step-control"><button class="ghost" type="button" data-step-direction="previous">← 段階</button><output data-step-output aria-live="polite">STEP 0 / ${slide.reveal_steps}</output><button class="ghost" type="button" data-step-direction="next">段階 →</button>${slide.composition?.mode === "scene" || slide.composition?.mode === "canvas" ? '<button class="ghost" type="button" data-grid-snap aria-pressed="false">5%グリッド OFF</button>' : ""}</div>

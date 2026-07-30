@@ -1958,6 +1958,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (filmstripSearch instanceof HTMLInputElement) {
     const filmstripSlides = [...document.querySelectorAll("[data-filmstrip-slide]")];
     const filmstripEmpty = document.querySelector("[data-filmstrip-empty]");
+    const filmstripCount = document.querySelector("[data-filmstrip-search-count]");
+    const filmstripProject = filmstripSearch.closest("[data-filmstrip-project]")?.dataset.filmstripProject || "unknown";
+    const filmstripSearchKey = "ultimate-freestyle:filmstrip-search:" + filmstripProject;
     const filterFilmstrip = () => {
       const query = filmstripSearch.value.trim().toLocaleLowerCase("ja");
       let visible = 0;
@@ -1968,14 +1971,25 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (matches) visible += 1;
       }
       if (filmstripEmpty instanceof HTMLElement) filmstripEmpty.hidden = visible > 0;
+      if (filmstripCount instanceof HTMLOutputElement) filmstripCount.value = visible + " / " + filmstripSlides.length + "枚";
     };
-    filmstripSearch.addEventListener("input", filterFilmstrip);
+    try {
+      const savedQuery = sessionStorage.getItem(filmstripSearchKey) || "";
+      const activeMatches = activeFilmstripSlide instanceof HTMLElement && (activeFilmstripSlide.dataset.searchText || "").includes(savedQuery.trim().toLocaleLowerCase("ja"));
+      filmstripSearch.value = savedQuery === "" || activeMatches ? savedQuery : "";
+    } catch {}
+    filmstripSearch.addEventListener("input", () => {
+      try { sessionStorage.setItem(filmstripSearchKey, filmstripSearch.value); } catch {}
+      filterFilmstrip();
+    });
     filmstripSearch.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
       filmstripSearch.value = "";
+      try { sessionStorage.removeItem(filmstripSearchKey); } catch {}
       filterFilmstrip();
       filmstripSearch.blur();
     });
+    filterFilmstrip();
   }
 
   const splitSlideButton = document.querySelector("[data-slide-split]");

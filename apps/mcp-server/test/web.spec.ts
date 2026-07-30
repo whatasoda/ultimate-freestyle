@@ -439,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=129"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=130"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントがこの端末になく");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントの代替表示");
@@ -733,6 +733,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("data-composition-editor");
     expect(workspaceHtml).toContain("スライド枠外を隠す");
     expect(workspaceHtml).toContain("data-slide-frame");
+    expect(workspaceHtml).toContain("data-filmstrip-search-count");
+    expect(workspaceHtml).toContain('data-filmstrip-project="10000000-0000-4000-8000-000000000001"');
     expect(workspaceHtml).toContain("data-content-structure");
     expect(workspaceHtml).toContain("「読み物」組版を試す");
     expect(workspaceHtml).toContain('data-aspect-ratio="16:9"');
@@ -884,6 +886,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
     expect(dashboardScriptText).toContain("data-project-search-empty");
     expect(dashboardScriptText).toContain("filterProjects");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:filmstrip-search:");
+    expect(dashboardScriptText).toContain('filmstripSlides.length + "枚"');
     expect(dashboardScriptText).toContain("ultimate-freestyle:quality-sweep:");
     expect(dashboardScriptText).toContain("data-voicevox-sample");
     expect(dashboardScriptText).toContain("data-segment-voicevox-sample");
