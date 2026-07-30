@@ -739,7 +739,12 @@ describe("MCP contract", () => {
             "参照画像のR2実体",
             "生成音声の合計100MiB上限",
             "生成HTMLの2MiB上限"
-          ])
+          ]),
+          quality: {
+            uri: `research://projects/${firstProject.project_id}/quality`,
+            state: "clean",
+            advisories: []
+          }
         },
         web: {
           dashboard: {
@@ -1707,6 +1712,11 @@ describe("MCP contract", () => {
               total: 1
             })
           ],
+          quality: {
+            uri: `research://projects/${projectId}/quality`,
+            state: "missing",
+            advisories: ["実rendererによる一括品質確認がまだありません。"]
+          },
           can_publish: false
         }
       });

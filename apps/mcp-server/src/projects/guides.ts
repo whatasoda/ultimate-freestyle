@@ -899,14 +899,15 @@ export function registerResearchGuides(
     async (uri, variables) => {
       const auth = projectResourceBody(getAuthProps, "research:read");
       const id = variables.id;
-      const [status, project, voice, assets] = !("error" in auth) && typeof id === "string"
+      const [status, project, voice, assets, renderedReport] = !("error" in auth) && typeof id === "string"
         ? await Promise.all([
             getPublicationStatus(db, auth.ownerUserId, id),
             getProject(db, auth.ownerUserId, id),
             getVoiceProjectStatus(db, auth.ownerUserId, id),
-            listProjectAssets(db, auth.ownerUserId, id)
+            listProjectAssets(db, auth.ownerUserId, id),
+            getRenderedQualityReport(db, auth.ownerUserId, id)
           ])
-        : [null, null, null, []];
+        : [null, null, null, [], null];
       const latest = status?.latest_preview ?? null;
       const previewCurrent = status !== null && latest !== null &&
         latest.project_version === status.draft_version &&
@@ -984,8 +985,26 @@ export function registerResearchGuides(
       ];
       const contentBlocked = previewBlockers.length > 0 ||
         durationSeconds > MAX_PRESENTATION_DURATION_SECONDS;
+      const qualityState = renderedReport === null
+        ? "missing"
+        : renderedReport.project_version !== project?.version ||
+            renderedReport.renderer_version !== PRESENTATION_RENDERER_VERSION ||
+            renderedReport.status !== "completed"
+          ? "stale"
+          : renderedReport.issue_count > 0
+            ? "issues"
+            : "clean";
+      const qualityAdvisories = qualityState === "missing"
+        ? ["実rendererによる一括品質確認がまだありません。"]
+        : qualityState === "stale"
+          ? ["最新の研究版とrendererで一括品質確認をやり直してください。"]
+          : qualityState === "issues"
+            ? [`実表示の確認事項が${renderedReport?.issue_count ?? 0}件あります。`]
+            : [];
       const nextAction = contentBlocked
         ? "fix_blockers"
+        : qualityState !== "clean"
+          ? "review_quality"
         : !previewCurrent
           ? "create_preview"
           : latest?.reviewed_at === null
@@ -1036,7 +1055,12 @@ export function registerResearchGuides(
                     "参照画像のR2実体",
                     "生成音声の合計100MiB上限",
                     "生成HTMLの2MiB上限"
-                  ]
+                  ],
+                  quality: {
+                    uri: `research://projects/${status.project_id}/quality`,
+                    state: qualityState,
+                    advisories: qualityAdvisories
+                  }
                 },
                 web: {
                   dashboard: {
