@@ -1777,6 +1777,26 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     addEventListener("message", (event) => {
       if (event.origin !== location.origin || event.source !== slideFrame.contentWindow) return;
       const data = event.data;
+      if (data?.type === "ultimate-freestyle:select-component" && typeof data.component_id === "string") {
+        const forms = data.component_type === "scene"
+          ? [...document.querySelectorAll("[data-scene-component-editor]")]
+          : [...document.querySelectorAll("[data-canvas-block-editor]")];
+        const target = forms.find((form) => form instanceof HTMLFormElement && (data.component_type === "scene" ? form.dataset.componentId : form.dataset.blockId) === data.component_id);
+        if (!(target instanceof HTMLFormElement)) return;
+        if (document.body.dataset.previewFocus === "true" && previewFocusButton instanceof HTMLButtonElement) previewFocusButton.click();
+        const section = target.closest("[data-inspector-section]");
+        if (section instanceof HTMLDetailsElement) section.open = true;
+        const detail = target.closest("details.component-detail");
+        if (detail instanceof HTMLDetailsElement) detail.open = true;
+        target.scrollIntoView({ block: "start", behavior: "smooth" });
+        const summary = detail?.querySelector(":scope > summary");
+        if (summary instanceof HTMLElement) summary.focus({ preventScroll: true });
+        if (layoutStatus instanceof HTMLElement) {
+          layoutStatus.textContent = "「" + data.component_id + "」の編集欄を開きました。";
+          layoutStatus.dataset.level = "ok";
+        }
+        return;
+      }
       if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || !Array.isArray(data.overflows)) return;
       const overflows = data.overflows.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.overflow_x) && Number.isFinite(item.overflow_y));
       const compressed = Array.isArray(data.fits)

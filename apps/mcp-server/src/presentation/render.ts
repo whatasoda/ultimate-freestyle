@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@60";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@61";
 
 function escapeHtml(value: string): string {
   return value
@@ -640,6 +640,9 @@ export function renderPresentationHtml(
     .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; touch-action: pan-y; }
     .stage:focus-visible { outline: .2rem solid var(--accent); outline-offset: .18rem; }
     body[data-editor-frame="true"] .stage { cursor: default; }
+    body[data-editor-frame="true"] :is(.canvas-block, .scene-node) { cursor: pointer; }
+    body[data-editor-frame="true"] :is(.canvas-block, .scene-node):hover { outline: max(2px, .18cqw) dashed color-mix(in srgb, var(--accent) 78%, white); outline-offset: max(1px, .1cqw); }
+    body[data-editor-frame="true"] :is(.canvas-block, .scene-node)[data-editor-selected="true"] { outline: max(3px, .24cqw) solid var(--accent); outline-offset: max(1px, .12cqw); }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
     .slide::before, .slide::after { content: ""; position: absolute; z-index: 0; pointer-events: none; }
     .slide > * { position: relative; z-index: 1; }
@@ -2011,7 +2014,19 @@ export function renderPresentationHtml(
     stage?.addEventListener('pointercancel', () => { swipeStart = null; });
     stage?.addEventListener('click', (event) => {
       if (suppressStageClick) { suppressStageClick = false; return; }
-      if (editorFrame || getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
+      if (editorFrame) {
+        const target = event.target instanceof Element ? event.target.closest('[data-node-id], [data-block-id]') : null;
+        if (!(target instanceof HTMLElement)) return;
+        document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
+        target.dataset.editorSelected = 'true';
+        parent.postMessage({
+          type: 'ultimate-freestyle:select-component',
+          component_type: target.hasAttribute('data-node-id') ? 'scene' : 'canvas',
+          component_id: target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || ''
+        }, location.origin);
+        return;
+      }
+      if (getSelection()?.toString() || (shortcuts instanceof HTMLElement && !shortcuts.hidden)) return;
       if (event.target instanceof Element && event.target.closest('button, a, input, select, textarea')) return;
       if (!started) {
         if (preludeStart instanceof HTMLButtonElement && !preludeStart.disabled) preludeStart.click();
