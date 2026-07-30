@@ -3,6 +3,7 @@ import { PROJECT_IMAGE_LIMIT, type ProjectAsset } from "../assets/schema";
 import type {
   ProjectRecord,
   ProjectSummary,
+  SlideBlock,
   SlideSceneNode
 } from "../projects/schema";
 import {
@@ -237,7 +238,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=76";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=77";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -999,6 +1000,35 @@ function sceneComponentOutline(nodes: SlideSceneNode[]): string {
   return renderChildren(null);
 }
 
+function canvasBlockEditor(options: {
+  block: SlideBlock;
+  assets: ProjectAsset[];
+  action: string;
+  version: number;
+  csrfToken: string;
+  maxStep: number;
+}): string {
+  const { block } = options;
+  const field = (path: string, label: string, value: string | number, attributes = "") => `<label>${label}<input name="${path}" data-component-field data-component-path="${path}" data-component-number="${String(typeof value === "number")}" data-nullable="false" value="${escapeHtml(String(value))}" ${attributes}></label>`;
+  const select = (path: string, label: string, value: string, choices: Array<[string, string]>) => `<label>${label}<select name="${path}" data-component-field data-component-path="${path}" data-component-number="false" data-nullable="false">${choices.map(([choice, choiceLabel]) => `<option value="${choice}"${choice === value ? " selected" : ""}>${choiceLabel}</option>`).join("")}</select></label>`;
+  const frameField = (path: string, label: string, value: number, min: number) => `<label>${label}（%）<input name="${path}" data-component-field data-component-path="${path}" data-component-number="true" data-nullable="false" data-component-frame-field type="number" min="${min}" max="100" step="0.1" value="${value}" required></label>`;
+  const optionalNumber = (path: string, label: string, value: number | undefined, inherited: number, min: number, max: number, step = 1) => `<label>${label}<input name="${path}" data-component-field data-component-style-field data-component-path="${path}" data-component-number="true" data-component-optional="true" type="number" min="${min}" max="${max}" step="${step}" value="${value ?? ""}" placeholder="継承 ${inherited}"></label>`;
+  const optionalSelect = (path: string, label: string, value: string | undefined, inherited: string, choices: Array<[string, string]>) => `<label>${label}<select name="${path}" data-component-field data-component-style-field data-component-path="${path}" data-component-number="false" data-component-optional="true"><option value=""${value === undefined ? " selected" : ""}>継承（${inherited}）</option>${choices.map(([choice, choiceLabel]) => `<option value="${choice}"${choice === value ? " selected" : ""}>${choiceLabel}</option>`).join("")}</select></label>`;
+  const color = (path: string, label: string, value: string | null | undefined, fallback: string) => `<label>${label}<span class="color-control"><input type="color" value="${escapeHtml(value ?? fallback)}" data-component-color-preview="${path}" aria-label="${label}を色見本から選ぶ"><input name="${path}" data-component-field data-component-style-field data-component-color-hex data-component-path="${path}" data-component-number="false" data-nullable="true" value="${escapeHtml(value ?? "")}" placeholder="空欄で継承" pattern="^$|^#[0-9A-Fa-f]{6}$" maxlength="7" spellcheck="false"></span></label>`;
+  let content = "";
+  if (block.kind === "markdown") {
+    content = `<label>本文<textarea name="markdown" data-component-field data-component-path="markdown" data-component-number="false" data-nullable="false" maxlength="20000" required>${escapeHtml(block.markdown)}</textarea></label>`;
+  } else if (block.kind === "image") {
+    const imageOptions = options.assets.map((asset) => [asset.asset_id, asset.alt_text || asset.original_filename] as [string, string]);
+    if (!imageOptions.some(([id]) => id === block.asset_id)) imageOptions.unshift([block.asset_id, "現在の画像"]);
+    content = `${select("asset_id", "画像", block.asset_id, imageOptions)}${field("alt_text", "画像の説明", block.alt_text, 'maxlength="500"')}${select("fit", "画像の収め方", block.fit, [["contain", "全体を収める"], ["cover", "枠を埋める"], ["fill", "枠に合わせて伸縮"]])}`;
+  } else {
+    content = `${select("shape", "形", block.shape, [["rectangle", "四角形"], ["ellipse", "楕円"], ["line", "線"]])}<label>ラベル<input name="label" data-component-field data-component-path="label" data-component-number="false" data-nullable="true" maxlength="500" value="${escapeHtml(block.label ?? "")}"></label>`;
+  }
+  const style = block.style ?? {};
+  return `<details class="component-detail"><summary>${escapeHtml(block.id)} · ${block.kind} の内容・配置・見た目</summary><form class="editor" data-canvas-block-editor data-versioned-form action="${options.action}" data-version="${options.version}" data-component="${escapeHtml(JSON.stringify(block))}" data-asset-urls="${escapeHtml(JSON.stringify(Object.fromEntries(options.assets.map((asset) => [asset.asset_id, asset.content_url]))))}" data-csrf="${escapeHtml(options.csrfToken)}"><fieldset><legend>内容</legend><div class="editor-grid">${content}</div></fieldset><fieldset data-component-frame-controls data-enabled="true"><legend>位置と大きさ</legend><input name="frame_enabled" type="checkbox" data-component-frame-toggle checked hidden><div class="actions"><button class="ghost" type="button" data-component-frame-preset="5,5,90,90">余白つき全面</button><button class="ghost" type="button" data-component-frame-preset="5,10,43,80">左半分</button><button class="ghost" type="button" data-component-frame-preset="52,10,43,80">右半分</button><button class="ghost" type="button" data-component-frame-preset="5,5,90,42">上半分</button><button class="ghost" type="button" data-component-frame-preset="5,53,90,42">下半分</button></div><div class="editor-grid">${frameField("frame.x", "左から", block.frame.x, 0)}${frameField("frame.y", "上から", block.frame.y, 0)}${frameField("frame.width", "幅", block.frame.width, 0.1)}${frameField("frame.height", "高さ", block.frame.height, 0.1)}</div><p class="feedback" data-component-frame-feedback aria-live="polite"></p></fieldset><fieldset><legend>重なりと表示</legend><div class="editor-grid">${field("z_index", "重なり順", block.z_index, 'type="number" min="0" max="100"')}${field("at", "表示STEP", block.at, `type="number" min="0" max="${options.maxStep}"`)}${select("animation", "表示アニメーション", block.animation, Object.entries(ANIMATION_LABELS))}</div></fieldset><fieldset><legend>見た目</legend><div class="editor-grid">${color("style.background", "背景色", style.background, "#111827")}${color("style.foreground", "文字色", style.foreground, "#f8fafc")}${color("style.border_color", "境界線色", style.border_color, "#52647c")}${optionalNumber("style.border_width_px", "境界線の太さ", style.border_width_px, 0, 0, 8)}${optionalNumber("style.corner_radius_px", "角丸", style.corner_radius_px, 0, 0, 64)}${optionalNumber("style.padding_px", "内側余白", style.padding_px, 0, 0, 64)}${optionalNumber("style.font_scale", "文字倍率", style.font_scale, 1, 0.5, 3, 0.05)}${optionalNumber("style.opacity", "不透明度", style.opacity, 1, 0.1, 1, 0.05)}${optionalSelect("style.text_align", "文字揃え", style.text_align, "左", [["start", "左"], ["center", "中央"], ["end", "右"]])}${optionalSelect("style.vertical_align", "縦位置", style.vertical_align, "上", [["start", "上"], ["center", "中央"], ["end", "下"]])}${optionalSelect("style.shadow", "影", style.shadow, "なし", [["none", "なし"], ["soft", "柔らかい"], ["strong", "強い"]])}</div><div class="actions"><button class="ghost" type="button" data-component-style-reset>見た目をすべて継承へ戻す</button></div></fieldset><div class="actions"><button type="submit">この表示パーツを保存</button><span class="version" data-version-label>v${options.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+}
+
 export function landingPage(options: {
   broadcasterLogin: string;
   minFollowDays: number;
@@ -1709,7 +1739,7 @@ export function slideWorkspacePage(options: {
     slide.composition?.mode === "scene"
       ? "登録済みの表示パーツで構成されています。AIから一件ずつ構造を編集でき、この画面では内容、並び方、表示STEP、アニメーション、画像、配色、余白、文字倍率を実表示で調整できます。"
       : slide.composition?.mode === "canvas"
-        ? "従来の自由配置です。既存表示は維持されます。より複雑な構成は入れ子の自由構成へ移行できます。"
+        ? "自由配置の表示パーツです。この画面で内容、画像、位置、大きさ、重なり、表示STEP、アニメーション、見た目を調整できます。入れ子が必要な場合はAIからリッチ構成へ移行できます。"
         : "本文と補足欄を使う定型レイアウトです。";
   const sceneComponentEditors = slide.composition?.mode === "scene"
     ? slide.composition.nodes
@@ -1722,6 +1752,16 @@ export function slideWorkspacePage(options: {
           return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-asset-urls="${escapeHtml(JSON.stringify(assetUrls))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
         .join("")
+    : "";
+  const canvasBlockEditors = slide.composition?.mode === "canvas"
+    ? slide.composition.blocks.map((block) => canvasBlockEditor({
+        block,
+        assets: options.assets ?? [],
+        action: `${slidePath}/blocks/${escapeHtml(block.id)}`,
+        version: options.project.version,
+        csrfToken: options.csrfToken,
+        maxStep: slide.reveal_steps
+      })).join("")
     : "";
   const compositionEditor = slide.composition === null || slide.composition === undefined
     ? ""
@@ -2028,7 +2068,7 @@ export function slideWorkspacePage(options: {
                <form class="editor" data-narration-settings-editor data-versioned-form action="${slidePath}/narration/settings" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>表示形式<select name="display">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<option value="${value}"${narrationDisplay === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>スライド話者名<input name="speaker" maxlength="80" value="${escapeHtml(slide.narration?.speaker ?? "")}" placeholder="発表全体の既定: ${escapeHtml(deck.narration_defaults?.speaker ?? "なし")}"></label></div>${narrationDisplayPicker}<fieldset><legend>読み上げ枠</legend><div class="editor-grid"><label>配置<select name="placement">${[["bottom", "下部"], ["overlay-bottom", "下部に重ねる"], ["sidebar", "補足欄"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.placement === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>大きさ<select name="size">${[["compact", "小"], ["normal", "標準"], ["large", "大"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.size === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>文字揃え<select name="text_align"><option value="start"${narrationAppearance.text_align === "start" ? " selected" : ""}>左</option><option value="center"${narrationAppearance.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>文字倍率<input name="text_scale" type="number" min="0.75" max="1.5" step="0.05" value="${narrationAppearance.text_scale}"></label><label>最大行数<input name="max_lines" type="number" min="2" max="8" value="${narrationAppearance.max_lines}"></label></div><label class="check-label"><input name="speaker_visible" type="checkbox"${narrationAppearance.speaker_visible ? " checked" : ""}>話者名を表示</label><label class="check-label"><input name="progress_visible" type="checkbox"${narrationAppearance.progress_visible ? " checked" : ""}>読み上げ進捗を表示</label></fieldset><fieldset><legend>読み上げ枠の色</legend>${narrationPalettePicker}<div class="editor-grid">${narrationColorControls}<label>角丸（px）<input name="appearance_corner_radius_px" type="number" min="0" max="64" value="${narrationAppearance.corner_radius_px ?? ""}" placeholder="空欄で表示形式の既定"></label></div><p class="inherit-note">空欄は選択した表示形式とテンプレートの色を使います。</p></fieldset><p class="inherit-note">話者の実効値: ${escapeHtml(effectiveSpeaker ?? "なし")}。この欄で保存するとスライド設定として上書きします。</p><div class="actions"><button type="submit">読み上げ枠を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
                ${narrationSegmentCreator}${voiceSegments}
              </div></details>
-             <details class="inspector-section" data-inspector-section="structure"><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${compositionEditor}${sceneComponentEditors}${componentOutline}</div></details>
+             <details class="inspector-section" data-inspector-section="structure"><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${compositionEditor}${canvasBlockEditors}${sceneComponentEditors}${componentOutline}</div></details>
              <details class="inspector-section" data-inspector-section="quality" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-base-count="${qualityItems.length}" data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
            </aside>
          </div>

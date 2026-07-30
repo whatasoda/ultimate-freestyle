@@ -416,6 +416,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   let draftNarrationTimer;
   let draftSceneTimer;
   let draftCompositionTimer;
+  let draftCanvasTimer;
   let setWorkspaceStep = () => {};
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
@@ -737,6 +738,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (form.matches("[data-scene-component-editor]")) {
       Object.assign(body, { component: sceneComponentFromForm(form) });
     }
+    if (form.matches("[data-canvas-block-editor]")) {
+      Object.assign(body, { block: sceneComponentFromForm(form) });
+    }
     if (form.matches("[data-deck-editor]")) Object.assign(body, {
       aspect_ratio: String(data.get("aspect_ratio") || "16:9"),
       loading_screen: {
@@ -997,7 +1001,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       layoutStatus.dataset.level = "";
     }
   });
-  for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
+  const syncCanvasBlockDrafts = () => {
+    if (!(slideFrame instanceof HTMLIFrameElement)) return;
+    for (const form of document.querySelectorAll("[data-canvas-block-editor]")) {
+      if (!(form instanceof HTMLFormElement)) continue;
+      let assetUrls = {};
+      try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
+      slideFrame.contentWindow?.postMessage({
+        type: "ultimate-freestyle:preview-canvas-block",
+        slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
+        block: sceneComponentFromForm(form),
+        asset_urls: assetUrls
+      }, location.origin);
+    }
+  };
+  for (const form of document.querySelectorAll("[data-scene-component-editor], [data-canvas-block-editor]")) {
     const frameToggle = form.querySelector("[data-component-frame-toggle]");
     const frameFields = [...form.querySelectorAll("[data-component-frame-field]")].filter((field) => field instanceof HTMLInputElement);
     const frameFeedback = form.querySelector("[data-component-frame-feedback]");
@@ -1056,8 +1074,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     syncFrameControls();
     form.addEventListener("input", () => {
       validateFrame();
-      clearTimeout(draftSceneTimer);
-      draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
+      const canvasEditor = form.matches("[data-canvas-block-editor]");
+      if (canvasEditor) {
+        clearTimeout(draftCanvasTimer);
+        draftCanvasTimer = setTimeout(syncCanvasBlockDrafts, 120);
+      } else {
+        clearTimeout(draftSceneTimer);
+        draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
+      }
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = "表示パーツの変更をプレビューへ反映しています…";
@@ -1561,6 +1585,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncCompositionDraft();
       syncNarrationDrafts();
       syncSceneComponentDrafts();
+      syncCanvasBlockDrafts();
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");
@@ -1571,6 +1596,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (id.startsWith("node:")) {
         const componentId = id.slice(5);
         target = [...document.querySelectorAll("[data-scene-component-editor]")].find((form) => form instanceof HTMLFormElement && form.dataset.componentId === componentId) || null;
+      } else if (id.startsWith("block:")) {
+        const blockId = id.slice(6);
+        target = [...document.querySelectorAll("[data-canvas-block-editor]")].find((form) => {
+          if (!(form instanceof HTMLFormElement)) return false;
+          try { return JSON.parse(form.dataset.component || "{}").id === blockId; } catch { return false; }
+        }) || null;
       } else if (id === "flow:main" || id === "flow:sidebar") {
         sectionName = preferredPath ? "design" : "content";
         target = preferredPath ? document.querySelector("[data-template-editor]") : document.querySelector("[data-slide-editor]");

@@ -35,6 +35,7 @@ import {
   presentationAspectRatioSchema,
   projectStageSchema,
   slideRoleSchema,
+  slideBlockSchema,
   slideSceneNodeSchema,
   slideTypographySchema,
   visualPresetSchema
@@ -176,6 +177,10 @@ const slideTypographyRequestSchema = z.object({
 const sceneComponentRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   component: slideSceneNodeSchema
+});
+const canvasBlockRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  block: slideBlockSchema
 });
 
 const templateFieldsRequestSchema = presentationTemplateSchema
@@ -1591,6 +1596,78 @@ async function handleSceneComponentUpdate(
   }
 }
 
+async function handleCanvasBlockUpdate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string,
+  blockId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = canvasBlockRequestSchema.safeParse(read.value);
+  if (!parsed.success || parsed.data.block.id !== blockId) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "表示パーツの入力内容を確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  if (parsed.data.block.kind === "image") {
+    const imageAssetId = parsed.data.block.asset_id;
+    const assets = await listProjectAssets(env.DB, session.userId, projectId);
+    if (!assets.some((asset) => asset.asset_id === imageAssetId)) {
+      return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "この研究で利用できる画像を選んでください。" }, request_id: crypto.randomUUID() }, 422);
+    }
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "canvas") {
+          const error = new Error("The slide does not use a canvas composition.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        const index = slide.composition.blocks.findIndex((block) => block.id === blockId);
+        const existing = slide.composition.blocks[index];
+        if (existing === undefined) {
+          const error = new Error("The canvas block does not exist.");
+          Object.assign(error, { code: "BLOCK_NOT_FOUND" });
+          throw error;
+        }
+        if (existing.kind !== parsed.data.block.kind) {
+          const error = new Error("The canvas block kind cannot be changed here.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        slide.composition.blocks[index] = parsed.data.block;
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_canvas_block_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, block_id: blockId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, block_id: blockId, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "表示パーツを保存できませんでした。");
+  }
+}
+
 function projectMutationErrorResponse(
   error: unknown,
   fallbackMessage: string
@@ -1615,8 +1692,9 @@ function projectMutationErrorResponse(
     INVALID_NARRATION_STEP: "表示段階の範囲内からSTEPを選んでください。",
     VOICE_PROFILE_NOT_FOUND: "VOICEVOX profileが見つかりません。",
     COMPONENT_NOT_FOUND: "componentが見つかりません。",
-    INVALID_COMPOSITION_MODE: "このスライドはcomponent sceneではありません。",
-    INVALID_FIELDS: "componentの文言を確認してください。",
+    BLOCK_NOT_FOUND: "表示パーツが見つかりません。",
+    INVALID_COMPOSITION_MODE: "このスライドの構成形式では操作できません。",
+    INVALID_FIELDS: "入力内容を確認してください。",
     LAST_SLIDE_REQUIRED: "最後の1枚は削除できません。先に別のスライドを複製または追加してください。",
     PROJECT_VERSION_CONFLICT: "別の場所で更新されました。画面を読み込み直してください。"
   };
@@ -1627,7 +1705,8 @@ function projectMutationErrorResponse(
     code === "NARRATION_NOT_FOUND" ||
     code === "NARRATION_SEGMENT_NOT_FOUND" ||
     code === "VOICE_PROFILE_NOT_FOUND" ||
-    code === "COMPONENT_NOT_FOUND"
+    code === "COMPONENT_NOT_FOUND" ||
+    code === "BLOCK_NOT_FOUND"
       ? 404
       : code === "PROJECT_VERSION_CONFLICT" ||
           code === "TEMPLATE_EXISTS" ||
@@ -2943,6 +3022,22 @@ export async function handleWebRequest(
       env,
       slideActionMatch[1],
       slideActionMatch[2]
+    );
+  }
+  const canvasBlockMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/blocks/([a-z0-9][a-z0-9-]{0,63})$`)
+  );
+  if (
+    canvasBlockMatch?.[1] !== undefined &&
+    canvasBlockMatch[2] !== undefined &&
+    canvasBlockMatch[3] !== undefined
+  ) {
+    return handleCanvasBlockUpdate(
+      request,
+      env,
+      canvasBlockMatch[1],
+      canvasBlockMatch[2],
+      canvasBlockMatch[3]
     );
   }
   const sceneComponentMatch = path.match(

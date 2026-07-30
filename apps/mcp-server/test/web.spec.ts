@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=76"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=77"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -554,6 +554,10 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("updateRecommendedBodyLimit");
     expect(DASHBOARD_SCRIPT).toContain("data-component-color-hex");
     expect(workspaceHtml).toContain("自由配置 1パーツ");
+    expect(workspaceHtml).toContain("data-canvas-block-editor");
+    expect(workspaceHtml).toContain("位置と大きさ");
+    expect(workspaceHtml).toContain("重なり順");
+    expect(workspaceHtml).toContain("/blocks/evidence-photo");
     expect(workspaceHtml).toContain("data-composition-editor");
     expect(workspaceHtml).toContain("スライド枠外を隠す");
     expect(workspaceHtml).toContain("data-slide-frame");
@@ -722,6 +726,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("spokenCharacters / 6");
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-canvas-block");
+    expect(dashboardScriptText).toContain("data-canvas-block-editor");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-composition");
     expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("data-component-frame-toggle");
@@ -1739,6 +1745,38 @@ describe("Web dashboard", () => {
     expect(deletedTemplateDeck.templates.some((template: { id: string }) => template.id === "lab")).toBe(false);
 
     const sceneDocument = JSON.parse(documentWithoutTemplate!.document_json);
+    const updateCanvasBlock = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/blocks/evidence-photo",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 17,
+            block: {
+              ...sceneDocument.deck.slides[0].composition.blocks[0],
+              frame: { x: 10, y: 14, width: 80, height: 70 },
+              alt_text: "Webで更新した配置画像"
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(updateCanvasBlock.status).toBe(200);
+    expect(await updateCanvasBlock.json()).toMatchObject({ ok: true, version: 18, block_id: "evidence-photo" });
+    const canvasDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    expect(JSON.parse(canvasDocument!.document_json).deck.slides[0].composition.blocks[0]).toMatchObject({
+      alt_text: "Webで更新した配置画像",
+      frame: { x: 10, y: 14, width: 80, height: 70 }
+    });
     sceneDocument.deck.slides[0].composition = {
       mode: "scene",
       runtime_version: "uf-runtime@1",
@@ -1770,7 +1808,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 17,
+            expected_version: 18,
             component: {
               ...sceneDocument.deck.slides[0].composition.nodes[0],
               frame: { x: 8, y: 12, width: 84, height: 72 }
@@ -1781,7 +1819,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(positionComponent.status).toBe(200);
-    expect(await positionComponent.json()).toMatchObject({ ok: true, version: 18 });
+    expect(await positionComponent.json()).toMatchObject({ ok: true, version: 19 });
     const positionedDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
@@ -1805,7 +1843,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 18,
+            expected_version: 19,
             composition_background: "#223344",
             composition_clip_content: false
           })
@@ -1814,7 +1852,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(updateComposition.status).toBe(200);
-    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 19 });
+    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 20 });
     const recoloredDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();

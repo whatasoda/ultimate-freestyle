@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@59";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@60";
 
 function escapeHtml(value: string): string {
   return value
@@ -1484,6 +1484,53 @@ export function renderPresentationHtml(
       }
       scheduleFit();
     };
+    const previewCanvasBlock = (data) => {
+      const currentSlide = slides[slide];
+      const block = data.block;
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'canvas' || data.slide_id !== DECK.slides[slide].id || !block || typeof block !== 'object') return;
+      const target = currentSlide.querySelector('[data-block-id="' + CSS.escape(String(block.id || '')) + '"]');
+      if (!(target instanceof HTMLElement) || target.dataset.blockKind !== block.kind || !block.frame) return;
+      target.style.left = Number(block.frame.x) + '%';
+      target.style.top = Number(block.frame.y) + '%';
+      target.style.width = Number(block.frame.width) + '%';
+      target.style.height = Number(block.frame.height) + '%';
+      target.style.zIndex = String(block.z_index);
+      target.dataset.reveal = String(block.at);
+      target.dataset.revealAt = String(block.at);
+      target.dataset.animation = String(block.animation || 'fade');
+      const visible = Number(block.at) <= step;
+      target.classList.toggle('is-visible', visible);
+      target.setAttribute('aria-hidden', String(!visible));
+      const style = block.style || {};
+      target.style.background = style.background || 'transparent';
+      target.style.color = style.foreground || 'inherit';
+      target.style.border = Number(style.border_width_px || 0) > 0 ? 'max(1px, ' + previewLength(style.border_width_px) + ') solid ' + (style.border_color || 'transparent') : '0 solid transparent';
+      target.style.borderRadius = previewLength(style.corner_radius_px);
+      target.style.padding = previewLength(style.padding_px);
+      target.style.setProperty('--component-opacity', String(style.opacity ?? 1));
+      target.style.setProperty('--component-font-scale', String(style.font_scale ?? 1));
+      target.style.textAlign = style.text_align === 'center' ? 'center' : style.text_align === 'end' ? 'end' : 'start';
+      target.style.justifyContent = style.vertical_align === 'center' ? 'center' : style.vertical_align === 'end' ? 'flex-end' : 'flex-start';
+      target.style.boxShadow = style.shadow === 'strong' ? '0 .75cqw 2.25cqw #0009' : style.shadow === 'soft' ? '0 .375cqw 1.375cqw #0005' : 'none';
+      if (block.kind === 'markdown') renderDraftMarkdown(target, String(block.markdown || ''));
+      else if (block.kind === 'image') {
+        const image = target.querySelector('img');
+        if (image instanceof HTMLImageElement) {
+          image.alt = String(block.alt_text || '');
+          image.dataset.fit = String(block.fit || 'contain');
+          if (data.asset_urls && typeof data.asset_urls === 'object' && data.asset_urls[block.asset_id]) image.src = String(data.asset_urls[block.asset_id]);
+        }
+      } else if (block.kind === 'shape') {
+        target.dataset.shape = String(block.shape || 'rectangle');
+        target.replaceChildren();
+        if (block.label !== null && block.label !== undefined) {
+          const label = document.createElement('span');
+          label.textContent = String(block.label);
+          target.append(label);
+        }
+      }
+      scheduleFit();
+    };
     const previewSceneComponent = (data) => {
       const currentSlide = slides[slide];
       const component = data.component;
@@ -1991,6 +2038,7 @@ export function renderPresentationHtml(
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
       else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-scene-component') previewSceneComponent(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-canvas-block') previewCanvasBlock(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-composition') previewComposition(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-template') previewTemplate(event.data);
