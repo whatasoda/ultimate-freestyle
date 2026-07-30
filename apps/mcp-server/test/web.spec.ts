@@ -447,6 +447,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("0ページ目と全スライドの実表示を一括確認");
     expect(detailHtml).toContain('&quot;id&quot;:&quot;__prelude__&quot;');
     expect(detailHtml).toContain("data-quality-sweep");
+    expect(detailHtml).toContain('data-project-version="1"');
     expect(detailHtml).toContain("段階を順番に描画");
     expect(DASHBOARD_SCRIPT).toContain("advanceQualitySweep");
     expect(DASHBOARD_SCRIPT).toContain('url.searchParams.set("prelude", "1")');
@@ -793,6 +794,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
     expect(dashboardScriptText).toContain("data-project-search-empty");
     expect(dashboardScriptText).toContain("filterProjects");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:quality-sweep:");
+    expect(dashboardScriptText).toContain('persistQualitySweep("completed")');
+    expect(dashboardScriptText).toContain("前回の確認結果：");
     expect(dashboardScriptText).toContain('card.dataset.needsAttention === "true"');
     expect(dashboardScriptText).toContain("updateImagePreview");
     expect(dashboardScriptText).toContain("URL.revokeObjectURL");

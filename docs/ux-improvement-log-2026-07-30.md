@@ -805,3 +805,9 @@
 - `edit_slide_data_item`は追加・更新・移動に加えて削除もできる一方、MCP annotationが`destructiveHint: false`だった。削除を含むtoolとしてtrueへ正し、対応クライアントが利用者への確認判断に使えるようにした。
 - `research://guide/edit-contract`を追加し、outline→対象resource→一意図の変更→返却version継承という操作順、競合時に古い入力を再送しない規則、長文・component・data itemの部分編集toolをまとめた。
 - 発表構成promptも編集契約を先に読むよう更新した。MCPから見えないWeb UIの未保存入力、削除前確認、復元時の段階比較までAgent向けの境界を明文化した。
+
+## 改善ループ271
+
+- 0ページ目・全スライドの品質一括チェック結果がDOMにしかなく、指摘された一枚へ移動して直すと一覧へ戻った時に消えていた。研究IDとversionをkeyに、完了・中断・途中結果をsessionStorageへ保存する。
+- 戻った画面では確認済み段階、指摘数、各スライドへの安全なtext/link、完了または中断状態を再構築する。保存値を`innerHTML`へ戻さず要素と`textContent`で描画し、改ざんされた保存値をHTMLとして解釈しない。
+- 研究versionが上がると別keyになり、古い版の合格結果を新しい内容へ流用しない。再実行時は保存結果と画面結果を同時に初期化する。

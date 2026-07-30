@@ -241,22 +241,34 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let sweepIssueCount = 0;
     let completedCheckpoints = 0;
     let currentSlideFindings = [];
+    let sweepResults = [];
     let sweepTimer;
     let sweepFrameMode = "unloaded";
     const totalCheckpoints = slides.reduce((total, slide) => total + Number(slide.max_step || 0) + 1, 0);
     const presentationSlideCount = slides.filter((slide) => slide.id !== "__prelude__").length;
     const includesPrelude = slides.some((slide) => slide.id === "__prelude__");
-    const appendSweepResult = (slide, message, warning = true) => {
+    const sweepStorageKey = "ultimate-freestyle:quality-sweep:" + (qualitySweepButton.dataset.projectId || "") + ":v" + (qualitySweepButton.dataset.projectVersion || "");
+    const renderSweepResult = (result) => {
       if (!(qualitySweepResults instanceof HTMLOListElement)) return;
       const item = document.createElement("li");
-      if (!warning) item.classList.add("success");
-      if (slide?.href) {
+      if (!result.warning) item.classList.add("success");
+      if (result.href) {
         const link = document.createElement("a");
-        link.href = slide.href;
-        link.textContent = slide.number + ". " + slide.title;
-        item.append(link, document.createTextNode(" — " + message));
-      } else item.textContent = message;
+        link.href = result.href;
+        link.textContent = result.label;
+        item.append(link, document.createTextNode(" — " + result.message));
+      } else item.textContent = result.message;
       qualitySweepResults.append(item);
+    };
+    const appendSweepResult = (slide, message, warning = true) => {
+      const result = { href: slide?.href || "", label: slide?.href ? slide.number + ". " + slide.title : "", message, warning };
+      sweepResults.push(result);
+      renderSweepResult(result);
+    };
+    const persistQualitySweep = (state) => {
+      try {
+        sessionStorage.setItem(sweepStorageKey, JSON.stringify({ state, completed_checkpoints: completedCheckpoints, total_checkpoints: totalCheckpoints, issue_count: sweepIssueCount, results: sweepResults }));
+      } catch {}
     };
     const finishQualitySweep = () => {
       sweepRunning = false;
@@ -272,6 +284,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0);
       }
       if (sweepIssueCount === 0) appendSweepResult(null, "全段階で見切れ、過剰な自動縮小、文字コントラスト不足は見つかりませんでした。", false);
+      persistQualitySweep("completed");
     };
     const requestSweepPosition = () => {
       const slide = slides[sweepIndex];
@@ -317,7 +330,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
       if (qualitySweepStatus instanceof HTMLElement) qualitySweepStatus.textContent = completedCheckpoints + " / " + totalCheckpoints + "段階を確認";
       if (sweepIndex >= slides.length) finishQualitySweep();
-      else requestSweepPosition();
+      else {
+        persistQualitySweep("partial");
+        requestSweepPosition();
+      }
     };
     const waitForSweepResult = () => {
       clearTimeout(sweepTimer);
@@ -370,6 +386,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       sweepIssueCount = 0;
       completedCheckpoints = 0;
       currentSlideFindings = [];
+      sweepResults = [];
       setButtonBusy(qualitySweepButton, true);
       qualitySweepButton.textContent = "確認中…";
       if (qualitySweepCancel instanceof HTMLButtonElement) qualitySweepCancel.hidden = false;
@@ -400,8 +417,30 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           qualitySweepStatus.textContent = completedCheckpoints + " / " + totalCheckpoints + "段階で中断しました。途中結果は下に残しています。";
           qualitySweepStatus.classList.remove("success", "warning");
         }
+        persistQualitySweep("cancelled");
       });
     }
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(sweepStorageKey) || "null");
+      if (saved && saved.total_checkpoints === totalCheckpoints && Array.isArray(saved.results)) {
+        sweepResults = saved.results.filter((result) => result && typeof result.message === "string" && typeof result.href === "string" && typeof result.label === "string" && typeof result.warning === "boolean");
+        sweepResults.forEach(renderSweepResult);
+        completedCheckpoints = Math.min(Math.max(Number(saved.completed_checkpoints) || 0, 0), totalCheckpoints);
+        sweepIssueCount = Math.max(Number(saved.issue_count) || 0, 0);
+        if (qualitySweepProgress instanceof HTMLProgressElement) {
+          qualitySweepProgress.hidden = false;
+          qualitySweepProgress.value = completedCheckpoints;
+        }
+        qualitySweepButton.textContent = "もう一度チェック";
+        if (qualitySweepStatus instanceof HTMLElement) {
+          qualitySweepStatus.textContent = saved.state === "completed"
+            ? "前回の確認結果：" + (sweepIssueCount ? sweepIssueCount + "項目に確認事項があります。" : "確認事項はありません。")
+            : "前回は" + completedCheckpoints + " / " + totalCheckpoints + "段階まで確認しました。最初から再実行できます。";
+          qualitySweepStatus.classList.toggle("warning", sweepIssueCount > 0 || saved.state !== "completed");
+          qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0 && saved.state === "completed");
+        }
+      }
+    } catch {}
   }
   const slideEditor = document.querySelector("[data-slide-editor]");
   const typographyEditor = document.querySelector("[data-typography-editor]");
