@@ -1,6 +1,12 @@
-export const DASHBOARD_ASSET_VERSION = "145";
+export const DASHBOARD_ASSET_VERSION = "146";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  if (location.hash.length > 1) {
+    const fragmentTarget = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (fragmentTarget instanceof HTMLElement && fragmentTarget.tabIndex === -1) {
+      requestAnimationFrame(() => fragmentTarget.focus({ preventScroll: true }));
+    }
+  }
   const projectSectionLinks = [...document.querySelectorAll(".project-section-nav a[href^='#']")];
   const setCurrentProjectSection = (id) => {
     for (const link of projectSectionLinks) {
