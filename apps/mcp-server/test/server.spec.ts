@@ -94,6 +94,10 @@ describe("MCP contract", () => {
       ).toBeLessThan(90_000);
       const blockTool = tools.find((tool) => tool.name === "edit_slide_block");
       expect(JSON.stringify(blockTool?.inputSchema)).not.toContain('"block"');
+      expect(JSON.stringify(blockTool?.inputSchema)).toContain('"text_edit"');
+      expect(JSON.stringify(blockTool?.inputSchema)).not.toContain('"maxLength":20000');
+      const revealTool = tools.find((tool) => tool.name === "set_slide_reveal");
+      expect(JSON.stringify(revealTool?.inputSchema)).toContain('"text_edit"');
       expect(tools).toContainEqual(
         expect.objectContaining({
           name: "edit_slide_data_item",
@@ -779,7 +783,10 @@ describe("MCP contract", () => {
           expected_version: 6,
           slide_id: "question",
           at: 1,
-          markdown: "- 記憶だけで作る"
+          text_edit: {
+            operation: "append",
+            text: "- 記憶だけで作る"
+          }
         }
       });
       expect(reveal.structuredContent).toMatchObject({ ok: true, version: 7 });
@@ -901,8 +908,12 @@ describe("MCP contract", () => {
           slide_id: "question",
           action: "update_field",
           block_id: "central-question",
-          field: "x",
-          value: 12
+          field: "markdown",
+          text_edit: {
+            operation: "replace_once",
+            old_text: "どこまで",
+            text: "どれほど"
+          }
         }
       });
       expect(movedBlock.structuredContent).toMatchObject({ ok: true, version: 11 });
@@ -913,7 +924,7 @@ describe("MCP contract", () => {
       expect(movedCanvasElement).toMatchObject({
         ok: true,
         version: 11,
-        element: { frame: { x: 12 } }
+        element: { markdown: "# どれほど丸くできる？" }
       });
       const incompatibleBlockField = await client.callTool({
         name: "edit_slide_block",

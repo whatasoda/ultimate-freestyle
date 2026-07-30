@@ -853,3 +853,9 @@
 - scene componentは一項目更新でもmarkdown等の値を最大2万字まるごと送れ、Agentが長文を短く直す場合の引数と競合が大きかった。
 - `update_slide_component_content`へ`text_edit`を追加し、既存の文字fieldを各2千字以内のreplace_once、append、prepend、clearで部分編集できるようにした。短い値・数値・booleanは`value`を使い、両方またはどちらもない入力は拒否する。
 - 通常のscalar文字列を4千字、component作成時の初期文を2千字へ制限した。保存schemaの長文上限は維持し、複数の小粒度更新で構築できる。実際のcaption置換をcontract testへ切り替えた。
+
+## 改善ループ279
+
+- 自由配置canvasのmarkdownと段階表示は、一文修正でも最大2万字・1万字の全体をtool引数へ再送でき、本文やsceneで整備した小粒度編集契約から外れていた。
+- `edit_slide_block`へ`text_edit`を追加し、既存のmarkdown、alt、labelを各2千字以内の一意置換・追記・前置・消去で変更できる。新規作成と単一値は4千字に抑え、内容以外へtext_editを使う入力やvalueとの二重指定を拒否する。
+- `set_slide_reveal`も短い全体指定と部分編集を排他的に受ける。既存STEPを読んで短いanchorだけを置換でき、clearはSTEP削除として扱う。MCP schema予算と実操作をcontract testで固定した。

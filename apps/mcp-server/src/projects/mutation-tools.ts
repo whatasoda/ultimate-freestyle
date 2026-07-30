@@ -1523,7 +1523,7 @@ export function registerProjectMutationTools(
     {
       title: "自由配置blockを個別編集",
       description:
-        "canvasのblockを安全な既定配置で一件作成するか、内容・座標・見た目の一項目だけを更新します。createのvalueはmarkdown本文、画像asset UUID、または図形labelです。更新前は対象element resourceを読んでください。",
+        "canvasのblockを安全な既定配置で一件作成するか、内容・座標・見た目の一項目だけを更新します。createのvalueはmarkdown本文、画像asset UUID、または図形labelです。既存の長文はtext_editで短い一致箇所だけを置換・追記・前置・消去できます。更新前は対象element resourceを読んでください。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -1558,7 +1558,8 @@ export function registerProjectMutationTools(
             "shadow"
           ])
           .optional(),
-        value: z.union([z.string().max(20_000), z.number(), z.null()]).optional()
+        value: z.union([z.string().max(4_000), z.number(), z.null()]).optional(),
+        text_edit: componentTextEditSchema.optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -1568,7 +1569,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, action, block_id, kind, field, value }) =>
+    async ({ project_id, expected_version, slide_id, action, block_id, kind, field, value, text_edit }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -1601,6 +1602,9 @@ export function registerProjectMutationTools(
             }
             if (kind === undefined) {
               throw new ProjectToolError("INVALID_FIELDS", "kind is required for create.");
+            }
+            if (text_edit !== undefined) {
+              throw new ProjectToolError("INVALID_FIELDS", "text_edit is available only for update_field.");
             }
             const base = {
               id: block_id,
@@ -1643,10 +1647,10 @@ export function registerProjectMutationTools(
             if (index === -1) {
               throw new ProjectToolError("BLOCK_NOT_FOUND", "The block does not exist.");
             }
-            if (field === undefined || value === undefined) {
+            if (field === undefined || (value === undefined) === (text_edit === undefined)) {
               throw new ProjectToolError(
                 "INVALID_FIELDS",
-                "field and value are required for update_field."
+                "field and exactly one of value or text_edit are required for update_field."
               );
             }
             const current = slide.composition.blocks[index];
@@ -1669,10 +1673,27 @@ export function registerProjectMutationTools(
                 `The ${field} field cannot be used with a ${current.kind} block.`
               );
             }
+            let nextValue = value;
+            if (text_edit !== undefined) {
+              if (!contentField) {
+                throw new ProjectToolError(
+                  "INVALID_FIELDS",
+                  "text_edit is available only for block content fields."
+                );
+              }
+              const currentValue = (current as unknown as Record<string, unknown>)[field];
+              if (typeof currentValue !== "string" && currentValue !== null) {
+                throw new ProjectToolError(
+                  "INVALID_CHANGE",
+                  "text_edit is available only when the selected block field contains text."
+                );
+              }
+              nextValue = applyComponentTextEdit(currentValue, text_edit);
+            }
             const candidate = JSON.parse(JSON.stringify(current)) as Record<string, unknown>;
             if (["x", "y", "width", "height"].includes(field)) {
               const frame = candidate.frame as Record<string, unknown>;
-              frame[field] = value;
+              frame[field] = nextValue;
             } else if (
               [
                 "background",
@@ -1689,11 +1710,11 @@ export function registerProjectMutationTools(
               ].includes(field)
             ) {
               const style = (candidate.style ?? {}) as Record<string, unknown>;
-              if (value === null) delete style[field];
-              else style[field] = value;
+              if (nextValue === null) delete style[field];
+              else style[field] = nextValue;
               candidate.style = style;
             } else {
-              candidate[field] = value;
+              candidate[field] = nextValue;
             }
             slide.composition.blocks[index] = parseSlideBlock(candidate);
           }
@@ -2205,12 +2226,13 @@ export function registerProjectMutationTools(
     {
       title: "段階表示を一件編集",
       description:
-        "スライドの指定stepへ表示内容を追加・置換します。markdownをnullにすると削除します。reveal_stepsは必要に応じて自動で増えます。",
+        "スライドの指定stepへ表示内容を追加・置換します。短い全体はmarkdown、既存の長文はtext_editで一部分だけを変更します。markdownをnullまたはtext_editのclearにすると削除します。reveal_stepsは必要に応じて自動で増えます。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         at: z.number().int().positive().max(100),
-        markdown: z.string().min(1).max(10_000).nullable()
+        markdown: z.string().min(1).max(4_000).nullable().optional(),
+        text_edit: componentTextEditSchema.optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -2220,7 +2242,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, at, markdown }) =>
+    async ({ project_id, expected_version, slide_id, at, markdown, text_edit }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -2229,12 +2251,27 @@ export function registerProjectMutationTools(
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
           const index = slide.reveal_blocks.findIndex((block) => block.at === at);
-          if (markdown === null) {
+          if ((markdown === undefined) === (text_edit === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_FIELDS",
+              "Specify exactly one of markdown or text_edit."
+            );
+          }
+          const nextMarkdown = text_edit === undefined
+            ? markdown
+            : applyComponentTextEdit(index === -1 ? null : slide.reveal_blocks[index].markdown, text_edit);
+          if (nextMarkdown === null) {
             if (index !== -1) slide.reveal_blocks.splice(index, 1);
           } else if (index === -1) {
-            slide.reveal_blocks.push({ at, markdown });
+            if (nextMarkdown === undefined || nextMarkdown.length === 0) {
+              throw new ProjectToolError("INVALID_FIELDS", "Reveal markdown cannot be empty.");
+            }
+            slide.reveal_blocks.push({ at, markdown: nextMarkdown });
           } else {
-            slide.reveal_blocks[index] = { at, markdown };
+            if (nextMarkdown === undefined || nextMarkdown.length === 0) {
+              throw new ProjectToolError("INVALID_FIELDS", "Reveal markdown cannot be empty.");
+            }
+            slide.reveal_blocks[index] = { at, markdown: nextMarkdown };
           }
           recalculateSlideRevealSteps(slide);
           slide.reveal_blocks.sort((a, b) => a.at - b.at);
