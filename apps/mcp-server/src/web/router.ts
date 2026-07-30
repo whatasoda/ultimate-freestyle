@@ -622,12 +622,17 @@ async function handleSlideWorkspace(
   }
   const project = await getHydratedProject(env, session.userId, projectId);
   if (project === null) return projectNotFoundPage();
+  const url = new URL(request.url);
+  const selectedNarrationAt = url.searchParams.get("narration");
   return slideWorkspacePage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
     project,
     slideId,
-    selectedComponentId: new URL(request.url).searchParams.get("component"),
+    selectedComponentId: url.searchParams.get("component"),
+    selectedNarrationAt: selectedNarrationAt !== null && /^\d+$/.test(selectedNarrationAt)
+      ? Number(selectedNarrationAt)
+      : null,
     assets: await listProjectAssets(env.DB, session.userId, projectId)
   });
 }

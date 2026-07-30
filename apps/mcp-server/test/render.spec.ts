@@ -1059,6 +1059,47 @@ describe("presentation artifact renderer", () => {
     expect(largeCanvasHtml).toContain('data-block-id="shape-99"');
     expect(new TextEncoder().encode(largeCanvasHtml).byteLength).toBeLessThan(400_000);
 
+    const largeNarrationProject = projectRecordSchema.parse({
+      ...structuredClone(project),
+      document: {
+        ...structuredClone(project.document),
+        deck: {
+          ...structuredClone(project.document.deck),
+          slides: [
+            {
+              ...structuredClone(project.document.deck?.slides[0]),
+              reveal_steps: 100,
+              narration: {
+                display: "commentary",
+                speaker: null,
+                segments: Array.from({ length: 101 }, (_, at) => ({
+                  at,
+                  text: `読み上げ区間 ${at}`,
+                  speaker: null,
+                  audio_src: null,
+                  voice_profile_id: null,
+                  voice_tuning: null
+                }))
+              }
+            }
+          ]
+        }
+      }
+    });
+    const largeNarrationHtml = await slideWorkspacePage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project: largeNarrationProject,
+      slideId: "rich-result",
+      selectedNarrationAt: 77
+    }).text();
+    expect(largeNarrationHtml.match(/data-narration-select=/g)).toHaveLength(101);
+    expect(largeNarrationHtml.match(/data-segment-editor/g)).toHaveLength(1);
+    expect(largeNarrationHtml).toContain('id="narration-segment-77"');
+    expect(largeNarrationHtml).toContain('data-selected-narration="77"');
+    expect(largeNarrationHtml).toContain('data-narration-select="77"');
+    expect(new TextEncoder().encode(largeNarrationHtml).byteLength).toBeLessThan(350_000);
+
     const projectWithNextSlide = projectRecordSchema.parse({
       ...project,
       document: {

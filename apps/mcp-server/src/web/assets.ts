@@ -2237,6 +2237,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (workspace instanceof HTMLElement && workspace.dataset.selectedComponent) {
         positionUrl.searchParams.set("component", workspace.dataset.selectedComponent);
       }
+      if (workspace instanceof HTMLElement && workspace.dataset.selectedNarration) {
+        positionUrl.searchParams.set("narration", workspace.dataset.selectedNarration);
+        if (positionUrl.hash.startsWith("#narration-segment-") && positionUrl.hash !== "#narration-segment-" + workspace.dataset.selectedNarration) {
+          positionUrl.hash = "narration-segment-" + workspace.dataset.selectedNarration;
+        }
+      } else {
+        positionUrl.searchParams.delete("narration");
+        if (positionUrl.hash.startsWith("#narration-segment-")) positionUrl.hash = "";
+      }
       history.replaceState(history.state, "", positionUrl);
       slideFrame.contentWindow?.postMessage({
         type: "ultimate-freestyle:set-position",

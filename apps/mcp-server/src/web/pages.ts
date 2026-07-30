@@ -215,7 +215,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=123";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=124";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -638,6 +638,9 @@ function shell(title: string, body: string): string {
       .component-search-row { display: flex; gap: .55rem; align-items: center; }
       .component-search-row input { min-width: 0; flex: 1; }
       .component-search-row output { min-width: 6.5rem; text-align: end; white-space: nowrap; }
+      .segment-outline { display: flex; gap: .4rem; overflow-x: auto; padding: .15rem 0 .5rem; scrollbar-width: thin; }
+      .segment-outline a { flex: 0 0 auto; padding: .45rem .65rem; border: 1px solid var(--line); border-radius: .5rem; color: var(--muted); text-decoration: none; font: 700 .75rem/1 ui-monospace, monospace; }
+      .segment-outline a:hover, .segment-outline a[aria-current="true"] { border-color: #9d7bff; background: #8062df30; color: white; }
       .component-step { padding: .2rem .38rem; border-radius: 999px; background: #8062df20; color: #c7b9ff; font: 750 .68rem/1 ui-monospace, monospace; white-space: nowrap; }
       .narration-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
       .narration-head .stage { font-size: .68rem; }
@@ -1934,7 +1937,7 @@ export function voiceFinishPage(options: {
             .join("");
           return `<details class="voice-review"${index === (attentionSegmentIndex === -1 ? 0 : attentionSegmentIndex) ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}">
             <summary><span class="component-step">${String(index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
-            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}?step=${segment.at}#narration-segment-${segment.at}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
+            <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}?step=${segment.at}&narration=${segment.at}#narration-segment-${segment.at}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
           </details>`;
         })
         .join("")
@@ -1980,6 +1983,7 @@ export function slideWorkspacePage(options: {
   project: ProjectRecord;
   slideId: string;
   selectedComponentId?: string | null;
+  selectedNarrationAt?: number | null;
   assets?: ProjectAsset[];
 }): Response {
   const deck = options.project.document.deck;
@@ -2286,8 +2290,12 @@ export function slideWorkspacePage(options: {
     if (catalogProfile !== undefined) profileCatalogIds[profileId] = catalogProfile.id;
   }
   const voicevoxSampleUrl = `/api/projects/${options.project.project_id}/voice/sample`;
-  const voiceSegments = slide.narration?.segments.length
-    ? slide.narration.segments
+  const narrationSegments = slide.narration?.segments ?? [];
+  const selectedNarrationSegment = narrationSegments.find(
+    (segment) => segment.at === options.selectedNarrationAt
+  ) ?? narrationSegments[0] ?? null;
+  const voiceSegments = selectedNarrationSegment !== null
+    ? [selectedNarrationSegment]
         .map((segment) => {
           const profile =
             (segment.voice_profile_id
@@ -2320,6 +2328,9 @@ export function slideWorkspacePage(options: {
         })
         .join("")
     : `<p class="prose">読み上げ区間はまだありません。「読み上げ区間を追加」から最初の原稿を入力できます。</p>`;
+  const narrationSegmentOutline = narrationSegments.length > 1
+    ? `<nav class="segment-outline" aria-label="読み上げ区間">${narrationSegments.map((segment) => `<a data-narration-select="${segment.at}" href="${currentSlideDashboardPath}?step=${segment.at}&narration=${segment.at}#narration-segment-${segment.at}"${segment.at === selectedNarrationSegment?.at ? ' aria-current="true"' : ""}>STEP ${segment.at}</a>`).join("")}</nav>`
+    : "";
   const usedNarrationSteps = new Set(
     slide.narration?.segments.map((segment) => segment.at) ?? []
   );
@@ -2408,7 +2419,7 @@ export function slideWorkspacePage(options: {
          <div class="workspace-head"><div><p class="eyebrow">スライド編集 · ${slideIndex + 1} / ${deck.slides.length}</p><h1 data-current-slide-title>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a><div class="slide-actions" role="group" aria-label="スライド構成の操作"><button class="ghost" type="button" data-slide-action="move" data-position="${Math.max(0, slideIndex - 1)}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-slide-action="move" data-position="${slideIndex + 1}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === deck.slides.length - 1 ? " disabled" : ""}>↓ 後へ</button><button class="ghost" type="button" data-slide-action="duplicate" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}">複製</button><button class="ghost danger" type="button" data-slide-action="delete" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${deck.slides.length === 1 ? " disabled" : ""}>削除</button></div><span class="feedback" data-slide-action-feedback aria-live="polite"></span></div></div>
          ${effectiveSummary}
          <nav class="mobile-workspace-tabs" role="tablist" aria-label="モバイル編集表示"><button class="ghost" id="mobile-tab-preview" type="button" role="tab" data-mobile-pane="preview" aria-selected="true" aria-controls="workspace-preview-pane">プレビュー<span class="tab-badge" data-mobile-preview-badge hidden>未確認</span></button><button class="ghost" id="mobile-tab-edit" type="button" role="tab" data-mobile-pane="edit" aria-selected="false" aria-controls="workspace-edit-pane" tabindex="-1">編集</button><button class="ghost" id="mobile-tab-slides" type="button" role="tab" data-mobile-pane="slides" aria-selected="false" aria-controls="workspace-slides-pane" tabindex="-1">スライド一覧</button></nav>
-         <div class="slide-workspace" data-workspace-asset-urls="${escapeHtml(JSON.stringify(workspaceAssetUrls))}" data-selected-component="${escapeHtml(selectedComponentId ?? "")}">
+         <div class="slide-workspace" data-workspace-asset-urls="${escapeHtml(JSON.stringify(workspaceAssetUrls))}" data-selected-component="${escapeHtml(selectedComponentId ?? "")}" data-selected-narration="${selectedNarrationSegment?.at ?? ""}">
            <nav class="filmstrip" id="workspace-slides-pane" role="tabpanel" aria-labelledby="mobile-tab-slides"><label class="filmstrip-search">${deck.slides.length}枚から検索<input type="search" data-filmstrip-search placeholder="タイトル・構成・音声状態" autocomplete="off"></label>${filmstrip}<p class="filmstrip-empty" data-filmstrip-empty hidden>一致するスライドはありません。</p></nav>
            <section class="panel workspace-preview" id="workspace-preview-pane" role="tabpanel" aria-labelledby="mobile-tab-preview">
              <div class="workspace-frame" style="--workspace-aspect:${(deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" data-slide-frame data-aspect-ratio="${deck.aspect_ratio ?? "16:9"}"></iframe></div>
@@ -2437,7 +2448,7 @@ export function slideWorkspacePage(options: {
              </div></details>
              <details class="inspector-section" data-inspector-section="narration"><summary>読み上げ</summary><div class="inspector-body">
                <form class="editor" data-narration-settings-editor data-versioned-form action="${slidePath}/narration/settings" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>表示形式<select name="display">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<option value="${value}"${narrationDisplay === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>スライド話者名<input name="speaker" maxlength="80" value="${escapeHtml(slide.narration?.speaker ?? "")}" placeholder="発表全体の既定: ${escapeHtml(deck.narration_defaults?.speaker ?? "なし")}"></label></div>${narrationDisplayPicker}<fieldset><legend>読み上げ枠</legend><div class="editor-grid"><label>配置<select name="placement">${[["bottom", "下部"], ["overlay-bottom", "下部に重ねる"], ["sidebar", "補足欄"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.placement === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>大きさ<select name="size">${[["compact", "小"], ["normal", "標準"], ["large", "大"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.size === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>文字揃え<select name="text_align"><option value="start"${narrationAppearance.text_align === "start" ? " selected" : ""}>左</option><option value="center"${narrationAppearance.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>文字倍率<input name="text_scale" type="number" min="0.75" max="1.5" step="0.05" value="${narrationAppearance.text_scale}"></label><label>最大行数<input name="max_lines" type="number" min="2" max="8" value="${narrationAppearance.max_lines}"></label></div><label class="check-label"><input name="speaker_visible" type="checkbox"${narrationAppearance.speaker_visible ? " checked" : ""}>話者名を表示</label><label class="check-label"><input name="progress_visible" type="checkbox"${narrationAppearance.progress_visible ? " checked" : ""}>読み上げ進捗を表示</label></fieldset><fieldset><legend>読み上げ枠の色</legend>${narrationPalettePicker}<div class="editor-grid">${narrationColorControls}<label>角丸（px）<input name="appearance_corner_radius_px" type="number" min="0" max="64" value="${narrationAppearance.corner_radius_px ?? ""}" placeholder="空欄で表示形式の既定"></label></div><p class="inherit-note">空欄は選択した表示形式とテンプレートの色を使います。</p></fieldset><p class="inherit-note">話者の実効値: ${escapeHtml(effectiveSpeaker ?? "なし")}。この欄で保存するとスライド設定として上書きします。</p><div class="actions"><button type="submit">読み上げ枠を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
-               ${narrationSegmentCreator}${voiceSegments}
+               ${narrationSegmentCreator}${narrationSegmentOutline}${voiceSegments}
              </div></details>
              <details class="inspector-section" data-inspector-section="structure"${flowComposition ? "" : " open"}><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${compositionEditor}${canvasBlockCreator}${sceneComponentCreate}${canvasBlockEditors}${sceneComponentEditors}${componentSearch}${componentOutline}</div></details>
              <details class="inspector-section" data-inspector-section="quality" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-base-count="${qualityItems.length}" data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
