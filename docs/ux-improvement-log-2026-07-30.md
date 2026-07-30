@@ -757,3 +757,9 @@
 - 公開状態resourceがスライドなし、VOICEVOX未生成、20分超過でも`create_preview`や`publish`を次操作として返し、Web UIで初めて失敗する状態を修正した。
 - `preview_blockers`と`publish_blockers`へ安定code、説明、音声生成数または時間上限を返す。内容上の阻害がある間は`next_action: fix_blockers`とし、`can_publish`もfalseにする。preview未作成・未確認という工程上の阻害も公開側へ明示する。
 - Web URLごとに認証要否を分け、研究詳細と固定previewはsession必須、公開ページは不要とした。deckなしとVOICEVOX 0/1のcontract testで、Agentが失敗前に修正を案内できることを固定した。
+
+## 改善ループ263
+
+- 下書き版resourceが最大100件のfindings・limitationsと長文ログ、全設定をそのまま返し、一枚resourceでは過去版と現在版を二重に返して最大約1MiBになり得る構成を縮小した。
+- 研究本文は長さを制限したpreview、配列は件数と先頭10件、ログは直近5件の短いpreviewにする。発表設定は復元判断に必要なtemplate・話者の要約へ絞り、件数差とslide ID差は維持する。
+- 過去版の一枚resourceは過去slideだけを返し、現在slideは既存resource URIを示す。小型fixtureにも16KiBの応答予算を設け、同じデータの二重投入を防ぐ契約にした。

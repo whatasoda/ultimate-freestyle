@@ -126,6 +126,11 @@ function projectResourceBody(
   return { ownerUserId: parsed.data.subject_id };
 }
 
+function resourceTextPreview(value: string | null, limit: number): string | null {
+  if (value === null || value.length <= limit) return value;
+  return `${value.slice(0, limit)}…`;
+}
+
 export function registerResearchGuides(
   server: McpServer,
   db: D1Database,
@@ -446,19 +451,63 @@ export function registerResearchGuides(
             research: {
               title: selected.title,
               stage: selected.stage,
-              summary: selected.summary,
-              question: selected.question,
-              hypothesis: selected.hypothesis,
-              method: selected.method,
-              findings: selected.findings,
-              limitations: selected.limitations,
+              summary: resourceTextPreview(selected.summary, 500),
+              question: resourceTextPreview(selected.question, 500),
+              hypothesis: resourceTextPreview(selected.hypothesis, 500),
+              method: resourceTextPreview(selected.method, 1_000),
+              findings: {
+                count: selected.findings.length,
+                previews: selected.findings.slice(0, 10).map((item) => resourceTextPreview(item, 300))
+              },
+              limitations: {
+                count: selected.limitations.length,
+                previews: selected.limitations.slice(0, 10).map((item) => resourceTextPreview(item, 300))
+              },
               log_count: selected.logs.length,
-              recent_logs: selected.logs.slice(-5)
+              recent_logs: selected.logs.slice(-5).map((log) => ({
+                id: log.id,
+                occurred_at: log.occurred_at,
+                kind: log.kind,
+                text: resourceTextPreview(log.text, 300),
+                source_url: log.source_url
+              }))
             },
             presentation: selected.deck === null ? null : {
-              settings: Object.fromEntries(
-                deckFields.map((field) => [field, selected.deck?.[field] ?? null])
-              ),
+              settings: {
+                short_title: selected.deck.short_title,
+                description: selected.deck.description,
+                author: selected.deck.author,
+                year: selected.deck.year,
+                accent: selected.deck.accent,
+                layout: selected.deck.layout,
+                aspect_ratio: selected.deck.aspect_ratio ?? "16:9",
+                loading_screen: selected.deck.loading_screen ?? null,
+                default_template_id: selected.deck.default_template_id ?? null,
+                templates: (selected.deck.templates ?? []).map((template) => ({
+                  id: template.id,
+                  name: template.name,
+                  region_layout: template.region_layout,
+                  visual_preset: template.visual_preset,
+                  body_font: template.body_font,
+                  heading_font: template.heading_font,
+                  density: template.density,
+                  motion_style: template.motion_style
+                })),
+                narration_defaults: selected.deck.narration_defaults,
+                voicevox: selected.deck.voicevox === null || selected.deck.voicevox === undefined
+                  ? null
+                  : {
+                      catalog_revision: selected.deck.voicevox.catalog_revision,
+                      default_profile_id: selected.deck.voicevox.default_profile_id,
+                      profiles: selected.deck.voicevox.profiles.map((profile) => ({
+                        id: profile.id,
+                        label: profile.label,
+                        speaker_name: profile.speaker_name,
+                        style_name: profile.style_name,
+                        tuning: profile.tuning
+                      }))
+                    }
+              },
               slide_count: selectedSlides.length,
               total_duration_seconds: selectedDuration,
               slides: slideSummaries
@@ -473,6 +522,9 @@ export function registerResearchGuides(
             current_only_slides: currentSlides
               .filter((slide) => !selectedIds.has(slide.id))
               .map((slide) => ({ slide_id: slide.id, title: slide.title, current_position: currentSlides.indexOf(slide) + 1 })),
+            finding_count_delta: selected.findings.length - currentDocument.findings.length,
+            limitation_count_delta: selected.limitations.length - currentDocument.limitations.length,
+            log_count_delta: selected.logs.length - currentDocument.logs.length,
             duration_delta_seconds: selectedDuration - currentDuration
           },
           web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${current.project_id}/revisions/${revision.version}`
@@ -542,7 +594,9 @@ export function registerResearchGuides(
                         : JSON.stringify(currentSlide) === JSON.stringify(selectedSlide)
                           ? "unchanged"
                           : "changed",
-                      current_slide: currentSlide ?? null
+                      current_slide_uri: currentSlide === undefined
+                        ? null
+                        : `research://projects/${current.project_id}/slides/${slideId}`
                     }
                   };
       return {

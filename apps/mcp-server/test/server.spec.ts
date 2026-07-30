@@ -549,6 +549,8 @@ describe("MCP contract", () => {
           research: {
             title: "記憶と泥団子の研究",
             question: null,
+            findings: { count: 0, previews: [] },
+            limitations: { count: 0, previews: [] },
             log_count: 0
           },
           presentation: null
@@ -560,6 +562,7 @@ describe("MCP contract", () => {
           duration_delta_seconds: 0
         }
       });
+      expect(new TextEncoder().encode(JSON.stringify(revisionResource)).byteLength).toBeLessThan(16 * 1024);
       const missingRevisionSlide = await readJsonResource(
         client,
         `research://projects/${firstProject.project_id}/revisions/1/slides/missing`
