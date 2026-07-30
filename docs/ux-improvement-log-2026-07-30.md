@@ -1406,3 +1406,9 @@
 - 公開前チェック、追従ナビ、容量内訳などの同一ページリンクは、移動先またはその親が閉じた`details`でも開かなかった。summaryまでは見えても「修正へ」で目的の入力欄を直接表示できない導線が残った。
 - 初期fragmentと同一ページanchor clickで、対象自身から外側へ全`details`を開いてからブラウザのscrollを続行する。プログラムfocus対象なら、表示可能にした後でfocusを合わせる。
 - 通常の外部・別ページリンクと空のplaceholder hashは対象外にし、共通script契約を追加した。dashboard assetを`v151`へ更新した。
+
+## 改善ループ371
+
+- 初期表示のfragment展開をプログラムfocus対象と同じ条件へ入れたため、`tabindex=-1`のない一覧見出しでは親detailsを開かなかった。研究項目削除後の`#research-list-findings`が代表例だった。
+- 存在する全fragment targetで親detailsを開き、focusだけを`tabindex=-1`の対象へ限定する二段階へ分けた。通常見出しではブラウザ本来のscroll・focusを維持する。
+- 初期展開と限定focusが別条件であることをscript契約へ追加し、dashboard assetを`v152`へ更新した。

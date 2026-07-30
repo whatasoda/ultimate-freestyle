@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "151";
+export const DASHBOARD_ASSET_VERSION = "152";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const revealFragmentTarget = (target) => {
@@ -11,9 +11,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   };
   if (location.hash.length > 1) {
     const fragmentTarget = document.getElementById(decodeURIComponent(location.hash.slice(1)));
-    if (fragmentTarget instanceof HTMLElement && fragmentTarget.tabIndex === -1) {
+    if (fragmentTarget instanceof HTMLElement) {
       revealFragmentTarget(fragmentTarget);
-      requestAnimationFrame(() => fragmentTarget.focus({ preventScroll: true }));
+      if (fragmentTarget.tabIndex === -1) {
+        requestAnimationFrame(() => fragmentTarget.focus({ preventScroll: true }));
+      }
     }
   }
   for (const link of document.querySelectorAll('a[href^="#"]')) {
