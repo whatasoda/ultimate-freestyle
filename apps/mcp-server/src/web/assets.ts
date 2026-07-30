@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "148";
+export const DASHBOARD_ASSET_VERSION = "149";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (location.hash.length > 1) {
@@ -2237,6 +2237,22 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const desktopInspectorOpen = new Map(inspectorSections.map((details) => [details.dataset.inspectorSection || "", details.open]));
 
   const mobilePaneButtons = [...document.querySelectorAll("[data-mobile-pane]")];
+  const mobilePaneMedia = matchMedia("(max-width: 48rem)");
+  const syncMobilePaneSemantics = () => {
+    for (const button of mobilePaneButtons) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      const panelId = button.getAttribute("aria-controls");
+      const panel = panelId ? document.getElementById(panelId) : null;
+      if (!(panel instanceof HTMLElement)) continue;
+      if (mobilePaneMedia.matches) {
+        panel.setAttribute("role", "tabpanel");
+        panel.setAttribute("aria-labelledby", button.id);
+      } else {
+        panel.removeAttribute("role");
+        panel.removeAttribute("aria-labelledby");
+      }
+    }
+  };
   const setMobilePane = (pane) => {
     if (!["preview", "edit", "slides"].includes(pane)) return;
     document.body.dataset.mobilePane = pane;
@@ -2281,6 +2297,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     const mobileWorkspaceTabs = mobilePaneButtons[0]?.closest(".mobile-workspace-tabs");
     if (mobileWorkspaceTabs instanceof HTMLElement) mobileWorkspaceTabs.hidden = false;
+    syncMobilePaneSemantics();
+    mobilePaneMedia.addEventListener("change", syncMobilePaneSemantics);
   }
 
   const mobileInspectorButtons = [...document.querySelectorAll("[data-inspector-pane]")];

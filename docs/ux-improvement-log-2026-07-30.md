@@ -1382,3 +1382,9 @@
 - 現行構成へ直した設計書の中にも、旧ローカル版のcamelCase field名と、緩和前の`tools/list`上限が残っていた。AIが`voiceProfileId`等を部分編集へ使うとschemaで拒否される。
 - `duration_seconds`、`speaker_uuid`、`style_id`、`voice_profile_id`、`voice_tuning`、`audio_src`へ現在schemaの表記を揃えた。
 - MCP契約値も自動テストと同じ36 tool以下、全体90KB未満、一入力12KB未満へ更新した。
+
+## 改善ループ367
+
+- モバイル用ワークスペースタブはデスクトップで非表示でも、一覧・preview・編集欄へ`tabpanel`と不可視タブの`aria-labelledby`が残った。filmstripのnavigationやsection／aside本来の意味を上書きしていた。
+- SSRでは3領域を通常のnav／section／asideとして出し、48rem以下でタブ初期化に成功した時だけ`tabpanel`と対応タブのlabelを付ける。幅を戻した場合はARIA属性を除去し、表示内容は変えない。
+- 初期HTMLに不要なtabpanelがないことと、media changeで付与・除去するscript契約を追加した。dashboard assetを`v149`へ更新した。
