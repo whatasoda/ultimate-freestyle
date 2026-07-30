@@ -543,6 +543,7 @@ describe("Web dashboard", () => {
     expect(draftRevisionHtml).toContain("これは現在の下書きです");
     expect(draftRevisionHtml).toContain("研究内容</dt><dd>変更なし");
     expect(draftRevisionHtml).toContain("発表全体の設定</dt><dd>変更なし");
+    expect(draftRevisionHtml).toContain("<span>同じ</span>");
     expect(draftRevisionHtml).toContain("/revisions/1/frame?slide=0&amp;step=0");
 
     const draftRevisionFrame = await requestProvider(

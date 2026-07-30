@@ -45,6 +45,64 @@ const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   review: "見直し"
 };
 
+type PresentationSlide = NonNullable<ProjectRecord["document"]["deck"]>["slides"][number];
+
+function slideDifferenceLabels(
+  previous: PresentationSlide,
+  selected: PresentationSlide
+): string[] {
+  const labels: string[] = [];
+  if (previous.title !== selected.title) labels.push("題名");
+  if (
+    previous.content_markdown !== selected.content_markdown ||
+    previous.sidebar_markdown !== selected.sidebar_markdown ||
+    JSON.stringify(previous.reveal_blocks) !== JSON.stringify(selected.reveal_blocks)
+  ) labels.push("画面の文章");
+  if (JSON.stringify(previous.composition ?? null) !== JSON.stringify(selected.composition ?? null)) labels.push("表示パーツ・画像");
+  if (
+    previous.duration_seconds !== selected.duration_seconds ||
+    previous.reveal_steps !== selected.reveal_steps
+  ) labels.push("時間・STEP");
+  const narrationContent = (slide: PresentationSlide) => ({
+    display: slide.narration?.display ?? null,
+    speaker: slide.narration?.speaker ?? null,
+    appearance: slide.narration?.appearance ?? null,
+    segments: slide.narration?.segments.map((segment) => ({
+      at: segment.at,
+      text: segment.text,
+      speaker: segment.speaker ?? null
+    })) ?? []
+  });
+  const narrationVoice = (slide: PresentationSlide) => slide.narration?.segments.map((segment) => ({
+    at: segment.at,
+    profile: segment.voice_profile_id ?? null,
+    tuning: segment.voice_tuning ?? null
+  })) ?? [];
+  const narrationAudio = (slide: PresentationSlide) => slide.narration?.segments.map((segment) => ({
+    at: segment.at,
+    audio: segment.audio_src ?? null
+  })) ?? [];
+  if (JSON.stringify(narrationContent(previous)) !== JSON.stringify(narrationContent(selected))) labels.push("読み上げ文・枠");
+  if (JSON.stringify(narrationVoice(previous)) !== JSON.stringify(narrationVoice(selected))) labels.push("声・トーン");
+  if (JSON.stringify(narrationAudio(previous)) !== JSON.stringify(narrationAudio(selected))) labels.push("生成音声");
+  if (JSON.stringify({
+    tone: previous.tone,
+    role: previous.role,
+    cover_layout: previous.cover_layout,
+    template_id: previous.template_id,
+    enter_animation: previous.enter_animation,
+    typography: previous.typography
+  }) !== JSON.stringify({
+    tone: selected.tone,
+    role: selected.role,
+    cover_layout: selected.cover_layout,
+    template_id: selected.template_id,
+    enter_animation: selected.enter_animation,
+    typography: selected.typography
+  })) labels.push("見た目・組版");
+  return labels;
+}
+
 function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, "0")}秒`;
 }
@@ -1168,7 +1226,8 @@ export function draftRevisionPage(options: {
     : `<ol class="revision-slide-list">${selectedSlides.map((slide, index) => {
         const prior = currentById.get(slide.id);
         const moved = currentIndexById.get(slide.id) !== index;
-        const state = prior === undefined ? "この版だけ" : JSON.stringify(prior) !== JSON.stringify(slide) ? moved ? "変更・順番" : "変更" : moved ? "順番変更" : "同じ";
+        const differences = prior === undefined ? [] : slideDifferenceLabels(prior, slide);
+        const state = prior === undefined ? "この版だけ" : [...differences, ...(moved ? ["順番"] : [])].join("・") || "同じ";
         return `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(slide.title)}</strong><span>${state}</span></li>`;
       }).join("")}</ol>`;
   const currentOnlySlides = currentSlides.filter((slide) => !selectedById.has(slide.id));
