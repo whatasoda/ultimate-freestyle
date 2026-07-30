@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@111";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@112";
 
 function escapeHtml(value: string): string {
   return value
@@ -1537,19 +1537,57 @@ export function renderPresentationHtml(
     const renderedBackground = (target, slideElement) => {
       let background = { red: 255, green: 255, blue: 255, alpha: 0 };
       let current = target;
-      let complex = false;
+      let estimated = false;
+      let manualReason = null;
       while (current instanceof HTMLElement) {
         const style = getComputedStyle(current);
-        if (style.backgroundImage && style.backgroundImage !== 'none') complex = true;
+        if (style.backgroundImage && style.backgroundImage !== 'none') {
+          estimated = true;
+          if (style.backgroundImage.includes('url(')) manualReason = 'image';
+        }
         const opacity = Math.min(1, Math.max(0, Number.parseFloat(style.opacity) || 0));
-        if (opacity < .99) complex = true;
+        if (opacity < .99) estimated = true;
         const color = parseRenderedColor(style.backgroundColor);
         if (color) background = compositeColor(background, { ...color, alpha: color.alpha * opacity });
         if (background.alpha >= .99 || current === slideElement) break;
         current = current.parentElement;
       }
       if (background.alpha < .99) background = compositeColor(background, { red: 255, green: 255, blue: 255, alpha: 1 });
-      return { color: background, complex };
+      return { color: background, estimated, manualReason };
+    };
+    const imageBehindText = (candidate, slideElement) => {
+      const textRects = [];
+      for (const node of candidate.childNodes) {
+        if (node.nodeType !== Node.TEXT_NODE || !node.textContent?.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        textRects.push(...[...range.getClientRects()].filter((rect) => rect.width > 1 && rect.height > 1));
+        range.detach();
+      }
+      const selectedRects = textRects.length <= 3
+        ? textRects
+        : [textRects[0], textRects[Math.floor((textRects.length - 1) / 2)], textRects[textRects.length - 1]];
+      for (const rect of selectedRects) for (const offset of [.2, .5, .8]) {
+        const stack = document.elementsFromPoint(rect.left + rect.width * offset, rect.top + rect.height / 2);
+        let reachedText = false;
+        for (const element of stack) {
+          if (element === candidate || candidate.contains(element)) {
+            reachedText = true;
+            continue;
+          }
+          if (!reachedText && element instanceof HTMLElement && element.contains(candidate)) reachedText = true;
+          if (!reachedText) continue;
+          const media = element.closest('img,video,canvas,[data-block-kind="image"],[data-component="uf-image"]');
+          if (media instanceof HTMLElement && !media.contains(candidate)) return true;
+          if (element instanceof HTMLElement) {
+            const style = getComputedStyle(element);
+            const color = parseRenderedColor(style.backgroundColor);
+            if ((color?.alpha ?? 0) >= .99 && Number.parseFloat(style.opacity) >= .99) break;
+          }
+          if (element === slideElement) break;
+        }
+      }
+      return false;
     };
     const relativeLuminance = (color) => {
       const channel = (value) => {
@@ -1591,16 +1629,17 @@ export function renderPresentationHtml(
         const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
         const required = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700) ? 3 : 4.5;
         const ratio = contrastRatio(displayedForeground, background.color);
+        const manualReason = background.manualReason ?? (imageBehindText(candidate, slideElement) ? 'image' : null);
         const dark = { red: 17, green: 24, blue: 39, alpha: 1 };
         const light = { red: 248, green: 250, blue: 252, alpha: 1 };
         const suggested = contrastRatio(dark, background.color) >= contrastRatio(light, background.color) ? dark : light;
-        const estimated = background.complex || effectiveOpacity < .99;
+        const estimated = background.estimated || effectiveOpacity < .99 || manualReason !== null;
         if (ratio + .05 < required) {
-          if (!lowest || lowest.ratio > ratio) lowest = { ratio, required, estimated, manual_review: false, suggested_foreground: colorHex(suggested) };
+          if (!lowest || lowest.ratio > ratio) lowest = { ratio, required, estimated, manual_review: false, suggested_foreground: estimated ? null : colorHex(suggested) };
           continue;
         }
-        if (estimated && (!manualReview || manualReview.ratio > ratio)) {
-          manualReview = { ratio, required, estimated: true, manual_review: true, suggested_foreground: colorHex(suggested) };
+        if (manualReason !== null && (!manualReview || manualReview.ratio > ratio)) {
+          manualReview = { ratio, required, estimated: true, manual_review: true, reason: manualReason, suggested_foreground: null };
         }
       }
       return lowest ?? manualReview;
@@ -1800,7 +1839,7 @@ export function renderPresentationHtml(
         },
         overflows: overflowing ? [{ id: 'prelude', region: '0ページ目', overflow_x: Math.max(0, content.width - boundary.width * .94), overflow_y: Math.max(0, content.height - boundary.height * .94), fit_scale: scale }] : [],
         fits: [{ id: 'prelude', region: '0ページ目', fit_scale: scale }],
-        contrasts: contrast ? [{ id: 'prelude', region: '0ページ目', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, manual_review: contrast.manual_review, suggested_foreground: contrast.suggested_foreground }] : [],
+        contrasts: contrast ? [{ id: 'prelude', region: '0ページ目', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, manual_review: contrast.manual_review, reason: contrast.reason, suggested_foreground: contrast.suggested_foreground }] : [],
         clamps: [],
         readability: smallText ? [{ id: 'prelude', region: '0ページ目', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px }] : [],
         occlusions: [],
@@ -1853,7 +1892,7 @@ export function renderPresentationHtml(
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
         if (editorFrame) {
           const contrast = collectContrast(target, currentSlide);
-          if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, manual_review: contrast.manual_review, suggested_foreground: contrast.suggested_foreground });
+          if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, manual_review: contrast.manual_review, reason: contrast.reason, suggested_foreground: contrast.suggested_foreground });
           const smallText = collectSmallText(target, currentSlide);
           if (smallText) readability.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px });
         }

@@ -692,7 +692,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@111"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@112"');
 
     const voicePage = await requestProvider(
       provider,
