@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=78"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=79"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -560,6 +560,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("/blocks/evidence-photo");
     expect(workspaceHtml).toContain('data-canvas-block-action="duplicate"');
     expect(workspaceHtml).toContain('data-canvas-block-action="delete"');
+    expect(workspaceHtml).toContain("data-canvas-block-create");
+    expect(workspaceHtml).toContain("表示パーツを追加");
     expect(workspaceHtml).toContain("data-composition-editor");
     expect(workspaceHtml).toContain("スライド枠外を隠す");
     expect(workspaceHtml).toContain("data-slide-frame");
@@ -731,6 +733,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-canvas-block");
     expect(dashboardScriptText).toContain("data-canvas-block-editor");
     expect(dashboardScriptText).toContain("data-canvas-block-action");
+    expect(dashboardScriptText).toContain("data-canvas-block-create");
     expect(dashboardScriptText).toContain("表示パーツを複製しています");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-composition");
     expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
@@ -1809,6 +1812,20 @@ describe("Web dashboard", () => {
     );
     expect(deleteCanvasBlock.status).toBe(200);
     expect(await deleteCanvasBlock.json()).toMatchObject({ ok: true, version: 20, result_block_id: null });
+    const createCanvasBlock = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/blocks",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 20, kind: "shape", asset_id: null })
+        }
+      ),
+      authEnv
+    );
+    expect(createCanvasBlock.status).toBe(200);
+    expect(await createCanvasBlock.json()).toMatchObject({ ok: true, version: 21, block_id: "shape-1" });
     sceneDocument.deck.slides[0].composition = {
       mode: "scene",
       runtime_version: "uf-runtime@1",
@@ -1840,7 +1857,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 20,
+            expected_version: 21,
             component: {
               ...sceneDocument.deck.slides[0].composition.nodes[0],
               frame: { x: 8, y: 12, width: 84, height: 72 }
@@ -1851,7 +1868,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(positionComponent.status).toBe(200);
-    expect(await positionComponent.json()).toMatchObject({ ok: true, version: 21 });
+    expect(await positionComponent.json()).toMatchObject({ ok: true, version: 22 });
     const positionedDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
@@ -1875,7 +1892,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 21,
+            expected_version: 22,
             composition_background: "#223344",
             composition_clip_content: false
           })
@@ -1884,7 +1901,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(updateComposition.status).toBe(200);
-    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 22 });
+    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 23 });
     const recoloredDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();

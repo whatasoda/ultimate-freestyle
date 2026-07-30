@@ -2,6 +2,7 @@ import {
   AssetRepositoryError,
   listProjectAssets
 } from "../assets/repository";
+import type { ProjectAsset } from "../assets/schema";
 import {
   AssetServiceError,
   readProjectImage,
@@ -185,6 +186,11 @@ const canvasBlockRequestSchema = z.object({
 const canvasBlockActionRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   action: z.enum(["duplicate", "delete"])
+});
+const canvasBlockCreateRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  kind: z.enum(["markdown", "image", "shape"]),
+  asset_id: z.string().uuid().nullable().optional()
 });
 
 const templateFieldsRequestSchema = presentationTemplateSchema
@@ -1672,6 +1678,89 @@ async function handleCanvasBlockUpdate(
   }
 }
 
+async function handleCanvasBlockCreate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = canvasBlockCreateRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "追加する表示パーツを確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  let imageAsset: ProjectAsset | undefined;
+  if (parsed.data.kind === "image") {
+    const assets = await listProjectAssets(env.DB, session.userId, projectId);
+    imageAsset = assets.find((asset) => asset.asset_id === parsed.data.asset_id);
+    if (imageAsset === undefined) {
+      return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "この研究で利用できる画像を選んでください。" }, request_id: crypto.randomUUID() }, 422);
+    }
+  }
+  let createdBlockId = "";
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "canvas") {
+          const error = new Error("The slide does not use a canvas composition.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        if (slide.composition.blocks.length >= 100) {
+          const error = new Error("The canvas block limit has been reached.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        const used = new Set(slide.composition.blocks.map((block) => block.id));
+        const base = parsed.data.kind === "markdown" ? "text" : parsed.data.kind;
+        let suffix = 1;
+        while (used.has(`${base}-${suffix}`)) suffix += 1;
+        createdBlockId = `${base}-${suffix}`;
+        const common = {
+          id: createdBlockId,
+          frame: { x: 10, y: 12, width: 80, height: 72 },
+          z_index: Math.min(100, Math.max(-1, ...slide.composition.blocks.map((block) => block.z_index)) + 1),
+          at: 0,
+          animation: "fade" as const
+        };
+        const block = parsed.data.kind === "markdown"
+          ? { ...common, kind: "markdown" as const, markdown: "# 新しいテキスト\n\nここに内容を入力します。" }
+          : parsed.data.kind === "image"
+            ? { ...common, kind: "image" as const, asset_id: imageAsset!.asset_id, alt_text: imageAsset!.alt_text, fit: "contain" as const }
+            : { ...common, kind: "shape" as const, shape: "rectangle" as const, label: "新しい図形" };
+        slide.composition.blocks.push(block);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_canvas_block_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, block_id: createdBlockId, kind: parsed.data.kind, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, block_id: createdBlockId, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "表示パーツを追加できませんでした。");
+  }
+}
+
 async function handleCanvasBlockAction(
   request: Request,
   env: Env,
@@ -3101,6 +3190,17 @@ export async function handleWebRequest(
       env,
       slideActionMatch[1],
       slideActionMatch[2]
+    );
+  }
+  const canvasBlockCreateMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/blocks$`)
+  );
+  if (canvasBlockCreateMatch?.[1] !== undefined && canvasBlockCreateMatch[2] !== undefined) {
+    return handleCanvasBlockCreate(
+      request,
+      env,
+      canvasBlockCreateMatch[1],
+      canvasBlockCreateMatch[2]
     );
   }
   const canvasBlockActionMatch = path.match(
