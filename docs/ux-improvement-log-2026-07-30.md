@@ -1394,3 +1394,9 @@
 - モバイルの編集項目は一節だけを開くtab動作になったが、各`details`は対応tabのlabelを持たず、tablistとpanelの関係が支援技術へ伝わらなかった。
 - 5つのtabへ安定IDを付け、モバイル幅では各編集節を`tabpanel`にして対応IDを`aria-labelledby`へ設定する。デスクトップへ戻したらroleとlabelを除き、通常の複数開閉`details`に戻す。
 - 内容tabのIDと動的label付与をWeb契約へ追加し、dashboard assetを`v150`へ更新した。
+
+## 改善ループ369
+
+- 問いと方法を入力済みの研究では「研究内容」detailsを初期表示で閉じるが、わかったこと／限界の選択URLでも同じ判定だった。保存後のfragmentが正しい全文フォームを指しても、閉じた親の内部は表示・focusできなかった。
+- `research_item`で一件を選んだ場合は研究の成熟度にかかわらず親detailsを開き、選択フォームへのscrollとfocus復元を成立させる。通常の研究詳細では従来どおり完成済み内容を閉じる。
+- 問い・方法入力済みfixtureで選択URLを開き、親がopenかつ対象フォームがfocus可能であることをWeb統合テストへ追加した。

@@ -1970,7 +1970,7 @@ export function projectDetailPage(options: {
          ${workflowPanel}
          <div class="detail-grid">
            <div class="detail-column">
-             <details class="panel panel-disclosure" id="basic-information" tabindex="-1"${researchReady ? "" : " open"}><summary>研究内容を編集</summary><div class="disclosure-body">
+             <details class="panel panel-disclosure" id="basic-information" tabindex="-1"${researchReady && options.selectedResearchItem == null ? "" : " open"}><summary>研究内容を編集</summary><div class="disclosure-body">
                <form class="editor" data-project-editor action="${projectFieldsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <fieldset><legend>題名と概要</legend><div class="editor-grid">
                    <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label>

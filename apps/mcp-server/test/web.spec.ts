@@ -1186,6 +1186,8 @@ describe("Web dashboard", () => {
     expect(csrfToken).toBeTruthy();
     const listItemProjectId = "90000000-0000-4000-8000-000000000009";
     const listItemDocument = createEmptyProject("項目編集の契約確認");
+    listItemDocument.question = "選択フォームを開けるか？";
+    listItemDocument.method = "選択URLから確認する";
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO research_projects (
@@ -1256,6 +1258,17 @@ describe("Web dashboard", () => {
       version: 3,
       item_index: 0
     });
+    const selectedListItemDetail = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${listItemProjectId}?research_item=findings:0`,
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const selectedListItemHtml = await selectedListItemDetail.text();
+    expect(selectedListItemHtml).toContain('id="basic-information" tabindex="-1" open');
+    expect(selectedListItemHtml).toContain('id="research-item-findings-0" tabindex="-1"');
     const deleteListItem = await mutateListItem({
       expected_version: 3,
       action: "delete",
