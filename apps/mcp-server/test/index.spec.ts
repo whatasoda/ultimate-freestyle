@@ -23,7 +23,7 @@ describe("MCP Worker", () => {
       ok: true,
       service: "ultimate-freestyle-mcp",
       version: "0.14.0",
-      renderer_version: "uf-renderer@70",
+      renderer_version: "uf-renderer@71",
       eligibility: {
         broadcaster_id: "67879379",
         broadcaster_login: "kashiwo",

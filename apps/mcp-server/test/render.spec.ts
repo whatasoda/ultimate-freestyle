@@ -176,8 +176,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("slideAnnouncer.textContent = 'スライド '");
     expect(html).toContain("const collectSmallText =");
     expect(html).toContain("clamps, readability");
+    expect(html).toContain("const collectOcclusions =");
+    expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@70");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@71");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');

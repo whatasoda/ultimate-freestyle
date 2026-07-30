@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@70";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@71";
 
 function escapeHtml(value: string): string {
   return value
@@ -1423,6 +1423,35 @@ export function renderPresentationHtml(
       }
       return smallest;
     };
+    const collectOcclusions = (slideElement) => {
+      const candidates = [...slideElement.querySelectorAll('.canvas-block[data-fit-content], .scene-node[data-positioned="true"][data-fit-content]')]
+        .filter((item) => item instanceof HTMLElement && item.offsetParent !== null && item.textContent?.trim() && Number(getComputedStyle(item).opacity) > .1);
+      const occlusions = [];
+      for (let leftIndex = 0; leftIndex < candidates.length; leftIndex += 1) {
+        const left = candidates[leftIndex];
+        const leftRect = left.getBoundingClientRect();
+        for (let rightIndex = leftIndex + 1; rightIndex < candidates.length; rightIndex += 1) {
+          const right = candidates[rightIndex];
+          if (left.contains(right) || right.contains(left)) continue;
+          const rightRect = right.getBoundingClientRect();
+          const width = Math.min(leftRect.right, rightRect.right) - Math.max(leftRect.left, rightRect.left);
+          const height = Math.min(leftRect.bottom, rightRect.bottom) - Math.max(leftRect.top, rightRect.top);
+          if (width <= 2 || height <= 2) continue;
+          const overlap = width * height;
+          const smaller = Math.min(leftRect.width * leftRect.height, rightRect.width * rightRect.height);
+          const ratio = smaller > 0 ? overlap / smaller : 0;
+          if (ratio < .2) continue;
+          occlusions.push({
+            id: left.dataset.fitId || '',
+            region: left.dataset.fitRegion || '',
+            other_id: right.dataset.fitId || '',
+            other_region: right.dataset.fitRegion || '',
+            overlap_ratio: Number(ratio.toFixed(2))
+          });
+        }
+      }
+      return occlusions;
+    };
     const collectNarrationClamp = (slideElement) => {
       const region = slideElement.querySelector('.narration[data-active="true"]:not([data-display="inline"])');
       const text = region?.querySelector('.narration-text');
@@ -1472,7 +1501,8 @@ export function renderPresentationHtml(
       });
       const narrationClamp = collectNarrationClamp(currentSlide);
       if (narrationClamp) clamps.push(narrationClamp);
-      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps, readability }, location.origin);
+      const occlusions = collectOcclusions(currentSlide);
+      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps, readability, occlusions }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
     const appendDraftInline = (target, text) => {
