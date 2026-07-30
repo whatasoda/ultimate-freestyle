@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@93");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@94");
     expect(html).toContain("const pauseProgressClock = () =>");
     expect(html).toContain("const autoRemaining = autoDeadline === null");
     expect(html).toContain("unitStartedAt += performance.now() - paused.hiddenAt");
@@ -193,6 +193,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("data-heading-font=\"system-sans\"");
     expect(html).toContain("const fitPrelude = () =>");
     expect(html).toContain("prelude.dataset.fitScale = String(scale)");
+    expect(html).toContain("--prelude-accent-foreground:#10131a");
+    expect(html).toContain("const contrast = collectContrast(preludeInner, prelude)");
+    expect(html).toContain("schedulePreludeFit();");
     expect(html).toContain("slide_id: '__prelude__'");
     expect(html).toContain('data-editor-prelude="false"');
     expect(html).toContain("stage.dataset.measuring = 'true'");

@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@93";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@94";
 
 function escapeHtml(value: string): string {
   return value
@@ -14,6 +14,18 @@ function escapeHtml(value: string): string {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function readableForeground(background: string): "#10131a" | "#f8fafc" {
+  const channels = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(background)?.slice(1).map((value) => Number.parseInt(value, 16));
+  if (!channels || channels.length !== 3) return "#10131a";
+  const luminance = channels
+    .map((value) => value / 255)
+    .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+  const darkContrast = (luminance + 0.05) / 0.056;
+  const lightContrast = 1.05 / (luminance + 0.05);
+  return darkContrast >= lightContrast ? "#10131a" : "#f8fafc";
 }
 
 function renderInlineText(value: string): string {
@@ -509,6 +521,7 @@ export function renderPresentationHtml(
   const preludeHeadingFont = templateAppearance(
     firstTemplateId === null ? null : templates.get(firstTemplateId)
   ).heading_font;
+  const preludeAccentForeground = readableForeground(deck.accent);
   const templateCss = [...templates.values()]
     .map(
       (template) => {
@@ -900,14 +913,14 @@ export function renderPresentationHtml(
     .prelude { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; overflow: hidden; background: #080d15; color: #f8fafc; }
     .prelude[hidden] { display: none; }
     .prelude-inner { --prelude-fit-scale: 1; position: relative; z-index: 1; display: grid; width: min(78%, 48rem); max-height: 88%; justify-items: center; gap: calc(1.4cqh * var(--prelude-fit-scale)); text-align: center; }
-    .prelude-kicker { margin: 0; color: var(--accent); font: 850 calc(1.1cqw * var(--prelude-fit-scale))/1.2 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; }
+    .prelude-kicker { margin: 0; color: color-mix(in srgb, var(--accent) 62%, white); font: 850 calc(1.1cqw * var(--prelude-fit-scale))/1.2 ui-monospace, monospace; letter-spacing: .18em; text-transform: uppercase; }
     .prelude h1 { max-width: 16ch; margin: 0; font-family: var(--font-heading, system-ui, sans-serif); font-size: calc(5.8cqw * var(--prelude-fit-scale)); line-height: .98; letter-spacing: -.05em; text-wrap: balance; overflow-wrap: anywhere; }
     .prelude-message { margin: 0; color: #b9c6d6; font-size: calc(1.35cqw * var(--prelude-fit-scale)); }
     .prelude-meter { width: min(100%, 32rem); height: .55cqh; overflow: hidden; border-radius: 99px; background: #ffffff18; }
     .prelude-meter i { display: block; width: 0; height: 100%; background: linear-gradient(90deg, var(--accent), #65ccff); transition: width .2s ease; }
     .prelude-status { min-height: 1.5em; margin: 0; color: #8fa0b5; font: 700 calc(1cqw * var(--prelude-fit-scale))/1.4 ui-monospace, monospace; }
-    .prelude-help { margin: .35cqh 0 0; color: #8fa0b5; font-size: calc(.9cqw * var(--prelude-fit-scale)); }
-    .prelude-start { min-width: 10em; padding: .8em 1.4em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: var(--accent); font-weight: 850; }
+    .prelude-help { margin: .35cqh 0 0; color: #a8b6c8; font-size: calc(1cqw * var(--prelude-fit-scale)); }
+    .prelude-start { min-width: 10em; padding: .8em 1.4em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: var(--accent); color: var(--prelude-accent-foreground); font-weight: 850; }
     .prelude-start:disabled { cursor: wait; opacity: .45; }
     .voice-unlock, .presentation-resume { position: absolute; z-index: 45; left: 50%; bottom: 4%; translate: -50% 0; min-width: 12em; padding: .75em 1.1em; border-color: color-mix(in srgb, var(--accent) 70%, white); background: #101827ee; box-shadow: 0 1em 3em #0009; font-weight: 850; }
     .voice-unlock[hidden], .presentation-resume[hidden] { display: none; }
@@ -940,7 +953,8 @@ export function renderPresentationHtml(
     .prelude[data-style="orbit"]::after { width: 21cqw; border-color: color-mix(in srgb, var(--accent) 55%, transparent); animation-direction: reverse; animation-duration: 4s; }
     .prelude[data-style="research-log"] { place-items: end start; background: linear-gradient(90deg, #ffffff09 1px, transparent 1px), #f3efe6; background-size: 4cqw 100%; color: #172033; }
     .prelude[data-style="research-log"] .prelude-inner { margin: 8%; justify-items: start; text-align: start; }
-    .prelude[data-style="research-log"] .prelude-message, .prelude[data-style="research-log"] .prelude-status { color: #536071; }
+    .prelude[data-style="research-log"] .prelude-kicker { color: color-mix(in srgb, var(--accent) 58%, black); }
+    .prelude[data-style="research-log"] .prelude-message, .prelude[data-style="research-log"] .prelude-status, .prelude[data-style="research-log"] .prelude-help { color: #536071; }
     @keyframes prelude-pulse { from { opacity: .55; scale: .82; } to { opacity: 1; scale: 1.12; } }
     @keyframes prelude-orbit { to { rotate: 1turn; } }
     ${templateCss}
@@ -1014,7 +1028,7 @@ export function renderPresentationHtml(
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
     <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p><p class="sr-only" data-slide-announcer aria-live="polite" aria-atomic="true"></p><p class="sr-only" data-voice-announcer aria-live="polite" aria-atomic="true"></p>
-      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
+      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}" style="--prelude-accent-foreground:${preludeAccentForeground}"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
           <h1>${escapeHtml(project.document.title)}</h1>
@@ -1630,13 +1644,18 @@ export function renderPresentationHtml(
       prelude.dataset.fitScale = String(scale);
       const overflowing = content.width > boundary.width * .94 || content.height > boundary.height * .94;
       prelude.dataset.overflow = String(overflowing);
+      const contrast = collectContrast(preludeInner, prelude);
+      const smallText = collectSmallText(preludeInner, prelude);
       if (editorPrelude && parent !== window) parent.postMessage({
         type: 'ultimate-freestyle:render-diagnostics',
         slide_id: '__prelude__',
         step: 0,
         overflows: overflowing ? [{ id: 'prelude', region: '0ページ目', overflow_x: Math.max(0, content.width - boundary.width * .94), overflow_y: Math.max(0, content.height - boundary.height * .94), fit_scale: scale }] : [],
         fits: [{ id: 'prelude', region: '0ページ目', fit_scale: scale }],
-        contrasts: [], clamps: [], readability: [], occlusions: []
+        contrasts: contrast ? [{ id: 'prelude', region: '0ページ目', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground }] : [],
+        clamps: [],
+        readability: smallText ? [{ id: 'prelude', region: '0ページ目', font_size_px: Number(smallText.font_size_px.toFixed(1)), recommended_px: smallText.recommended_px }] : [],
+        occlusions: []
       }, location.origin);
     };
     const schedulePreludeFit = () => requestAnimationFrame(() => requestAnimationFrame(fitPrelude));
@@ -2268,6 +2287,7 @@ export function renderPresentationHtml(
       if (preludeStatus) preludeStatus.textContent = completed < resources.length
         ? '一部を読み込みながら開始できます'
         : failed > 0 ? failed + '件は開始後に読み込みます' : '準備できました';
+      schedulePreludeFit();
     };
     document.querySelector('#next').addEventListener('click', () => { if (started) advance(); });
     document.querySelector('#prev').addEventListener('click', () => { if (!started) return; if (step > 0) step -= 1; else if (slide > 0) { slide -= 1; step = DECK.slides[slide].revealSteps; } else return; syncUrl(); render(); });
