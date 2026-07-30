@@ -925,23 +925,55 @@ function sceneComponentContentControls(node: SlideSceneNode, maxStep: number): s
   return controls ? `<fieldset><legend>内容</legend><div class="editor-grid">${controls}</div></fieldset>` : "";
 }
 
-function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideSceneNode[]): string {
-  const descendants = new Set<string>();
-  const collect = (parentId: string): void => {
-    for (const child of nodes.filter((candidate) => candidate.parent_id === parentId)) {
-      if (descendants.has(child.id)) continue;
-      descendants.add(child.id);
-      collect(child.id);
+type SceneHierarchyIndex = {
+  containerNodes: SlideSceneNode[];
+  descendantsById: Map<string, Set<string>>;
+  siblingsByParentId: Map<string | null, SlideSceneNode[]>;
+};
+
+function createSceneHierarchyIndex(nodes: SlideSceneNode[]): SceneHierarchyIndex {
+  const childrenByParentId = new Map<string, SlideSceneNode[]>();
+  const siblingsByParentId = new Map<string | null, SlideSceneNode[]>();
+  for (const node of nodes) {
+    const siblings = siblingsByParentId.get(node.parent_id) ?? [];
+    siblings.push(node);
+    siblingsByParentId.set(node.parent_id, siblings);
+    if (node.parent_id !== null) {
+      const children = childrenByParentId.get(node.parent_id) ?? [];
+      children.push(node);
+      childrenByParentId.set(node.parent_id, children);
     }
+  }
+  for (const siblings of siblingsByParentId.values()) {
+    siblings.sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+  }
+  const descendantsById = new Map<string, Set<string>>();
+  const descendantsFor = (nodeId: string): Set<string> => {
+    const cached = descendantsById.get(nodeId);
+    if (cached !== undefined) return cached;
+    const descendants = new Set<string>();
+    descendantsById.set(nodeId, descendants);
+    for (const child of childrenByParentId.get(nodeId) ?? []) {
+      descendants.add(child.id);
+      for (const descendantId of descendantsFor(child.id)) descendants.add(descendantId);
+    }
+    return descendants;
   };
-  collect(node.id);
-  const parents = nodes
-    .filter((candidate) => ["layer", "stack", "grid"].includes(candidate.kind) && candidate.id !== node.id && !descendants.has(candidate.id))
+  for (const node of nodes) descendantsFor(node.id);
+  return {
+    containerNodes: nodes.filter((node) => ["layer", "stack", "grid"].includes(node.kind)),
+    descendantsById,
+    siblingsByParentId
+  };
+}
+
+function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideSceneNode[], index: SceneHierarchyIndex): string {
+  const descendants = index.descendantsById.get(node.id) ?? new Set<string>();
+  const parents = index.containerNodes
+    .filter((candidate) => candidate.id !== node.id && !descendants.has(candidate.id))
     .map((candidate) => `<option value="${escapeHtml(candidate.id)}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
     .join("");
-  const siblings = nodes
-    .filter((candidate) => candidate.parent_id === node.parent_id)
-    .sort((left, right) => left.order - right.order || left.id.localeCompare(right.id));
+  const siblings = index.siblingsByParentId.get(node.parent_id) ?? [];
   const siblingIndex = siblings.findIndex((candidate) => candidate.id === node.id);
   return `<fieldset><legend>階層と並び順</legend><div class="editor-grid"><label>追加先<select name="parent_id" data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value=""${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。自分自身や子孫は追加先に選べません。</p></fieldset>`;
 }
@@ -1989,12 +2021,13 @@ export function slideWorkspacePage(options: {
         ? "自由配置の表示パーツです。この画面で内容、画像、位置、大きさ、重なり、表示STEP、アニメーション、見た目を調整できます。入れ子が必要な場合はAIからリッチ構成へ移行できます。"
         : "本文と補足欄を使う定型レイアウトです。";
   const sceneNodes = slide.composition?.mode === "scene" ? slide.composition.nodes : [];
+  const sceneHierarchyIndex = createSceneHierarchyIndex(sceneNodes);
   const workspaceAssetUrls = Object.fromEntries((options.assets ?? []).map((asset) => [asset.asset_id, asset.content_url]));
   const sceneComponentEditors = slide.composition?.mode === "scene"
     ? sceneNodes
         .map((node) => {
           const fields = sceneTextFields(node);
-          const hierarchyControls = sceneComponentHierarchyControls(node, sceneNodes);
+          const hierarchyControls = sceneComponentHierarchyControls(node, sceneNodes, sceneHierarchyIndex);
           const controls = sceneComponentContentControls(node, slide.reveal_steps);
           const kindControls = sceneComponentKindControls(node, options.assets ?? []);
           const appearanceControls = sceneComponentAppearanceControls(node, slide.reveal_steps);
