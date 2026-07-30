@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=107"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=108"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -563,7 +563,10 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("word-break: auto-phrase");
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
-    expect(workspaceHtml).toContain("内容を保存");
+    expect(workspaceHtml).toContain("基本情報と代替テキストを保存");
+    expect(workspaceHtml).toContain("発表画面には直接表示されません");
+    expect(workspaceHtml).toContain('data-composition-mode="canvas"');
+    expect(workspaceHtml).toContain('data-inspector-section="structure" open');
     expect(workspaceHtml).toContain('class="mobile-workspace-tabs"');
     expect(workspaceHtml).toContain('data-mobile-pane="preview"');
     expect(workspaceHtml).toContain('data-mobile-pane="edit"');
@@ -757,6 +760,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("この画像はスライドで使用中です");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-fields");
     expect(dashboardScriptText).toContain("入力内容をプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("代替テキストを編集中です");
+    expect(dashboardScriptText).toContain("基本情報と代替テキストを保存しました");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-typography");
     expect(dashboardScriptText).toContain("組版をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-template");
@@ -2307,6 +2312,9 @@ describe("Web dashboard", () => {
       authEnv
     );
     const flowWorkspaceHtml = await flowWorkspace.text();
+    expect(flowWorkspaceHtml).toContain('data-composition-mode="flow"');
+    expect(flowWorkspaceHtml).toContain('data-inspector-section="content" open');
+    expect(flowWorkspaceHtml).toContain("内容を保存");
     expect(flowWorkspaceHtml).toContain("data-composition-create");
     expect(flowWorkspaceHtml).toContain("選んだ自由構成を開始");
     const createComposition = await requestProvider(

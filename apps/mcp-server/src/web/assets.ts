@@ -482,7 +482,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       draftFrameTimer = setTimeout(syncSlideDraft, 120);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
-        layoutStatus.textContent = "入力内容をプレビューへ反映しています…";
+        layoutStatus.textContent = slideEditor.dataset.compositionMode === "flow"
+          ? "入力内容をプレビューへ反映しています…"
+          : "代替テキストを編集中です。見える内容は「構造」の表示パーツで編集します。";
         layoutStatus.dataset.level = "";
       }
     });
@@ -976,7 +978,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           location.reload();
           return;
         }
-        feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
+        feedback.textContent = form.matches("[data-slide-editor]") && form.dataset.compositionMode !== "flow"
+          ? "v" + result.version + " として基本情報と代替テキストを保存しました。見える内容は「構造」で編集します。"
+          : "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
         postEditorSaveStatus(form, "v" + result.version + " として保存しました。");
         if (form.matches("[data-segment-editor]") && result.voice_generation_required) {
