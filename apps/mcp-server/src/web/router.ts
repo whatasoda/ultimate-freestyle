@@ -43,6 +43,18 @@ import {
 } from "../projects/quality-reports";
 import { invalidateVoiceProfileAudio } from "../projects/voice-audio";
 import {
+  deleteReviewComment,
+  listReviewComments,
+  reviewCommentCreateSchema,
+  reviewCommentStatusSchema,
+  setReviewCommentStatus
+} from "../reviews/repository";
+import {
+  addSlideReviewComment,
+  buildReviewRepairInstruction,
+  ReviewServiceError
+} from "../reviews/service";
+import {
   animationSchema,
   coverLayoutSchema,
   loadingScreenSchema,
@@ -98,6 +110,7 @@ import {
   projectDetailPage,
   projectNotFoundPage,
   redirectPage,
+  slideReviewPage,
   slideWorkspacePage,
   userGuidePage,
   voiceFinishPage
@@ -115,6 +128,10 @@ const IMAGE_CLIENT_ERROR_CODES = new Set([
   "IMAGE_OUTPUT_TOO_LARGE",
   "IMAGE_EMPTY"
 ]);
+
+const reviewInstructionRequestSchema = z.object({
+  comment_ids: z.array(z.string().uuid()).min(1).max(20)
+});
 
 const projectFieldsRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -694,6 +711,161 @@ async function handleSlideWorkspace(
       ? Number(selectedNarrationAt)
       : null,
     assets: await listProjectAssets(env.DB, session.userId, projectId)
+  });
+}
+
+async function handleSlideReviewPage(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return redirectPage("/", clearWebSessionCookies());
+  const project = await getHydratedProject(env, session.userId, projectId);
+  if (project === null || project.document.deck === null) return projectNotFoundPage();
+  const requestedSlide = new URL(request.url).searchParams.get("slide");
+  const slideId = requestedSlide !== null && project.document.deck.slides.some((slide) => slide.id === requestedSlide)
+    ? requestedSlide
+    : project.document.deck.slides[0]?.id;
+  if (slideId === undefined) return projectNotFoundPage();
+  return slideReviewPage({
+    twitchLogin: session.twitchLogin,
+    csrfToken: session.csrfToken,
+    project,
+    slideId,
+    comments: await listReviewComments(env.DB, session.userId, projectId, { limit: 200 })
+  });
+}
+
+async function handleReviewCommentCreate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = reviewCommentCreateSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_REVIEW_COMMENT", message: "コメント対象と本文を確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  const project = await getProject(env.DB, session.userId, projectId);
+  if (project === null) {
+    return jsonResponse({ ok: false, error: { code: "PROJECT_NOT_FOUND", message: "研究が見つかりません。" }, request_id: crypto.randomUUID() }, 404);
+  }
+  try {
+    const comment = await addSlideReviewComment(env.DB, session.userId, project, slideId, parsed.data);
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "slide.review_comment_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, comment_id: comment.id, target_key: comment.target_key },
+      createdAt: comment.created_at
+    });
+    return jsonResponse({
+      ok: true,
+      comment,
+      next_url: `/dashboard/projects/${projectId}/review?slide=${encodeURIComponent(slideId)}#review-comment-${comment.id}`,
+      error: null,
+      request_id: crypto.randomUUID()
+    }, 201);
+  } catch (error) {
+    if (error instanceof ReviewServiceError) {
+      const status = error.code === "SLIDE_NOT_FOUND" || error.code === "REVIEW_TARGET_NOT_FOUND" ? 404 : error.code === "REVIEW_COMMENT_LIMIT_REACHED" ? 409 : 422;
+      return jsonResponse({ ok: false, error: { code: error.code, message: error.message }, request_id: crypto.randomUUID() }, status);
+    }
+    throw error;
+  }
+}
+
+async function handleReviewCommentMutation(
+  request: Request,
+  env: Env,
+  projectId: string,
+  commentId: string
+): Promise<Response> {
+  if (request.method !== "PATCH" && request.method !== "DELETE") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH, DELETE" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  if (request.method === "DELETE") {
+    const deleted = await deleteReviewComment(env.DB, session.userId, projectId, commentId);
+    if (!deleted) return jsonResponse({ ok: false, error: { code: "REVIEW_COMMENT_NOT_FOUND", message: "コメントが見つかりません。" }, request_id: crypto.randomUUID() }, 404);
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "slide.review_comment_deleted",
+      outcome: "succeeded",
+      details: { project_id: projectId, comment_id: commentId },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, comment_id: commentId, deleted: true, error: null, request_id: crypto.randomUUID() });
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = reviewCommentStatusSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_REVIEW_STATUS", message: "コメントの状態を確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  const comment = await setReviewCommentStatus(env.DB, session.userId, projectId, commentId, parsed.data.status);
+  if (comment === null) return jsonResponse({ ok: false, error: { code: "REVIEW_COMMENT_NOT_FOUND", message: "コメントが見つかりません。" }, request_id: crypto.randomUUID() }, 404);
+  await recordWebAudit(env.DB, {
+    userId: session.userId,
+    eventType: "slide.review_comment_status_changed",
+    outcome: "succeeded",
+    details: { project_id: projectId, comment_id: commentId, status: comment.status },
+    createdAt: comment.updated_at
+  });
+  return jsonResponse({ ok: true, comment, error: null, request_id: crypto.randomUUID() });
+}
+
+async function handleReviewInstruction(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = reviewInstructionRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_COMMENT_SELECTION", message: "未解決コメントを1〜20件選んでください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  const [project, comments] = await Promise.all([
+    getProject(env.DB, session.userId, projectId),
+    listReviewComments(env.DB, session.userId, projectId, { status: "open", limit: 200 })
+  ]);
+  if (project === null) return jsonResponse({ ok: false, error: { code: "PROJECT_NOT_FOUND", message: "研究が見つかりません。" }, request_id: crypto.randomUUID() }, 404);
+  const byId = new Map(comments.map((comment) => [comment.id, comment]));
+  const selected = parsed.data.comment_ids.map((id) => byId.get(id)).filter((comment) => comment !== undefined);
+  if (selected.length !== parsed.data.comment_ids.length) {
+    return jsonResponse({ ok: false, error: { code: "REVIEW_COMMENT_NOT_FOUND", message: "選択したコメントが更新または解決されています。画面を更新してください。" }, request_id: crypto.randomUUID() }, 409);
+  }
+  return jsonResponse({
+    ok: true,
+    instruction: buildReviewRepairInstruction(project, selected),
+    comment_count: selected.length,
+    project_version: project.version,
+    error: null,
+    request_id: crypto.randomUUID()
   });
 }
 
@@ -3327,7 +3499,8 @@ async function handleTemplateFieldsUpdate(
       createdAt: new Date().toISOString()
     });
     const deck = project.document.deck!;
-    const template = deck.templates?.find((item) => item.id === templateId)!;
+    const template = deck.templates?.find((item) => item.id === templateId);
+    if (template === undefined) throw new Error("Updated presentation template could not be read.");
     const directSlideCount = deck.slides.filter((slide) => slide.template_id === templateId).length;
     const inheritedSlideCount = deck.default_template_id === templateId
       ? deck.slides.filter((slide) => slide.template_id === null || slide.template_id === undefined).length
@@ -4503,6 +4676,12 @@ export async function handleWebRequest(
       Number(draftRevisionPageMatch[2])
     );
   }
+  const slideReviewPageMatch = path.match(
+    new RegExp(`^/dashboard/projects/${UUID_PATH}/review$`, "i")
+  );
+  if (slideReviewPageMatch?.[1] !== undefined) {
+    return handleSlideReviewPage(request, env, slideReviewPageMatch[1]);
+  }
   const projectMatch = path.match(
     new RegExp(`^/dashboard/projects/${UUID_PATH}$`, "i")
   );
@@ -4528,6 +4707,24 @@ export async function handleWebRequest(
       slideWorkspaceMatch[1],
       slideWorkspaceMatch[2]
     );
+  }
+  const reviewCommentCreateMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/review-comments$`, "i")
+  );
+  if (reviewCommentCreateMatch?.[1] !== undefined && reviewCommentCreateMatch[2] !== undefined) {
+    return handleReviewCommentCreate(request, env, reviewCommentCreateMatch[1], reviewCommentCreateMatch[2]);
+  }
+  const reviewCommentMutationMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/review-comments/${UUID_PATH}$`, "i")
+  );
+  if (reviewCommentMutationMatch?.[1] !== undefined && reviewCommentMutationMatch[2] !== undefined) {
+    return handleReviewCommentMutation(request, env, reviewCommentMutationMatch[1], reviewCommentMutationMatch[2]);
+  }
+  const reviewInstructionMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/review-instruction$`, "i")
+  );
+  if (reviewInstructionMatch?.[1] !== undefined) {
+    return handleReviewInstruction(request, env, reviewInstructionMatch[1]);
   }
   const projectImageMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/images$`, "i")

@@ -32,6 +32,8 @@ import {
 import { RUBRIC_MARKDOWN } from "./rubric";
 import { staticSlideQuality } from "./quality";
 import { getRenderedQualityReport } from "./quality-reports";
+import { listReviewComments } from "../reviews/repository";
+import { reviewCommentWithAnchor } from "../reviews/service";
 
 const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 
@@ -311,6 +313,7 @@ export function registerResearchGuides(
               publication_uri: `research://projects/${project.project_id}/publication`,
               voice_uri: `research://projects/${project.project_id}/voice`,
               revisions_uri: `research://projects/${project.project_id}/revisions`,
+              review_comments_uri: `research://projects/${project.project_id}/review-comments`,
               counts: {
                 findings: project.document.findings.length,
                 limitations: project.document.limitations.length,
@@ -322,6 +325,125 @@ export function registerResearchGuides(
       return {
         contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }]
       };
+    }
+  );
+
+  server.registerResource(
+    "research-project-review-comments",
+    new ResourceTemplate("research://projects/{id}/review-comments", { list: undefined }),
+    {
+      title: "スライドのレビューコメント",
+      description:
+        "Webレビューで付けた未解決コメントの件数とページ索引です。修正前に読み、各ページの範囲アンカーを確認します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const comments = project === null || "error" in auth
+        ? []
+        : await listReviewComments(db, auth.ownerUserId, project.project_id, { limit: 200 });
+      const openCount = comments.filter((comment) => comment.status === "open").length;
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : project === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : {
+              ok: true,
+              project_id: project.project_id,
+              project_version: project.version,
+              counts: {
+                open: openCount,
+                resolved: comments.length - openCount,
+                total: comments.length
+              },
+              open_comments: {
+                page_size: 20,
+                pages: Math.ceil(openCount / 20),
+                uri_template: `research://projects/${project.project_id}/review-comments/pages/{page}`
+              },
+              workflow: {
+                read_slide_uri_template: `research://projects/${project.project_id}/slides/{slideId}`,
+                stale_anchor: "推測で編集せず利用者へ確認する",
+                moved_anchor: "現在の一意な位置を確認してから編集する",
+                resolution: "変更後にWebレビューで利用者が解決済みにする"
+              },
+              web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${project.project_id}/review`
+            };
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
+    }
+  );
+
+  server.registerResource(
+    "research-project-review-comment-page",
+    new ResourceTemplate("research://projects/{id}/review-comments/pages/{page}", { list: undefined }),
+    {
+      title: "未解決レビューコメントの一ページ",
+      description:
+        "一度に20件ずつ読む、対象スライド・保存時version・選択文・現在のアンカー状態を含む未解決コメントです。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const pageValue = variables.page;
+      const page = typeof pageValue === "string" && /^\d+$/.test(pageValue) ? Number(pageValue) : null;
+      const project = !("error" in auth) && typeof id === "string" && page !== null
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      let body: Record<string, unknown>;
+      if ("error" in auth) {
+        body = { ok: false, error: { code: auth.error } };
+      } else if (typeof id !== "string" || page === null || page < 1) {
+        body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+      } else if (project === null) {
+        body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+      } else {
+        const pageComments = await listReviewComments(db, auth.ownerUserId, project.project_id, {
+          status: "open",
+          limit: 21,
+          offset: (page - 1) * 20
+        });
+        const hasMore = pageComments.length > 20;
+        const comments = pageComments.slice(0, 20);
+        body = {
+          ok: true,
+          project_id: project.project_id,
+          project_version: project.version,
+          page,
+          comments: comments.map((comment) => {
+            const anchored = reviewCommentWithAnchor(project, comment);
+            return {
+              comment_id: comment.id,
+              slide_id: comment.slide_id,
+              slide_uri: `research://projects/${project.project_id}/slides/${comment.slide_id}`,
+              created_at_project_version: comment.project_version,
+              target: {
+                key: comment.target_key,
+                label: comment.target_label,
+                kind: comment.target_kind
+              },
+              selection: comment.selected_text.length === 0
+                ? null
+                : {
+                    text: comment.selected_text,
+                    prefix: comment.quote_prefix,
+                    suffix: comment.quote_suffix,
+                    original_range: { start: comment.range_start, end: comment.range_end },
+                    current_anchor: anchored.anchor
+                  },
+              comment: comment.body
+            };
+          }),
+          next_uri: hasMore
+            ? `research://projects/${project.project_id}/review-comments/pages/${page + 1}`
+            : null
+        };
+      }
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
     }
   );
 

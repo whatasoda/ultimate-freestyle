@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "160";
+export const DASHBOARD_ASSET_VERSION = "161";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
@@ -4197,6 +4197,216 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (copyPublicFeedback instanceof HTMLElement) copyPublicFeedback.textContent = "コピーできませんでした。公開ページを開いてURLをコピーしてください。";
       }
     });
+  }
+
+  const reviewPage = document.querySelector("[data-review-page]");
+  if (reviewPage instanceof HTMLElement) {
+    const composer = reviewPage.querySelector("[data-review-composer]");
+    const selectionLabel = reviewPage.querySelector("[data-review-selection]");
+    const feedback = reviewPage.querySelector("[data-review-feedback]");
+    const targetKey = composer?.querySelector('input[name="target_key"]');
+    const rangeStart = composer?.querySelector('input[name="range_start"]');
+    const rangeEnd = composer?.querySelector('input[name="range_end"]');
+    const selectedText = composer?.querySelector('input[name="selected_text"]');
+    const bodyInput = composer?.querySelector('textarea[name="body"]');
+    const reviewDraftKey = "ultimate-freestyle:review-draft:" + (reviewPage.dataset.projectId || "") + ":" + (reviewPage.dataset.slideId || "");
+    if (bodyInput instanceof HTMLTextAreaElement) {
+      try {
+        const draft = sessionStorage.getItem(reviewDraftKey);
+        if (draft !== null && bodyInput.value.length === 0) {
+          bodyInput.value = draft;
+          if (feedback instanceof HTMLElement) feedback.textContent = "このタブに残っていたコメントの下書きを復元しました。";
+        }
+      } catch {}
+      bodyInput.addEventListener("input", () => {
+        try {
+          if (bodyInput.value.length === 0) sessionStorage.removeItem(reviewDraftKey);
+          else sessionStorage.setItem(reviewDraftKey, bodyInput.value);
+        } catch {}
+      });
+    }
+    const resetSelection = () => {
+      if (!(targetKey instanceof HTMLInputElement) || !(rangeStart instanceof HTMLInputElement) || !(rangeEnd instanceof HTMLInputElement) || !(selectedText instanceof HTMLInputElement)) return;
+      targetKey.value = "slide:whole";
+      rangeStart.value = "";
+      rangeEnd.value = "";
+      selectedText.value = "";
+      composer?.removeAttribute("data-active");
+      for (const source of reviewPage.querySelectorAll("[data-review-source]")) source.removeAttribute("data-selected");
+      if (selectionLabel instanceof HTMLElement) selectionLabel.textContent = "スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。";
+    };
+    const captureSelection = () => {
+      const selection = getSelection();
+      if (selection === null || selection.rangeCount !== 1 || selection.isCollapsed) return;
+      const range = selection.getRangeAt(0);
+      const startElement = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
+      const endElement = range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement;
+      const source = startElement?.closest("[data-review-source]");
+      if (!(source instanceof HTMLElement) || source !== endElement?.closest("[data-review-source]")) return;
+      const text = source.querySelector("[data-review-text]");
+      if (!(text instanceof HTMLElement) || !text.contains(range.commonAncestorContainer)) return;
+      const prefixRange = document.createRange();
+      prefixRange.selectNodeContents(text);
+      try { prefixRange.setEnd(range.startContainer, range.startOffset); } catch { return; }
+      const value = range.toString();
+      if (value.length === 0 || value.length > 2000) {
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = value.length > 2000 ? "一度に選択できるのは2000文字までです。範囲を分けてください。" : "";
+          feedback.classList.toggle("warning", value.length > 2000);
+        }
+        return;
+      }
+      const start = prefixRange.toString().length;
+      if (!(targetKey instanceof HTMLInputElement) || !(rangeStart instanceof HTMLInputElement) || !(rangeEnd instanceof HTMLInputElement) || !(selectedText instanceof HTMLInputElement)) return;
+      targetKey.value = source.dataset.sourceKey || "";
+      rangeStart.value = String(start);
+      rangeEnd.value = String(start + value.length);
+      selectedText.value = value;
+      composer?.setAttribute("data-active", "true");
+      for (const item of reviewPage.querySelectorAll("[data-review-source]")) item.toggleAttribute("data-selected", item === source);
+      if (selectionLabel instanceof HTMLElement) selectionLabel.textContent = (source.dataset.sourceLabel || "文章") + "の「" + value.replace(/\s+/g, " ").slice(0, 160) + (value.length > 160 ? "…" : "") + "」へのコメントです。";
+      if (feedback instanceof HTMLElement) {
+        feedback.textContent = "範囲を指定しました。指摘を書いて追加してください。";
+        feedback.classList.remove("warning");
+      }
+      bodyInput?.focus({ preventScroll: true });
+    };
+    reviewPage.addEventListener("mouseup", () => setTimeout(captureSelection));
+    reviewPage.addEventListener("keyup", (event) => {
+      if (event.key === "Shift" || event.key.startsWith("Arrow")) setTimeout(captureSelection);
+    });
+    reviewPage.querySelector("[data-review-whole]")?.addEventListener("click", resetSelection);
+    if (composer instanceof HTMLFormElement) {
+      composer.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const submit = composer.querySelector('button[type="submit"]');
+        if (!(targetKey instanceof HTMLInputElement) || !(rangeStart instanceof HTMLInputElement) || !(rangeEnd instanceof HTMLInputElement) || !(selectedText instanceof HTMLInputElement) || !(bodyInput instanceof HTMLTextAreaElement)) return;
+        setButtonBusy(submit, true);
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = "コメントを保存しています…";
+          feedback.classList.remove("warning", "success");
+        }
+        try {
+          const response = await fetch(reviewPage.dataset.commentUrl || "", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-csrf-token": reviewPage.dataset.csrf || "" },
+            body: JSON.stringify({
+              target_key: targetKey.value,
+              range_start: rangeStart.value === "" ? null : Number(rangeStart.value),
+              range_end: rangeEnd.value === "" ? null : Number(rangeEnd.value),
+              selected_text: selectedText.value,
+              body: bodyInput.value
+            })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(apiErrorMessage(result, "コメントを保存できませんでした。"));
+          if (feedback instanceof HTMLElement) {
+            feedback.textContent = "保存しました。レビューを更新します…";
+            feedback.classList.add("success");
+          }
+          try { sessionStorage.removeItem(reviewDraftKey); } catch {}
+          location.assign(result.next_url || location.href);
+        } catch (error) {
+          if (feedback instanceof HTMLElement) {
+            feedback.textContent = caughtErrorMessage(error, "コメントを保存できませんでした。");
+            feedback.classList.add("warning");
+          }
+          setButtonBusy(submit, false);
+        }
+      });
+    }
+    for (const button of reviewPage.querySelectorAll("[data-review-status], [data-review-delete]")) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      button.addEventListener("click", async () => {
+        const deleting = button.hasAttribute("data-review-delete");
+        if (deleting && !confirm("このコメントを削除しますか？元に戻せません。")) return;
+        const original = button.textContent;
+        setButtonBusy(button, true);
+        button.textContent = deleting ? "削除中…" : "更新中…";
+        try {
+          const response = await fetch(button.dataset.actionUrl || "", {
+            method: deleting ? "DELETE" : "PATCH",
+            headers: { "content-type": "application/json", "x-csrf-token": button.dataset.csrf || "" },
+            body: deleting ? undefined : JSON.stringify({ status: button.dataset.reviewStatus })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(apiErrorMessage(result, "コメントを更新できませんでした。"));
+          location.reload();
+        } catch (error) {
+          alert(caughtErrorMessage(error, "コメントを更新できませんでした。"));
+          button.textContent = original;
+          setButtonBusy(button, false);
+        }
+      });
+    }
+    const generateButton = reviewPage.querySelector("[data-review-script-generate]");
+    const copyButton = reviewPage.querySelector("[data-review-script-copy]");
+    const scriptOutput = reviewPage.querySelector("[data-review-script-output]");
+    const scriptFeedback = reviewPage.querySelector("[data-review-script-feedback]");
+    if (generateButton instanceof HTMLButtonElement && scriptOutput instanceof HTMLTextAreaElement) {
+      generateButton.addEventListener("click", async () => {
+        const commentIds = [...reviewPage.querySelectorAll("[data-review-script-comment]:checked")]
+          .filter((item) => item instanceof HTMLInputElement)
+          .map((item) => item.value);
+        if (commentIds.length > 20) {
+          if (scriptFeedback instanceof HTMLElement) {
+            scriptFeedback.textContent = "一度に生成できるのは20件までです。チェックを減らしてください。";
+            scriptFeedback.classList.add("warning");
+          }
+          return;
+        }
+        if (commentIds.length === 0) {
+          if (scriptFeedback instanceof HTMLElement) {
+            scriptFeedback.textContent = "未解決コメントを1件以上チェックしてください。";
+            scriptFeedback.classList.add("warning");
+          }
+          return;
+        }
+        setButtonBusy(generateButton, true);
+        if (scriptFeedback instanceof HTMLElement) {
+          scriptFeedback.textContent = "修正依頼文を生成しています…";
+          scriptFeedback.classList.remove("warning", "success");
+        }
+        try {
+          const response = await fetch(reviewPage.dataset.scriptUrl || "", {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-csrf-token": reviewPage.dataset.csrf || "" },
+            body: JSON.stringify({ comment_ids: commentIds })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(apiErrorMessage(result, "修正依頼文を生成できませんでした。"));
+          scriptOutput.value = result.instruction;
+          if (scriptFeedback instanceof HTMLElement) {
+            scriptFeedback.textContent = result.comment_count + "件の未解決コメントから生成しました。";
+            scriptFeedback.classList.add("success");
+          }
+        } catch (error) {
+          if (scriptFeedback instanceof HTMLElement) {
+            scriptFeedback.textContent = caughtErrorMessage(error, "修正依頼文を生成できませんでした。");
+            scriptFeedback.classList.add("warning");
+          }
+        } finally {
+          setButtonBusy(generateButton, false);
+        }
+      });
+    }
+    if (copyButton instanceof HTMLButtonElement && scriptOutput instanceof HTMLTextAreaElement) {
+      copyButton.addEventListener("click", async () => {
+        if (scriptOutput.value.length === 0) return;
+        try {
+          await navigator.clipboard.writeText(scriptOutput.value);
+          copyButton.textContent = "コピーしました";
+          if (scriptFeedback instanceof HTMLElement) scriptFeedback.textContent = "AIクライアントの会話へ貼り付けてください。";
+          setTimeout(() => { copyButton.textContent = "コピー"; }, 1800);
+        } catch {
+          scriptOutput.select();
+          if (scriptFeedback instanceof HTMLElement) {
+            scriptFeedback.textContent = "自動コピーできませんでした。選択済みの文章をコピーしてください。";
+            scriptFeedback.classList.add("warning");
+          }
+        }
+      });
+    }
   }
 
   const uploadForm = document.querySelector("[data-image-upload]");

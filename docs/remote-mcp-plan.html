@@ -1525,7 +1525,7 @@ docs/                  # 設計・運用手順</pre>
           <h2>認証を先に証明し、制作機能を後から載せる</h2>
           <p>各段階を単独で検証できるようにし、資格判定や公開処理を一度に作り込まない。</p>
           <p class="callout">
-            <strong>2026-07-29現在：</strong>Phase 0は完了。Phase 1のWorker v0.14.0を
+            <strong>2026-07-30現在：</strong>Phase 0は完了。Phase 1のWorker v0.15.0を
             <code>https://saijiyu-kenkyu.2764.moe/mcp</code>へデプロイし、
             自動contract test、本番スモークテスト、Codexからのtool／resource呼び出しを確認済み。
             Phase 2はOAuth用KV、state用KV、D1 migration、二段OAuth、PKCE、CSRF、
@@ -1535,6 +1535,7 @@ docs/                  # 設計・運用手順</pre>
             Phase 4は安全なHTML renderer、宣言的な利用者template、標準<code>data-*</code> hook、不変preview、確認後publish、private R2配信まで実装・自動検証済み。定型flow、絶対配置canvasに加え、<code>layer</code>／<code>stack</code>／<code>grid</code>へ登録済み<code>uf-*</code> Web Componentsを入れ子にするsceneを追加した。文章、情報card、数値、callout、棒グラフ、timeline、画像、図形は安全な既定値から作り、内容、配置、style、data itemを別の小粒度toolで一項目ずつ編集する。任意HTML／CSS／script／外部URLは受け付けず、参照画像はpreview revision専用R2 objectへ固定して元画像の変更や削除から公開版を分離する。
             Web UIはトップページ、Twitchログイン、D1上の24時間Web専用セッション、CSRF付きログアウト、所有者限定の研究一覧・詳細、基本文言編集、競合防止、preview／publish導線まで実装済み。さらに各スライドを検索可能なfilmstrip、公開版と同じrendererの16:9／4:3 iframe、内容・デザイン・読み上げ・構造・品質のinspectorで確認する一枚編集workspaceを追加し、複製・前後移動・削除もWeb上で行える。9種類のvisual presetとfont preset、密度、配色、領域、余白、motion、5種類の読み上げ表示、segment別VOICEVOX profileと7種の調声値を小粒度APIから編集できる。rendererはstage基準の寸法、自動文字fit、編集用overflow診断、音声file優先再生とbrowser fallbackに対応し、STEP切替ではiframeを再読込しない。
             private R2 bucketとImages binding、Web UIの画像追加・閲覧・削除は実装済み。入力10 MiB、40 MP、一辺10,000 px、保存2 MiB・最大辺2,560 px、100画像/project・300画像/user・150 MiB/userを上限とし、原本を残さずWebPへ正規化する。VOICEVOXはUUID + style IDの複数profile、segment別profile、7種の調声値、生成入力fingerprint、Cloudflare Queue、outbox、VOICEVOX ENGINE 0.25.1固定Container、MP3変換、private R2 cache、Web UIの生成・進捗・試聴、公開revisionへの不変音声snapshot、使用話者の自動クレジットまで接続済み。
+            スライドレビューは専用Web画面へ分離し、実rendererの下にflow、canvas、sceneの画面テキストと音声原稿を平坦表示する。UTF-16 offset、選択文、前後文脈を使う範囲コメントをD1へ研究documentと独立保存し、現在位置、一意な再発見、要再指定を区別する。未解決コメントは20件単位の標準MCP resourceでも読み、Web UIで選んだ最大20件から既存の小粒度toolだけを使うAI修正依頼文を生成する。コメント追加・解決・削除は研究versionと固定previewの現在性を変更しない。
             main pushではGitHub Actionsが自動contract testを通した後、後方互換な未適用D1 migration、Worker deploy、本番smokeを直列実行する。GitHub Pagesの自動deployは廃止し、VOICEVOX Actionは手動／専用tagの試聴artifact生成に限定した。
             Codexでは<code>health</code>と<code>get_access_status</code>の実呼び出しまで確認済み。ChatGPT実クライアント確認と、Queue・Containerを含む本番音声生成の継続的な費用・cold start計測を残す。
           </p>

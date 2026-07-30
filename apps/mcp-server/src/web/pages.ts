@@ -42,6 +42,12 @@ import {
   staticSlideQuality
 } from "../projects/quality";
 import type { RenderedQualityReport } from "../projects/quality-reports";
+import { flattenSlideReviewSources } from "../reviews/flatten";
+import {
+  buildReviewRepairInstruction,
+  reviewCommentWithAnchor
+} from "../reviews/service";
+import type { ReviewComment } from "../reviews/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import { DASHBOARD_ASSET_VERSION } from "./assets";
 import {
@@ -681,6 +687,44 @@ const DASHBOARD_STYLE = String.raw`
       .save-state[data-state="dirty"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
       .save-state[data-state="saving"] { border-color: #35506a; background: #0a1b29; color: #bfe6f7; }
       .slide-workspace { display: grid; grid-template-columns: minmax(10rem, 15rem) minmax(0, 1fr) minmax(17rem, 22rem); gap: 1rem; align-items: start; }
+      .review-workspace { display: grid; grid-template-columns: minmax(11rem, 14rem) minmax(28rem, 1fr) minmax(19rem, 25rem); gap: 1rem; align-items: start; }
+      .review-filmstrip, .review-comments { position: sticky; top: .75rem; display: grid; gap: .65rem; max-height: calc(100dvh - 1.5rem); overflow: auto; scrollbar-gutter: stable; }
+      .review-filmstrip .filmstrip-link { grid-template-columns: 2rem minmax(0, 1fr) auto; }
+      .review-count { display: inline-grid; place-items: center; min-width: 1.6rem; height: 1.6rem; padding: 0 .35rem; border-radius: 999px; background: #8062df40; color: #e8e0ff; font-size: .68rem; font-weight: 850; }
+      .review-count[data-empty="true"] { background: #ffffff0a; color: #718096; }
+      .review-center { display: grid; min-width: 0; gap: 1rem; }
+      .review-preview { padding: .8rem; }
+      .review-source-list { display: grid; gap: .7rem; }
+      .review-source { position: relative; display: grid; grid-template-columns: minmax(7.5rem, 10rem) minmax(0, 1fr); gap: .8rem; padding: .85rem; border: 1px solid var(--line); border-radius: .75rem; background: #09131f; }
+      .review-source[data-kind="narration"] { border-color: #5b4b8d; background: #17132a; }
+      .review-source[data-selected="true"] { border-color: #91ddff; box-shadow: 0 0 0 .12rem #91ddff55; }
+      .review-source-meta { display: grid; align-content: start; gap: .35rem; }
+      .review-source-meta strong { font-size: .78rem; line-height: 1.4; }
+      .review-kind { width: fit-content; padding: .2rem .4rem; border-radius: .35rem; background: #16405a; color: #bcecff; font-size: .64rem; font-weight: 850; }
+      .review-source[data-kind="narration"] .review-kind { background: #4a3479; color: #e6dbff; }
+      .review-source-text { min-width: 0; margin: 0; padding: .2rem 0; color: #e5edf7; font: inherit; font-size: .88rem; line-height: 1.75; overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
+      .review-source-text mark { padding: .08rem .12rem; border-radius: .2rem; background: #f4bd6250; color: #fff3d6; }
+      .review-select-hint { margin: 0; color: var(--muted); font-size: .76rem; line-height: 1.6; }
+      .review-composer { display: grid; gap: .65rem; padding: 1rem; border: 1px solid #51637a; border-radius: .85rem; background: #101b29; }
+      .review-composer[data-active="true"] { border-color: #91ddff; }
+      .review-selection { min-height: 3rem; margin: 0; padding: .65rem; border-radius: .55rem; background: #07101a; color: #c7d3e1; font-size: .78rem; line-height: 1.55; overflow-wrap: anywhere; }
+      .review-composer textarea { min-height: 7rem; }
+      .review-card { display: grid; gap: .55rem; padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; background: #0a131f; }
+      .review-card[data-status="resolved"] { opacity: .68; }
+      .review-card-head { display: flex; align-items: start; justify-content: space-between; gap: .5rem; }
+      .review-card-head label { display: flex; align-items: start; gap: .45rem; min-width: 0; font-size: .76rem; font-weight: 760; }
+      .review-card-head input { width: auto; margin-top: .18rem; }
+      .review-card p { margin: 0; color: #d6dfeb; font-size: .84rem; line-height: 1.65; overflow-wrap: anywhere; }
+      .review-quote { padding-left: .65rem; border-left: .15rem solid #f4bd62; color: #ffe5b8 !important; }
+      .anchor-state { flex: 0 0 auto; padding: .18rem .38rem; border-radius: 999px; background: #153125; color: #9be6bd; font-size: .62rem; font-weight: 850; }
+      .anchor-state[data-state="moved"] { background: #2a210d; color: #ffe09a; }
+      .anchor-state[data-state="stale"] { background: #3b171c; color: #ffbdc8; }
+      .review-card-actions { display: flex; flex-wrap: wrap; gap: .4rem; }
+      .review-card-actions button { min-height: 2.1rem; padding: .35rem .55rem; font-size: .7rem; }
+      [data-review-comment-list] { display: grid; gap: .55rem; }
+      .review-script { display: grid; gap: .65rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+      .review-script textarea { min-height: 14rem; font: .74rem/1.6 ui-monospace, monospace; }
+      .review-empty { margin: 0; padding: .85rem; border: 1px dashed #52647c; border-radius: .7rem; color: var(--muted); font-size: .8rem; line-height: 1.65; }
       .mobile-workspace-tabs, .mobile-inspector-tabs { display: none; }
       .mobile-workspace-tabs[hidden], .mobile-inspector-tabs[hidden] { display: none; }
       body[data-preview-focus="true"] .slide-workspace { grid-template-columns: minmax(0, 1fr); }
@@ -857,7 +901,8 @@ const DASHBOARD_STYLE = String.raw`
       .voice-next li + li { margin-top: .35rem; }
       form { margin: 0; }
       @media (min-width: 72.01rem) { main.workspace-main { width: min(98vw, 112rem); } .slide-workspace { grid-template-columns: minmax(11rem, 13rem) minmax(34rem, 1fr) minmax(23rem, 27rem); gap: .8rem; } .filmstrip, .inspector { max-height: calc(100dvh - 7rem); scrollbar-gutter: stable; } .filmstrip { position: sticky; top: .75rem; } .workspace-preview { position: sticky; top: .75rem; } .inspector { position: sticky; top: .75rem; padding-right: .2rem; } .workspace-frame { max-height: calc(100dvh - 15rem); margin-inline: auto; } }
-      @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } .workspace-guide-body { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+      @media (max-width: 72rem) { .slide-workspace { grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr); } .inspector { grid-column: 1 / -1; max-height: none; } .workspace-guide-body { grid-template-columns: repeat(2, minmax(0, 1fr)); } .review-workspace { grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr); } .review-comments { position: static; grid-column: 1 / -1; max-height: none; } }
+      @media (max-width: 48rem) { .review-workspace { grid-template-columns: 1fr; } .review-filmstrip, .review-comments { position: static; max-height: none; } .review-comments { grid-column: auto; } .review-source { grid-template-columns: 1fr; } }
       @media (max-width: 48rem) { .hero, .detail-grid, .editor-grid, .slide-workspace, .tuning-grid, .voice-flow, .voice-hero, .journey-next, .setup-steps, .voice-preset-fields, .workspace-guide-body, .voice-pause-grid, .product-grid, .role-table, .guide-client-tabs { grid-template-columns: 1fr; } .role-table > article + article { border-top: 1px solid var(--line); border-left: 0; } .landing-cta { align-items: stretch; flex-direction: column; } .landing-nav a:not(.button) { display: none; } .dashboard-tools { align-items: stretch; flex-direction: column; } .dashboard-filter { justify-content: flex-start; } .editor label.wide { grid-column: auto; } .mobile-workspace-tabs { position: sticky; z-index: 20; top: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: .35rem; margin: 0 0 .65rem; padding: .45rem; border: 1px solid var(--line); border-radius: .75rem; background: #090f18ee; backdrop-filter: blur(12px); } .mobile-workspace-tabs button { min-height: 2.75rem; padding: .45rem; font-size: .78rem; } .mobile-workspace-tabs button[aria-selected="true"] { border-color: #9d7bff; background: #8062df40; color: white; } .tab-badge { display: inline-flex; margin-left: .25rem; padding: .1rem .3rem; border-radius: 999px; background: #8a4b16; color: #ffe5b8; font-size: .62rem; } .tab-badge[hidden] { display: none; } body[data-mobile-pane="preview"] .slide-workspace > :not(.workspace-preview), body[data-mobile-pane="edit"] .slide-workspace > :not(.inspector), body[data-mobile-pane="slides"] .slide-workspace > :not(.filmstrip) { display: none; } .filmstrip { display: flex; max-height: none; overflow-x: auto; } body[data-mobile-pane="slides"] .filmstrip { display: grid; overflow: visible; } body[data-mobile-pane="slides"] .filmstrip-link { min-width: 0; } .filmstrip-link { min-width: 12rem; } .inspector { grid-column: auto; } .component-outline-row { grid-template-columns: minmax(0, 1fr) auto; } .component-outline-row code { grid-column: 1 / -1; min-width: 0; overflow-wrap: anywhere; } .component-outline-row > span { min-width: 0; overflow-wrap: anywhere; } .component-outline .component-outline { margin-inline: .25rem; padding-left: .4rem; } .voice-stats, .journey-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-next { position: static; } .troubleshooting, .troubleshooting tbody, .troubleshooting tr, .troubleshooting th, .troubleshooting td { display: block; width: 100%; } .troubleshooting th { padding-bottom: .25rem; border-bottom: 0; } .troubleshooting td { padding-top: .25rem; } }
       @media (max-width: 48rem) { .mobile-inspector-tabs { position: sticky; z-index: 18; top: .25rem; display: flex; gap: .3rem; margin-bottom: .55rem; padding: .35rem; overflow-x: auto; border: 1px solid var(--line); border-radius: .7rem; background: #090f18ee; scrollbar-width: thin; } .mobile-inspector-tabs button { flex: 0 0 auto; min-height: 2.75rem; padding: .45rem .65rem; font-size: .74rem; } .mobile-inspector-tabs button[aria-selected="true"] { border-color: #9d7bff; background: #8062df40; color: white; } }
       @media (max-width: 38rem) { .site-header, .account { align-items: flex-start; } .site-header { flex-direction: column; } .section-head { align-items: flex-start; flex-direction: column; } .step-control { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: .45rem; } .step-control button { width: 100%; min-height: 2.75rem; padding-inline: .45rem; } .step-control output { min-width: 5.5rem; } .step-control [data-grid-snap] { grid-column: 1 / -1; } .voice-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .voice-stat { min-width: 0; padding: .6rem; } .voice-stat strong { overflow-wrap: anywhere; font-size: 1.05rem; } .voice-search-row { grid-template-columns: 1fr; } .voice-filter-tabs { flex-wrap: nowrap; margin-inline: -.55rem; padding-inline: .55rem; overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; } .voice-filter-tabs .button { flex: 0 0 auto; } .voice-result-count { margin-left: 0; } .voice-review > summary { grid-template-columns: auto minmax(0, 1fr); } .voice-review > summary .voice-status { grid-column: 2; justify-self: start; } .voice-audio-timeline { grid-template-columns: 1fr; } .voice-audio-timeline output { text-align: left; } }
@@ -2151,7 +2196,7 @@ export function projectDetailPage(options: {
                <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
              </dl><div class="project-storage" data-state="${projectStorageWarning ? "warning" : "ok"}"><span class="meta">保存容量 ${Math.ceil(projectBytes / 1024)} / ${MAX_PROJECT_DOCUMENT_BYTES / 1024} KiB（${projectStoragePercent}%）</span><progress max="${MAX_PROJECT_DOCUMENT_BYTES}" value="${projectBytes}">${projectStoragePercent}%</progress><small class="inherit-note">${projectStorageWarning ? "上限に近づいています。大きい項目から整理してください。" : `残り約${Math.floor((MAX_PROJECT_DOCUMENT_BYTES - projectBytes) / 1024)} KiBです。`}</small>${storageBreakdownHtml}</div></section>
              ${draftHistoryPanel}
-             <section class="panel" id="presentation-structure" tabindex="-1"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
+             <section class="panel" id="presentation-structure" tabindex="-1"><div class="section-head"><div><h2>発表構成</h2><p class="inherit-note">一枚ずつ編集するか、実表示と原稿を並べてレビューします。</p></div>${slides.length === 0 ? "" : `<a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/review?slide=${escapeHtml(slides[0]?.id ?? "")}">全スライドをレビュー</a>`}</div><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
              ${evaluationPanel}
              ${voicePanel}
              ${publicationPanel}
@@ -2395,6 +2440,104 @@ export function voiceFinishPage(options: {
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><form class="voice-filter" method="get" aria-label="区間の絞り込み"><div class="voice-search-row"><input class="voice-search" type="search" name="q" value="${escapeHtml(options.query ?? "")}" data-voice-search placeholder="スライド名・原稿・声を検索" autocomplete="off"><input type="hidden" name="status" value="${voiceStatus === "all" ? "" : voiceStatus}"><button class="ghost" type="submit">全区間から検索</button></div><div class="voice-filter-tabs" role="group" aria-label="音声の生成状態"><a class="button ghost" data-voice-filter="all" href="${escapeHtml(voiceFilterHref("all"))}"${voiceStatus === "all" ? ' aria-current="page"' : ""}>すべて ${summary.total}</a><a class="button ghost" data-voice-filter="needs_generation" href="${escapeHtml(voiceFilterHref("needs_generation"))}"${voiceStatus === "needs_generation" ? ' aria-current="page"' : ""}>要生成（失敗含む） ${summary.needs_generation}</a><a class="button ghost" data-voice-filter="ready" href="${escapeHtml(voiceFilterHref("ready"))}"${voiceStatus === "ready" ? ' aria-current="page"' : ""}>生成済み ${summary.ready}</a><a class="button ghost" data-voice-filter="failed" href="${escapeHtml(voiceFilterHref("failed"))}"${voiceStatus === "failed" ? ' aria-current="page"' : ""}>失敗 ${summary.failed}</a></div><output class="voice-result-count" data-voice-visible aria-live="polite">${pageSegments.length} / ${filteredSegments.length}件表示</output></form><p class="search-empty" data-voice-filter-empty hidden>このページ内で一致する読み上げ区間はありません。全区間から探すには検索ボタンを押してください。</p><div class="voice-segment-list" data-voice-segments>${segmentList}</div>${voicePager}</section>
            </div>
            <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>必要な区間だけVOICEVOXを生成</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">${options.voice.configured ? "VOICEVOXを設定した発表は、固定プレビューを作る前に全区間の生成が必要です。編集画面のブラウザ音声は仮試聴に使えます。" : "VOICEVOXを設定しない場合、固定プレビューはブラウザ音声で読み上げます。"}</p></aside>
+         </div>
+       </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
+    ),
+    { headers: headers() }
+  );
+}
+
+function reviewSourceTextHtml(
+  source: ReturnType<typeof flattenSlideReviewSources>[number],
+  project: ProjectRecord,
+  comments: ReviewComment[]
+): string {
+  const ranges = comments
+    .filter((comment) => comment.target_key === source.key && comment.status === "open")
+    .map((comment) => ({ comment, anchor: reviewCommentWithAnchor(project, comment).anchor }))
+    .filter((item) => item.anchor.start !== null && item.anchor.end !== null && item.anchor.state !== "stale")
+    .sort((left, right) => (left.anchor.start ?? 0) - (right.anchor.start ?? 0));
+  const parts: string[] = [];
+  let cursor = 0;
+  for (const item of ranges) {
+    const start = item.anchor.start ?? 0;
+    const end = item.anchor.end ?? start;
+    if (start < cursor) continue;
+    parts.push(escapeHtml(source.text.slice(cursor, start)));
+    parts.push(`<mark title="未解決コメント: ${escapeHtml(item.comment.body.slice(0, 120))}">${escapeHtml(source.text.slice(start, end))}</mark>`);
+    cursor = end;
+  }
+  parts.push(escapeHtml(source.text.slice(cursor)));
+  return parts.join("");
+}
+
+export function slideReviewPage(options: {
+  twitchLogin: string;
+  csrfToken: string;
+  project: ProjectRecord;
+  slideId: string;
+  comments: ReviewComment[];
+}): Response {
+  const deck = options.project.document.deck;
+  const slideIndex = deck?.slides.findIndex((slide) => slide.id === options.slideId) ?? -1;
+  if (deck === null || slideIndex === -1) return projectNotFoundPage();
+  const slide = deck.slides[slideIndex];
+  if (slide === undefined) return projectNotFoundPage();
+  const projectId = options.project.project_id;
+  const currentComments = options.comments.filter((comment) => comment.slide_id === slide.id);
+  const currentOpenComments = currentComments.filter((comment) => comment.status === "open");
+  const commentsBySlide = new Map<string, number>();
+  for (const comment of options.comments) {
+    if (comment.status === "open") commentsBySlide.set(comment.slide_id, (commentsBySlide.get(comment.slide_id) ?? 0) + 1);
+  }
+  const sources = flattenSlideReviewSources(slide);
+  const textSources = sources.filter((source) => source.key !== "slide:whole");
+  const filmstrip = deck.slides.map((item, index) => {
+    const count = commentsBySlide.get(item.id) ?? 0;
+    return `<a class="filmstrip-link" href="/dashboard/projects/${escapeHtml(projectId)}/review?slide=${escapeHtml(item.id)}" data-active="${String(item.id === slide.id)}"${item.id === slide.id ? ' aria-current="page"' : ""}><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}<small class="filmstrip-meta">${item.composition?.mode ?? "flow"} · ${item.reveal_steps + 1}段階</small></strong><span class="review-count" data-empty="${String(count === 0)}" aria-label="未解決コメント${count}件">${count}</span></a>`;
+  }).join("");
+  const sourceCards = textSources.map((source) => {
+    const kindLabel = source.kind === "narration" ? "音声原稿" : "画面テキスト";
+    const step = source.step === null ? "" : `<small>STEP ${source.step}</small>`;
+    return `<article class="review-source" data-review-source data-source-key="${escapeHtml(source.key)}" data-source-label="${escapeHtml(source.label)}" data-kind="${escapeHtml(source.kind)}"><div class="review-source-meta"><span class="review-kind">${kindLabel}</span><strong>${escapeHtml(source.label)}</strong>${step}</div><pre class="review-source-text" data-review-text tabindex="0">${reviewSourceTextHtml(source, options.project, currentComments)}</pre></article>`;
+  }).join("");
+  const anchorLabels = { whole: "対象全体", current: "現在位置", moved: "位置を再発見", stale: "要再指定" } as const;
+  let initiallySelectedOpenComments = 0;
+  const commentCards = currentComments.length === 0
+    ? '<p class="review-empty" data-review-empty>このスライドにはまだコメントがありません。中央の文章を選択するか、スライド全体を対象にして追加できます。</p>'
+    : currentComments.map((comment) => {
+      const anchor = reviewCommentWithAnchor(options.project, comment).anchor;
+      const quote = comment.selected_text.length === 0
+        ? ""
+        : `<p class="review-quote">「${escapeHtml(comment.selected_text.slice(0, 500))}${comment.selected_text.length > 500 ? "…" : ""}」</p>`;
+      const checked = comment.status === "open" && initiallySelectedOpenComments < 20 ? " checked" : "";
+      if (comment.status === "open") initiallySelectedOpenComments += 1;
+      const statusAction = comment.status === "open" ? "resolved" : "open";
+      const statusLabel = comment.status === "open" ? "解決済みにする" : "未解決へ戻す";
+      return `<article class="review-card" id="review-comment-${escapeHtml(comment.id)}" data-review-comment data-comment-id="${escapeHtml(comment.id)}" data-status="${escapeHtml(comment.status)}"><div class="review-card-head"><label><input type="checkbox" data-review-script-comment value="${escapeHtml(comment.id)}"${checked}${comment.status === "resolved" ? " disabled" : ""}><span>${escapeHtml(comment.target_label)}<small class="filmstrip-meta">v${comment.project_version}で追加</small></span></label><span class="anchor-state" data-state="${escapeHtml(anchor.state)}">${anchorLabels[anchor.state]}</span></div>${quote}<p>${escapeHtml(comment.body)}</p><div class="review-card-actions"><button class="ghost" type="button" data-review-status="${statusAction}" data-action-url="/api/projects/${escapeHtml(projectId)}/review-comments/${escapeHtml(comment.id)}" data-csrf="${escapeHtml(options.csrfToken)}">${statusLabel}</button><button class="ghost danger" type="button" data-review-delete data-action-url="/api/projects/${escapeHtml(projectId)}/review-comments/${escapeHtml(comment.id)}" data-csrf="${escapeHtml(options.csrfToken)}">削除</button></div></article>`;
+    }).join("");
+  const initialInstruction = currentOpenComments.length === 0
+    ? ""
+    : buildReviewRepairInstruction(options.project, currentOpenComments);
+  const aspect = (deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9";
+  return new Response(
+    shell(
+      `${slide.title} — レビュー`,
+      `${accountHeader(options.twitchLogin, options.csrfToken)}
+       <main id="main-content" tabindex="-1" class="workspace-main" data-review-page data-project-id="${escapeHtml(projectId)}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}" data-comment-url="/api/projects/${escapeHtml(projectId)}/slides/${escapeHtml(slide.id)}/review-comments" data-script-url="/api/projects/${escapeHtml(projectId)}/review-instruction">
+         <a class="back" href="/dashboard/projects/${escapeHtml(projectId)}">← 研究詳細へ戻る</a>
+         <div class="workspace-head"><div><p class="eyebrow">Slide review · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1><p class="lead">実表示を見ながら、画面テキストと音声原稿へ範囲付きコメントを残します。</p></div><div class="workspace-version"><span class="stage">未解決 ${currentOpenComments.length}</span><a class="button ghost" href="/dashboard/projects/${escapeHtml(projectId)}/slides/${escapeHtml(slide.id)}">編集画面へ</a></div></div>
+         <div class="review-workspace">
+           <nav class="review-filmstrip" aria-label="レビューするスライド"><div class="filmstrip-search"><span class="filmstrip-search-head"><span>スライド</span><output>${deck.slides.length}枚</output></span></div>${filmstrip}</nav>
+           <div class="review-center">
+             <section class="panel review-preview"><div class="workspace-frame" style="--workspace-aspect:${aspect}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(projectId)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=${slide.reveal_steps}" data-slide-frame></iframe></div></section>
+             <section class="panel"><div class="section-head"><div><p class="eyebrow">Flat source</p><h2>画面の文章と音声原稿</h2></div><span class="count">${textSources.length}項目</span></div><p class="review-select-hint">コメントしたい文字を一つの枠内でドラッグ選択してください。Markdown記号を含む保存データをそのまま表示するため、AIが修正する場所と一致します。</p><div class="review-source-list">${sourceCards}</div></section>
+           </div>
+           <aside class="panel review-comments">
+             <form class="review-composer" data-review-composer><div><p class="eyebrow">New comment</p><h2>コメントを追加</h2></div><p class="review-selection" data-review-selection>スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。</p><input type="hidden" name="target_key" value="slide:whole"><input type="hidden" name="range_start"><input type="hidden" name="range_end"><input type="hidden" name="selected_text"><label>指摘・修正してほしいこと<textarea name="body" maxlength="4000" required placeholder="例: 結論を先に示し、根拠との関係が一読で分かる表現にしてください。"></textarea></label><div class="actions"><button type="submit">コメントを追加</button><button class="ghost" type="button" data-review-whole>スライド全体に戻す</button></div><p class="feedback" data-review-feedback aria-live="polite"></p></form>
+             <div class="section-head"><h2>コメント</h2><span class="count">${currentComments.length}件</span></div><div data-review-comment-list>${commentCards}</div>
+             <section class="review-script"><div><h2>AI修正依頼文</h2><p class="review-select-hint">チェックした未解決コメントを最大20件まで、Codex・ChatGPT・Claudeへ安全に渡せる依頼文にします。これは実行コードではありません。</p></div><div class="actions"><button class="ghost" type="button" data-review-script-generate${currentOpenComments.length === 0 ? " disabled" : ""}>選択から生成</button><button type="button" data-review-script-copy${currentOpenComments.length === 0 ? " disabled" : ""}>コピー</button></div><textarea readonly data-review-script-output placeholder="未解決コメントを追加すると、ここにAI修正依頼文が表示されます。">${escapeHtml(initialInstruction)}</textarea><p class="feedback" data-review-script-feedback aria-live="polite">${currentOpenComments.length > 0 ? `${Math.min(currentOpenComments.length, 20)}件を含む依頼文です。${currentOpenComments.length > 20 ? "残りはチェックを切り替えて別の依頼文にしてください。" : ""}` : "未解決コメントを追加すると生成できます。"}</p></section>
+           </aside>
          </div>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
@@ -2865,6 +3008,7 @@ export function slideWorkspacePage(options: {
        <main id="main-content" tabindex="-1" class="workspace-main">
          <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
          <div class="workspace-head"><div><p class="eyebrow">スライド編集 · ${slideIndex + 1} / ${deck.slides.length}</p><h1 data-current-slide-title>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a><div class="slide-actions" role="group" aria-label="スライド構成の操作"><button class="ghost" type="button" data-slide-action="move" data-position="${Math.max(0, slideIndex - 1)}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-slide-action="move" data-position="${slideIndex + 1}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === deck.slides.length - 1 ? " disabled" : ""}>↓ 後へ</button><button class="ghost" type="button" data-slide-action="duplicate" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}">複製</button><button class="ghost danger" type="button" data-slide-action="delete" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${deck.slides.length === 1 ? " disabled" : ""}>削除</button></div><span class="feedback" data-slide-action-feedback aria-live="polite"></span></div></div>
+         <div class="actions"><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/review?slide=${escapeHtml(slide.id)}">このスライドをレビュー</a></div>
          ${effectiveSummary}
          <details class="workspace-guide"><summary>この編集画面の使い方</summary><div class="workspace-guide-body"><p><strong>1 · スライドを選ぶ</strong>左の一覧で一枚を選びます。検索するとタイトル・構成・音声状態で絞れます。</p><p><strong>2 · 実表示で確認</strong>中央は公開時と同じrendererです。段階ボタンでSTEPごとの見え方を確認します。</p><p><strong>3 · 項目ごとに保存</strong>右側で内容、デザイン、読み上げ、構造を編集します。変更した欄の保存ボタンを押します。</p><p><strong>4 · 品質を解消</strong>見切れや文字サイズは品質確認に出ます。研究詳細で全スライド確認後、previewを作成します。</p></div></details>
          <nav class="mobile-workspace-tabs" role="tablist" aria-label="モバイル編集表示" hidden><button class="ghost" id="mobile-tab-preview" type="button" role="tab" data-mobile-pane="preview" aria-selected="true" aria-controls="workspace-preview-pane">プレビュー<span class="tab-badge" data-mobile-preview-badge hidden>未確認</span></button><button class="ghost" id="mobile-tab-edit" type="button" role="tab" data-mobile-pane="edit" aria-selected="false" aria-controls="workspace-edit-pane" tabindex="-1">編集</button><button class="ghost" id="mobile-tab-slides" type="button" role="tab" data-mobile-pane="slides" aria-selected="false" aria-controls="workspace-slides-pane" tabindex="-1">スライド一覧</button></nav>

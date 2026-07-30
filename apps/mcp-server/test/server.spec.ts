@@ -207,7 +207,7 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.14.0",
+        version: "0.15.0",
         renderer_version: "uf-renderer@114",
         eligibility: {
           broadcaster_id: "67879379",
@@ -605,6 +605,12 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/deck"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/review-comments"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/review-comments/pages/{page}"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/research"
           }),
           expect.objectContaining({
@@ -672,6 +678,20 @@ describe("MCP contract", () => {
           })
         ])
       );
+      const reviewIndex = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/review-comments`
+      );
+      expect(reviewIndex).toMatchObject({
+        ok: true,
+        project_id: firstProject.project_id,
+        counts: { open: 0, resolved: 0, total: 0 },
+        open_comments: {
+          page_size: 20,
+          pages: 0,
+          uri_template: `research://projects/${firstProject.project_id}/review-comments/pages/{page}`
+        }
+      });
       const projectResource = await client.readResource({
         uri: `research://projects/${firstProject.project_id}/research`
       });

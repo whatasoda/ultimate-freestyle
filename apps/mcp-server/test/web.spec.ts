@@ -481,8 +481,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=160"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=160"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=161"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=161"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -808,8 +808,111 @@ describe("Web dashboard", () => {
     const workspaceHtml = await workspace.text();
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
+    expect(workspaceHtml).toContain("このスライドをレビュー");
+    const reviewUrl =
+      "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/review?slide=intro";
+    const emptyReview = await requestProvider(
+      provider,
+      new Request(reviewUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const emptyReviewHtml = await emptyReview.text();
+    expect(emptyReview.status).toBe(200);
+    expect(emptyReviewHtml).toContain("画面の文章と音声原稿");
+    expect(emptyReviewHtml).toContain("画像の説明 · evidence-photo");
+    expect(emptyReviewHtml).toContain("最初の読み上げ文");
+    expect(emptyReviewHtml).toContain('data-kind="narration"');
+    expect(emptyReviewHtml).toContain("AI修正依頼文");
+    expect(emptyReviewHtml).toContain("これは実行コードではありません");
+    expect(DASHBOARD_SCRIPT).toContain("captureSelection");
+    expect(DASHBOARD_SCRIPT).toContain("一度に選択できるのは2000文字まで");
+
+    const createReviewCommentResponse = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/review-comments",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": cookieCsrfToken
+          },
+          body: JSON.stringify({
+            target_key: "canvas:evidence-photo:alt_text",
+            range_start: 5,
+            range_end: 7,
+            selected_text: "観察",
+            body: "何を観察した画像なのか具体化してください。"
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(createReviewCommentResponse.status).toBe(201);
+    const createdReviewComment = await createReviewCommentResponse.json() as {
+      comment: { id: string };
+    };
+    const populatedReview = await requestProvider(
+      provider,
+      new Request(reviewUrl, { headers: { cookie: browserCookies } }),
+      authEnv
+    );
+    const populatedReviewHtml = await populatedReview.text();
+    expect(populatedReviewHtml).toContain("何を観察した画像なのか具体化してください。");
+    expect(populatedReviewHtml).toContain("<mark");
+    expect(populatedReviewHtml).toContain("現在位置");
+
+    const reviewInstructionResponse = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/review-instruction",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": cookieCsrfToken
+          },
+          body: JSON.stringify({ comment_ids: [createdReviewComment.comment.id] })
+        }
+      ),
+      authEnv
+    );
+    expect(reviewInstructionResponse.status).toBe(200);
+    expect(await reviewInstructionResponse.json()).toMatchObject({
+      ok: true,
+      comment_count: 1,
+      instruction: expect.stringContaining("何を観察した画像なのか具体化してください。")
+    });
+    const reviewCommentActionUrl =
+      `https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/review-comments/${createdReviewComment.comment.id}`;
+    const resolveReviewCommentResponse = await requestProvider(
+      provider,
+      new Request(reviewCommentActionUrl, {
+        method: "PATCH",
+        headers: {
+          cookie: browserCookies,
+          "content-type": "application/json",
+          "x-csrf-token": cookieCsrfToken
+        },
+        body: JSON.stringify({ status: "resolved" })
+      }),
+      authEnv
+    );
+    expect(resolveReviewCommentResponse.status).toBe(200);
+    expect(await resolveReviewCommentResponse.json()).toMatchObject({ comment: { status: "resolved" } });
+    const deleteReviewCommentResponse = await requestProvider(
+      provider,
+      new Request(reviewCommentActionUrl, {
+        method: "DELETE",
+        headers: { cookie: browserCookies, "x-csrf-token": cookieCsrfToken }
+      }),
+      authEnv
+    );
+    expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=160"'
+      'href="/assets/dashboard.css?v=161"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -995,7 +1098,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=160"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=161"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1004,7 +1107,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=160"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=161"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
