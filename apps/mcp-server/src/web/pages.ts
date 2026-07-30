@@ -320,7 +320,7 @@ const DASHBOARD_STYLE = String.raw`
       .section-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1.25rem; }
       .project-section-nav { position: sticky; z-index: 14; top: .5rem; display: flex; gap: .35rem; margin: 1rem 0; padding: .45rem; overflow-x: auto; border: 1px solid var(--line); border-radius: .85rem; background: #090f18eb; box-shadow: 0 .4rem 1rem #02060c55; backdrop-filter: blur(14px); scrollbar-width: thin; }
       .project-section-nav a { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 2.75rem; padding: .5rem .7rem; border-radius: .55rem; color: var(--muted); font-size: .78rem; font-weight: 760; text-decoration: none; white-space: nowrap; }
-      .project-section-nav a:hover, .project-section-nav a:focus-visible { background: #ffffff12; color: var(--text); }
+      .project-section-nav a:hover, .project-section-nav a:focus-visible { background: #ffffff12; color: var(--ink); }
       .project-section-nav a[aria-current="location"] { background: #8062df40; color: #fff; }
       #journey, #basic-information, #presentation-screen, #rendered-quality, #presentation-structure, #research-images, #research-log, #research-list-findings, #research-list-limitations, [id^="research-item-"], #voice-finishing, #publication { scroll-margin-top: 5rem; }
       .section-head h1 { font-size: clamp(2rem, 5vw, 3.6rem); }

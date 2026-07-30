@@ -1436,3 +1436,9 @@
 - 研究内ナビは横スクロールできるが、現在節が右側の音声・公開へ変わっても選択リンクを可視範囲へ追従させなかった。色は更新されても、狭い画面では現在地の名前が見えない。
 - 現在節IDが変わった時だけ選択リンクを横方向`nearest`へ移し、同じIntersectionObserver通知では繰り返さない。reduced motionでは即時、それ以外はsmoothにする。
 - 横追従と動き設定のscript契約を追加し、dashboard assetを`v155`へ更新した。
+
+## 改善ループ376
+
+- 研究内ナビのhover／focus文字色だけ、dashboard themeに存在しない`--text`を参照していた。宣言が無効になり、背景を強調してもmuted文字のままだった。
+- 定義済みの本文色`--ink`へ揃え、pointerとキーボードfocusで同じ明瞭な状態にする。
+- 配信CSSに有効tokenがあり、未定義`var(--text)`がないことを契約へ追加した。dashboard assetを`v156`へ更新した。
