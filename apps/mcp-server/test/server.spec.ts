@@ -111,6 +111,7 @@ describe("MCP contract", () => {
         (tool) => tool.name === "update_slide_fields"
       );
       expect(JSON.stringify(slideFieldsTool?.inputSchema)).toContain('"body_edits"');
+      expect(JSON.stringify(slideFieldsTool?.inputSchema)).toContain('"maxLength":4000');
       expect(
         (slideFieldsTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("content_markdown");

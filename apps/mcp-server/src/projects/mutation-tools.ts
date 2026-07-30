@@ -125,8 +125,8 @@ const templateMutableFieldSchema = z.enum([
 const slideBodyEditSchema = z.object({
   target: z.enum(["content", "sidebar"]),
   operation: z.enum(["replace", "replace_once", "append", "prepend", "clear"]),
-  old_text: z.string().min(1).max(20_000).optional(),
-  text: z.string().max(20_000).optional()
+  old_text: z.string().min(1).max(4_000).optional(),
+  text: z.string().max(4_000).optional()
 });
 const researchTextEditSchema = z.object({
   target: z.enum(["summary", "question", "hypothesis", "method"]),
@@ -1288,7 +1288,7 @@ export function registerProjectMutationTools(
     {
       title: "スライドの項目だけを更新",
       description:
-        "指定したスライドの基本項目と本文・補足を部分更新します。body_editsのreplace_onceはold_textが一度だけ一致する場合に安全に置換します。revealと読み上げは別toolです。",
+        "指定したスライドの基本項目と本文・補足を最大2か所、各4千字以内で部分更新します。body_editsのreplace_onceはold_textが一度だけ一致する場合に安全に置換します。長文全体を再送せず、revealと読み上げは別toolを使います。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),

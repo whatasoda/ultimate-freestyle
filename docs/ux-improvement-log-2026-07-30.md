@@ -841,3 +841,9 @@
 - `update_project_fields`が方法を最大2万字、仮説を4千字まるごと受け取り、短い文言修正でもAgentが長文全体をtool引数へ再送できる契約を小粒度化した。
 - 題名・研究段階は単一値のまま、概要・問い・仮説・方法は最大2件の`text_edits`だけを受ける。`replace_once`は現在の`old_text`が一度だけ一致する場合に限り、append、prepend、clear、短い全面replaceも各2千字以内で扱う。
 - 編集後に各fieldの保存上限を再検証し、競合時は既存のversion conflictで止める。tool数を増やさず旧長文引数をschemaから除き、部分編集契約とcontract testを更新した。
+
+## 改善ループ277
+
+- スライド本文は`body_edits`へ移行済みでも、一回の`old_text`と`text`が各2万字まで許され、Agentが短い修正で本文全体を引数へ載せる余地が残っていた。
+- 一回の部分編集を各4千字、最大2か所へ制限した。20,000字の保存上限自体は維持し、長文の作成・追記は複数versionへ分け、文言修正は短い`replace_once`で扱う。
+- tool説明とschema contractへ上限を明記した。スライド作成toolは元から題名だけを作り、本文を後続の小粒度編集へ分ける構成を維持する。
