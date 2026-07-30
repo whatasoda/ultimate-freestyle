@@ -157,6 +157,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const resultCount = document.querySelector("[data-project-count]");
     const emptyResult = document.querySelector("[data-project-search-empty]");
     const projectViewKey = "ultimate-freestyle:project-view";
+    const projectSearchKey = "ultimate-freestyle:project-search:" + (projectSearch.dataset.projectSearchUser || "unknown");
     let savedProjectView = {};
     try { savedProjectView = JSON.parse(localStorage.getItem(projectViewKey) || "{}"); } catch {}
     if (!savedProjectView || typeof savedProjectView !== "object" || Array.isArray(savedProjectView)) savedProjectView = {};
@@ -180,10 +181,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (resultCount instanceof HTMLElement) resultCount.textContent = visible + "件を表示";
       if (emptyResult instanceof HTMLElement) emptyResult.hidden = visible > 0;
     };
-    projectSearch.addEventListener("input", filterProjects);
+    try { projectSearch.value = sessionStorage.getItem(projectSearchKey) || ""; } catch {}
+    projectSearch.addEventListener("input", () => {
+      try { sessionStorage.setItem(projectSearchKey, projectSearch.value); } catch {}
+      filterProjects();
+    });
     projectSearch.addEventListener("keydown", (event) => {
       if (event.key !== "Escape") return;
       projectSearch.value = "";
+      try { sessionStorage.removeItem(projectSearchKey); } catch {}
       filterProjects();
       projectSearch.blur();
     });

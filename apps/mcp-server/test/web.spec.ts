@@ -398,6 +398,7 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).not.toContain("viewer<script>");
     expect(dashboardHtml).toContain("1 / 20 件");
     expect(dashboardHtml).toContain("data-project-search");
+    expect(dashboardHtml).toContain('data-project-search-user="viewer&lt;script&gt;"');
     expect(dashboardHtml).toContain("タイトル・制作段階");
     expect(dashboardHtml).toContain("data-project-card");
     expect(dashboardHtml).toContain("発表 1枚 · 0分30秒");
@@ -440,7 +441,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=130"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=131"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントがこの端末になく");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントの代替表示");
@@ -895,6 +896,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
     expect(dashboardScriptText).toContain("data-project-search-empty");
     expect(dashboardScriptText).toContain("filterProjects");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:project-search:");
     expect(dashboardScriptText).toContain("ultimate-freestyle:filmstrip-search:");
     expect(dashboardScriptText).toContain('filmstripSlides.length + "枚"');
     expect(dashboardScriptText).toContain("ultimate-freestyle:quality-sweep:");
