@@ -30,9 +30,25 @@
 
 完成済みのホスト版を使う場合は、ローカル環境を作る必要はありません。
 
-1. `https://saijiyu-kenkyu.2764.moe/` でTwitchログインする
-2. Codex、ChatGPTなどRemote MCP対応AIの連携設定へ `https://saijiyu-kenkyu.2764.moe/mcp` を追加し、同じTwitchアカウントで認証する
-3. AIへ「最自由研究MCPを使って、新しい研究を対話しながら作りたい。まず興味のあることを聞いて」と伝える
+1. [`https://saijiyu-kenkyu.2764.moe/guide`](https://saijiyu-kenkyu.2764.moe/guide) で、利用条件と使うAIごとの接続手順を確認する
+2. `https://saijiyu-kenkyu.2764.moe/` でTwitchログインする
+3. CodexまたはClaudeへ `https://saijiyu-kenkyu.2764.moe/mcp` を追加し、同じTwitchアカウントで認証する
+4. AIへ「最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを一つずつ聞いてください」と伝える
+
+Codexの最短手順:
+
+```bash
+codex mcp add saijiyu-kenkyu --url https://saijiyu-kenkyu.2764.moe/mcp
+codex mcp login saijiyu-kenkyu
+```
+
+Claude Codeの最短手順:
+
+```bash
+claude mcp add --transport http --scope user saijiyu-kenkyu https://saijiyu-kenkyu.2764.moe/mcp
+```
+
+Claude Code内の `/mcp` から認証する。Claude Web／Desktopではカスタムコネクタとして同じURLを登録する。正式なプロダクト説明、役割分担、接続確認、復旧方法は [利用者ガイド](docs/利用者ガイド.md) を参照する。
 
 AIで作った下書きはWeb UIへすぐ反映されます。Web UIでは一枚ずつ実表示を見ながら、文言・組版・配色・表紙・読み上げ・VOICEVOXの声色を調整し、スライドの複製・並べ替え・削除、固定プレビュー、公開まで進められます。
 

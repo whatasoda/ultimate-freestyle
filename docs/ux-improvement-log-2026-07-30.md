@@ -1514,3 +1514,39 @@
 - 大型デスクトップでも編集画面の最大幅と右inspectorが狭く、縦に長い設定を追う間に中央previewを見失いやすかった。
 - 72rem超では最大112remの3列へ広げ、filmstrip、preview、inspectorをviewport内でstickyにし、一覧と編集欄は独立してスクロールできるようにした。
 - 72rem以下の2列と48rem以下のモバイルタブは維持し、同じ編集DOMを画面幅に応じて再配置する。
+
+## 改善ループ389
+
+- 未ログイン画面は機能の断片と利用条件だけで、このプロダクトが「研究の発見・記録・発表制作をAIとWeb UIで一続きに進める制作・発表ワークスペース」であること、一般的なWebサイト作成サービスではないことが伝わりにくかった。
+- 正式な説明、研究・スライド・音声の3領域、AIとWeb UIの役割分担、所有者分離と明示公開の境界をトップページへ追加した。
+- 初回の主要行動をTwitchログインだけにせず、環境別の「はじめかた」へ進める導線をheaderと末尾に置いた。
+
+## 改善ループ390
+
+- MCP URLだけを示す3手順では、Codex、Claude Code、Claude Web／Desktopの設定画面と認証開始方法の違いを利用者が補完する必要があった。
+- 公開`/guide`を追加し、CodexのCLI・GUI、Claude Code、Claudeカスタムコネクタを独立した手順に分けた。登録、OAuth、接続確認、最初の依頼までを一続きにした。
+- CodexとClaudeの現行公式資料を確認し、Codexは`mcp add`と`mcp login`、Claude CodeはHTTPのuser scope登録と`/mcp`、Claude Web／Desktopはカスタムコネクタを推奨経路とした。
+
+## 改善ループ391
+
+- Twitchログイン後に研究が0件だと、空状態とMCP接続説明が別々に見え、Web側の準備が済んだのか判断しにくかった。
+- 空状態を「Web UIの準備完了」と明示し、次の操作をAI接続と最初の依頼文に絞った。Codex・Claudeの詳細手順へ同じ場所から移動できるようにした。
+- 研究がある利用者にも再接続導線を残し、WebログインとAI側OAuthが別であることをダッシュボードで説明した。
+
+## 改善ループ392
+
+- 実際の認証検証で発生した期限切れ、複数回開始、callbackで停止、接続後にtoolが見えない状態が、接続手順だけでは復旧できなかった。
+- 症状別の復旧表を設け、再認証コマンド、再起動、同一Twitchアカウント、Claude Codeへのcallback URL貼り付けを案内した。
+- `127.0.0.1`と`localhost`はCLIの一時的なOAuth戻り先であり正常であること、Twitch passwordやtokenを会話へ貼らないことを認証前後の両方で明記した。
+
+## 改善ループ393
+
+- 利用手順がWeb UIだけにあると、運営・開発時に説明の境界をレビューできず、外部クライアントの変更へ追従しにくい。
+- `docs/利用者ガイド.md`へ正式説明、初回体験の完了条件、各クライアントの詳細、OAuthの誤解、説明品質基準、公式資料を記録した。
+- READMEの開始方法も公開ガイドと揃え、本番smokeで`/guide`、CSP、3つの接続経路、MCP endpointを検証するようにした。
+
+## 改善ループ394
+
+- `wrangler dev`はWorker entrypointから数値定数をnamed exportしており、現行runtimeがDurable Object exportとして解釈してローカル起動に失敗した。自動テストとdry-runだけでは初回画面を実際に配信する経路を検証できなかった。
+- MCP request上限定数を通常moduleへ移し、entrypointのnamed exportをWorker classだけに限定した。上限テストは同じ通常moduleから値を読む。
+- ローカルWorkerが`http://localhost:8787`で起動し、`/`と`/guide`が200、HEADが空body、CSPが有効、詳細手順と見出し階層が配信されることを確認した。

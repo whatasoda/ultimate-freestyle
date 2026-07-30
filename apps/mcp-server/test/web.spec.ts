@@ -118,10 +118,13 @@ describe("Web dashboard", () => {
     expect(landingHtml).toContain("kashiwoを30日以上フォロー");
     expect(landingHtml).toContain("現在サブスク中");
     expect(landingHtml).toContain("AIと研究を作る");
-    expect(landingHtml).toContain("Remote MCPに対応したAIアプリ");
+    expect(landingHtml).toContain("Remote MCP対応AI");
     expect(landingHtml).toContain("固定プレビューを最後まで見てから");
     expect(landingHtml).toContain("Webで一枚ずつ確認");
     expect(landingHtml).toContain("確認した版を公開");
+    expect(landingHtml).toContain("限定利用者向けの制作・発表ワークスペース");
+    expect(landingHtml).toContain('href="/guide"');
+    expect(landingHtml).toContain("下書きは本人だけ。公開は明示操作です");
     expect(landing.headers.get("content-security-policy")).toContain(
       "default-src 'none'"
     );
@@ -137,6 +140,38 @@ describe("Web dashboard", () => {
     expect(landingHead.headers.get("content-security-policy")).toContain(
       "default-src 'none'"
     );
+
+    const guide = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/guide"),
+      authEnv
+    );
+    const guideHtml = await guide.text();
+    expect(guide.status).toBe(200);
+    expect(guideHtml).toContain("最自由研究の<br>はじめかた");
+    expect(guideHtml).toContain(
+      "codex mcp add saijiyu-kenkyu --url https://saijiyu-kenkyu.2764.moe/mcp"
+    );
+    expect(guideHtml).toContain("codex mcp login saijiyu-kenkyu");
+    expect(guideHtml).toContain(
+      "claude mcp add --transport http --scope user saijiyu-kenkyu https://saijiyu-kenkyu.2764.moe/mcp"
+    );
+    expect(guideHtml).toContain("Claudeのカスタムコネクタへ追加する");
+    expect(guideHtml).toContain("http://127.0.0.1");
+    expect(guideHtml).toContain("Client IDやSecretは入力せず追加します");
+    expect(guideHtml).toContain("公開は自動ではありません");
+    expect(guideHtml).toContain("認証ボタンを連打しません");
+    expect(guide.headers.get("content-security-policy")).toContain(
+      "script-src 'self'"
+    );
+
+    const guideHead = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/guide", { method: "HEAD" }),
+      authEnv
+    );
+    expect(guideHead.status).toBe(200);
+    expect(await guideHead.text()).toBe("");
 
     const unauthenticatedDashboard = await requestProvider(
       provider,
@@ -416,9 +451,11 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("音声 1/1 完成");
     expect(dashboardHtml).toContain("data-project-sort");
     expect(dashboardHtml).toContain("発表時間が長い順");
-    expect(dashboardHtml).toContain("AIクライアントとの接続方法");
+    expect(dashboardHtml).toContain("AIクライアントとの接続・再接続");
     expect(dashboardHtml).toContain("https://saijiyu-kenkyu.2764.moe/mcp");
     expect(dashboardHtml).toContain("TwitchのパスワードやtokenをAIへ貼る必要はありません");
+    expect(dashboardHtml).toContain("Claude Web／Desktop");
+    expect(dashboardHtml).toContain('href="/guide"');
     expect(dashboardHtml).toContain(
       'href="/dashboard/projects/10000000-0000-4000-8000-000000000001"'
     );
@@ -444,8 +481,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=159"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=159"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=160"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=160"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -772,7 +809,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=159"'
+      'href="/assets/dashboard.css?v=160"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -958,7 +995,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=159"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=160"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -967,7 +1004,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=159"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=160"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);

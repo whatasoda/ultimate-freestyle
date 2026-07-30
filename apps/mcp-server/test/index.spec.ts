@@ -2,7 +2,8 @@ import { exports } from "cloudflare:workers";
 import { createExecutionContext, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
-import { handleMcpRequest, MAX_MCP_REQUEST_BYTES } from "../src/index";
+import { handleMcpRequest } from "../src/index";
+import { MAX_MCP_REQUEST_BYTES } from "../src/lib/limits";
 
 describe("MCP Worker", () => {
   it("passes a bounded MCP request to the Streamable HTTP handler", async () => {

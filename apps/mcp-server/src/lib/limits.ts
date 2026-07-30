@@ -1,0 +1,1 @@
+export const MAX_MCP_REQUEST_BYTES = 256 * 1024;

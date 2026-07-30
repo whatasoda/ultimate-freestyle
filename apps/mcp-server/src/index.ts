@@ -14,10 +14,9 @@ import {
   type VoiceGenerationMessage
 } from "./voicevox/service";
 import { readBytesCapped } from "./lib/http";
+import { MAX_MCP_REQUEST_BYTES } from "./lib/limits";
 
 export { VoicevoxContainer } from "./voicevox/container";
-
-export const MAX_MCP_REQUEST_BYTES = 256 * 1024;
 
 function isVoiceGenerationMessage(value: unknown): value is VoiceGenerationMessage {
   if (value === null || typeof value !== "object") return false;

@@ -72,6 +72,33 @@ assert.match(
 );
 assert.match(await landingResponse.text(), /Twitchでログイン/);
 
+const guideResponse = await fetch(new URL("/guide", baseUrl), {
+  redirect: "manual",
+  signal: AbortSignal.timeout(15_000)
+});
+assert.equal(guideResponse.status, 200);
+assert.match(
+  guideResponse.headers.get("content-type") ?? "",
+  /^text\/html\b/
+);
+assert.match(
+  guideResponse.headers.get("content-security-policy") ?? "",
+  /default-src 'none'/
+);
+const guideHtml = await guideResponse.text();
+assert.match(guideHtml, /Codexへ接続する/);
+assert.match(guideHtml, /Claude Codeへ接続する/);
+assert.match(guideHtml, /Claudeのカスタムコネクタへ追加する/);
+assert.match(guideHtml, /https:\/\/saijiyu-kenkyu\.2764\.moe\/mcp/);
+
+const guideHeadResponse = await fetch(new URL("/guide", baseUrl), {
+  method: "HEAD",
+  redirect: "manual",
+  signal: AbortSignal.timeout(15_000)
+});
+assert.equal(guideHeadResponse.status, 200);
+assert.equal(await guideHeadResponse.text(), "");
+
 const landingHeadResponse = await fetch(new URL("/", baseUrl), {
   method: "HEAD",
   redirect: "manual",
@@ -159,6 +186,7 @@ console.log(
     renderer_version: health.body.renderer_version,
     mcp_auth: "required",
     web_dashboard: "available",
+    user_guide: "available",
     authorization_endpoint: authorizationMetadata.body.authorization_endpoint
   })
 );
