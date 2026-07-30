@@ -599,6 +599,7 @@ function shell(title: string, body: string): string {
       .slide-actions button { min-height: 2.2rem; padding: .45rem .62rem; }
       .slide-actions .danger { border-color: #7e3b49; color: #ffb8c3; }
       .actions .danger { border-color: #7e3b49; color: #ffb8c3; }
+      [data-appearance-editor]:has(select[name="role"] option[value="content"]:checked) label:has(select[name="cover_layout"]), [data-appearance-editor]:has(select[name="role"] option[value="content"]:checked) [aria-label="表紙レイアウトを選ぶ"] { display: none; }
       .save-state { padding: .28rem .55rem; border: 1px solid #36785b; border-radius: 999px; background: #15312566; color: #9be8c1; font-size: .75rem; font-weight: 760; white-space: nowrap; }
       .save-state[data-state="dirty"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
       .save-state[data-state="saving"] { border-color: #35506a; background: #0a1b29; color: #bfe6f7; }

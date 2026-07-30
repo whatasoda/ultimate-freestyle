@@ -588,6 +588,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("「読み物」組版を試す");
     expect(workspaceHtml).toContain('data-aspect-ratio="16:9"');
     expect(workspaceHtml).toContain("表紙レイアウト");
+    expect(workspaceHtml).toContain('[data-appearance-editor]:has(select[name="role"] option[value="content"]:checked)');
     expect(workspaceHtml).toContain("左右均等");
     expect(workspaceHtml).toContain("第2アクセント");
     expect(workspaceHtml).toContain("data-frame-loading");
