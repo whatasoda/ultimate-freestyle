@@ -439,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=127"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=128"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントがこの端末になく");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントの代替表示");
@@ -450,6 +450,9 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("0ページ目と全スライドの実表示を一括確認");
+    expect(detailHtml).toContain('id="rendered-quality" open');
+    expect(detailHtml).toContain('data-rendered-quality-state>未実行');
+    expect(detailHtml).toContain("実表示の一括チェック · おすすめ");
     expect(detailHtml).toContain('&quot;id&quot;:&quot;__prelude__&quot;');
     expect(detailHtml).toContain("data-quality-sweep");
     expect(detailHtml).toContain('data-report-url="/api/projects/10000000-0000-4000-8000-000000000001/quality-report"');
@@ -461,6 +464,7 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("Number(data.step) !== sweepStep");
     expect(DASHBOARD_SCRIPT).toContain('slide.id === "__prelude__" && data.ready !== true');
     expect(DASHBOARD_SCRIPT).toContain("qualitySweepButton.dataset.preludeMinimumMs");
+    expect(DASHBOARD_SCRIPT).toContain('sharedState.textContent = sweepIssueCount');
     expect(detailHtml).toContain('data-prelude-minimum-ms="500"');
     expect(DASHBOARD_SCRIPT).toContain("推奨色を入力");
     expect(DASHBOARD_SCRIPT).toContain('item.id === "flow:sidebar" ? "muted" : "foreground"');
@@ -489,7 +493,7 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:preview-review");
     expect(DASHBOARD_SCRIPT).toContain("recordCompletedPreview");
     expect(detailHtml).toContain("公開前チェック ·");
-    expect(detailHtml).toContain("基本 2/4 · おすすめ 3/4");
+    expect(detailHtml).toContain("基本 2/4 · おすすめ 3/5");
     expect(detailHtml).toContain("公開版の画像容量");
     expect(detailHtml).toContain("表紙スライド · おすすめ");
     expect(detailHtml).toContain("文字量と表示枠 · おすすめ");

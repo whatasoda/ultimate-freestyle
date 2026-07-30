@@ -300,6 +300,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!response.ok && qualitySweepStatus instanceof HTMLElement) {
           qualitySweepStatus.textContent += " 結果を共有保存できませんでした。";
           qualitySweepStatus.classList.add("warning");
+        } else if (response.ok) {
+          const sharedState = document.querySelector("[data-rendered-quality-state]");
+          if (sharedState instanceof HTMLElement) {
+            sharedState.textContent = sweepIssueCount ? "要確認 " + sweepIssueCount + "件" : "確認済み";
+          }
         }
       } catch {
         if (qualitySweepStatus instanceof HTMLElement) {

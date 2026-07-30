@@ -38,6 +38,7 @@ import {
   recommendedFlowBodyLimit,
   staticSlideQuality
 } from "../projects/quality";
+import type { RenderedQualityReport } from "../projects/quality-reports";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import {
   MAX_JOB_CHARACTERS,
@@ -219,7 +220,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=127";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=128";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -364,7 +365,7 @@ function shell(title: string, body: string): string {
       .journey-progress { min-width: 8rem; text-align: right; }
       .journey-progress strong { display: block; font-size: 1.35rem; }
       .journey-progress progress { width: 8rem; accent-color: #74e6b2; }
-      .journey-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; margin: 0; padding: 0; list-style: none; }
+      .journey-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr)); gap: .55rem; margin: 0; padding: 0; list-style: none; }
       .journey-step { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .55rem; align-items: center; padding: .7rem; border: 1px solid var(--line); border-radius: .7rem; color: var(--muted); }
       .journey-step::before { content: "○"; color: #6f8096; font-weight: 900; }
       .journey-step[data-complete="true"] { border-color: #36785b; background: #15312566; color: #c9f7df; }
@@ -1337,6 +1338,7 @@ export function projectDetailPage(options: {
   assets: ProjectAsset[];
   publication: PublicationStatus;
   draftRevisions: ProjectDraftRevisionSummary[];
+  renderedQualityReport: RenderedQualityReport | null;
 }): Response {
   const document = options.project.document;
   const recentLogs = document.logs.slice(-20).reverse();
@@ -1519,9 +1521,28 @@ export function projectDetailPage(options: {
   const firstSlidePath = slides[0] === undefined
     ? "#presentation-structure"
     : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slides[0].id)}`;
+  const renderedQualityCurrent =
+    options.renderedQualityReport?.project_version === options.project.version &&
+    options.renderedQualityReport.renderer_version === PRESENTATION_RENDERER_VERSION &&
+    options.renderedQualityReport.status === "completed";
+  const renderedQualityState = options.renderedQualityReport === null
+    ? "missing"
+    : !renderedQualityCurrent
+      ? "stale"
+      : options.renderedQualityReport.issue_count > 0
+        ? "issues"
+        : "clean";
+  const renderedQualityLabel = renderedQualityState === "missing"
+    ? "未実行"
+    : renderedQualityState === "stale"
+      ? "要再確認"
+      : renderedQualityState === "issues"
+        ? `要確認 ${options.renderedQualityReport?.issue_count ?? 0}件`
+        : "確認済み";
   const journeySteps = [
     { label: "研究内容", detail: "問いと方法", complete: researchReady },
     { label: "発表構成", detail: `${slides.length}枚`, complete: slidesReady },
+    { label: "実表示", detail: renderedQualityLabel, complete: renderedQualityState === "clean" },
     { label: "プレビュー", detail: previewCurrent ? "確認可能" : "未確認", complete: previewCurrent },
     { label: "公開", detail: publishedCurrent ? "最新版" : "未反映", complete: publishedCurrent }
   ];
@@ -1544,6 +1565,14 @@ export function projectDetailPage(options: {
             title: "発表を20分以内に収める",
             description: `現在は${formatDuration(totalDurationSeconds)}です。スライドの構成または想定秒数を見直してください。`,
             action: `<a class="button" href="${firstSlidePath}">スライドを見直す</a>`
+          }
+      : renderedQualityState !== "clean"
+        ? {
+            title: renderedQualityState === "issues" ? "実表示の確認事項を直す" : "全スライドの実表示を確認する",
+            description: renderedQualityState === "issues"
+              ? `${options.renderedQualityReport?.issue_count ?? 0}件の確認事項があります。対象の一枚を直してから一括チェックをやり直します。`
+              : "実際のフォント・画像・アニメーションを含め、全STEPの見切れや重なりを一括確認します。",
+            action: `<a class="button" href="#rendered-quality">実表示チェックへ</a>`
           }
       : !previewCurrent
         ? {
@@ -1653,6 +1682,19 @@ export function projectDetailPage(options: {
         : firstSlidePath
     },
     {
+      complete: renderedQualityState === "clean",
+      recommended: true,
+      label: "実表示の一括チェック",
+      detail: renderedQualityState === "clean"
+        ? "現在の下書きと表示エンジンで確認事項はありません。"
+        : renderedQualityState === "issues"
+          ? `${options.renderedQualityReport?.issue_count ?? 0}件の確認事項があります。修正後に再実行してください。`
+          : renderedQualityState === "stale"
+            ? "下書きまたは表示エンジンが変わったため再実行してください。"
+            : "実際のフォント・画像・全STEPをまだ一括確認していません。",
+      href: "#rendered-quality"
+    },
+    {
       complete: previewReviewed,
       recommended: false,
       label: "固定プレビュー",
@@ -1669,6 +1711,7 @@ export function projectDetailPage(options: {
     ${preflightChecklist}
     <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
     <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
+    <div class="status-row"><span>実表示チェック</span><strong data-rendered-quality-state>${escapeHtml(renderedQualityLabel)}</strong></div>
     <div class="status-row"><span>最新プレビュー</span><strong data-preview-status>${preview === null ? "未作成" : `v${preview.project_version} · ${escapeHtml(preview.renderer_version)}${previewCurrent ? "" : " · 要再生成"}`}</strong></div>
     <div class="status-row"><span>プレビュー確認</span><strong data-preview-review-status>${previewReviewed ? "確認済み" : previewCurrent ? "終了画面の到達待ち" : "対象なし"}</strong></div>
     <div class="status-row"><span>公開中</span><strong data-published-status>${published === null ? "未公開" : `v${published.project_version} · ${escapeHtml(published.renderer_version)}`}</strong></div>
@@ -1731,7 +1774,7 @@ export function projectDetailPage(options: {
   const qualitySweepStepCount = qualitySweepSlides.reduce((total, slide) => total + slide.max_step + 1, 0);
   const qualitySweepPanel = qualitySweepSlides.length === 0
     ? ""
-    : `<details class="panel panel-disclosure"><summary>0ページ目と全スライドの実表示を一括確認</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で${loadingScreen.enabled ? "0ページ目と" : ""}全${slides.length}枚・${qualitySweepStepCount}段階を順番に描画し、見切れ、70%未満の自動縮小、文字コントラスト、読み上げ文の省略、文字サイズ、重なりを探します。完了結果は同じ研究へ接続したAIからも確認できます。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-project-id="${escapeHtml(options.project.project_id)}" data-project-version="${options.project.version}" data-renderer-version="${escapeHtml(PRESENTATION_RENDERER_VERSION)}" data-report-url="/api/projects/${escapeHtml(options.project.project_id)}/quality-report" data-csrf="${escapeHtml(options.csrfToken)}" data-prelude-minimum-ms="${loadingScreen.minimum_duration_ms}" data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`/dashboard/projects/${options.project.project_id}/slides/${slides[0]?.id}/frame?slide=1&step=0`)}">一括チェックを開始</button><button class="ghost" type="button" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">未実行</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="0ページ目と全スライドの表示確認"></iframe></div></div></details>`;
+    : `<details class="panel panel-disclosure" id="rendered-quality"${renderedQualityState === "clean" ? "" : " open"}><summary>0ページ目と全スライドの実表示を一括確認 · ${escapeHtml(renderedQualityLabel)}</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で${loadingScreen.enabled ? "0ページ目と" : ""}全${slides.length}枚・${qualitySweepStepCount}段階を順番に描画し、見切れ、70%未満の自動縮小、文字コントラスト、読み上げ文の省略、文字サイズ、重なり、代替フォントを探します。完了結果は同じ研究へ接続したAIからも確認できます。</p><div class="quality-sweep-head"><button type="button" data-quality-sweep data-project-id="${escapeHtml(options.project.project_id)}" data-project-version="${options.project.version}" data-renderer-version="${escapeHtml(PRESENTATION_RENDERER_VERSION)}" data-report-url="/api/projects/${escapeHtml(options.project.project_id)}/quality-report" data-csrf="${escapeHtml(options.csrfToken)}" data-prelude-minimum-ms="${loadingScreen.minimum_duration_ms}" data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`/dashboard/projects/${options.project.project_id}/slides/${slides[0]?.id}/frame?slide=1&step=0`)}">${renderedQualityState === "missing" ? "一括チェックを開始" : "一括チェックをやり直す"}</button><button class="ghost" type="button" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">${escapeHtml(renderedQualityLabel)}</span></div><ol class="quality-sweep-results" data-quality-sweep-results></ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="0ページ目と全スライドの表示確認"></iframe></div></div></details>`;
 
   return new Response(
     shell(

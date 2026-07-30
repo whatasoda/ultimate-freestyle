@@ -1136,3 +1136,9 @@
 - 音声jobのMCP応答にWeb APIの相対`status_url`が含まれていたが、Remote MCPクライアントはTwitchのブラウザsession cookieを持たず、そのURLをpollできない。resource URIと人が開く画面の認証条件も応答内で区別されていなかった。
 - jobにはMCPから読める`poll_resource_uri`を返し、音声仕上げ画面は絶対URLと`requires_session: true`を持つ`web_voice_finish`へ分離した。研究全体の音声状態にも同じWeb導線を付ける。
 - tool説明と固定output schemaを更新し、`status_url`がMCP応答から消え、poll URIと認証条件が公開schemaへ現れることを契約テストで固定した。内部Web APIのjob URLはWeb UI用serviceとして維持する。
+
+## 改善ループ326
+
+- MCPの公開準備は実表示品質を`missing / stale / issues / clean`で案内する一方、Web UIの完成導線は研究・構成・プレビュー・公開の4段階だけだった。未確認でも主要な次操作が固定プレビューになり、品質確認が下部の任意detailsに見えた。
+- project detail取得時に品質reportを他の補助情報と並列取得し、完成導線へ「実表示」を追加した。未実行・古い・問題ありなら、時間超過などのhard blockerの次に一括チェックを唯一の次操作として案内する。
+- 公開前チェックと公開状態にも品質stateを表示し、未完了時は一括チェックを開いておく。保存成功後は画面内の状態を即時更新し、dashboard scriptを`v128`へ更新した。品質は従来どおり公開のhard blockerにはせず、明確な推奨順序として扱う。

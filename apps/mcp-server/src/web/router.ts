@@ -36,6 +36,7 @@ import {
 } from "../projects/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import {
+  getRenderedQualityReport,
   renderedQualityReportInputSchema,
   saveRenderedQualityReport
 } from "../projects/quality-reports";
@@ -441,13 +442,20 @@ async function handleProjectDetail(
   if (project === null) {
     return projectNotFoundPage();
   }
+  const [assets, publication, draftRevisions, renderedQualityReport] = await Promise.all([
+    listProjectAssets(env.DB, session.userId, projectId),
+    getPublicationStatus(env.DB, session.userId, projectId),
+    listProjectDraftRevisions(env.DB, session.userId, projectId, 50),
+    getRenderedQualityReport(env.DB, session.userId, projectId)
+  ]);
   return projectDetailPage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
     project,
-    assets: await listProjectAssets(env.DB, session.userId, projectId),
-    publication: (await getPublicationStatus(env.DB, session.userId, projectId))!,
-    draftRevisions: await listProjectDraftRevisions(env.DB, session.userId, projectId, 50)
+    assets,
+    publication: publication!,
+    draftRevisions,
+    renderedQualityReport
   });
 }
 

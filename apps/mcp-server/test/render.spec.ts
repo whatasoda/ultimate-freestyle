@@ -1166,6 +1166,7 @@ describe("presentation artifact renderer", () => {
       project: overLimitProject,
       assets: [],
       draftRevisions: [],
+      renderedQualityReport: null,
       publication: {
         project_id: overLimitProject.project_id,
         draft_version: overLimitProject.version,
@@ -1182,6 +1183,40 @@ describe("presentation artifact renderer", () => {
     expect(overLimitHtml).toContain('<dt>想定時間</dt><dd data-state="warning">23分20秒 · 20分超過</dd>');
     expect(overLimitHtml).toContain("発表を20分以内に収める");
     expect(overLimitHtml).toContain('data-duration-valid="false" data-preview-current="false" data-preview-reviewed="false" data-published-current="false" disabled');
+
+    const qualityPriorityProject = projectRecordSchema.parse({
+      ...overLimitProject,
+      document: {
+        ...overLimitProject.document,
+        deck: {
+          ...overLimitProject.document.deck!,
+          slides: overLimitProject.document.deck!.slides.map((slide) => ({
+            ...slide,
+            duration_seconds: 60
+          }))
+        }
+      }
+    });
+    const qualityPriorityHtml = await projectDetailPage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project: qualityPriorityProject,
+      assets: [],
+      draftRevisions: [],
+      renderedQualityReport: null,
+      publication: {
+        project_id: qualityPriorityProject.project_id,
+        draft_version: qualityPriorityProject.version,
+        current_renderer_version: PRESENTATION_RENDERER_VERSION,
+        slug: null,
+        latest_preview: null,
+        published: null,
+        published_history: [],
+        events: []
+      }
+    }).text();
+    expect(qualityPriorityHtml).toContain("全スライドの実表示を確認する");
+    expect(qualityPriorityHtml).toContain('href="#rendered-quality">実表示チェックへ');
 
     const voiceLimitHtml = await voiceFinishPage({
       twitchLogin: "researcher",
