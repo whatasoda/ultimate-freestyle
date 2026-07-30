@@ -122,6 +122,11 @@ describe("MCP contract", () => {
       expect(
         (projectFieldsTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("method");
+      const componentContentTool = tools.find(
+        (tool) => tool.name === "update_slide_component_content"
+      );
+      expect(JSON.stringify(componentContentTool?.inputSchema)).toContain('"text_edit"');
+      expect(JSON.stringify(componentContentTool?.inputSchema)).not.toContain('"maxLength":20000');
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
@@ -995,7 +1000,11 @@ describe("MCP contract", () => {
           slide_id: "question",
           component_id: "trial-count",
           field: "caption",
-          value: "試した回数"
+          text_edit: {
+            operation: "replace_once",
+            old_text: "指標",
+            text: "試した回数"
+          }
         }
       });
       expect(metricCaption.structuredContent).toMatchObject({

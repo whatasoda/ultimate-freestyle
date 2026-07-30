@@ -572,11 +572,16 @@ const sceneComponentContentFieldSchema = z.enum([
 ]);
 
 const sceneComponentScalarSchema = z.union([
-  z.string().max(20_000),
+  z.string().max(4_000),
   z.number().finite(),
   z.boolean(),
   z.null()
 ]);
+const componentTextEditSchema = z.object({
+  operation: z.enum(["replace_once", "append", "prepend", "clear"]),
+  old_text: z.string().min(1).max(2_000).optional(),
+  text: z.string().max(2_000).optional()
+});
 
 const sceneDataItemFieldSchema = z.enum([
   "at",
@@ -730,6 +735,33 @@ function updateSceneComponentContent(
     );
   }
   return parsed.data;
+}
+
+function applyComponentTextEdit(
+  currentValue: string | null,
+  edit: z.infer<typeof componentTextEditSchema>
+): string | null {
+  const current = currentValue ?? "";
+  if (edit.operation === "clear") return null;
+  if (edit.text === undefined) {
+    throw new ProjectToolError("INVALID_FIELDS", "text is required for this component text edit.");
+  }
+  if (edit.operation === "append") return current + edit.text;
+  if (edit.operation === "prepend") return edit.text + current;
+  if (edit.old_text === undefined) {
+    throw new ProjectToolError("INVALID_FIELDS", "old_text is required for replace_once.");
+  }
+  const first = current.indexOf(edit.old_text);
+  const second = first === -1 ? -1 : current.indexOf(edit.old_text, first + edit.old_text.length);
+  if (first === -1 || second !== -1) {
+    throw new ProjectToolError(
+      "INVALID_CHANGE",
+      first === -1
+        ? "old_text was not found in the selected component field."
+        : "old_text must match exactly once in the selected component field."
+    );
+  }
+  return current.slice(0, first) + edit.text + current.slice(first + edit.old_text.length);
 }
 
 function findSceneComponent(
@@ -1791,7 +1823,7 @@ export function registerProjectMutationTools(
         at: z.number().int().nonnegative().max(100).default(0),
         animation: animationSchema.default("none"),
         frame: slideBlockFrameSchema.nullable().optional(),
-        initial_text: z.string().max(20_000).optional(),
+        initial_text: z.string().max(2_000).optional(),
         asset_id: z.string().uuid().optional()
       },
       outputSchema: mutationOutput,
@@ -1856,13 +1888,14 @@ export function registerProjectMutationTools(
     {
       title: "scene componentの内容を一項目更新",
       description:
-        "本文、数値、表示variant、layout固有値など一項目だけを更新します。配置と共通styleはupdate_slide_componentを使います。",
+        "本文、数値、表示variant、layout固有値など一項目だけを更新します。短い値はvalue、既存の長文はtext_editで一部置換・追記・前置・消去し、全体を再送しません。配置と共通styleはupdate_slide_componentを使います。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         field: sceneComponentContentFieldSchema,
-        value: sceneComponentScalarSchema
+        value: sceneComponentScalarSchema.optional(),
+        text_edit: componentTextEditSchema.optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -1872,7 +1905,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, component_id, field, value }) =>
+    async ({ project_id, expected_version, slide_id, component_id, field, value, text_edit }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -1881,7 +1914,18 @@ export function registerProjectMutationTools(
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
           const component = findSceneComponent(document, slide_id, component_id);
-          const parsed = updateSceneComponentContent(component, field, value);
+          if ((value === undefined) === (text_edit === undefined)) {
+            throw new ProjectToolError("INVALID_FIELDS", "Specify exactly one of value or text_edit.");
+          }
+          let nextValue = value;
+          if (text_edit !== undefined) {
+            const currentValue = (component as unknown as Record<string, unknown>)[field];
+            if (typeof currentValue !== "string" && currentValue !== null) {
+              throw new ProjectToolError("INVALID_CHANGE", "text_edit is available only for text fields.");
+            }
+            nextValue = applyComponentTextEdit(currentValue, text_edit);
+          }
+          const parsed = updateSceneComponentContent(component, field, nextValue ?? null);
           if (slide.composition?.mode !== "scene") return;
           const index = slide.composition.nodes.findIndex(
             (node) => node.id === component_id

@@ -51,7 +51,7 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 ## component一覧
 
 - 作成: 全13種類を \`create_slide_component\` で安全な既定値から一件ずつ追加する。imageだけはproject内の \`asset_id\` が必要。
-- 内容: \`update_slide_component_content\` で本文、数値、variant、layout固有値のうち一項目だけを更新する。
+- 内容: \`update_slide_component_content\` で本文、数値、variant、layout固有値のうち一項目だけを更新する。長文は\`text_edit.replace_once\`で現在の短い部分だけを置換する。
 - data item: \`edit_slide_data_item\` でbar chartまたはtimelineの項目を一件ずつ追加、更新、移動、削除する。
 - 配置・見た目の調整: \`update_slide_component\`。本文を再送せず、\`layout\`で親、順番、step、animation、frameを、\`style\`で指定した見た目だけを部分更新する。
 - 削除: \`delete_slide_component\`。子があるcomponentは削除できないため、子を移動または削除してから親を削除する。

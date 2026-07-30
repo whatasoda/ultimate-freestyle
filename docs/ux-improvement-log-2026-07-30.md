@@ -847,3 +847,9 @@
 - スライド本文は`body_edits`へ移行済みでも、一回の`old_text`と`text`が各2万字まで許され、Agentが短い修正で本文全体を引数へ載せる余地が残っていた。
 - 一回の部分編集を各4千字、最大2か所へ制限した。20,000字の保存上限自体は維持し、長文の作成・追記は複数versionへ分け、文言修正は短い`replace_once`で扱う。
 - tool説明とschema contractへ上限を明記した。スライド作成toolは元から題名だけを作り、本文を後続の小粒度編集へ分ける構成を維持する。
+
+## 改善ループ278
+
+- scene componentは一項目更新でもmarkdown等の値を最大2万字まるごと送れ、Agentが長文を短く直す場合の引数と競合が大きかった。
+- `update_slide_component_content`へ`text_edit`を追加し、既存の文字fieldを各2千字以内のreplace_once、append、prepend、clearで部分編集できるようにした。短い値・数値・booleanは`value`を使い、両方またはどちらもない入力は拒否する。
+- 通常のscalar文字列を4千字、component作成時の初期文を2千字へ制限した。保存schemaの長文上限は維持し、複数の小粒度更新で構築できる。実際のcaption置換をcontract testへ切り替えた。
