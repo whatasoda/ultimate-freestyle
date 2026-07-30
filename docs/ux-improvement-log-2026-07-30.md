@@ -650,3 +650,8 @@
 - `get_voice_generation_status`のoutput schemaが全区間の原稿、7種の実効調声、完全なjobをtool定義へ含め、MCP全体で最大の約8.8KBを占めていた。
 - toolはversion、既定profile名、生成数、compactなjob、`details_uri`だけを返し、区間詳細を`research://projects/{id}/voice` resourceへ分離した。生成開始toolのjob出力も進捗確認に必要な項目だけへ縮小した。
 - tool数36以下を維持しながら`tools/list`のbyte上限を100KBから90KB、最大input schemaを12KBから8KBへ厳格化し、VOICEVOX output単体にも6KB上限を追加した。resource側では従来の完全な調声・区間情報をcontract testで検証する。
+
+## 改善ループ245
+
+- 自由構成スライドの編集導線を「本文」から「基本情報と代替テキスト」へ整理した変更に対し、実表示contract testだけが旧ラベルを要求して全体検証を止めていた。
+- scene構成では代替テキストと代替の補足情報を表示することを期待値として固定し、flow構成と異なる編集責務を回帰テストでも明示した。
