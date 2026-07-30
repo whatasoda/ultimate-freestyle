@@ -43,7 +43,10 @@ export const fontPresetSchema = z.enum([
   "mincho",
   "serif",
   "monospace",
-  "display"
+  "display",
+  "textbook",
+  "handwritten",
+  "condensed"
 ]);
 
 export const densitySchema = z.enum([

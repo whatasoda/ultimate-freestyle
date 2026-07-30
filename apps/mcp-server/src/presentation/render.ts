@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@55";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@56";
 
 function escapeHtml(value: string): string {
   return value
@@ -646,6 +646,9 @@ export function renderPresentationHtml(
     .slide[data-body-font="serif"] { --font-body: Georgia, "Noto Serif JP", "Yu Mincho", serif; }
     .slide[data-body-font="monospace"] { --font-body: "BIZ UDGothic", "SFMono-Regular", Consolas, monospace; }
     .slide[data-body-font="display"] { --font-body: "Arial Black", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif; }
+    .slide[data-body-font="textbook"] { --font-body: "UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN", serif; }
+    .slide[data-body-font="handwritten"] { --font-body: Klee, "Hannotate SC", "YuKyokasho", cursive; }
+    .slide[data-body-font="condensed"] { --font-body: "Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN", sans-serif; }
     .slide[data-heading-font="system-sans"] { --font-heading: Inter, "Noto Sans JP", system-ui, sans-serif; }
     .slide[data-heading-font="gothic"] { --font-heading: "BIZ UDPGothic", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif; }
     .slide[data-heading-font="rounded"] { --font-heading: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", ui-rounded, sans-serif; }
@@ -653,6 +656,9 @@ export function renderPresentationHtml(
     .slide[data-heading-font="serif"] { --font-heading: Georgia, "Noto Serif JP", "Yu Mincho", serif; }
     .slide[data-heading-font="monospace"] { --font-heading: "BIZ UDGothic", "SFMono-Regular", Consolas, monospace; }
     .slide[data-heading-font="display"] { --font-heading: "Arial Black", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif; }
+    .slide[data-heading-font="textbook"] { --font-heading: "UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN", serif; }
+    .slide[data-heading-font="handwritten"] { --font-heading: Klee, "Hannotate SC", "YuKyokasho", cursive; }
+    .slide[data-heading-font="condensed"] { --font-heading: "Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN", sans-serif; }
     .slide[data-user-template="false"][data-visual-preset="paper"] { --theme-background: #f7f3ea; --theme-surface: #ebe5d8; --theme-foreground: #1d2735; --theme-muted: #596474; --theme-border: #23304433; --slide-base: var(--theme-background); }
     .slide[data-user-template="false"][data-visual-preset="editorial"] { --theme-background: #f2eadb; --theme-surface: #e5d8c3; --theme-foreground: #201b18; --theme-muted: #665b52; --theme-border: #4d332d40; --slide-base: var(--theme-background); }
     .slide[data-user-template="false"][data-visual-preset="neon"] { --theme-background: #09071b; --theme-surface: #161130dd; --theme-foreground: #f4f2ff; --theme-muted: #b7afd6; --theme-border: color-mix(in srgb, var(--accent) 52%, transparent); --slide-base: var(--theme-background); }

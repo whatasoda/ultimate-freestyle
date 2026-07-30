@@ -184,7 +184,10 @@ const FONT_LABELS = {
   mincho: "明朝",
   serif: "クラシックセリフ",
   monospace: "等幅",
-  display: "強調見出し"
+  display: "強調見出し",
+  textbook: "教科書体",
+  handwritten: "手書き・ノート",
+  condensed: "凝縮ゴシック"
 } as const;
 
 const DENSITY_LABELS = {
@@ -479,6 +482,9 @@ function shell(title: string, body: string): string {
       .font-pick[data-font-pick="serif"] { font-family: Georgia, "Noto Serif JP", "Yu Mincho", serif; }
       .font-pick[data-font-pick="monospace"] { font-family: "BIZ UDGothic", "SFMono-Regular", Consolas, monospace; }
       .font-pick[data-font-pick="display"] { font-family: "Arial Black", "Hiragino Kaku Gothic StdN", "Yu Gothic", sans-serif; font-weight: 850; }
+      .font-pick[data-font-pick="textbook"] { font-family: "UD Digi Kyokasho N-R", "YuKyokasho", "Hiragino Mincho ProN", serif; }
+      .font-pick[data-font-pick="handwritten"] { font-family: Klee, "Hannotate SC", "YuKyokasho", cursive; }
+      .font-pick[data-font-pick="condensed"] { font-family: "Avenir Next Condensed", "Arial Narrow", "Hiragino Kaku Gothic ProN", sans-serif; font-stretch: condensed; }
       .cover-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(5.6rem, 1fr)); gap: .45rem; }
       .cover-pick { display: grid; gap: .35rem; min-height: 4.4rem; padding: .45rem; border: 1px solid var(--line); background: #0a111b; color: #cbd6e4; font-size: .68rem; }
       .cover-pick[aria-pressed="true"] { border-color: #9d7bff; background: #8062df24; color: white; }
