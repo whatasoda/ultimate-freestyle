@@ -2493,9 +2493,39 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     form.addEventListener("input", () => updateSegmentDuration(form));
   }
 
+  let segmentSampleButton = null;
+  let segmentSamplePlayer = null;
+  let segmentSampleObjectUrl = "";
+  let segmentSampleAbort = null;
+  const stopSegmentVoicevoxSample = (message = "") => {
+    segmentSampleAbort?.abort();
+    segmentSampleAbort = null;
+    if (segmentSamplePlayer) {
+      segmentSamplePlayer.pause();
+      segmentSamplePlayer.removeAttribute("src");
+      segmentSamplePlayer.load();
+      segmentSamplePlayer = null;
+    }
+    if (segmentSampleObjectUrl) {
+      URL.revokeObjectURL(segmentSampleObjectUrl);
+      segmentSampleObjectUrl = "";
+    }
+    if (segmentSampleButton instanceof HTMLButtonElement) {
+      segmentSampleButton.removeAttribute("aria-busy");
+      segmentSampleButton.setAttribute("aria-pressed", "false");
+      segmentSampleButton.textContent = segmentSampleButton.dataset.idleLabel || "この声をVOICEVOXで試聴";
+      if (message) {
+        const feedback = segmentSampleButton.closest("form")?.querySelector("[data-form-feedback]");
+        if (feedback instanceof HTMLElement) feedback.textContent = message;
+      }
+    }
+    segmentSampleButton = null;
+  };
+
   for (const button of document.querySelectorAll("[data-segment-speech-preview]")) {
     if (!(button instanceof HTMLButtonElement)) continue;
     button.addEventListener("click", () => {
+      stopSegmentVoicevoxSample();
       if (!("speechSynthesis" in window) || typeof SpeechSynthesisUtterance === "undefined") {
         const feedback = button.closest("form")?.querySelector("[data-form-feedback]");
         if (feedback instanceof HTMLElement) feedback.textContent = "このブラウザでは音声の仮試聴を利用できません。";
@@ -2533,6 +2563,91 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       button.setAttribute("aria-pressed", "true");
       button.textContent = "試聴を停止";
       speechSynthesis.speak(utterance);
+    });
+  }
+
+  for (const button of document.querySelectorAll("[data-segment-voicevox-sample]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.dataset.idleLabel = button.textContent || "この声をVOICEVOXで試聴";
+    button.addEventListener("click", async () => {
+      if (segmentSampleButton === button) {
+        stopSegmentVoicevoxSample("VOICEVOX試聴を停止しました。");
+        return;
+      }
+      stopSegmentVoicevoxSample();
+      if ("speechSynthesis" in window) speechSynthesis.cancel();
+      for (const speechButton of document.querySelectorAll("[data-segment-speech-preview]")) {
+        if (speechButton instanceof HTMLButtonElement) {
+          speechButton.setAttribute("aria-pressed", "false");
+          speechButton.textContent = "ブラウザで仮試聴";
+        }
+      }
+      const form = button.closest("[data-segment-preview]");
+      if (!(form instanceof HTMLFormElement)) return;
+      const feedback = form.querySelector("[data-form-feedback]");
+      let catalogs = {};
+      try { catalogs = JSON.parse(form.dataset.profileCatalogs || "{}"); } catch {}
+      const voiceField = form.elements.namedItem("voice_profile_id");
+      const profileId = voiceField instanceof HTMLSelectElement ? voiceField.value : "";
+      const catalogProfileId = catalogs[profileId];
+      if (!catalogProfileId) {
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = "選択した声は現在のVOICEVOXカタログにありません。声を選び直してください。";
+          feedback.classList.add("warning");
+        }
+        return;
+      }
+      const tuning = {};
+      for (const key of ["speedScale", "pitchScale", "intonationScale", "volumeScale", "pauseLengthScale", "prePhonemeLength", "postPhonemeLength"]) {
+        tuning[key] = segmentTuningValue(form, key);
+      }
+      segmentSampleButton = button;
+      segmentSampleAbort = new AbortController();
+      button.setAttribute("aria-busy", "true");
+      button.setAttribute("aria-pressed", "true");
+      button.textContent = "VOICEVOXを準備中…";
+      if (feedback instanceof HTMLElement) {
+        feedback.textContent = "未保存の声とトーンで短い固定文を準備しています…";
+        feedback.classList.remove("warning", "success");
+      }
+      try {
+        const response = await fetch(button.dataset.segmentVoicevoxSample || "", {
+          method: "POST",
+          headers: {
+            "accept": "audio/mpeg",
+            "content-type": "application/json",
+            "x-csrf-token": form.dataset.csrf || ""
+          },
+          body: JSON.stringify({ profile_id: catalogProfileId, tuning }),
+          signal: segmentSampleAbort.signal
+        });
+        if (!response.ok) {
+          let result = null;
+          try { result = await response.json(); } catch {}
+          throw new Error(apiErrorMessage(result, "VOICEVOX試聴を生成できませんでした。"));
+        }
+        const cacheHit = response.headers.get("x-voicevox-cache") === "hit";
+        const blob = await response.blob();
+        segmentSampleObjectUrl = URL.createObjectURL(blob);
+        segmentSamplePlayer = new Audio(segmentSampleObjectUrl);
+        segmentSampleAbort = null;
+        button.removeAttribute("aria-busy");
+        button.textContent = "試聴を停止";
+        segmentSamplePlayer.addEventListener("ended", () => stopSegmentVoicevoxSample("VOICEVOX試聴が終わりました。"), { once: true });
+        segmentSamplePlayer.addEventListener("error", () => stopSegmentVoicevoxSample("取得した試聴音声を再生できませんでした。"), { once: true });
+        await segmentSamplePlayer.play();
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = cacheHit ? "同じ声とトーンのVOICEVOX試聴を再利用しています。" : "VOICEVOX実音声を再生しています。次回は同じ設定を再利用します。";
+          feedback.classList.add("success");
+        }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        stopSegmentVoicevoxSample();
+        if (feedback instanceof HTMLElement) {
+          feedback.textContent = caughtErrorMessage(error, "VOICEVOX試聴を生成できませんでした。");
+          feedback.classList.add("warning");
+        }
+      }
     });
   }
 
@@ -2698,7 +2813,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (voicevoxSampleButton instanceof HTMLButtonElement) {
         voicevoxSampleButton.setAttribute("aria-pressed", "false");
         voicevoxSampleButton.textContent = "選択中の声をVOICEVOXで試聴";
-        setButtonBusy(voicevoxSampleButton, false);
+        voicevoxSampleButton.removeAttribute("aria-busy");
       }
       if (message && voicevoxSampleFeedback instanceof HTMLElement) voicevoxSampleFeedback.textContent = message;
     };
@@ -2712,9 +2827,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           for (const key of ["speedScale", "pitchScale", "intonationScale", "volumeScale", "pauseLengthScale", "prePhonemeLength", "postPhonemeLength"]) tuning[key] = Number(data.get("tuning_" + key));
         }
         sampleAbort = new AbortController();
-        setButtonBusy(voicevoxSampleButton, true);
+        voicevoxSampleButton.setAttribute("aria-busy", "true");
         voicevoxSampleButton.setAttribute("aria-pressed", "true");
-        voicevoxSampleButton.textContent = "VOICEVOXを準備中…";
+        voicevoxSampleButton.textContent = "準備を中止";
         if (voicevoxSampleFeedback instanceof HTMLElement) {
           voicevoxSampleFeedback.textContent = "選択中の話者・スタイルとトーンで短い音声を準備しています…";
           voicevoxSampleFeedback.classList.remove("warning", "success");
@@ -2737,7 +2852,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           samplePlayer = new Audio(sampleObjectUrl);
           sampleAbort = null;
           voicevoxSampleButton.textContent = "試聴を停止";
-          setButtonBusy(voicevoxSampleButton, false);
+          voicevoxSampleButton.removeAttribute("aria-busy");
           samplePlayer.addEventListener("ended", () => stopVoicevoxSample("VOICEVOX試聴が終わりました。"), { once: true });
           samplePlayer.addEventListener("error", () => stopVoicevoxSample("取得した試聴音声を再生できませんでした。"), { once: true });
           await samplePlayer.play();
@@ -2755,6 +2870,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
       });
       profileSelect?.addEventListener("change", () => stopVoicevoxSample());
+      speakerSelect?.addEventListener("change", () => stopVoicevoxSample());
+      profileTuningForm?.addEventListener("input", () => stopVoicevoxSample());
     }
     const pollJob = async (statusUrl) => {
       const url = safeStatusUrl(statusUrl);

@@ -255,7 +255,7 @@ describe("Web dashboard", () => {
           {
             id: "zundamon",
             label: "ずんだもん・ノーマル",
-            speaker_uuid: "40000000-0000-4000-8000-000000000004",
+            speaker_uuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
             speaker_name: "ずんだもん",
             style_id: 3,
             style_name: "ノーマル",
@@ -670,8 +670,11 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("ずんだ色");
     expect(workspaceHtml).toContain("形式の既定");
     expect(workspaceHtml).toContain("data-segment-speech-preview");
+    expect(workspaceHtml).toContain("data-segment-voicevox-sample");
     expect(workspaceHtml).toContain("data-segment-duration");
     expect(workspaceHtml).toContain("data-profile-tunings");
+    expect(workspaceHtml).toContain("data-profile-catalogs");
+    expect(workspaceHtml).toContain("この声をVOICEVOXで試聴");
     expect(workspaceHtml).toContain("STEP目安");
     expect(workspaceHtml).toContain("data-narration-segment-delete");
     expect(workspaceHtml).toContain('data-inspector-section="design"');
@@ -800,6 +803,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("filterProjects");
     expect(dashboardScriptText).toContain("ultimate-freestyle:quality-sweep:");
     expect(dashboardScriptText).toContain("data-voicevox-sample");
+    expect(dashboardScriptText).toContain("data-segment-voicevox-sample");
+    expect(dashboardScriptText).toContain("未保存の声とトーンで短い固定文");
+    expect(dashboardScriptText).toContain('voicevoxSampleButton.textContent = "準備を中止"');
     expect(dashboardScriptText).toContain('response.headers.get("x-voicevox-cache")');
     expect(dashboardScriptText).toContain('persistQualitySweep("completed")');
     expect(dashboardScriptText).toContain("前回の確認結果：");
@@ -1994,6 +2000,7 @@ describe("Web dashboard", () => {
     expect(workspaceWithoutNarrationHtml).toContain('data-slide-id="intro"');
     expect(workspaceWithoutNarrationHtml).toContain("data-segment-speech-preview");
     expect(workspaceWithoutNarrationHtml).toContain('data-segment-speech-preview aria-pressed="false" disabled');
+    expect(workspaceWithoutNarrationHtml).toContain("既定の声をVOICEVOXで試聴");
     expect(workspaceWithoutNarrationHtml).toContain("data-duration-breakdown");
     expect(workspaceWithoutNarrationHtml).toContain("同じSTEPへ移動します");
     expect(workspaceWithoutNarrationHtml).toContain("最初の原稿を入力できます");

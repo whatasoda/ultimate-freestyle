@@ -2181,6 +2181,18 @@ export function slideWorkspacePage(options: {
       mergeVoicevoxTuning(profile.tuning ?? undefined)
     ])
   ]);
+  const profileCatalogIds: Record<string, string> = {};
+  for (const [profileId, profile] of [
+    ["", defaultProfile] as const,
+    ...profiles.map((profile) => [profile.id, profile] as const)
+  ]) {
+    if (profile === undefined) continue;
+    const catalogProfile = VOICEVOX_CATALOG.find(
+      (item) => item.speakerUuid === profile.speaker_uuid && item.styleId === profile.style_id
+    );
+    if (catalogProfile !== undefined) profileCatalogIds[profileId] = catalogProfile.id;
+  }
+  const voicevoxSampleUrl = `/api/projects/${options.project.project_id}/voice/sample`;
   const voiceSegments = slide.narration?.segments.length
     ? slide.narration.segments
         .map((segment) => {
@@ -2203,14 +2215,14 @@ export function slideWorkspacePage(options: {
               (item) => `<option value="${escapeHtml(item.id)}"${segment.voice_profile_id === item.id ? " selected" : ""}>${escapeHtml(item.label)} · ${escapeHtml(item.speaker_name)} ${escapeHtml(item.style_name)}</option>`
             )
           ].join("");
-          return `<form class="voice-segment editor" id="narration-segment-${segment.at}" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-profile-tunings="${escapeHtml(JSON.stringify(profileTunings))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
+          return `<form class="voice-segment editor" id="narration-segment-${segment.at}" data-segment-editor data-segment-preview data-versioned-form action="${slidePath}/narration/segments/${segment.at}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-segment-at="${segment.at}" data-effective-tuning="${escapeHtml(JSON.stringify(effectiveTuning))}" data-profile-tunings="${escapeHtml(JSON.stringify(profileTunings))}" data-profile-catalogs="${escapeHtml(JSON.stringify(profileCatalogIds))}" data-step-duration="${stepDuration}" data-csrf="${escapeHtml(options.csrfToken)}">
             <div class="voice-segment-head"><span class="component-step">STEP ${segment.at}</span><span class="voice-timing" data-segment-duration data-state="${estimatedDuration > stepDuration * 1.15 ? "warning" : "ok"}">概算 ${estimatedDuration.toFixed(1)}秒 / STEP目安 ${stepDuration.toFixed(1)}秒</span><span class="audio-state${segment.audio_src ? " ready" : ""}">${segment.audio_src ? "VOICEVOX音声あり" : "ブラウザ音声で代替"}</span></div>
             <label>表示・読み上げ文<textarea name="text" maxlength="2000" required>${escapeHtml(segment.text)}</textarea></label>
             <div class="editor-grid"><label>この区間の話者名<input name="speaker" maxlength="80" value="${escapeHtml(segment.speaker ?? "")}" placeholder="スライド設定を継承"></label><label>VOICEVOXの声<select name="voice_profile_id">${profileOptions}</select></label></div>
             <p class="inherit-note">現在有効な声: ${escapeHtml(profile ? `${profile.label} / ${profile.speaker_name} ${profile.style_name}` : "未設定（ブラウザ音声）")}。空欄の調声値は選んだ声またはVOICEVOX標準値を継承します。</p>
             <fieldset><legend>調声（空欄で継承）</legend><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" value="${segment.voice_tuning?.[key] ?? ""}" placeholder="実効 ${effectiveTuning[key]}"></label>`).join("")}</div></fieldset>
             <p class="inherit-note">ブラウザ仮試聴では速度・高さ・音量を近似します。抑揚、間、前後の無音はVOICEVOX生成後に確認してください。</p>
-            <div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false">ブラウザで仮試聴</button><button type="submit">この区間を保存</button><button type="button" class="ghost danger" data-narration-segment-delete data-delete-url="${slidePath}/narration/segments/${segment.at}" data-csrf="${escapeHtml(options.csrfToken)}">区間を削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
+            <div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false">ブラウザで仮試聴</button>${Object.keys(profileCatalogIds).length > 0 ? `<button type="button" class="ghost" data-segment-voicevox-sample="${voicevoxSampleUrl}" aria-pressed="false">この声をVOICEVOXで試聴</button>` : ""}<button type="submit">この区間を保存</button><button type="button" class="ghost danger" data-narration-segment-delete data-delete-url="${slidePath}/narration/segments/${segment.at}" data-csrf="${escapeHtml(options.csrfToken)}">区間を削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
           </form>`;
         })
         .join("")
@@ -2223,7 +2235,7 @@ export function slideWorkspacePage(options: {
     (_, index) => index
   ).filter((step) => !usedNarrationSteps.has(step));
   const narrationSegmentCreator = availableNarrationSteps.length
-    ? `<details class="component-detail"><summary>読み上げ区間を追加</summary><form class="editor" data-narration-segment-create data-segment-preview data-versioned-form data-method="POST" action="${slidePath}/narration/segments" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-effective-tuning="${escapeHtml(JSON.stringify(defaultNarrationTuning))}" data-step-duration="${slide.duration_seconds / (slide.reveal_steps + 1)}" data-csrf="${escapeHtml(options.csrfToken)}"><label>表示する段階<select name="at">${availableNarrationSteps.map((step) => `<option value="${step}">STEP ${step}</option>`).join("")}</select><small class="inherit-note">選ぶと左の実表示も同じSTEPへ移動します。</small></label><label>表示・読み上げ文<textarea name="text" maxlength="2000" required placeholder="この段階で読み上げる文"></textarea></label><span class="voice-timing" data-segment-duration data-state="ok">概算 1.5秒 / STEP目安 ${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒</span><div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false" disabled>ブラウザで仮試聴</button><button type="submit">区間を追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
+    ? `<details class="component-detail"><summary>読み上げ区間を追加</summary><form class="editor" data-narration-segment-create data-segment-preview data-versioned-form data-method="POST" action="${slidePath}/narration/segments" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-effective-tuning="${escapeHtml(JSON.stringify(defaultNarrationTuning))}" data-profile-catalogs="${escapeHtml(JSON.stringify(profileCatalogIds))}" data-step-duration="${slide.duration_seconds / (slide.reveal_steps + 1)}" data-csrf="${escapeHtml(options.csrfToken)}"><label>表示する段階<select name="at">${availableNarrationSteps.map((step) => `<option value="${step}">STEP ${step}</option>`).join("")}</select><small class="inherit-note">選ぶと左の実表示も同じSTEPへ移動します。</small></label><label>表示・読み上げ文<textarea name="text" maxlength="2000" required placeholder="この段階で読み上げる文"></textarea></label><span class="voice-timing" data-segment-duration data-state="ok">概算 1.5秒 / STEP目安 ${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒</span><div class="actions"><button type="button" class="ghost" data-segment-speech-preview aria-pressed="false" disabled>ブラウザで仮試聴</button>${profileCatalogIds[""] ? `<button type="button" class="ghost" data-segment-voicevox-sample="${voicevoxSampleUrl}" aria-pressed="false">既定の声をVOICEVOXで試聴</button>` : ""}<button type="submit">区間を追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
     : `<p class="inherit-note">STEP 0〜${slide.reveal_steps}にはすべて読み上げ区間があります。</p>`;
   const missingAlt =
     slide.composition?.mode === "canvas"
