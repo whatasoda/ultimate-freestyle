@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=108"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=109"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -515,6 +515,8 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("40話者・118種類");
     expect(voicePageHtml).toContain('value="voicevox-style-3" selected');
     expect(voicePageHtml).toContain('data-voice-speaker');
+    expect(voicePageHtml).toContain('data-voice-selection-form');
+    expect(voicePageHtml).toContain('data-initial-profile="voicevox-style-3"');
     expect(voicePageHtml).toContain('value="四国めたん"');
     expect(voicePageHtml).toContain('data-voice-catalog');
     expect(voicePageHtml).toContain("7種の調声値");
@@ -755,6 +757,10 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("setTimeout(() => location.reload(), 700)");
     expect(dashboardScriptText).toContain("result.voice_generation_required");
     expect(dashboardScriptText).toContain("VOICEVOX音声を再生成してください");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:voice-selection:");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:voice-tuning:");
+    expect(dashboardScriptText).toContain("未保存選択を復元しました");
+    expect(dashboardScriptText).toContain("未保存のトーン調整を復元しました");
     expect(dashboardScriptText).toContain("結果を反映しています");
     expect(dashboardScriptText).toContain('job.status === "completed" ? 800 : 1200');
     expect(dashboardScriptText).toContain("この画像はスライドで使用中です");

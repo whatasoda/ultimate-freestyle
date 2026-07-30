@@ -2316,6 +2316,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (voicePage instanceof HTMLElement) {
     const csrf = voicePage.dataset.csrf || "";
     const setupButton = voicePage.querySelector("[data-voice-setup]");
+    const selectionForm = voicePage.querySelector("[data-voice-selection-form]");
     const speakerSelect = voicePage.querySelector("[data-voice-speaker]");
     const profileSelect = voicePage.querySelector("[data-voice-profile]");
     const setupFeedback = voicePage.querySelector("[data-voice-setup-feedback]");
@@ -2324,6 +2325,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const generateFeedback = voicePage.querySelector("[data-voice-generate-feedback]");
     const jobCard = voicePage.querySelector("[data-voice-job]");
     const terminalStatuses = new Set(["completed", "partially_failed", "failed", "cancelled"]);
+    const selectionDraftKey = "ultimate-freestyle:voice-selection:" + (voicePage.dataset.projectId || "");
+    const tuningDraftKey = "ultimate-freestyle:voice-tuning:" + (voicePage.dataset.projectId || "");
     let voiceCatalog = [];
     if (profileSelect instanceof HTMLSelectElement) {
       try { voiceCatalog = JSON.parse(profileSelect.dataset.voiceCatalog || "[]"); } catch {}
@@ -2339,9 +2342,36 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }));
       if (selectedId && profiles.some((profile) => profile.id === selectedId)) profileSelect.value = selectedId;
     };
+    const persistVoiceSelection = () => {
+      if (!(selectionForm instanceof HTMLFormElement) || !(profileSelect instanceof HTMLSelectElement)) return;
+      const changed = profileSelect.value !== selectionForm.dataset.initialProfile;
+      selectionForm.dataset.dirty = String(changed);
+      try {
+        if (changed) sessionStorage.setItem(selectionDraftKey, JSON.stringify({ profile_id: profileSelect.value }));
+        else sessionStorage.removeItem(selectionDraftKey);
+      } catch {}
+    };
+    if (selectionForm instanceof HTMLFormElement && profileSelect instanceof HTMLSelectElement && speakerSelect instanceof HTMLSelectElement) {
+      try {
+        const draft = JSON.parse(sessionStorage.getItem(selectionDraftKey) || "null");
+        const profile = voiceCatalog.find((item) => item.id === draft?.profile_id);
+        if (profile && profile.id !== selectionForm.dataset.initialProfile) {
+          speakerSelect.value = profile.speakerName;
+          rebuildVoiceStyles(profile.id);
+          selectionForm.dataset.dirty = "true";
+          if (setupFeedback instanceof HTMLElement) {
+            setupFeedback.textContent = profile.label + "の未保存選択を復元しました。確認して保存または選び直してください。";
+            setupFeedback.classList.remove("success", "warning");
+          }
+        } else if (draft !== null) sessionStorage.removeItem(selectionDraftKey);
+      } catch {
+        try { sessionStorage.removeItem(selectionDraftKey); } catch {}
+      }
+    }
     if (speakerSelect instanceof HTMLSelectElement) {
       speakerSelect.addEventListener("change", () => {
         rebuildVoiceStyles();
+        persistVoiceSelection();
         const style = profileSelect instanceof HTMLSelectElement
           ? profileSelect.selectedOptions[0]?.textContent || "スタイル"
           : "スタイル";
@@ -2353,6 +2383,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     if (profileSelect instanceof HTMLSelectElement) {
       profileSelect.addEventListener("change", () => {
+        persistVoiceSelection();
         const selected = voiceCatalog.find((profile) => profile.id === profileSelect.value);
         if (setupFeedback instanceof HTMLElement && selected) {
           setupFeedback.textContent = selected.label + "を選択しました。保存すると発表全体へ適用されます。";
@@ -2482,6 +2513,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             setupFeedback.textContent = "設定しました。音声の状態を更新します…";
             setupFeedback.classList.add("success");
           }
+          if (selectionForm instanceof HTMLFormElement) selectionForm.dataset.dirty = "false";
+          try { sessionStorage.removeItem(selectionDraftKey); } catch {}
           setTimeout(() => location.reload(), 500);
         } catch (error) {
           setupButton.disabled = false;
@@ -2497,7 +2530,28 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const tuningSubmit = profileTuningForm.querySelector('button[type="submit"]');
       const tuningPreview = profileTuningForm.querySelector("[data-voice-profile-tuning-preview]");
       const tuningReset = profileTuningForm.querySelector("[data-voice-profile-tuning-reset]");
-      profileTuningForm.addEventListener("input", () => { profileTuningForm.dataset.dirty = "true"; });
+      const tuningFields = () => Object.fromEntries(
+        [...profileTuningForm.elements]
+          .filter((field) => field instanceof HTMLInputElement && field.name.startsWith("tuning_"))
+          .map((field) => [field.name, field.value])
+      );
+      try {
+        const draft = JSON.parse(sessionStorage.getItem(tuningDraftKey) || "null");
+        if (draft && typeof draft === "object") {
+          for (const [name, value] of Object.entries(draft)) {
+            const input = profileTuningForm.elements.namedItem(name);
+            if (input instanceof HTMLInputElement) input.value = String(value);
+          }
+          profileTuningForm.dataset.dirty = "true";
+          if (tuningFeedback instanceof HTMLElement) tuningFeedback.textContent = "未保存のトーン調整を復元しました。仮試聴してから保存してください。";
+        }
+      } catch {
+        try { sessionStorage.removeItem(tuningDraftKey); } catch {}
+      }
+      profileTuningForm.addEventListener("input", () => {
+        profileTuningForm.dataset.dirty = "true";
+        try { sessionStorage.setItem(tuningDraftKey, JSON.stringify(tuningFields())); } catch {}
+      });
       if (tuningReset instanceof HTMLButtonElement) {
         tuningReset.addEventListener("click", () => {
           let defaults = {};
@@ -2568,6 +2622,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           const result = await response.json();
           if (!response.ok) throw new Error(apiErrorMessage(result, "既定のトーンを保存できませんでした。"));
           profileTuningForm.dataset.dirty = "false";
+          try { sessionStorage.removeItem(tuningDraftKey); } catch {}
           tuningFeedback.textContent = "保存しました。VOICEVOX音声の生成状態を更新します…";
           tuningFeedback.classList.add("success");
           setTimeout(() => location.reload(), 600);
@@ -2586,6 +2641,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!profile) return;
         speakerSelect.value = profile.speakerName;
         rebuildVoiceStyles(profileId);
+        persistVoiceSelection();
         const selected = profile.label || (profile.speakerName + "・" + profile.styleName);
         if (setupFeedback instanceof HTMLElement) {
           setupFeedback.textContent = selected + "を選択しました。保存すると発表全体へ適用されます。";
