@@ -985,6 +985,23 @@ describe("Web dashboard", () => {
     expect(dashboardStyleText).not.toContain("var(--text)");
     expect(dashboardStyleText).toContain("--bg: #090f18");
     expect(dashboardStyleText).toContain("background: linear-gradient(var(--bg) 80%, transparent)");
+    const definedDashboardTokens = new Set(
+      [...dashboardStyleText.matchAll(/--([\w-]+)\s*:/g)].map((match) => match[1])
+    );
+    const inlineDashboardTokens = new Set([
+      "swatch",
+      "quality-sweep-aspect",
+      "palette-border",
+      "palette-background",
+      "palette-accent",
+      "revision-aspect",
+      "workspace-aspect",
+      "component-indent"
+    ]);
+    const undefinedDashboardTokens = [
+      ...new Set([...dashboardStyleText.matchAll(/var\(--([\w-]+)/g)].map((match) => match[1]))
+    ].filter((token) => !inlineDashboardTokens.has(token) && !definedDashboardTokens.has(token));
+    expect(undefinedDashboardTokens).toEqual([]);
     expect(dashboardStyleText).toContain(
       ".component-outline-row code { grid-column: 1 / -1;"
     );

@@ -1448,3 +1448,9 @@
 - filmstrip検索欄のsticky背景は未定義の`--bg`を使い、gradient宣言全体が無効だった。スライド一覧を縦スクロールすると、固定検索欄の下へ項目が透けた。
 - dashboardの基底色`#090f18`をrootの`--bg`として定義し、body末尾色とfilmstrip gradientで共有する。
 - token定義とsticky gradientの配信CSS契約を追加し、dashboard assetを`v157`へ更新した。
+
+## 改善ループ378
+
+- 未定義tokenによる表示低下を個別文字列テストだけで守ると、別名のtypoを追加した場合は再び目視まで発見できない。
+- 配信dashboard CSSからcustom propertyの定義と`var()`参照を抽出し、SSRが要素ごとに与えるaspect・palette・indent・swatchの明示list以外に未定義参照があれば失敗させる契約を追加した。
+- hover色やsticky背景に限らず、今後増える配色・レイアウトtokenを同じ検査で保護する。
