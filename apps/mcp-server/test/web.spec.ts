@@ -421,7 +421,9 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=89"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=90"');
+    expect(detailHtml).toContain("data-slide-create");
+    expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -592,6 +594,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("最初の読み上げ文");
     expect(workspaceHtml).toContain('aria-current="page"');
     expect(workspaceHtml).toContain('data-slide-action="duplicate"');
+    expect(workspaceHtml).toContain("data-slide-create");
     expect(workspaceHtml).toContain('data-slide-action="move"');
     expect(workspaceHtml).toContain('data-slide-action="delete"');
     expect(workspaceHtml).toContain("現在有効な設定");
@@ -734,6 +737,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("ultimate-freestyle:grid-snap");
     expect(dashboardScriptText).toContain("data-component-frame-reset");
     expect(dashboardScriptText).toContain("form.dataset.component = JSON.stringify");
+    expect(dashboardScriptText).toContain("data-slide-create");
     expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain("data-scene-component-create");
     expect(dashboardScriptText).toContain("data-scene-item-action");
@@ -2074,6 +2078,31 @@ describe("Web dashboard", () => {
     expect(JSON.parse(recoloredDocument!.document_json).deck.slides[0].composition).toMatchObject({
       background: "#223344",
       clip_content: false
+    });
+    const createSlide = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 32, title: "Webから追加", position: 1, template: "scene" })
+        }
+      ),
+      authEnv
+    );
+    expect(createSlide.status).toBe(200);
+    const createSlideResult = await createSlide.json() as { slide_id: string; version: number; next_url: string };
+    expect(createSlideResult).toMatchObject({ version: 33 });
+    expect(createSlideResult.next_url).toContain(createSlideResult.slide_id);
+    const documentWithCreatedSlide = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const createdSlide = JSON.parse(documentWithCreatedSlide!.document_json).deck.slides[1];
+    expect(createdSlide).toMatchObject({
+      id: createSlideResult.slide_id,
+      title: "Webから追加",
+      composition: { mode: "scene", runtime_version: "uf-runtime@1" }
     });
 
     const unsupportedUpload = await requestProvider(

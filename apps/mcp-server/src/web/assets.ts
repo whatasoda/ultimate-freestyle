@@ -750,6 +750,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       parent_id: String(data.get("parent_id") || "") || null,
       asset_id: String(data.get("asset_id") || "") || null
     });
+    if (form.matches("[data-slide-create]")) Object.assign(body, {
+      title: String(data.get("title") || ""),
+      position: numberValue(data, "position"),
+      template: String(data.get("slide_template") || "flow")
+    });
     if (form.matches("[data-deck-editor]")) Object.assign(body, {
       aspect_ratio: String(data.get("aspect_ratio") || "16:9"),
       loading_screen: {
@@ -885,6 +890,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         syncPageVersion(result.version);
         if (form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) {
           form.dataset.component = JSON.stringify(sceneComponentFromForm(form));
+        }
+        if (form.matches("[data-slide-create]")) {
+          location.href = result.next_url;
+          return;
         }
         if (form.matches("[data-template-create], [data-narration-segment-create], [data-canvas-block-create], [data-scene-component-create]")) {
           location.reload();

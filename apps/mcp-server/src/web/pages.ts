@@ -238,7 +238,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=89";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=90";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -780,6 +780,20 @@ function slideCompositionLabel(
   return "定型レイアウト";
 }
 
+function slideCreator(options: {
+  action: string;
+  version: number;
+  csrfToken: string;
+  slideCount: number;
+  defaultPosition: number;
+}): string {
+  const positions = Array.from({ length: options.slideCount + 1 }, (_, index) => {
+    const label = index === 0 ? "先頭" : index === options.slideCount ? "末尾" : `${index}枚目の後`;
+    return `<option value="${index}"${index === options.defaultPosition ? " selected" : ""}>${label}</option>`;
+  }).join("");
+  return `<details class="component-detail"><summary>スライドを追加</summary><form class="editor" data-slide-create data-versioned-form data-method="POST" action="${options.action}" data-version="${options.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>タイトル<input name="title" maxlength="120" required placeholder="この一枚で伝えること"></label><div class="editor-grid"><label>雛形<select name="slide_template"><option value="flow">本文スライド</option><option value="cover">表紙</option><option value="canvas">自由配置</option><option value="scene">リッチ構成</option></select></label><label>挿入位置<select name="position">${positions}</select></label></div><p class="inherit-note">最低限の内容で追加し、次の画面で本文・読み上げ・見た目・表示パーツを調整します。</p><div class="actions"><button type="submit">追加して編集する</button><span class="version" data-version-label>v${options.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+}
+
 function settingValue(value: unknown): string {
   if (value === null || value === undefined || value === "") return "未設定（継承）";
   if (typeof value === "boolean") return value ? "有効" : "無効";
@@ -1170,6 +1184,13 @@ export function projectDetailPage(options: {
   const addSlidePrompt = `「${document.title}」の発表へ新しいスライドを1枚追加したいです。前後の流れを確認し、入れる位置・役割・内容を提案してから作成してください。`;
   const reviseSlidesPrompt = `「${document.title}」の発表構成を見直したいです。現在の全スライドを確認し、過不足と順番の改善案を先に示してください。合意した部分だけを個別に変更してください。`;
   const slideAiActions = `<details class="component-detail"><summary>AIでスライドを追加・構成変更</summary><div class="disclosure-body"><p class="inherit-note">接続中のAIクライアントへ依頼文を貼り付けます。AIは現在の構成を自動で確認できます。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(addSlidePrompt)}">追加を頼む文をコピー</button><button class="ghost" type="button" data-copy-text="${escapeHtml(reviseSlidesPrompt)}">構成見直しを頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
+  const slideCreateForm = deck === null ? "" : slideCreator({
+    action: `/api/projects/${escapeHtml(options.project.project_id)}/slides`,
+    version: options.project.version,
+    csrfToken: options.csrfToken,
+    slideCount: slides.length,
+    defaultPosition: slides.length
+  });
   const evaluationPrompt = `「${document.title}」をresearch://guide/evaluationの8観点でレビューしてください。research://projects/${options.project.project_id}を根拠にし、情報不足は0点ではなくNEにしてください。強み、最大のリスク、最優先の改善を一つずつ示し、最後はその改善につながる質問を一問だけしてください。`;
   const imageAiPrompt = `research://projects/${options.project.project_id}の研究画像一覧を確認し、説明と寸法を根拠に「${document.title}」の発表で有効な使い方を提案してください。まだスライドは変更せず、使う画像と配置の合意後に個別編集してください。`;
   const evaluationPanel = `<details class="panel panel-disclosure"><summary>AIで研究を8観点レビュー</summary><div class="disclosure-body"><p class="prose">問い、仮説、方法、証拠、考察、独自性、発表、制作整合性を0〜4で確認します。根拠がない項目はNEとして扱います。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(evaluationPrompt)}">評価を頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
@@ -1525,7 +1546,7 @@ export function projectDetailPage(options: {
                <dt>スライド</dt><dd>${slides.length}枚</dd>
                <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
              </dl></section>
-             <section class="panel" id="presentation-structure"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideAiActions}</section>
+             <section class="panel" id="presentation-structure"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
              ${evaluationPanel}
              ${voicePanel}
              ${publicationPanel}
@@ -1815,6 +1836,13 @@ export function slideWorkspacePage(options: {
   const canvasBlockCreator = slide.composition?.mode === "canvas"
     ? `<details class="component-detail"><summary>表示パーツを追加</summary><form class="editor" data-canvas-block-create data-versioned-form data-method="POST" action="${slidePath}/blocks" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>種類<select name="kind"><option value="markdown">テキスト</option><option value="shape">図形</option><option value="image"${(options.assets ?? []).length === 0 ? " disabled" : ""}>画像${(options.assets ?? []).length === 0 ? "（画像を先に追加）" : ""}</option></select></label><label>画像パーツで使用する画像<select name="asset_id"><option value="">選択してください</option>${(options.assets ?? []).map((asset) => `<option value="${escapeHtml(asset.asset_id)}">${escapeHtml(asset.alt_text || asset.original_filename)}</option>`).join("")}</select></label></div><p class="inherit-note">追加後に内容、位置、大きさ、重なり順、見た目を調整できます。</p><div class="actions"><button type="submit">表示パーツを追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
     : "";
+  const workspaceSlideCreator = slideCreator({
+    action: `${projectPath}/slides`,
+    version: options.project.version,
+    csrfToken: options.csrfToken,
+    slideCount: deck.slides.length,
+    defaultPosition: slideIndex + 1
+  });
   const compositionEditor = slide.composition === null || slide.composition === undefined
     ? ""
     : `<form class="editor" data-composition-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}"><fieldset><legend>構成全体の表示</legend><label>背景色<span class="color-control"><input name="composition_background" type="color" value="${escapeHtml(slide.composition.background)}" aria-label="構成全体の背景色を色見本から選ぶ"><input type="text" value="${escapeHtml(slide.composition.background)}" data-color-text="composition_background" aria-label="構成全体の背景色のHEX値" pattern="#[0-9A-Fa-f]{6}" maxlength="7" spellcheck="false"></span></label><label class="check-label"><input name="composition_clip_content" type="checkbox"${slide.composition.clip_content ? " checked" : ""}>スライド枠外を隠す</label><p class="inherit-note">枠外を隠すと、自由配置したパーツのはみ出しを切り取ります。品質確認の見切れ診断と合わせて確認してください。</p></fieldset><div class="actions"><button type="submit">構成全体を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>`;
@@ -2100,7 +2128,7 @@ export function slideWorkspacePage(options: {
              ${slide.composition?.mode === "scene" || slide.composition?.mode === "canvas" ? '<p class="inherit-note">パーツをクリックすると編集欄を開きます。自由配置はドラッグで移動、右下でリサイズ、矢印キーで1%移動（Shiftで5%）、Alt＋矢印で大きさを調整できます。</p>' : ""}
              <p class="quality-status" data-layout-status role="status" aria-live="polite">実表示の文字収まりを確認しています…</p>
            </section>
-           <aside class="inspector">
+           <aside class="inspector">${workspaceSlideCreator}
              <details class="inspector-section" data-inspector-section="content" open><summary>内容</summary><div class="inspector-body">
                <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-max-step="${slide.reveal_steps}" data-step-count="${slide.reveal_steps + 1}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>

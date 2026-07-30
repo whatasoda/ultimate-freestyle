@@ -727,6 +727,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('class="filmstrip-meta"');
     expect(workspaceHtml).toContain("60秒 · 3段階 · リッチ構成 6パーツ");
     expect(workspaceHtml).toContain("data-scene-component-editor");
+    expect(workspaceHtml).toContain("data-slide-create");
+    expect(workspaceHtml).toContain('<option value="canvas">自由配置</option>');
     expect(workspaceHtml).toContain("パーツをクリックすると編集欄を開きます");
     expect(workspaceHtml).toContain("Alt＋矢印で大きさを調整");
     expect(workspaceHtml).toContain("5%グリッド OFF");

@@ -34,6 +34,7 @@ import {
   narrationSegmentSchema,
   presentationTemplateSchema,
   presentationAspectRatioSchema,
+  projectSlideSchema,
   projectStageSchema,
   slideRoleSchema,
   slideBlockSchema,
@@ -171,6 +172,12 @@ const slideActionRequestSchema = z.discriminatedUnion("action", [
     action: z.literal("delete")
   })
 ]);
+const slideCreateRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  title: z.string().min(1).max(120),
+  position: z.number().int().nonnegative().max(99),
+  template: z.enum(["flow", "cover", "canvas", "scene"])
+});
 
 const slideTypographyRequestSchema = z.object({
   expected_version: z.number().int().positive(),
@@ -1230,6 +1237,102 @@ async function handleSlideFieldsUpdate(
       },
       status
     );
+  }
+}
+
+async function handleSlideCreate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = slideCreateRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "追加するスライドを確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  const slideId = `slide-${crypto.randomUUID()}`;
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const deck = document.deck;
+        if (deck === null) {
+          const error = new Error("The presentation deck does not exist.");
+          Object.assign(error, { code: "DECK_REQUIRED" });
+          throw error;
+        }
+        if (deck.slides.length >= 100) {
+          const error = new Error("The slide limit has been reached.");
+          Object.assign(error, { code: "INVALID_FIELDS" });
+          throw error;
+        }
+        const title = parsed.data.title;
+        const common = {
+          id: slideId,
+          title,
+          duration_seconds: parsed.data.template === "cover" ? 30 : 60,
+          reveal_steps: 0,
+          tone: "dark" as const,
+          template_id: deck.default_template_id ?? null,
+          enter_animation: null,
+          role: parsed.data.template === "cover" ? "cover" as const : "content" as const,
+          cover_layout: "center" as const,
+          content_markdown: parsed.data.template === "cover" ? `# ${title}` : `## ${title}\n\nここに伝えたい内容を入力します。`,
+          reveal_blocks: [],
+          sidebar_markdown: null,
+          narration: null
+        };
+        const composition = parsed.data.template === "canvas"
+          ? {
+              mode: "canvas" as const,
+              background: "#111827",
+              clip_content: true,
+              blocks: [{
+                id: "text-1",
+                kind: "markdown" as const,
+                frame: { x: 10, y: 12, width: 80, height: 72 },
+                z_index: 0,
+                at: 0,
+                animation: "fade" as const,
+                markdown: `# ${title}\n\nここに内容を入力します。`
+              }]
+            }
+          : parsed.data.template === "scene"
+            ? {
+                mode: "scene" as const,
+                runtime_version: "uf-runtime@1" as const,
+                background: "#111827",
+                clip_content: true,
+                nodes: [
+                  { id: "root", kind: "stack" as const, parent_id: null, order: 0, at: 0, animation: "fade" as const, frame: { x: 6, y: 7, width: 88, height: 86 }, direction: "column" as const, gap_px: 16, align: "stretch" as const, justify: "center" as const, wrap: false },
+                  { id: "heading", kind: "hero" as const, parent_id: "root", order: 0, at: 0, animation: "fade" as const, frame: null, eyebrow: null, heading: title, subtitle: "ここに補足文を入力します。", align: "start" as const }
+                ]
+              }
+            : undefined;
+        const slide = projectSlideSchema.parse({ ...common, ...(composition === undefined ? {} : { composition }) });
+        deck.slides.splice(Math.min(parsed.data.position, deck.slides.length), 0, slide);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, template: parsed.data.template, position: parsed.data.position, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, version: project.version, next_url: `/dashboard/projects/${projectId}/slides/${slideId}`, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "スライドを追加できませんでした。");
   }
 }
 
@@ -3536,6 +3639,12 @@ export async function handleWebRequest(
   );
   if (deckSettingsMatch?.[1] !== undefined) {
     return handleDeckSettingsUpdate(request, env, deckSettingsMatch[1]);
+  }
+  const slideCreateMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides$`)
+  );
+  if (slideCreateMatch?.[1] !== undefined) {
+    return handleSlideCreate(request, env, slideCreateMatch[1]);
   }
   const slideTypographyMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/typography$`)
