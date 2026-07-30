@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "135";
+export const DASHBOARD_ASSET_VERSION = "136";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const apiErrorMessage = (result, fallback) => {
@@ -862,7 +862,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (frameToggle instanceof HTMLInputElement && !frameToggle.checked) component.frame = null;
     return component;
   };
-  const serializeVersionedForm = (form) => {
+  const serializeVersionedForm = (form, submitter = null) => {
     const data = new FormData(form);
     const body = { expected_version: Number(form.dataset.version) };
     if (form.matches("[data-project-editor]")) {
@@ -873,6 +873,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!data.has(name)) continue;
         body[name] = String(data.get(name) || "").split(/\n+/).map((value) => value.trim()).filter(Boolean);
       }
+    }
+    if (form.matches("[data-project-list-item]")) {
+      const action = submitter instanceof HTMLButtonElement
+        ? submitter.dataset.projectListAction || ""
+        : "";
+      Object.assign(body, {
+        action,
+        list: String(data.get("list") || "")
+      });
+      if (data.has("index")) body.index = Number(data.get("index"));
+      if (action !== "delete") body.value = String(data.get("value") || "");
     }
     if (form.matches("[data-slide-editor]")) Object.assign(body, {
       title: String(data.get("title") || ""),
@@ -1171,6 +1182,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     addEventListener("ultimate-freestyle:version-changed", persistDraft);
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
+      if (event.submitter instanceof HTMLButtonElement && event.submitter.dataset.projectListAction === "delete" && !confirm("この項目を削除しますか？")) return;
       const feedback = form.querySelector("[data-form-feedback], [data-editor-feedback]");
       const submitButtons = [...form.querySelectorAll('button[type="submit"]')];
       const nextUrl = event.submitter instanceof HTMLButtonElement
@@ -1190,7 +1202,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             "content-type": "application/json",
             "x-csrf-token": form.dataset.csrf || ""
           },
-          body: JSON.stringify(serializeVersionedForm(form))
+          body: JSON.stringify(serializeVersionedForm(form, event.submitter))
         });
         const result = await response.json();
         if (!response.ok) {
@@ -1245,7 +1257,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           feedback.classList.add("warning");
         }
         markDraftChanged();
-        if (form.matches("[data-project-editor]")) {
+        if (form.matches("[data-project-editor], [data-project-list-item]")) {
           setTimeout(() => location.reload(), 500);
           return;
         }

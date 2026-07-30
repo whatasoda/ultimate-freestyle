@@ -126,6 +126,27 @@ const projectFieldsRequestSchema = z.object({
   (value) => Object.keys(value).some((key) => key !== "expected_version"),
   { message: "更新する項目を1つ以上指定してください。" }
 );
+const projectListItemRequestSchema = z.discriminatedUnion("action", [
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("add"),
+    list: z.enum(["findings", "limitations"]),
+    value: z.string().trim().min(1).max(4_000)
+  }),
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("update"),
+    list: z.enum(["findings", "limitations"]),
+    index: z.number().int().nonnegative().max(99),
+    value: z.string().trim().min(1).max(4_000)
+  }),
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("delete"),
+    list: z.enum(["findings", "limitations"]),
+    index: z.number().int().nonnegative().max(99)
+  })
+]);
 const imageAltRequestSchema = z.object({
   alt_text: z.string().max(500)
 });
@@ -452,6 +473,9 @@ async function handleProjectDetail(
     listProjectDraftRevisions(env.DB, session.userId, projectId, 50),
     getRenderedQualityReport(env.DB, session.userId, projectId)
   ]);
+  const selectedResearchItemMatch = new URL(request.url).searchParams
+    .get("research_item")
+    ?.match(/^(findings|limitations):(\d{1,2})$/);
   return projectDetailPage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
@@ -459,7 +483,13 @@ async function handleProjectDetail(
     assets,
     publication: publication!,
     draftRevisions,
-    renderedQualityReport
+    renderedQualityReport,
+    selectedResearchItem: selectedResearchItemMatch?.[1] !== undefined && selectedResearchItemMatch[2] !== undefined
+      ? {
+          list: selectedResearchItemMatch[1] as "findings" | "limitations",
+          index: Number(selectedResearchItemMatch[2])
+        }
+      : null
   });
 }
 
@@ -1309,6 +1339,88 @@ async function handleProjectFieldsUpdate(
       },
       status
     );
+  }
+}
+
+async function handleProjectListItemUpdate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
+        request_id: crypto.randomUUID()
+      },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = projectListItemRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      {
+        ok: false,
+        error: { code: "INVALID_FIELDS", message: "入力内容を確認してください。" },
+        request_id: crypto.randomUUID()
+      },
+      422
+    );
+  }
+  try {
+    const input = parsed.data;
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: input.expected_version,
+      mutate: (document) => {
+        const values = document[input.list];
+        if (input.action === "add") {
+          if (values.length >= 100) {
+            const error = new Error("list full") as Error & { code: string };
+            error.code = "INVALID_FIELDS";
+            throw error;
+          }
+          values.push(input.value);
+          return;
+        }
+        if (input.index >= values.length) {
+          const error = new Error("item not found") as Error & { code: string };
+          error.code = "INVALID_FIELDS";
+          throw error;
+        }
+        if (input.action === "delete") values.splice(input.index, 1);
+        else values[input.index] = input.value;
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: `project.${parsed.data.list}_item_${parsed.data.action === "add" ? "added" : parsed.data.action === "update" ? "updated" : "deleted"}`,
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        version: project.version,
+        index: "index" in parsed.data ? parsed.data.index : project.document[parsed.data.list].length - 1
+      },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      version: project.version,
+      updated_at: project.updated_at,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "項目を保存できませんでした。");
   }
 }
 
@@ -4349,6 +4461,12 @@ export async function handleWebRequest(
   );
   if (projectFieldsMatch?.[1] !== undefined) {
     return handleProjectFieldsUpdate(request, env, projectFieldsMatch[1]);
+  }
+  const projectListItemMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/list-items$`, "i")
+  );
+  if (projectListItemMatch?.[1] !== undefined) {
+    return handleProjectListItemUpdate(request, env, projectListItemMatch[1]);
   }
   const qualityReportMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/quality-report$`, "i")

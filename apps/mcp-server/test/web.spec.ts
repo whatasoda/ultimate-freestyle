@@ -441,8 +441,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=135"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=135"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=136"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=136"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -522,12 +522,17 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain('id="research-images"');
     expect(detailHtml).toContain('id="presentation-structure"');
     expect(detailHtml).toContain("基本情報を編集");
-    expect(detailHtml.match(/data-project-editor/g)).toHaveLength(5);
+    expect(detailHtml.match(/data-project-editor/g)).toHaveLength(3);
+    expect(detailHtml.match(/data-project-list-item/g)).toHaveLength(2);
     expect(detailHtml).toContain("題名と概要を保存");
     expect(detailHtml).toContain("問いと仮説を保存");
     expect(detailHtml).toContain("方法を保存");
-    expect(detailHtml).toContain("わかったことを保存");
-    expect(detailHtml).toContain("限界と今後を保存");
+    expect(detailHtml).toContain("わかったこと · 1 / 100件");
+    expect(detailHtml).toContain("限界・今後の課題 · 0 / 100件");
+    expect(detailHtml).toContain(
+      "?research_item=findings:0#research-list-findings"
+    );
+    expect(detailHtml).toContain("1件追加");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
     expect(detailHtml).toContain("ワイド 16:9");
@@ -562,6 +567,30 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("自由配置 1パーツ");
     expect(detailHtml).toContain("/revisions/1\">内容を確認");
     expect(detailHtml).toContain("直近10版を必ず残し、最大50版・合計8MiB");
+
+    const selectedFindingDetail = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001?research_item=findings:0",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const selectedFindingHtml = await selectedFindingDetail.text();
+    expect(selectedFindingHtml.match(/data-project-list-item/g)).toHaveLength(3);
+    expect(selectedFindingHtml).toContain('name="index" value="0"');
+    expect(selectedFindingHtml).toContain(
+      'data-project-list-action="update"'
+    );
+    expect(selectedFindingHtml).toContain(
+      'data-project-list-action="delete"'
+    );
+    expect(selectedFindingHtml).toContain(
+      'data-project-list-action="delete" formnovalidate'
+    );
+    expect(selectedFindingHtml).toContain(
+      '<textarea name="value" maxlength="4000" required>観察した結果</textarea>'
+    );
 
     const qualityReport = await requestProvider(
       provider,
@@ -724,7 +753,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=135"'
+      'href="/assets/dashboard.css?v=136"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -896,7 +925,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=135"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=136"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -905,7 +934,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=135"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=136"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1002,6 +1031,10 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("reloadPublicationWhenSafe(publishFeedback)");
     expect(dashboardScriptText).toContain('[data-versioned-form], [data-project-editor]');
     expect(dashboardScriptText).toContain("if (data.has(name)) body[name]");
+    expect(dashboardScriptText).toContain(
+      "serializeVersionedForm(form, event.submitter)"
+    );
+    expect(dashboardScriptText).toContain("この項目を削除しますか？");
     expect(dashboardScriptText).toContain("syncPublicationDirtyState(dirtyCount)");
     expect(dashboardScriptText).toContain("未保存の入力を保護するため自動再読み込みを止めました");
     expect(dashboardScriptText).toContain("result.voice_generation_required");
@@ -1129,6 +1162,124 @@ describe("Web dashboard", () => {
       /name="csrf_token" value="([^"]+)"/
     )?.[1];
     expect(csrfToken).toBeTruthy();
+    const listItemProjectId = "90000000-0000-4000-8000-000000000009";
+    const listItemDocument = createEmptyProject("項目編集の契約確認");
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO research_projects (
+           id, owner_user_id, title, stage, document_json, version,
+           idempotency_key, created_at, updated_at
+         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      ).bind(
+        listItemProjectId,
+        "twitch-dashboard-viewer-id",
+        listItemDocument.title,
+        listItemDocument.stage,
+        JSON.stringify(listItemDocument),
+        "list-item-project",
+        now,
+        now
+      ),
+      env.DB.prepare(
+        `INSERT INTO project_draft_revisions (
+           project_id, owner_user_id, version, document_json, source, created_at
+         ) VALUES (?, ?, 1, ?, 'created', ?)`
+      ).bind(
+        listItemProjectId,
+        "twitch-dashboard-viewer-id",
+        JSON.stringify(listItemDocument),
+        now
+      )
+    ]);
+    const mutateListItem = async (body: Record<string, unknown>) =>
+      requestProvider(
+        provider,
+        new Request(
+          `https://saijiyu-kenkyu.2764.moe/api/projects/${listItemProjectId}/list-items`,
+          {
+            method: "PATCH",
+            headers: {
+              cookie: browserCookies,
+              "content-type": "application/json",
+              "x-csrf-token": csrfToken ?? ""
+            },
+            body: JSON.stringify(body)
+          }
+        ),
+        authEnv
+      );
+    const addListItem = await mutateListItem({
+      expected_version: 1,
+      action: "add",
+      list: "findings",
+      value: "追加した発見"
+    });
+    expect(addListItem.status).toBe(200);
+    expect(await addListItem.json()).toMatchObject({ ok: true, version: 2 });
+    const updateListItem = await mutateListItem({
+      expected_version: 2,
+      action: "update",
+      list: "findings",
+      index: 0,
+      value: "更新した発見"
+    });
+    expect(updateListItem.status).toBe(200);
+    expect(await updateListItem.json()).toMatchObject({ ok: true, version: 3 });
+    const deleteListItem = await mutateListItem({
+      expected_version: 3,
+      action: "delete",
+      list: "findings",
+      index: 0
+    });
+    expect(deleteListItem.status).toBe(200);
+    expect(await deleteListItem.json()).toMatchObject({ ok: true, version: 4 });
+    expect(
+      JSON.parse(
+        (await env.DB.prepare(
+          "SELECT document_json FROM research_projects WHERE id = ?"
+        ).bind(listItemProjectId).first<{ document_json: string }>())!.document_json
+      ).findings
+    ).toEqual([]);
+    const maximumListDocument = createEmptyProject("最大件数の表示確認");
+    maximumListDocument.findings = Array.from(
+      { length: 100 },
+      (_, index) => `発見${index + 1} ${"観".repeat(980)}`
+    );
+    maximumListDocument.limitations = Array.from(
+      { length: 100 },
+      (_, index) => `限界${index + 1} ${"未".repeat(980)}`
+    );
+    await env.DB.prepare(
+      "UPDATE research_projects SET title = ?, document_json = ? WHERE id = ?"
+    ).bind(
+      maximumListDocument.title,
+      JSON.stringify(maximumListDocument),
+      listItemProjectId
+    ).run();
+    const maximumListDetail = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${listItemProjectId}`,
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const maximumListHtml = await maximumListDetail.text();
+    expect(maximumListDetail.status).toBe(200);
+    expect(maximumListHtml).toContain("わかったこと · 100 / 100件");
+    expect(maximumListHtml).toContain("限界・今後の課題 · 100 / 100件");
+    expect(maximumListHtml).not.toContain("観".repeat(500));
+    expect(new TextEncoder().encode(maximumListHtml).byteLength).toBeLessThan(
+      500_000
+    );
+    await env.DB.batch([
+      env.DB.prepare(
+        "DELETE FROM project_draft_revisions WHERE project_id = ?"
+      ).bind(listItemProjectId),
+      env.DB.prepare("DELETE FROM research_projects WHERE id = ?").bind(
+        listItemProjectId
+      )
+    ]);
     const altUpdate = await requestProvider(
       provider,
       new Request(
