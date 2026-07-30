@@ -546,6 +546,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-markdown-action="bold"');
     expect(workspaceHtml).toContain('data-markdown-action="table"');
     expect(DASHBOARD_SCRIPT).toContain('field.dispatchEvent(new Event("input"');
+    expect(DASHBOARD_SCRIPT).toContain("updateRecommendedBodyLimit");
+    expect(DASHBOARD_SCRIPT).toContain("data-component-color-hex");
     expect(workspaceHtml).toContain("自由配置 1パーツ");
     expect(workspaceHtml).toContain("data-slide-frame");
     expect(workspaceHtml).toContain('data-aspect-ratio="16:9"');
@@ -690,7 +692,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-scene-component-editor");
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
-    expect(dashboardScriptText).toContain("表示パーツの文言をプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("changingConfiguredVoice");
     expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
 

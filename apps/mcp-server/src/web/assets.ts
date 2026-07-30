@@ -341,6 +341,32 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const narrationSettingsEditor = document.querySelector("[data-narration-settings-editor]");
   const slideFrame = document.querySelector("[data-slide-frame]");
   const frameLoading = document.querySelector("[data-frame-loading]");
+  const contentCapacityField = slideEditor instanceof HTMLFormElement ? slideEditor.elements.namedItem("content_markdown") : null;
+  let currentPreviewTypography = {};
+  try { currentPreviewTypography = JSON.parse(typographyEditor?.dataset.effectiveTypography || "{}"); } catch {}
+  const updateCharacterCounter = (field, counter) => {
+    const recommended = Number(field.dataset.recommendedLimit || 0);
+    counter.textContent = recommended > 0
+      ? field.value.length.toLocaleString() + "字 · 推奨目安 " + recommended.toLocaleString() + "字"
+      : field.value.length.toLocaleString() + " / " + Number(field.maxLength).toLocaleString() + "字";
+    counter.dataset.nearLimit = String(recommended > 0 ? field.value.length >= recommended * .85 : field.value.length >= field.maxLength * 0.9);
+    counter.dataset.overLimit = String(recommended > 0 && field.value.length > recommended);
+  };
+  const updateRecommendedBodyLimit = (typography) => {
+    if (!(contentCapacityField instanceof HTMLTextAreaElement) || !(slideEditor instanceof HTMLFormElement)) return;
+    const data = new FormData(slideEditor);
+    const presetFactors = { statement: .55, standard: 1, article: 1.45, columns: 1.5, dense: 1.75 };
+    const preset = String(typography.preset || "standard");
+    const bodyScale = Math.max(.5, Number(typography.body_scale) || 1);
+    const lineHeight = Math.max(1, Number(typography.line_height) || 1.5);
+    const columns = Math.max(1, Number(typography.columns) || 1);
+    const base = slideFrame instanceof HTMLIFrameElement && slideFrame.dataset.aspectRatio === "4:3" ? 460 : 600;
+    const sidebarFactor = String(data.get("sidebar_markdown") || "") === "" ? 1 : .78;
+    const limit = Math.round(Math.min(1600, Math.max(180, base * sidebarFactor * (presetFactors[preset] || 1) * Math.pow(1 / bodyScale, 1.6) * (1.5 / lineHeight) * (1 + (columns - 1) * .08))) / 10) * 10;
+    contentCapacityField.dataset.recommendedLimit = String(limit);
+    const counter = contentCapacityField.nextElementSibling;
+    if (counter instanceof HTMLElement && counter.classList.contains("character-count")) updateCharacterCounter(contentCapacityField, counter);
+  };
   let draftFrameTimer;
   let draftTypographyTimer;
   let draftTemplateTimer;
@@ -351,6 +377,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(slideEditor);
+    updateRecommendedBodyLimit(currentPreviewTypography);
     slideFrame.contentWindow?.postMessage({
       type: "ultimate-freestyle:preview-fields",
       slide_id: slideEditor.dataset.slideId || "",
@@ -419,6 +446,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const value = String(data.get(key) || "");
       if (value) typography[key] = value;
     }
+    currentPreviewTypography = typography;
+    updateRecommendedBodyLimit(typography);
     slideFrame.contentWindow?.postMessage({
       type: "ultimate-freestyle:preview-typography",
       slide_id: typographyEditor.dataset.slideId || "",
@@ -825,7 +854,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
-        layoutStatus.textContent = "表示パーツの文言をプレビューへ反映しています…";
+        layoutStatus.textContent = "表示パーツの変更をプレビューへ反映しています…";
         layoutStatus.dataset.level = "";
       }
     });
@@ -844,15 +873,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
 
-  for (const field of document.querySelectorAll('textarea[maxlength], input[maxlength]:not([type]), input[type="text"][maxlength]')) {
+  for (const field of document.querySelectorAll('textarea[maxlength], input[maxlength]:not([type]):not([data-component-color-hex]), input[type="text"][maxlength]:not([data-color-text]):not([data-component-color-hex])')) {
     if (!(field instanceof HTMLTextAreaElement || field instanceof HTMLInputElement)) continue;
     const counter = document.createElement("span");
     counter.className = "character-count";
     counter.setAttribute("aria-hidden", "true");
-    const updateCounter = () => {
-      counter.textContent = field.value.length.toLocaleString() + " / " + Number(field.maxLength).toLocaleString() + "字";
-      counter.dataset.nearLimit = String(field.value.length >= field.maxLength * 0.9);
-    };
+    const updateCounter = () => updateCharacterCounter(field, counter);
     field.insertAdjacentElement("afterend", counter);
     field.addEventListener("input", updateCounter);
     updateCounter();

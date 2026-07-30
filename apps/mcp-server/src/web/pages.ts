@@ -88,8 +88,7 @@ function staticSlideQuality(
     warnings.push("タイトルに長い英数字の語があります。空白または改行を入れて見切れを防いでください。");
   }
   if (slide.composition === null || slide.composition === undefined) {
-    const bodyLimit = aspectRatio === "4:3" ? 460 : 600;
-    const adjustedBodyLimit = slide.sidebar_markdown === null ? bodyLimit : Math.round(bodyLimit * 0.78);
+    const adjustedBodyLimit = recommendedFlowBodyLimit(slide, aspectRatio);
     if (slide.content_markdown.length > adjustedBodyLimit) {
       warnings.push(
         `本文が${slide.content_markdown.length}文字あります。実表示の自動縮小と段組みを確認してください。`
@@ -127,6 +126,26 @@ function staticSlideQuality(
     warnings.push("読み上げの概算時間がSTEPの想定秒数を超えています。原稿、話速、想定秒数を確認してください。");
   }
   return warnings;
+}
+
+function recommendedFlowBodyLimit(
+  slide: ProjectSlide,
+  aspectRatio: "16:9" | "4:3"
+): number {
+  const typography = resolveSlideTypography(slide.typography);
+  const presetFactor = {
+    statement: 0.55,
+    standard: 1,
+    article: 1.45,
+    columns: 1.5,
+    dense: 1.75
+  }[typography.preset];
+  const base = aspectRatio === "4:3" ? 460 : 600;
+  const sidebarFactor = slide.sidebar_markdown?.trim() ? 0.78 : 1;
+  const scaleFactor = Math.pow(1 / typography.body_scale, 1.6);
+  const lineHeightFactor = 1.5 / typography.line_height;
+  const columnFactor = 1 + (typography.columns - 1) * 0.08;
+  return Math.round(Math.min(1_600, Math.max(180, base * sidebarFactor * presetFactor * scaleFactor * lineHeightFactor * columnFactor)) / 10) * 10;
 }
 
 const TONE_LABELS = {
@@ -530,6 +549,7 @@ function shell(title: string, body: string): string {
       button[aria-busy="true"] { cursor: wait; }
       .character-count { justify-self: end; margin-top: -.2rem; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
       .character-count[data-near-limit="true"] { color: #ffd681; font-weight: 750; }
+      .character-count[data-over-limit="true"] { color: #ff9fa9; font-weight: 800; }
       .publish-state { display: grid; gap: .8rem; }
       .preflight-list { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
       .preflight-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .65rem; align-items: start; padding: .65rem .7rem; border: 1px solid var(--line); border-radius: .65rem; background: #0a131f; color: #c7d3e1; font-size: .82rem; line-height: 1.55; }
@@ -851,7 +871,7 @@ function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number)
     label: string,
     value: string | null | undefined,
     fallback: string
-  ) => `<label>${label}<span class="color-control"><input type="color" value="${escapeHtml(value ?? fallback)}" data-component-color-preview="${path}" aria-label="${label}を色見本から選ぶ"><input name="${path}" data-component-field data-component-path="${path}" data-component-number="false" data-nullable="true" value="${escapeHtml(value ?? "")}" placeholder="空欄で${label === "背景色" ? "透明" : "継承"}" pattern="^$|^#[0-9A-Fa-f]{6}$" maxlength="7" spellcheck="false"></span></label>`;
+  ) => `<label>${label}<span class="color-control"><input type="color" value="${escapeHtml(value ?? fallback)}" data-component-color-preview="${path}" aria-label="${label}を色見本から選ぶ"><input name="${path}" data-component-field data-component-color-hex data-component-path="${path}" data-component-number="false" data-nullable="true" value="${escapeHtml(value ?? "")}" placeholder="空欄で${label === "背景色" ? "透明" : "継承"}" pattern="^$|^#[0-9A-Fa-f]{6}$" maxlength="7" spellcheck="false"></span></label>`;
   return `<fieldset><legend>表示タイミング</legend><div class="editor-grid">${numberField("at", "表示STEP", node.at, 0, maxStep)}${selectField("animation", "表示アニメーション", node.animation, Object.entries(ANIMATION_LABELS))}</div></fieldset>
     <fieldset><legend>パーツの見た目</legend><div class="editor-grid">${colorField("style.background", "背景色", style.background, "#111827")}${colorField("style.foreground", "文字色", style.foreground, "#f8fafc")}${colorField("style.border_color", "境界線色", style.border_color, "#52647c")}${numberField("style.border_width_px", "境界線の太さ", style.border_width_px ?? 0, 0, 8)}${numberField("style.corner_radius_px", "角丸", style.corner_radius_px ?? 0, 0, 64)}${numberField("style.padding_px", "内側余白", style.padding_px ?? 0, 0, 64)}${numberField("style.font_scale", "文字倍率", style.font_scale ?? 1, 0.5, 3, 0.05)}${numberField("style.opacity", "不透明度", style.opacity ?? 1, 0.1, 1, 0.05)}${selectField("style.text_align", "文字揃え", style.text_align ?? "start", [["start", "左"], ["center", "中央"], ["end", "右"]])}${selectField("style.vertical_align", "縦位置", style.vertical_align ?? "start", [["start", "上"], ["center", "中央"], ["end", "下"]])}${selectField("style.shadow", "影", style.shadow ?? "none", [["none", "なし"], ["soft", "柔らかい"], ["strong", "強い"]])}</div><p class="inherit-note">色のHEX値を空欄にすると、背景は透明、文字と境界線は周囲の設定を使います。変更は保存前からプレビューへ反映されます。</p></fieldset>`;
 }
@@ -1737,7 +1757,7 @@ export function slideWorkspacePage(options: {
         <div class="actions"><button type="submit">テンプレートを保存</button><button class="ghost danger" type="button" data-template-delete data-template-name="${escapeHtml(activeTemplate.name)}" data-delete-url="${projectPath}/templates/${escapeHtml(activeTemplate.id)}">このテンプレートを削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
       </form>`
     : `<p class="mode-note">組み込みスタイルを使用中です。テンプレートを選ぶと色、フォント、密度、余白、動きを編集できます。</p>`;
-  const typographyEditor = `<form class="editor" data-typography-editor data-versioned-form action="${slidePath}/typography" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-typography-presets="${escapeHtml(JSON.stringify(typographyPreviewPresets))}" data-csrf="${escapeHtml(options.csrfToken)}">
+  const typographyEditor = `<form class="editor" data-typography-editor data-versioned-form action="${slidePath}/typography" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-typography-presets="${escapeHtml(JSON.stringify(typographyPreviewPresets))}" data-effective-typography="${escapeHtml(JSON.stringify(typography))}" data-csrf="${escapeHtml(options.csrfToken)}">
     <p class="inherit-note">定型レイアウトの文章配分を一枚単位で調整します。未入力の項目は選択した組版プリセットを使います。</p>
     <div class="editor-grid"><label>組版プリセット<select name="preset">${Object.entries(SLIDE_TYPOGRAPHY_LABELS).map(([value, label]) => `<option value="${value}"${typography.preset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>段数<input name="columns" type="number" min="1" max="3" value="${slide.typography?.columns ?? ""}" placeholder="実効 ${typography.columns}"></label></div>
     <fieldset><legend>文字サイズと行送り</legend><div class="editor-grid"><label>本文倍率<input name="body_scale" type="number" min="0.5" max="1.4" step="0.05" value="${slide.typography?.body_scale ?? ""}" placeholder="実効 ${typography.body_scale}"></label><label>見出し倍率<input name="heading_scale" type="number" min="0.5" max="1.5" step="0.05" value="${slide.typography?.heading_scale ?? ""}" placeholder="実効 ${typography.heading_scale}"></label><label>行間<input name="typography_line_height" type="number" min="1" max="2" step="0.05" value="${slide.typography?.line_height ?? ""}" placeholder="実効 ${typography.line_height}"></label><label>段落間隔（em）<input name="paragraph_spacing_em" type="number" min="0" max="2" step="0.05" value="${slide.typography?.paragraph_spacing_em ?? ""}" placeholder="実効 ${typography.paragraph_spacing_em}"></label><label>段間隔（em）<input name="column_gap_em" type="number" min="0.5" max="5" step="0.1" value="${slide.typography?.column_gap_em ?? ""}" placeholder="実効 ${typography.column_gap_em}"></label></div></fieldset>
@@ -1881,7 +1901,7 @@ export function slideWorkspacePage(options: {
                <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-max-step="${slide.reveal_steps}" data-step-count="${slide.reveal_steps + 1}" data-csrf="${escapeHtml(options.csrfToken)}">
                  <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(slide.title)}"></label>
                  <label>想定秒数<input name="duration_seconds" type="number" min="1" max="1200" required value="${slide.duration_seconds}"><small class="inherit-note" data-duration-breakdown>読み上げを含むスライド全体の目安です。${slide.reveal_steps + 1}段階では1段階あたり約${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒です。</small></label>
-                 <label>スライド本文（Markdown対応）<span class="markdown-toolbar" role="toolbar" aria-label="スライド本文の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="content_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="content_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="number" data-markdown-target="content_markdown">番号</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="content_markdown">強調</button><button class="ghost" type="button" data-markdown-action="table" data-markdown-target="content_markdown">比較表</button></span><textarea name="content_markdown" maxlength="20000" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">定型レイアウトでは入力中も実表示へ反映し、自由配置・リッチ構成では代替表示に使います。</small></label>
+                 <label>スライド本文（Markdown対応）<span class="markdown-toolbar" role="toolbar" aria-label="スライド本文の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="content_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="content_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="number" data-markdown-target="content_markdown">番号</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="content_markdown">強調</button><button class="ghost" type="button" data-markdown-action="table" data-markdown-target="content_markdown">比較表</button></span><textarea name="content_markdown" maxlength="20000" data-recommended-limit="${recommendedFlowBodyLimit(slide, deck.aspect_ratio ?? "16:9")}" required>${escapeHtml(slide.content_markdown)}</textarea><small class="inherit-note">定型レイアウトでは組版・比率・補足欄から文章量の目安を計算し、入力中も実表示へ反映します。自由配置・リッチ構成では代替表示に使います。</small></label>
                  <label>補足欄（読み上げない情報）<span class="markdown-toolbar" role="toolbar" aria-label="補足欄の書式"><button class="ghost" type="button" data-markdown-action="heading" data-markdown-target="sidebar_markdown">見出し</button><button class="ghost" type="button" data-markdown-action="bullet" data-markdown-target="sidebar_markdown">箇条書き</button><button class="ghost" type="button" data-markdown-action="bold" data-markdown-target="sidebar_markdown">強調</button><button class="ghost" type="button" data-markdown-action="table" data-markdown-target="sidebar_markdown">比較表</button></span><textarea name="sidebar_markdown" maxlength="10000">${escapeHtml(slide.sidebar_markdown ?? "")}</textarea><small class="inherit-note">作者コメント、出典、追加データなど、音声に含めない情報を置けます。</small></label>
                  <div class="actions"><button type="submit">内容を保存</button>${nextSlidePath === null ? "" : `<button class="ghost" type="submit" data-save-next="${nextSlidePath}">保存して次へ</button>`}<span class="version" data-version-label>v${options.project.version}</span></div>
                  <p class="feedback" data-form-feedback aria-live="polite"></p>

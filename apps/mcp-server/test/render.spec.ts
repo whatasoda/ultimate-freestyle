@@ -722,6 +722,7 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain(">全文追従</span>");
     expect(workspaceHtml).toContain("スライド本文（Markdown対応）");
+    expect(workspaceHtml).toContain("data-recommended-limit=");
     expect(workspaceHtml).toContain("補足欄（読み上げない情報）");
     expect(workspaceHtml).toContain("data-preview-focus");
     expect(workspaceHtml).toContain("プレビューを広げる");
