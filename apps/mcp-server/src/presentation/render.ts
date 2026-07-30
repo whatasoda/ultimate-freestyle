@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@51";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@52";
 
 function escapeHtml(value: string): string {
   return value
@@ -325,10 +325,10 @@ function renderSceneNode(
   }
   if (node.kind === "image") {
     const src = assetUrls[node.asset_id] ?? `/media/${node.asset_id}`;
-    return `<uf-image ${attributes}><img src="${escapeHtml(src)}" alt="${escapeHtml(node.alt_text)}" data-fit="${node.fit}">${node.caption === null ? "" : `<small>${escapeHtml(node.caption)}</small>`}</uf-image>`;
+    return `<uf-image ${attributes}><img src="${escapeHtml(src)}" alt="${escapeHtml(node.alt_text)}" data-fit="${node.fit}">${node.caption === null ? "" : `<small data-fit-content data-fit-id="node:${escapeHtml(node.id)}" data-fit-region="画像キャプション">${escapeHtml(node.caption)}</small>`}</uf-image>`;
   }
   if (node.kind === "shape") {
-    return `<uf-shape ${attributes} data-shape="${node.shape}">${node.label === null ? "" : `<span>${escapeHtml(node.label)}</span>`}</uf-shape>`;
+    return `<uf-shape ${attributes} data-shape="${node.shape}">${node.label === null ? "" : `<span data-fit-content data-fit-id="node:${escapeHtml(node.id)}" data-fit-region="図形ラベル">${escapeHtml(node.label)}</span>`}</uf-shape>`;
   }
   if (node.kind === "card") {
     return `<uf-card ${attributes} data-variant="${node.variant}">${node.label === null ? "" : `<p class="component-label">${escapeHtml(node.label)}</p>`}<div>${renderTextBlocks(node.markdown)}</div></uf-card>`;
@@ -715,7 +715,7 @@ export function renderPresentationHtml(
     uf-hero { gap: .45cqh; justify-content: center; }
     uf-hero[data-align="center"] { align-items: center; text-align: center; }
     uf-hero[data-align="end"] { align-items: flex-end; text-align: end; }
-    :is(uf-hero,uf-markdown,uf-card,uf-metric,uf-quote,uf-callout,uf-bar-chart,uf-timeline)[data-fit-content] { --fit-scale: 1; }
+    :is(uf-hero,uf-markdown,uf-card,uf-metric,uf-quote,uf-callout,uf-bar-chart,uf-timeline)[data-fit-content], uf-image small[data-fit-content], uf-shape span[data-fit-content] { --fit-scale: 1; }
     uf-hero h2 { max-width: 16ch; margin: 0; font-family: var(--font-heading); font-size: calc(7.1cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); font-weight: var(--heading-weight); line-height: .96; letter-spacing: -.055em; text-wrap: balance; overflow-wrap: anywhere; }
     uf-hero[data-compact-heading="true"] h2 { max-width: none; white-space: nowrap; text-wrap: nowrap; }
     .component-eyebrow, .component-label { margin: 0; color: var(--accent); font: 850 calc(1.05cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale))/1.2 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; }
@@ -745,10 +745,10 @@ export function renderPresentationHtml(
     uf-image img[data-fit="contain"] { object-fit: contain; }
     uf-image img[data-fit="cover"] { object-fit: cover; }
     uf-image img[data-fit="fill"] { object-fit: fill; }
-    uf-image small { color: color-mix(in srgb, currentColor 62%, transparent); font-size: calc(1cqw * var(--template-font-scale)); }
+    uf-image small { color: color-mix(in srgb, currentColor 62%, transparent); font-size: calc(1cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); overflow-wrap: anywhere; }
     uf-shape[data-shape="ellipse"] { border-radius: 50%; }
     uf-shape[data-shape="line"] { height: 0 !important; min-height: 0; border-width: 0 0 2px !important; overflow: visible; }
-    uf-shape span { margin: auto; }
+    uf-shape span { margin: auto; font-size: calc(1.65cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale)); overflow-wrap: anywhere; }
     uf-bar-chart { justify-content: center; gap: 1.35cqh; }
     uf-bar-row { display: grid; grid-template-columns: minmax(5em, 22%) 1fr auto; align-items: center; gap: 1em; }
     uf-bar-row span, uf-bar-row strong { font: 750 calc(1.35cqw * var(--template-font-scale) * var(--component-font-scale) * var(--fit-scale))/1.2 ui-monospace, monospace; overflow-wrap: anywhere; }
