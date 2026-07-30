@@ -6,6 +6,7 @@ import type {
   SlideBlock,
   SlideSceneNode
 } from "../projects/schema";
+import type { ProjectDraftRevisionSummary } from "../projects/repository";
 import {
   DEFAULT_VOICEVOX_TUNING,
   VOICEVOX_TUNING_LIMITS,
@@ -240,7 +241,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=102";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=103";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -591,6 +592,10 @@ function shell(title: string, body: string): string {
       .publication-history .status-row { align-items: center; padding: .55rem .65rem; border: 1px solid var(--line); border-radius: .55rem; }
       .publication-history .status-row span, .publication-history .status-row small { display: grid; gap: .12rem; }
       .publication-history .actions { display: flex; align-items: center; gap: .4rem; }
+      .draft-history { display: grid; gap: .45rem; margin-top: .65rem; }
+      .draft-revision { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .6rem; align-items: center; padding: .65rem; border: 1px solid var(--line); border-radius: .6rem; background: #08111b88; }
+      .draft-revision p, .draft-revision small { margin: 0; }
+      .draft-revision small { color: var(--muted); }
       .success { color: #74e6b2 !important; }
       .warning { color: #ffd681 !important; }
       .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
@@ -1157,6 +1162,7 @@ export function projectDetailPage(options: {
   project: ProjectRecord;
   assets: ProjectAsset[];
   publication: PublicationStatus;
+  draftRevisions: ProjectDraftRevisionSummary[];
 }): Response {
   const document = options.project.document;
   const recentLogs = document.logs.slice(-20).reverse();
@@ -1256,6 +1262,13 @@ export function projectDetailPage(options: {
         const revisionMeta = `${(revision.byte_size / 1024).toFixed(1)} KB · ${revision.content_hash.slice(0, 8)}`;
         return `<article class="status-row"><span><strong>v${revision.project_version} · ${escapeHtml(revision.renderer_version)}</strong><small>${escapeHtml(new Date(publishedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(revisionMeta)}</small></span><span class="actions"><a class="button ghost" href="/preview/${escapeHtml(revision.revision_id)}" target="_blank" rel="noopener">この版を確認</a>${active ? '<strong class="success">公開中</strong>' : `<button class="ghost" type="button" data-publish-rollback="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(revision.revision_id)}" data-csrf="${escapeHtml(options.csrfToken)}">この版へ戻す</button>`}</span></article>`;
       }).join("")}</div></details>`;
+  const revisionSourceLabels = { created: "作成", edit: "編集", restore: "復元" } as const;
+  const draftHistoryPanel = options.draftRevisions.length === 0
+    ? ""
+    : `<details class="panel panel-disclosure"><summary>下書き履歴 · ${options.draftRevisions.length}件</summary><div class="disclosure-body"><p class="inherit-note">直近50版を保存します。過去版は現在の下書きを消さず、新しいversionとして復元します。</p><div class="draft-history">${options.draftRevisions.map((revision) => {
+        const current = revision.version === options.project.version;
+        return `<article class="draft-revision"><div><p><strong>v${revision.version} · ${escapeHtml(revision.title)}</strong>${current ? ' <span class="success">現在</span>' : ""}</p><small>${escapeHtml(revisionSourceLabels[revision.source])} · ${escapeHtml(STAGE_LABELS[revision.stage])} · ${revision.slide_count}枚 · ${formatDuration(revision.total_duration_seconds)} · ${escapeHtml(new Date(revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></div>${current ? "" : `<button class="ghost" type="button" data-draft-restore="/api/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}/restore" data-target-version="${revision.version}" data-current-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button>`}</article>`;
+      }).join("")}</div><p class="feedback" data-draft-restore-feedback aria-live="polite"></p></div></details>`;
   const researchReady =
     (document.question?.trim().length ?? 0) > 0 &&
     (document.method?.trim().length ?? 0) > 0;
@@ -1574,6 +1587,7 @@ export function projectDetailPage(options: {
                <dt>スライド</dt><dd>${slides.length}枚</dd>
                <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
              </dl></section>
+             ${draftHistoryPanel}
              <section class="panel" id="presentation-structure"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
              ${evaluationPanel}
              ${voicePanel}

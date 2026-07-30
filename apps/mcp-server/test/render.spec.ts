@@ -902,6 +902,7 @@ describe("presentation artifact renderer", () => {
       csrfToken: "csrf-token",
       project: overLimitProject,
       assets: [],
+      draftRevisions: [],
       publication: {
         project_id: overLimitProject.project_id,
         draft_version: overLimitProject.version,

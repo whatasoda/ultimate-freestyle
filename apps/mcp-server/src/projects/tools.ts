@@ -7,7 +7,8 @@ import {
   createProject,
   getProject,
   listProjects,
-  ProjectRepositoryError
+  ProjectRepositoryError,
+  restoreProjectDraftRevision
 } from "./repository";
 import {
   createEmptyProject,
@@ -342,6 +343,79 @@ export function registerProjectTools(
             request_id: requestId,
             project: null,
             replayed: null,
+            error: { code: normalized.code, message: normalized.message }
+          },
+          true
+        );
+      }
+    }
+  );
+
+  server.registerTool(
+    "restore_draft_revision",
+    {
+      title: "過去の下書きを新しい版として復元",
+      description:
+        "research://projects/{id}/revisionsで確認した過去版を、現在の下書きを消さず新しいversionとして復元します。",
+      inputSchema: {
+        project_id: z.string().uuid(),
+        expected_version: z.number().int().positive(),
+        target_version: z.number().int().positive()
+      },
+      outputSchema: {
+        ok: z.boolean(),
+        request_id: z.string().uuid(),
+        version: z.number().int().positive().nullable(),
+        current_version: z.number().int().positive().nullable(),
+        restored_from_version: z.number().int().positive().nullable(),
+        error: projectErrorSchema.nullable()
+      },
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, target_version }) => {
+      const requestId = crypto.randomUUID();
+      try {
+        const ownerUserId = requireSubject(getAuthProps, "research:write");
+        const project = await restoreProjectDraftRevision(db, {
+          ownerUserId,
+          projectId: project_id,
+          expectedVersion: expected_version,
+          targetVersion: target_version
+        });
+        await recordAuditEvent(db, {
+          userId: ownerUserId,
+          eventType: "project.draft_restored",
+          outcome: "succeeded",
+          details: {
+            project_id,
+            version: project.version,
+            restored_from_version: target_version,
+            source: "mcp"
+          },
+          createdAt: new Date().toISOString()
+        });
+        return toolResult({
+          ok: true,
+          request_id: requestId,
+          version: project.version,
+          current_version: project.version,
+          restored_from_version: target_version,
+          error: null
+        });
+      } catch (error) {
+        const normalized = normalizeProjectToolError(error);
+        return toolResult(
+          {
+            ok: false,
+            request_id: requestId,
+            version: null,
+            current_version: normalized.currentVersion,
+            restored_from_version: null,
             error: { code: normalized.code, message: normalized.message }
           },
           true

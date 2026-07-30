@@ -77,6 +77,7 @@ describe("MCP contract", () => {
           "update_slide_narration_voice",
           "get_voice_generation_status",
           "generate_voice_audio",
+          "restore_draft_revision",
           "move_slide",
           "delete_slide"
         ])
@@ -456,6 +457,9 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/deck"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/revisions"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/slides/{slideId}"
           })
         ])
@@ -833,6 +837,32 @@ describe("MCP contract", () => {
             ])
           }
         }
+      });
+      const revisions = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/revisions`
+      );
+      expect(revisions).toMatchObject({
+        ok: true,
+        current_version: 16,
+        revisions: expect.arrayContaining([
+          expect.objectContaining({ version: 16, source: "edit" }),
+          expect.objectContaining({ version: 15, source: "edit" })
+        ])
+      });
+      const restoredDraft = await client.callTool({
+        name: "restore_draft_revision",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 16,
+          target_version: 1
+        }
+      });
+      expect(restoredDraft.structuredContent).toMatchObject({
+        ok: true,
+        version: 17,
+        current_version: 17,
+        restored_from_version: 1
       });
 
       const otherSubjectId = "twitch-other-project-owner";

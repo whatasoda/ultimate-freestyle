@@ -5,7 +5,7 @@ import {
 import { z } from "zod";
 
 import { twitchGrantPropsSchema } from "../auth/types";
-import { getProject } from "./repository";
+import { getProject, listProjectDraftRevisions } from "./repository";
 import { RUBRIC_MARKDOWN } from "./rubric";
 
 const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
@@ -223,6 +223,52 @@ export function registerResearchGuides(
                 project_id: project.project_id,
                 version: project.version,
                 deck: project.document.deck
+              };
+      return {
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: "application/json",
+            text: JSON.stringify(body)
+          }
+        ]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-revisions",
+    new ResourceTemplate("research://projects/{id}/revisions", {
+      list: undefined
+    }),
+    {
+      title: "研究の下書き履歴",
+      description:
+        "復元前に確認する、認証中の利用者が所有する研究の直近20版です。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const project =
+        !("error" in auth) && typeof id === "string"
+          ? await getProject(db, auth.ownerUserId, id)
+          : null;
+      const body =
+        "error" in auth
+          ? { ok: false, error: { code: auth.error } }
+          : project === null
+            ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+            : {
+                ok: true,
+                project_id: project.project_id,
+                current_version: project.version,
+                revisions: await listProjectDraftRevisions(
+                  db,
+                  auth.ownerUserId,
+                  project.project_id,
+                  20
+                )
               };
       return {
         contents: [

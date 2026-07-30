@@ -2836,6 +2836,37 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
   }
+  const draftRestoreFeedback = document.querySelector("[data-draft-restore-feedback]");
+  for (const restoreButton of document.querySelectorAll("[data-draft-restore]")) {
+    if (!(restoreButton instanceof HTMLButtonElement) || !(draftRestoreFeedback instanceof HTMLElement)) continue;
+    restoreButton.addEventListener("click", async () => {
+      const dirty = document.querySelector('[data-dirty="true"]') !== null;
+      const prefix = dirty ? "未保存の入力は履歴に残りません。\n" : "";
+      if (!confirm(prefix + "v" + (restoreButton.dataset.targetVersion || "?") + " を新しい下書きとして復元しますか？ 現在の保存済み下書きも履歴に残ります。")) return;
+      setButtonBusy(restoreButton, true);
+      draftRestoreFeedback.textContent = "過去の下書きを新しいversionとして復元しています…";
+      draftRestoreFeedback.classList.remove("warning", "success");
+      try {
+        const response = await fetch(restoreButton.dataset.draftRestore || "", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-csrf-token": restoreButton.dataset.csrf || ""
+          },
+          body: JSON.stringify({ expected_version: Number(restoreButton.dataset.currentVersion) })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "下書きを復元できませんでした。"));
+        draftRestoreFeedback.textContent = "v" + result.restored_from_version + " をv" + result.version + "として復元しました。移動します…";
+        draftRestoreFeedback.classList.add("success");
+        location.href = result.next_url;
+      } catch (error) {
+        draftRestoreFeedback.textContent = caughtErrorMessage(error, "下書きを復元できませんでした。");
+        draftRestoreFeedback.classList.add("warning");
+        setButtonBusy(restoreButton, false);
+      }
+    });
+  }
   if (copyPublicButton instanceof HTMLButtonElement && publicLink instanceof HTMLAnchorElement) {
     copyPublicButton.addEventListener("click", async () => {
       if (publicLink.hidden || publicLink.getAttribute("href") === "#") return;

@@ -11,6 +11,17 @@ export type ProjectRepositoryErrorCode =
   | "PROJECT_LIMIT_REACHED"
   | "PROJECT_TOO_LARGE";
 
+export type ProjectDraftRevisionSummary = {
+  project_id: string;
+  version: number;
+  title: string;
+  stage: ProjectDocument["stage"];
+  slide_count: number;
+  total_duration_seconds: number;
+  source: "created" | "edit" | "restore";
+  created_at: string;
+};
+
 export class ProjectRepositoryError extends Error {
   constructor(
     readonly code: ProjectRepositoryErrorCode,
@@ -145,8 +156,9 @@ export async function createProject(
   const now = (options.now ?? new Date()).toISOString();
   const projectId = crypto.randomUUID();
   try {
-    await db
-      .prepare(
+    const documentJson = JSON.stringify(options.document);
+    await db.batch([
+      db.prepare(
         `INSERT INTO research_projects (
            id, owner_user_id, title, stage, document_json, version,
            idempotency_key, created_at, updated_at
@@ -157,12 +169,17 @@ export async function createProject(
         options.ownerUserId,
         options.document.title,
         options.document.stage,
-        JSON.stringify(options.document),
+        documentJson,
         options.idempotencyKey,
         now,
         now
-      )
-      .run();
+      ),
+      db.prepare(
+        `INSERT INTO project_draft_revisions (
+           project_id, owner_user_id, version, document_json, source, created_at
+         ) VALUES (?, ?, 1, ?, 'created', ?)`
+      ).bind(projectId, options.ownerUserId, documentJson, now)
+    ]);
   } catch (error) {
     const replay = await db
       .prepare(
@@ -192,13 +209,15 @@ export async function updateProject(
     projectId: string;
     expectedVersion: number;
     document: ProjectDocument;
+    revisionSource?: "edit" | "restore";
     now?: Date;
   }
 ): Promise<ProjectRecord> {
   assertProjectSize(options.document);
   const now = (options.now ?? new Date()).toISOString();
-  const result = await db
-    .prepare(
+  const documentJson = JSON.stringify(options.document);
+  const [result] = await db.batch([
+    db.prepare(
       `UPDATE research_projects
        SET title = ?, stage = ?, document_json = ?,
            version = version + 1, updated_at = ?
@@ -207,13 +226,42 @@ export async function updateProject(
     .bind(
       options.document.title,
       options.document.stage,
-      JSON.stringify(options.document),
+      documentJson,
       now,
       options.projectId,
       options.ownerUserId,
       options.expectedVersion
+    ),
+    db.prepare(
+      `INSERT INTO project_draft_revisions (
+         project_id, owner_user_id, version, document_json, source, created_at
+       )
+       SELECT id, owner_user_id, version, document_json, ?, ?
+       FROM research_projects
+       WHERE id = ? AND owner_user_id = ? AND version = ? AND document_json = ?
+       ON CONFLICT(project_id, version) DO NOTHING`
+    ).bind(
+      options.revisionSource ?? "edit",
+      now,
+      options.projectId,
+      options.ownerUserId,
+      options.expectedVersion + 1,
+      documentJson
+    ),
+    db.prepare(
+      `DELETE FROM project_draft_revisions
+       WHERE project_id = ? AND owner_user_id = ? AND version NOT IN (
+         SELECT version FROM project_draft_revisions
+         WHERE project_id = ? AND owner_user_id = ?
+         ORDER BY version DESC LIMIT 50
+       )`
+    ).bind(
+      options.projectId,
+      options.ownerUserId,
+      options.projectId,
+      options.ownerUserId
     )
-    .run();
+  ]);
 
   if (result.meta.changes === 0) {
     const current = await getProject(
@@ -239,6 +287,82 @@ export async function updateProject(
     throw new Error("Updated project could not be read.");
   }
   return project;
+}
+
+export async function listProjectDraftRevisions(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  limit = 20
+): Promise<ProjectDraftRevisionSummary[]> {
+  const result = await db.prepare(
+    `SELECT project_id, version,
+            json_extract(document_json, '$.title') AS title,
+            json_extract(document_json, '$.stage') AS stage,
+            COALESCE(json_array_length(document_json, '$.deck.slides'), 0) AS slide_count,
+            COALESCE((
+              SELECT SUM(CAST(json_extract(slide.value, '$.duration_seconds') AS INTEGER))
+              FROM json_each(project_draft_revisions.document_json, '$.deck.slides') AS slide
+            ), 0) AS total_duration_seconds,
+            source, created_at
+     FROM project_draft_revisions
+     WHERE project_id = ? AND owner_user_id = ?
+     ORDER BY version DESC
+     LIMIT ?`
+  ).bind(projectId, ownerUserId, Math.min(Math.max(limit, 1), 50)).all<{
+    project_id: string;
+    version: number;
+    title: string;
+    stage: string;
+    slide_count: number;
+    total_duration_seconds: number;
+    source: "created" | "edit" | "restore";
+    created_at: string;
+  }>();
+  return result.results.map((row) => ({
+    ...row,
+    stage: projectDocumentSchema.shape.stage.parse(row.stage)
+  }));
+}
+
+export async function restoreProjectDraftRevision(
+  db: D1Database,
+  options: {
+    ownerUserId: string;
+    projectId: string;
+    expectedVersion: number;
+    targetVersion: number;
+    now?: Date;
+  }
+): Promise<ProjectRecord> {
+  const current = await getProject(db, options.ownerUserId, options.projectId);
+  if (current === null) {
+    throw new ProjectRepositoryError("PROJECT_NOT_FOUND", "The project does not exist.");
+  }
+  if (current.version !== options.expectedVersion) {
+    throw new ProjectRepositoryError(
+      "PROJECT_VERSION_CONFLICT",
+      "The project was changed after it was read.",
+      current.version
+    );
+  }
+  const revision = await db.prepare(
+    `SELECT document_json FROM project_draft_revisions
+     WHERE project_id = ? AND owner_user_id = ? AND version = ?`
+  ).bind(options.projectId, options.ownerUserId, options.targetVersion).first<{
+    document_json: string;
+  }>();
+  if (revision === null) {
+    throw new ProjectRepositoryError("PROJECT_NOT_FOUND", "The draft revision does not exist.");
+  }
+  return updateProject(db, {
+    ownerUserId: options.ownerUserId,
+    projectId: options.projectId,
+    expectedVersion: options.expectedVersion,
+    document: projectDocumentSchema.parse(JSON.parse(revision.document_json)),
+    revisionSource: "restore",
+    now: options.now
+  });
 }
 
 export async function mutateProject(

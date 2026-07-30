@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=102"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=103"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -1323,6 +1323,7 @@ describe("Web dashboard", () => {
     );
     const publishedDetailHtml = await publishedDetail.text();
     expect(publishedDetailHtml).toContain("公開履歴 · 1件");
+    expect(publishedDetailHtml).toContain("下書き履歴 · 3件");
     expect(publishedDetailHtml).toContain("公開中");
     expect(publishedDetailHtml).toContain("この版を確認");
     expect(publishedDetailHtml).toContain(`/preview/${previewResult.revision.revision_id}`);
@@ -2317,6 +2318,43 @@ describe("Web dashboard", () => {
     );
     expect(rolledBackPage.status).toBe(200);
     expect(await rolledBackPage.text()).toContain("Webで微調整した研究");
+
+    const restoreDraft = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/revisions/4/restore",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 35 })
+        }
+      ),
+      authEnv
+    );
+    expect(restoreDraft.status).toBe(200);
+    expect(await restoreDraft.json()).toMatchObject({
+      ok: true,
+      restored_from_version: 4,
+      version: 36
+    });
+    const restoredDetail = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const restoredDetailHtml = await restoredDetail.text();
+    expect(restoredDetailHtml).toContain("下書き履歴 · 20件");
+    expect(restoredDetailHtml).toContain("v36");
+    expect(restoredDetailHtml).toContain("復元");
+    expect(DASHBOARD_SCRIPT).toContain("data-draft-restore");
+    expect(DASHBOARD_SCRIPT).toContain("現在の保存済み下書きも履歴に残ります");
 
     const unsupportedUpload = await requestProvider(
       provider,

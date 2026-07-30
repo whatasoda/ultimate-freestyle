@@ -23,7 +23,13 @@ import {
 } from "../auth/web-session";
 import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
 import { renderPresentationHtml } from "../presentation/render";
-import { getProject, listProjects, mutateProject } from "../projects/repository";
+import {
+  getProject,
+  listProjectDraftRevisions,
+  listProjects,
+  mutateProject,
+  restoreProjectDraftRevision
+} from "../projects/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import {
   animationSchema,
@@ -108,6 +114,10 @@ const imageAltRequestSchema = z.object({
 });
 
 const previewRequestSchema = z.object({
+  expected_version: z.number().int().positive()
+});
+
+const draftRestoreRequestSchema = z.object({
   expected_version: z.number().int().positive()
 });
 
@@ -411,8 +421,83 @@ async function handleProjectDetail(
     csrfToken: session.csrfToken,
     project,
     assets: await listProjectAssets(env.DB, session.userId, projectId),
-    publication: (await getPublicationStatus(env.DB, session.userId, projectId))!
+    publication: (await getPublicationStatus(env.DB, session.userId, projectId))!,
+    draftRevisions: await listProjectDraftRevisions(env.DB, session.userId, projectId, 20)
   });
+}
+
+async function handleDraftRevisionRestore(
+  request: Request,
+  env: Env,
+  projectId: string,
+  targetVersion: number
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = draftRestoreRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      { ok: false, error: { code: "INVALID_FIELDS", message: "復元対象を確認してください。" }, request_id: crypto.randomUUID() },
+      422
+    );
+  }
+  try {
+    const project = await restoreProjectDraftRevision(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      targetVersion
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.draft_restored",
+      outcome: "succeeded",
+      details: { project_id: projectId, target_version: targetVersion, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      restored_from_version: targetVersion,
+      version: project.version,
+      next_url: `/dashboard/projects/${projectId}`,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    const code = error instanceof Error && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "INTERNAL_ERROR";
+    const currentVersion = error instanceof Error && "currentVersion" in error
+      ? ((error as { currentVersion?: number }).currentVersion ?? null)
+      : null;
+    return jsonResponse(
+      {
+        ok: false,
+        current_version: currentVersion,
+        error: {
+          code,
+          message: code === "PROJECT_VERSION_CONFLICT"
+            ? "別の場所で更新されました。画面を読み込み直してください。"
+            : code === "PROJECT_NOT_FOUND"
+              ? "指定した下書き履歴が見つかりません。"
+              : "下書きを復元できませんでした。"
+        },
+        request_id: crypto.randomUUID()
+      },
+      code === "PROJECT_VERSION_CONFLICT" ? 409 : code === "PROJECT_NOT_FOUND" ? 404 : 500
+    );
+  }
 }
 
 async function getHydratedProject(
@@ -3787,6 +3872,17 @@ export async function handleWebRequest(
   );
   if (projectFieldsMatch?.[1] !== undefined) {
     return handleProjectFieldsUpdate(request, env, projectFieldsMatch[1]);
+  }
+  const draftRestoreMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/revisions/(\\d{1,9})/restore$`, "i")
+  );
+  if (draftRestoreMatch?.[1] !== undefined && draftRestoreMatch[2] !== undefined) {
+    return handleDraftRevisionRestore(
+      request,
+      env,
+      draftRestoreMatch[1],
+      Number(draftRestoreMatch[2])
+    );
   }
   const deckSettingsMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/presentation/settings$`, "i")
