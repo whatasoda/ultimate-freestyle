@@ -592,6 +592,18 @@ describe("MCP contract", () => {
               "research://projects/{id}/revisions/{version}/slides/{slideId}"
           }),
           expect.objectContaining({
+            uriTemplate:
+              "research://projects/{id}/revisions/{version}/slides/{slideId}/content"
+          }),
+          expect.objectContaining({
+            uriTemplate:
+              "research://projects/{id}/revisions/{version}/slides/{slideId}/{section}/pages/{page}"
+          }),
+          expect.objectContaining({
+            uriTemplate:
+              "research://projects/{id}/revisions/{version}/slides/{slideId}/{section}/{itemId}"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/publication"
           }),
           expect.objectContaining({
@@ -1683,6 +1695,48 @@ describe("MCP contract", () => {
       expect(expandedTemplate.structuredContent).toMatchObject({
         ok: true,
         version: 15
+      });
+
+      const revisionSlide = await readJsonResource(
+        client,
+        `research://projects/${projectId}/revisions/14/slides/intro`
+      );
+      expect(revisionSlide).toMatchObject({
+        ok: true,
+        revision_version: 14,
+        slide: {
+          id: "intro",
+          content: {
+            uri: `research://projects/${projectId}/revisions/14/slides/intro/content`
+          },
+          narration: {
+            segments: {
+              count: 1,
+              uri_template: `research://projects/${projectId}/revisions/14/slides/intro/narration/pages/{page}`
+            }
+          }
+        }
+      });
+      expect(JSON.stringify(revisionSlide)).not.toContain('"segments":[');
+      const revisionNarrationPage = await readJsonResource(
+        client,
+        `research://projects/${projectId}/revisions/14/slides/intro/narration/pages/1`
+      );
+      expect(revisionNarrationPage).toMatchObject({
+        ok: true,
+        total_items: 1,
+        items: [{
+          at: 0,
+          uri: `research://projects/${projectId}/revisions/14/slides/intro/narration/0`
+        }]
+      });
+      const revisionNarration = await readJsonResource(
+        client,
+        `research://projects/${projectId}/revisions/14/slides/intro/narration/0`
+      );
+      expect(revisionNarration).toMatchObject({
+        ok: true,
+        item: { at: 0, text: "研究のきっかけから始めます。" }
       });
 
       const voiceStatus = await client.callTool({

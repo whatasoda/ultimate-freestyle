@@ -578,6 +578,9 @@ export function registerResearchGuides(
                 selection_workflow: {
                   revision_detail_uri_template: `research://projects/${project.project_id}/revisions/{version}`,
                   revision_slide_uri_template: `research://projects/${project.project_id}/revisions/{version}/slides/{slideId}`,
+                  revision_slide_content_uri_template: `research://projects/${project.project_id}/revisions/{version}/slides/{slideId}/content`,
+                  revision_slide_collection_uri_template: `research://projects/${project.project_id}/revisions/{version}/slides/{slideId}/{section}/pages/{page}`,
+                  revision_slide_item_uri_template: `research://projects/${project.project_id}/revisions/{version}/slides/{slideId}/{section}/{itemId}`,
                   current_project_uri: `research://projects/${project.project_id}`,
                   restore_tool: "restore_draft_revision"
                 },
@@ -795,7 +798,7 @@ export function registerResearchGuides(
     {
       title: "研究の下書き一版にあるスライド",
       description:
-        "過去版の指定スライド一枚と、現在版にある同一IDのスライドとの差です。",
+        "過去版の指定スライド一枚の軽量索引と、現在版にある同一IDのスライドとの差です。本文と各collectionは返されたURIから必要な範囲だけ読みます。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -833,7 +836,62 @@ export function registerResearchGuides(
                     project_id: current.project_id,
                     current_version: current.version,
                     revision_version: revision.version,
-                    slide: selectedSlide,
+                    slide: (() => {
+                      const {
+                        content_markdown,
+                        sidebar_markdown,
+                        reveal_blocks,
+                        narration,
+                        composition,
+                        ...fields
+                      } = selectedSlide;
+                      const baseUri = `research://projects/${current.project_id}/revisions/${revision.version}/slides/${selectedSlide.id}`;
+                      const elementCount = composition?.mode === "scene"
+                        ? composition.nodes.length
+                        : composition?.mode === "canvas"
+                          ? composition.blocks.length
+                          : 0;
+                      return {
+                        ...fields,
+                        content: {
+                          content_characters: content_markdown.length,
+                          sidebar_characters: sidebar_markdown?.length ?? 0,
+                          uri: `${baseUri}/content`
+                        },
+                        reveals: {
+                          count: reveal_blocks.length,
+                          page_size: 20,
+                          pages: Math.ceil(reveal_blocks.length / 20),
+                          uri_template: `${baseUri}/reveals/pages/{page}`
+                        },
+                        narration: narration === null
+                          ? null
+                          : {
+                              display: narration.display,
+                              speaker: narration.speaker,
+                              appearance: narration.appearance,
+                              segments: {
+                                count: narration.segments.length,
+                                page_size: 20,
+                                pages: Math.ceil(narration.segments.length / 20),
+                                uri_template: `${baseUri}/narration/pages/{page}`
+                              }
+                            },
+                        composition: composition === null || composition === undefined
+                          ? null
+                          : {
+                              mode: composition.mode,
+                              background: composition.background,
+                              clip_content: composition.clip_content,
+                              elements: {
+                                count: elementCount,
+                                page_size: 20,
+                                pages: Math.ceil(elementCount / 20),
+                                uri_template: `${baseUri}/elements/pages/{page}`
+                              }
+                            }
+                      };
+                    })(),
                     comparison: {
                       state: currentSlide === undefined
                         ? "revision_only"
@@ -852,6 +910,220 @@ export function registerResearchGuides(
           text: JSON.stringify(body)
         }]
       };
+    }
+  );
+
+  server.registerResource(
+    "research-project-revision-slide-content",
+    new ResourceTemplate(
+      "research://projects/{id}/revisions/{version}/slides/{slideId}/content",
+      { list: undefined }
+    ),
+    {
+      title: "過去版スライドの本文",
+      description: "過去版の指定スライドにある本文と読み上げない補足だけを取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const version = typeof variables.version === "string" && /^\d+$/.test(variables.version)
+        ? Number(variables.version)
+        : null;
+      const [current, revision] = !("error" in auth) && typeof id === "string" && version !== null
+        ? await Promise.all([
+            getProject(db, auth.ownerUserId, id),
+            getProjectDraftRevision(db, auth.ownerUserId, id, version)
+          ])
+        : [null, null];
+      const slide = revision?.document.deck?.slides.find((item) => item.id === slideId);
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : typeof id !== "string" || typeof slideId !== "string" || version === null
+          ? { ok: false, error: { code: "INVALID_RESOURCE_URI" } }
+          : current === null
+            ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+            : revision === null
+              ? { ok: false, error: { code: "REVISION_NOT_FOUND" } }
+              : slide === undefined
+                ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+                : {
+                    ok: true,
+                    project_id: current.project_id,
+                    current_version: current.version,
+                    revision_version: revision.version,
+                    slide_id: slide.id,
+                    content_markdown: slide.content_markdown,
+                    sidebar_markdown: slide.sidebar_markdown
+                  };
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
+    }
+  );
+
+  server.registerResource(
+    "research-project-revision-slide-collection-page",
+    new ResourceTemplate(
+      "research://projects/{id}/revisions/{version}/slides/{slideId}/{section}/pages/{page}",
+      { list: undefined }
+    ),
+    {
+      title: "過去版スライド内構成の1page",
+      description: "過去版の一枚にある段階表示、読み上げ、表示要素の軽量索引を20件ずつ取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const section = variables.section;
+      const version = typeof variables.version === "string" && /^\d+$/.test(variables.version)
+        ? Number(variables.version)
+        : null;
+      const page = typeof variables.page === "string" && /^\d+$/.test(variables.page)
+        ? Number(variables.page)
+        : 0;
+      const [current, revision] = !("error" in auth) && typeof id === "string" && version !== null
+        ? await Promise.all([
+            getProject(db, auth.ownerUserId, id),
+            getProjectDraftRevision(db, auth.ownerUserId, id, version)
+          ])
+        : [null, null];
+      const slide = revision?.document.deck?.slides.find((item) => item.id === slideId);
+      const validSection = section === "reveals" || section === "narration" || section === "elements";
+      let body: unknown;
+      if ("error" in auth) body = { ok: false, error: { code: auth.error } };
+      else if (typeof id !== "string" || typeof slideId !== "string" || version === null || !validSection || page < 1) body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+      else if (current === null) body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+      else if (revision === null) body = { ok: false, error: { code: "REVISION_NOT_FOUND" } };
+      else if (slide === undefined) body = { ok: false, error: { code: "SLIDE_NOT_FOUND" } };
+      else {
+        const baseUri = `research://projects/${current.project_id}/revisions/${revision.version}/slides/${slide.id}`;
+        const items = section === "reveals"
+          ? slide.reveal_blocks.map((block) => ({
+              id: String(block.at),
+              at: block.at,
+              preview: resourceTextPreview(block.markdown, 160),
+              uri: `${baseUri}/reveals/${block.at}`
+            }))
+          : section === "narration"
+            ? (slide.narration?.segments ?? []).map((segment) => ({
+                id: String(segment.at),
+                at: segment.at,
+                preview: resourceTextPreview(segment.text, 160),
+                has_generated_audio: segment.audio_src !== null,
+                uri: `${baseUri}/narration/${segment.at}`
+              }))
+            : slide.composition?.mode === "scene"
+              ? slide.composition.nodes.map((element) => ({
+                  id: element.id,
+                  kind: element.kind,
+                  at: element.at,
+                  parent_id: element.parent_id,
+                  order: element.order,
+                  frame: element.frame,
+                  uri: `${baseUri}/elements/${element.id}`
+                }))
+              : slide.composition?.mode === "canvas"
+                ? slide.composition.blocks.map((element) => ({
+                    id: element.id,
+                    kind: element.kind,
+                    at: element.at,
+                    z_index: element.z_index,
+                    frame: element.frame,
+                    uri: `${baseUri}/elements/${element.id}`
+                  }))
+                : [];
+        const pageSize = 20;
+        const totalPages = Math.ceil(items.length / pageSize);
+        if (page > Math.max(1, totalPages)) body = { ok: false, error: { code: "PAGE_NOT_FOUND" } };
+        else {
+          const start = (page - 1) * pageSize;
+          body = {
+            ok: true,
+            project_id: current.project_id,
+            current_version: current.version,
+            revision_version: revision.version,
+            slide_id: slide.id,
+            section,
+            page,
+            page_size: pageSize,
+            total_items: items.length,
+            total_pages: totalPages,
+            previous_uri: page > 1 ? `${baseUri}/${section}/pages/${page - 1}` : null,
+            next_uri: page < totalPages ? `${baseUri}/${section}/pages/${page + 1}` : null,
+            items: items.slice(start, start + pageSize)
+          };
+        }
+      }
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
+    }
+  );
+
+  server.registerResource(
+    "research-project-revision-slide-item",
+    new ResourceTemplate(
+      "research://projects/{id}/revisions/{version}/slides/{slideId}/{section}/{itemId}",
+      { list: undefined }
+    ),
+    {
+      title: "過去版スライド内構成の一件",
+      description: "過去版の段階表示、読み上げ、表示要素から指定した一件だけを取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const section = variables.section;
+      const itemId = variables.itemId;
+      const version = typeof variables.version === "string" && /^\d+$/.test(variables.version)
+        ? Number(variables.version)
+        : null;
+      const [current, revision] = !("error" in auth) && typeof id === "string" && version !== null
+        ? await Promise.all([
+            getProject(db, auth.ownerUserId, id),
+            getProjectDraftRevision(db, auth.ownerUserId, id, version)
+          ])
+        : [null, null];
+      const slide = revision?.document.deck?.slides.find((value) => value.id === slideId);
+      const at = typeof itemId === "string" && /^\d+$/.test(itemId) ? Number(itemId) : -1;
+      const item = slide === undefined || typeof section !== "string" || typeof itemId !== "string"
+        ? undefined
+        : section === "reveals"
+          ? slide.reveal_blocks.find((value) => value.at === at)
+          : section === "narration"
+            ? slide.narration?.segments.find((value) => value.at === at)
+            : section === "elements"
+              ? slide.composition?.mode === "scene"
+                ? slide.composition.nodes.find((value) => value.id === itemId)
+                : slide.composition?.mode === "canvas"
+                  ? slide.composition.blocks.find((value) => value.id === itemId)
+                  : undefined
+              : undefined;
+      const validSection = section === "reveals" || section === "narration" || section === "elements";
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : typeof id !== "string" || typeof slideId !== "string" || typeof itemId !== "string" || version === null || !validSection
+          ? { ok: false, error: { code: "INVALID_RESOURCE_URI" } }
+          : current === null
+            ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+            : revision === null
+              ? { ok: false, error: { code: "REVISION_NOT_FOUND" } }
+              : slide === undefined
+                ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+                : item === undefined
+                  ? { ok: false, error: { code: "REVISION_SLIDE_ITEM_NOT_FOUND" } }
+                  : {
+                      ok: true,
+                      project_id: current.project_id,
+                      current_version: current.version,
+                      revision_version: revision.version,
+                      slide_id: slide.id,
+                      section,
+                      item
+                    };
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
     }
   );
 
