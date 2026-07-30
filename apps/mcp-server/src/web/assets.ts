@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "131";
+export const DASHBOARD_ASSET_VERSION = "132";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const apiErrorMessage = (result, fallback) => {

@@ -89,6 +89,7 @@ import { z } from "zod";
 import { DASHBOARD_ASSET_VERSION, dashboardScriptResponse } from "./assets";
 import {
   dashboardPage,
+  dashboardStyleResponse,
   draftRevisionPage,
   landingPage,
   projectDetailPage,
@@ -4107,6 +4108,9 @@ export async function handleWebRequest(
   const path = url.pathname;
   if (path === "/assets/dashboard.js" && request.method === "GET") {
     return dashboardScriptResponse(url.searchParams.get("v") === DASHBOARD_ASSET_VERSION);
+  }
+  if (path === "/assets/dashboard.css" && request.method === "GET") {
+    return dashboardStyleResponse(url.searchParams.get("v") === DASHBOARD_ASSET_VERSION);
   }
   if (path === "/" && (request.method === "GET" || request.method === "HEAD")) {
     const session = await readWebSession(request, env.DB);

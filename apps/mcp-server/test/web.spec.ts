@@ -441,7 +441,12 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=131"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=132"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=132"');
+    expect(detailHtml).not.toContain("<style>");
+    expect(detail.headers.get("content-security-policy")).toContain(
+      "style-src 'self' 'unsafe-inline'"
+    );
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントがこの端末になく");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントの代替表示");
@@ -707,9 +712,9 @@ describe("Web dashboard", () => {
     const workspaceHtml = await workspace.text();
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
-    expect(workspaceHtml).toContain(".workspace-head { display: grid;");
-    expect(workspaceHtml).toContain("max-width: min(100%, 32ch)");
-    expect(workspaceHtml).toContain("word-break: auto-phrase");
+    expect(workspaceHtml).toContain(
+      'href="/assets/dashboard.css?v=132"'
+    );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
     expect(workspaceHtml).toContain("基本情報と代替テキストを保存");
@@ -717,8 +722,6 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-composition-mode="canvas"');
     expect(workspaceHtml).toContain('data-inspector-section="structure" open');
     expect(workspaceHtml).toContain('class="mobile-workspace-tabs"');
-    expect(workspaceHtml).toContain('.step-control [data-grid-snap] { grid-column: 1 / -1; }');
-    expect(workspaceHtml).toContain('.component-outline-row code { grid-column: 1 / -1;');
     expect(workspaceHtml).toContain('data-mobile-pane="preview"');
     expect(workspaceHtml).toContain('data-mobile-pane="edit"');
     expect(workspaceHtml).toContain('data-mobile-pane="slides"');
@@ -749,7 +752,6 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("「読み物」組版を試す");
     expect(workspaceHtml).toContain('data-aspect-ratio="16:9"');
     expect(workspaceHtml).toContain("表紙レイアウト");
-    expect(workspaceHtml).toContain('[data-appearance-editor]:has(select[name="role"] option[value="content"]:checked)');
     expect(workspaceHtml).toContain("左右均等");
     expect(workspaceHtml).toContain("第2アクセント");
     expect(workspaceHtml).toContain("data-frame-loading");
@@ -872,14 +874,59 @@ describe("Web dashboard", () => {
     expect(dashboardScript.headers.get("cache-control")).toBe(
       "no-cache, must-revalidate"
     );
+    const dashboardStyle = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css"),
+      authEnv
+    );
+    expect(dashboardStyle.status).toBe(200);
+    expect(dashboardStyle.headers.get("cache-control")).toBe(
+      "no-cache, must-revalidate"
+    );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=131"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=132"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
     expect(versionedDashboardScript.headers.get("cache-control")).toBe(
       "public, max-age=31536000, immutable"
+    );
+    const versionedDashboardStyle = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=132"),
+      authEnv
+    );
+    expect(versionedDashboardStyle.status).toBe(200);
+    expect(versionedDashboardStyle.headers.get("content-type")).toContain(
+      "text/css"
+    );
+    expect(versionedDashboardStyle.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable"
+    );
+    const dashboardStyleText = await versionedDashboardStyle.text();
+    expect(dashboardStyleText.length).toBeGreaterThan(30_000);
+    expect(dashboardStyleText).toContain(".workspace-head { display: grid;");
+    expect(dashboardStyleText).toContain("max-width: min(100%, 32ch)");
+    expect(dashboardStyleText).toContain("word-break: auto-phrase");
+    expect(dashboardStyleText).toContain(
+      ".step-control [data-grid-snap] { grid-column: 1 / -1; }"
+    );
+    expect(dashboardStyleText).toContain(
+      ".component-outline-row code { grid-column: 1 / -1;"
+    );
+    expect(dashboardStyleText).toContain(
+      '[data-appearance-editor]:has(select[name="role"] option[value="content"]:checked)'
+    );
+    expect(dashboardStyleText).toContain(
+      '.font-pick[data-font-available="false"]'
+    );
+    expect(dashboardStyleText).toContain(".voice-filter { position: sticky;");
+    expect(dashboardStyleText).toContain(
+      ".voice-filter-tabs { flex-wrap: nowrap;"
+    );
+    expect(dashboardStyleText).toContain(
+      ".voice-review > summary .voice-status { grid-column: 2;"
     );
     const dashboardScriptText = await dashboardScript.text();
     expect(() => new Function(dashboardScriptText)).not.toThrow();

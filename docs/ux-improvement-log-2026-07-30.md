@@ -1190,3 +1190,9 @@
 - 全Web画面が読み込むdashboard scriptは約220 KiBあり、内容versionをqueryへ付けているのに常に`no-cache, must-revalidate`だった。一覧・詳細・音声・一枚編集の移動ごとに同じscriptの再検証が発生していた。
 - asset versionをscript本体側の単一定数へ移し、HTMLと配信routeで共有する。現在versionと完全一致するURLだけ`public, max-age=31536000, immutable`にし、versionなし・古いversionは従来どおり必ず再検証する。
 - `?v=131`の長期cacheとversionなしURLの非cache契約を並べて固定した。これにより内容変更時の取り違えを避けつつ、編集画面間の再訪ではブラウザcacheだけで読み込める。
+
+## 改善ループ335
+
+- 一覧・詳細・音声・一枚編集の全HTMLへ約40 KiBの共通CSSを毎回埋め込んでいた。画面遷移のたびに同一内容を転送し、`no-store`のHTMLと一緒に捨てるため、version付きscriptだけをcacheしても再訪負荷が残っていた。
+- 共通CSSを`/assets/dashboard.css`へ分離し、HTMLは単一定数の`v132`を付けて参照する。現在versionとの完全一致だけ一年間immutable、versionなし・古いversionは再検証とし、CSPは同一originのstylesheetを許可した。
+- CSSは専用定数から直接配信してHTML生成時の文字列抽出を避ける。HTMLにinline style blockが残らないこと、主要responsive規則、CSP、30 KiB超の実体、version付き・なし双方のcache契約をWebテストで固定した。
