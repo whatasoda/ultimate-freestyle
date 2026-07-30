@@ -549,9 +549,10 @@ function shell(title: string, body: string): string {
       .feedback { min-height: 1.4em; margin: 0; color: #9fddf5; font-size: .88rem; }
       .notice { max-width: 42rem; margin: 3rem auto; text-align: center; }
       main.workspace-main { width: min(96vw, 100rem); padding-top: 1rem; }
-      .workspace-head { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-      .workspace-head h1 { font-size: clamp(1.65rem, 3vw, 2.8rem); }
-      .workspace-version { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .55rem; color: var(--muted); }
+      .workspace-head { display: grid; gap: .75rem; margin-bottom: 1rem; }
+      .workspace-head > div:first-child { min-width: 0; }
+      .workspace-head h1 { max-width: 24ch; font-size: clamp(1.65rem, 3vw, 2.8rem); line-height: 1.12; overflow-wrap: anywhere; text-wrap: balance; }
+      .workspace-version { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: .55rem; color: var(--muted); }
       .slide-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
       .slide-actions button { min-height: 2.2rem; padding: .45rem .62rem; }
       .slide-actions .danger { border-color: #7e3b49; color: #ffb8c3; }
