@@ -589,6 +589,9 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("動きをもう一度見る");
     expect(workspaceHtml).toContain('data-tone-pick="signal"');
     expect(workspaceHtml).toContain('data-cover-pick="statement"');
+    expect(workspaceHtml).toContain('data-cover-pick="band"');
+    expect(workspaceHtml).toContain('data-cover-pick="corner"');
+    expect(workspaceHtml).toContain('data-cover-pick="frame"');
     expect(workspaceHtml).toContain("表紙レイアウトを選ぶ");
     expect(workspaceHtml).toContain('data-narration-display-pick="inline"');
     expect(workspaceHtml).toContain("読み上げ文の表示形式を選ぶ");

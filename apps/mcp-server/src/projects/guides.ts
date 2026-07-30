@@ -57,7 +57,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 
 - \`configure_presentation_stage\` で発表全体の \`16:9\`／\`4:3\`と、開始前の0ページ目だけを部分更新する。
 - 0ページ目は画像、生成音声、利用可能なfontをpreloadし、開始クリック後に経過時間と初回読み上げを始める。slide数と進捗には含めない。
-- 表紙相当の一枚は \`update_slide_fields\` で \`role: "cover"\` とし、\`center\`、\`split\`、\`poster\`、\`minimal\`、\`statement\`から \`cover_layout\` を選ぶ。sceneやcanvasがある場合は、その自由構成を優先する。
+- 表紙相当の一枚は \`update_slide_fields\` で \`role: "cover"\` とし、中央の\`center\`、左右分割の\`split\`、写真向けの\`poster\`、余白重視の\`minimal\`、一言強調の\`statement\`、中央帯の\`band\`、左下配置の\`corner\`、額縁の\`frame\`から \`cover_layout\` を選ぶ。sceneやcanvasがある場合は、その自由構成を優先する。
 
 ## 一枚ごとの文章組版
 

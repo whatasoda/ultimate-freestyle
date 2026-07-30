@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@52");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@53");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -268,6 +268,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-style="orbit"');
     expect(html).toContain('data-slide-role="cover"');
     expect(html).toContain('data-cover-layout="poster"');
+    expect(html).toContain('[data-cover-layout="band"]');
+    expect(html).toContain('[data-cover-layout="corner"]');
+    expect(html).toContain('[data-cover-layout="frame"]');
     expect(html).toContain('data-text-preset="columns"');
     expect(html).toContain('data-columns="3"');
     expect(html).toContain('--slide-body-scale:0.6');

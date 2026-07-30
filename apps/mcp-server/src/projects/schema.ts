@@ -78,7 +78,10 @@ export const coverLayoutSchema = z.enum([
   "split",
   "poster",
   "minimal",
-  "statement"
+  "statement",
+  "band",
+  "corner",
+  "frame"
 ]);
 
 export const slideTypographyPresetSchema = z.enum([
