@@ -638,6 +638,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-inspector-section="structure" open');
     expect(workspaceHtml).toContain('class="mobile-workspace-tabs"');
     expect(workspaceHtml).toContain('.step-control [data-grid-snap] { grid-column: 1 / -1; }');
+    expect(workspaceHtml).toContain('.component-outline-row code { grid-column: 1 / -1;');
     expect(workspaceHtml).toContain('data-mobile-pane="preview"');
     expect(workspaceHtml).toContain('data-mobile-pane="edit"');
     expect(workspaceHtml).toContain('data-mobile-pane="slides"');
