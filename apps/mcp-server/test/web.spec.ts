@@ -392,7 +392,12 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("発表 1枚 · 0分30秒");
     expect(dashboardHtml).toContain("data-project-search-empty");
     expect(dashboardHtml).toContain('data-project-filter="ready"');
+    expect(dashboardHtml).toContain('data-project-filter="published"');
+    expect(dashboardHtml).toContain('data-project-filter="attention"');
     expect(dashboardHtml).toContain('data-project-filter="missing"');
+    expect(dashboardHtml).toContain('data-project-state="attention"');
+    expect(dashboardHtml).toContain("プレビュー未作成");
+    expect(dashboardHtml).toContain("音声 1/1 完成");
     expect(dashboardHtml).toContain("data-project-sort");
     expect(dashboardHtml).toContain("発表時間が長い順");
     expect(dashboardHtml).toContain("AIクライアントとの接続方法");
@@ -421,7 +426,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=111"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=112"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");

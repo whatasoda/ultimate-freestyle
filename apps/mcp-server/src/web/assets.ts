@@ -99,14 +99,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let savedProjectView = {};
     try { savedProjectView = JSON.parse(localStorage.getItem(projectViewKey) || "{}"); } catch {}
     if (!savedProjectView || typeof savedProjectView !== "object" || Array.isArray(savedProjectView)) savedProjectView = {};
-    let activeFilter = ["all", "ready", "missing"].includes(savedProjectView.filter) ? savedProjectView.filter : "all";
+    let activeFilter = ["all", "ready", "published", "attention", "missing"].includes(savedProjectView.filter) ? savedProjectView.filter : "all";
     const filterProjects = () => {
       const query = projectSearch.value.trim().toLocaleLowerCase("ja");
       let visible = 0;
       for (const card of projectCards) {
         if (!(card instanceof HTMLElement)) continue;
         const matchesText = query === "" || (card.dataset.searchText || "").includes(query);
-        const matchesFilter = activeFilter === "all" || card.dataset.presentation === activeFilter;
+        const matchesFilter = activeFilter === "all" ||
+          (["ready", "missing"].includes(activeFilter)
+            ? card.dataset.presentation === activeFilter
+            : card.dataset.projectState === activeFilter);
         const matches = matchesText && matchesFilter;
         card.hidden = !matches;
         if (matches) visible += 1;

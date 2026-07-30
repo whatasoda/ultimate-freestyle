@@ -22,6 +22,17 @@ export type ProjectDraftRevisionSummary = {
   created_at: string;
 };
 
+export type DashboardProjectSummary = ProjectSummary & {
+  voice_segment_count: number;
+  voice_ready_count: number;
+  publication_slug: string | null;
+  preview_project_version: number | null;
+  preview_renderer_version: string | null;
+  preview_reviewed_at: string | null;
+  published_project_version: number | null;
+  published_renderer_version: string | null;
+};
+
 export class ProjectRepositoryError extends Error {
   constructor(
     readonly code: ProjectRepositoryErrorCode,
@@ -98,6 +109,84 @@ export async function listProjects(
     has_presentation: row.has_presentation === 1,
     slide_count: row.slide_count,
     total_duration_seconds: row.total_duration_seconds,
+    created_at: row.created_at,
+    updated_at: row.updated_at
+  }));
+}
+
+export async function listDashboardProjects(
+  db: D1Database,
+  ownerUserId: string
+): Promise<DashboardProjectSummary[]> {
+  const result = await db
+    .prepare(
+      `SELECT projects.id, projects.title, projects.stage, projects.version,
+              projects.created_at, projects.updated_at,
+              CASE WHEN json_type(projects.document_json, '$.deck') = 'object' THEN 1 ELSE 0 END AS has_presentation,
+              COALESCE(json_array_length(projects.document_json, '$.deck.slides'), 0) AS slide_count,
+              COALESCE((
+                SELECT SUM(CAST(json_extract(slide.value, '$.duration_seconds') AS INTEGER))
+                FROM json_each(projects.document_json, '$.deck.slides') AS slide
+              ), 0) AS total_duration_seconds,
+              COALESCE((
+                SELECT COUNT(*)
+                FROM json_each(projects.document_json, '$.deck.slides') AS slide,
+                     json_each(slide.value, '$.narration.segments') AS segment
+              ), 0) AS voice_segment_count,
+              COALESCE((
+                SELECT COUNT(*)
+                FROM json_each(projects.document_json, '$.deck.slides') AS slide,
+                     json_each(slide.value, '$.narration.segments') AS segment
+                WHERE json_extract(segment.value, '$.audio_src') IS NOT NULL
+              ), 0) AS voice_ready_count,
+              publications.slug AS publication_slug,
+              preview.project_version AS preview_project_version,
+              preview.renderer_version AS preview_renderer_version,
+              preview.reviewed_at AS preview_reviewed_at,
+              published.project_version AS published_project_version,
+              published.renderer_version AS published_renderer_version
+       FROM research_projects AS projects
+       LEFT JOIN project_publications AS publications
+         ON publications.project_id = projects.id AND publications.owner_user_id = projects.owner_user_id
+       LEFT JOIN presentation_revisions AS preview
+         ON preview.id = publications.latest_preview_revision_id AND preview.owner_user_id = projects.owner_user_id
+       LEFT JOIN presentation_revisions AS published
+         ON published.id = publications.published_revision_id AND published.owner_user_id = projects.owner_user_id
+       WHERE projects.owner_user_id = ?
+       ORDER BY projects.updated_at DESC
+       LIMIT ?`
+    )
+    .bind(ownerUserId, MAX_PROJECTS_PER_USER)
+    .all<Omit<ProjectRow, "document_json"> & {
+      has_presentation: number;
+      slide_count: number;
+      total_duration_seconds: number;
+      voice_segment_count: number;
+      voice_ready_count: number;
+      publication_slug: string | null;
+      preview_project_version: number | null;
+      preview_renderer_version: string | null;
+      preview_reviewed_at: string | null;
+      published_project_version: number | null;
+      published_renderer_version: string | null;
+    }>();
+
+  return result.results.map((row) => ({
+    project_id: row.id,
+    title: row.title,
+    stage: projectDocumentSchema.shape.stage.parse(row.stage),
+    version: row.version,
+    has_presentation: row.has_presentation === 1,
+    slide_count: row.slide_count,
+    total_duration_seconds: row.total_duration_seconds,
+    voice_segment_count: row.voice_segment_count,
+    voice_ready_count: row.voice_ready_count,
+    publication_slug: row.publication_slug,
+    preview_project_version: row.preview_project_version,
+    preview_renderer_version: row.preview_renderer_version,
+    preview_reviewed_at: row.preview_reviewed_at,
+    published_project_version: row.published_project_version,
+    published_renderer_version: row.published_renderer_version,
     created_at: row.created_at,
     updated_at: row.updated_at
   }));

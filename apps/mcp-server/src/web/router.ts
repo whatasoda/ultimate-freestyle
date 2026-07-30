@@ -25,8 +25,8 @@ import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
 import { renderPresentationHtml } from "../presentation/render";
 import {
   getProject,
+  listDashboardProjects,
   listProjectDraftRevisions,
-  listProjects,
   mutateProject,
   restoreProjectDraftRevision
 } from "../projects/repository";
@@ -404,7 +404,7 @@ async function handleDashboard(request: Request, env: Env): Promise<Response> {
   return dashboardPage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
-    projects: await listProjects(env.DB, session.userId)
+    projects: await listDashboardProjects(env.DB, session.userId)
   });
 }
 

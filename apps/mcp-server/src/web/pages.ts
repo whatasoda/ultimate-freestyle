@@ -6,7 +6,10 @@ import type {
   SlideBlock,
   SlideSceneNode
 } from "../projects/schema";
-import type { ProjectDraftRevisionSummary } from "../projects/repository";
+import type {
+  DashboardProjectSummary,
+  ProjectDraftRevisionSummary
+} from "../projects/repository";
 import {
   DEFAULT_VOICEVOX_TUNING,
   VOICEVOX_TUNING_LIMITS,
@@ -19,7 +22,10 @@ import {
   MAX_PRESENTATION_DURATION_SECONDS,
   type PublicationStatus
 } from "../publications/service";
-import { listPresentationAssetIds } from "../presentation/render";
+import {
+  listPresentationAssetIds,
+  PRESENTATION_RENDERER_VERSION
+} from "../presentation/render";
 import { VOICEVOX_CATALOG } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import { resolveSlideTypography } from "../projects/typography";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
@@ -241,7 +247,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=111";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=112";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -370,6 +376,10 @@ function shell(title: string, body: string): string {
       .version { color: var(--muted); font-size: .78rem; }
       .card h2 { margin: 1.2rem 0 .6rem; font-size: 1.35rem; overflow-wrap: anywhere; }
       .meta { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+      .project-statuses { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .8rem; }
+      .project-status { padding: .22rem .45rem; border: 1px solid #52647c; border-radius: 999px; color: #c4cfdd; font-size: .7rem; font-weight: 750; }
+      .project-status[data-state="ready"] { border-color: #36785b; background: #15312566; color: #9be6bd; }
+      .project-status[data-state="attention"] { border-color: #826b30; background: #2a210d; color: #ffe09a; }
       .empty { padding: clamp(1.5rem, 5vw, 3rem); text-align: center; }
       .empty h2 { margin-top: 0; }
       .empty p { color: var(--muted); line-height: 1.7; }
@@ -1127,21 +1137,44 @@ export function landingPage(options: {
 export function dashboardPage(options: {
   twitchLogin: string;
   csrfToken: string;
-  projects: ProjectSummary[];
+  projects: DashboardProjectSummary[];
 }): Response {
   const cards = options.projects
     .map(
-      (project) => `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-title="${escapeHtml(project.title)}" data-updated="${escapeHtml(project.updated_at)}" data-duration="${project.total_duration_seconds}" data-search-text="${escapeHtml(`${project.title} ${STAGE_LABELS[project.stage]}`.toLocaleLowerCase("ja"))}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
+      (project) => {
+        const previewCurrent = project.preview_project_version === project.version && project.preview_renderer_version === PRESENTATION_RENDERER_VERSION;
+        const publishedCurrent = project.published_project_version === project.version && project.published_renderer_version === PRESENTATION_RENDERER_VERSION;
+        const publicationLabel = publishedCurrent
+          ? "公開中"
+          : project.published_project_version !== null
+            ? "公開後に変更あり"
+            : previewCurrent && project.preview_reviewed_at !== null
+              ? "公開できます"
+              : previewCurrent
+                ? "プレビュー確認待ち"
+                : "プレビュー未作成";
+        const publicationState = publishedCurrent ? "ready" : "attention";
+        const cardState = !project.has_presentation ? "missing" : publishedCurrent ? "published" : "attention";
+        const voiceLabel = project.voice_segment_count === 0
+          ? "音声原稿なし"
+          : project.voice_ready_count === project.voice_segment_count
+            ? `音声 ${project.voice_ready_count}/${project.voice_segment_count} 完成`
+            : `音声 ${project.voice_ready_count}/${project.voice_segment_count}`;
+        const voiceState = project.voice_segment_count > 0 && project.voice_ready_count === project.voice_segment_count ? "ready" : "attention";
+        const searchText = `${project.title} ${STAGE_LABELS[project.stage]} ${voiceLabel} ${publicationLabel}`.toLocaleLowerCase("ja");
+        return `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-project-state="${cardState}" data-title="${escapeHtml(project.title)}" data-updated="${escapeHtml(project.updated_at)}" data-duration="${project.total_duration_seconds}" data-search-text="${escapeHtml(searchText)}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
         <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
         <p class="meta">${project.has_presentation ? `発表 ${project.slide_count}枚 · ${formatDuration(project.total_duration_seconds)}` : "発表は未構成"}</p>
+        ${project.has_presentation ? `<div class="project-statuses"><span class="project-status" data-state="${voiceState}">${voiceLabel}</span><span class="project-status" data-state="${publicationState}">${publicationLabel}</span></div>` : ""}
         <p class="meta">最終更新 ${escapeHtml(formatDate(project.updated_at))}</p>
-      </article></a>`
+      </article></a>`;
+      }
     )
     .join("");
   const content =
     cards.length > 0
-      ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search placeholder="タイトル・制作段階" autocomplete="off"></label><div class="dashboard-filter" role="group" aria-label="研究一覧の表示設定"><button class="ghost" type="button" data-project-filter="all" aria-pressed="true">すべて</button><button class="ghost" type="button" data-project-filter="ready" aria-pressed="false">発表あり</button><button class="ghost" type="button" data-project-filter="missing" aria-pressed="false">未構成</button><label class="dashboard-sort">並び順<select data-project-sort><option value="updated">更新が新しい順</option><option value="title">題名順</option><option value="duration">発表時間が長い順</option></select></label><span class="count" data-project-count>${options.projects.length}件を表示</span></div></div><div class="grid" data-project-grid>${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。検索語または絞り込みを変えてください。</p>`
+      ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search placeholder="タイトル・制作段階・音声・公開状態" autocomplete="off"></label><div class="dashboard-filter" role="group" aria-label="研究一覧の表示設定"><button class="ghost" type="button" data-project-filter="all" aria-pressed="true">すべて</button><button class="ghost" type="button" data-project-filter="ready" aria-pressed="false">発表あり</button><button class="ghost" type="button" data-project-filter="published" aria-pressed="false">公開中</button><button class="ghost" type="button" data-project-filter="attention" aria-pressed="false">要仕上げ</button><button class="ghost" type="button" data-project-filter="missing" aria-pressed="false">未構成</button><label class="dashboard-sort">並び順<select data-project-sort><option value="updated">更新が新しい順</option><option value="title">題名順</option><option value="duration">発表時間が長い順</option></select></label><span class="count" data-project-count>${options.projects.length}件を表示</span></div></div><div class="grid" data-project-grid>${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。検索語または絞り込みを変えてください。</p>`
       : `<section class="empty"><h2>まだ研究がありません</h2><p>Codexなどの対応AIクライアントへ、下の文を貼り付けると最初の研究を始められます。</p><div class="copy-box"><code>最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。</code><div class="actions"><button type="button" data-copy-text="最自由研究MCPを使って、新しい研究を対話しながら作りたいです。まず興味のあることを聞いてください。">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></section>`;
   const connectionGuide = `<details class="connection-guide"${options.projects.length === 0 ? " open" : ""}><summary>AIクライアントとの接続方法</summary><div class="connection-body"><p>Remote MCPに対応したCodex、ChatGPT、Claudeなどから接続します。アプリによって設定画面の名前は「MCP」「コネクタ」「連携」など異なります。</p><ol class="setup-steps"><li>AIクライアントの連携設定で、下のMCP URLを追加します。</li><li>開いた画面でTwitchログインを完了します。</li><li>AIへ「最自由研究MCPを使いたい」と伝えます。</li></ol><div class="endpoint-box"><code>https://saijiyu-kenkyu.2764.moe/mcp</code><button type="button" data-copy-text="https://saijiyu-kenkyu.2764.moe/mcp" data-copy-success="MCP URLをコピーしました。">MCP URLをコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div><p class="inherit-note">TwitchのパスワードやtokenをAIへ貼る必要はありません。認証はTwitchの画面で行います。</p></div></details>`;
 
