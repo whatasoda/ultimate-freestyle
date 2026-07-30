@@ -480,3 +480,10 @@
 - 見出し、表、図だけは途中で分断せず、段落と箇条書きは次段へ自然に続けられるようにした。
 - 段落・項目の先頭または末尾が1行だけ別段へ孤立しないよう、orphansとwidowsを2行に設定した。
 - rendererを@84へ更新した。
+
+## 改善ループ219
+
+- VOICEVOX生成状況の実返却とMCP output schemaを同じZod schemaへ統一した。
+- 既定profileの上書き調声値、区間ごとの7つの実効調声値、未設定時のnull profile名をschemaへ正しく含めた。
+- job状態を自由文字列からqueued、running、completed、partially_failed、failedへ固定し、生成失敗codeも契約化した。
+- service境界で返却値をparseし、Web UIでは通ってもMCP clientのstructuredContent検証だけが失敗するずれを早期検出するようにした。

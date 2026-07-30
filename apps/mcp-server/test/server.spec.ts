@@ -1102,7 +1102,22 @@ describe("MCP contract", () => {
         voice: {
           version: 14,
           configured: true,
-          summary: { total: 1, ready: 0, needs_generation: 1 }
+          default_profile: {
+            tuning: { speedScale: 1.1, intonationScale: 1.2 }
+          },
+          summary: { total: 1, ready: 0, needs_generation: 1 },
+          segments: [{
+            profile_label: "案内役",
+            effective_tuning: {
+              speedScale: 1.1,
+              pitchScale: -0.02,
+              intonationScale: 1.2,
+              volumeScale: 1,
+              pauseLengthScale: 1,
+              prePhonemeLength: 0.1,
+              postPhonemeLength: 0.1
+            }
+          }]
         }
       });
       const deniedGeneration = await client.callTool({

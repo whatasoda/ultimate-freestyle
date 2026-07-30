@@ -67,55 +67,68 @@ type VoiceJobRow = {
   completed_at: string | null;
 };
 
-export type VoiceJob = {
-  job_id: string;
-  project_id: string;
-  requested_version: number;
-  status: string;
-  total_segments: number;
-  completed_segments: number;
-  failed_segments: number;
-  cached_segments: number;
-  total_characters: number;
-  error: { code: string; message: string } | null;
-  created_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  status_url: string;
-};
+export const voicevoxTuningStatusSchema = z.object({
+  speedScale: z.number(),
+  pitchScale: z.number(),
+  intonationScale: z.number(),
+  volumeScale: z.number(),
+  pauseLengthScale: z.number(),
+  prePhonemeLength: z.number(),
+  postPhonemeLength: z.number()
+});
 
-export type VoiceProjectStatus = {
-  project_id: string;
-  version: number;
-  configured: boolean;
-  default_profile: {
-    id: string;
-    label: string;
-    speaker_name: string;
-    style_name: string;
-    tuning: Partial<VoicevoxTuning> | null;
-  } | null;
-  summary: {
-    total: number;
-    ready: number;
-    needs_generation: number;
-    failed: number;
-    queued: number;
-  };
-  segments: Array<{
-    slide_id: string;
-    slide_title: string;
-    at: number;
-    text: string;
-    speaker: string | null;
-    profile_label: string | null;
-    effective_tuning: VoicevoxTuning;
-    status: "ready" | "needs_generation" | "queued" | "failed";
-    audio_url: string | null;
-  }>;
-  active_job: VoiceJob | null;
-  latest_job: VoiceJob | null;
-};
+export const voiceJobStatusSchema = z.object({
+  job_id: z.string().uuid(),
+  project_id: z.string().uuid(),
+  requested_version: z.number().int().positive(),
+  status: z.enum(["queued", "running", "completed", "partially_failed", "failed"]),
+  total_segments: z.number().int().nonnegative(),
+  completed_segments: z.number().int().nonnegative(),
+  failed_segments: z.number().int().nonnegative(),
+  cached_segments: z.number().int().nonnegative(),
+  total_characters: z.number().int().nonnegative(),
+  error: z.object({ code: z.literal("VOICE_GENERATION_FAILED"), message: z.string() }).nullable(),
+  created_at: z.string().datetime(),
+  started_at: z.string().datetime().nullable(),
+  completed_at: z.string().datetime().nullable(),
+  status_url: z.string()
+});
+
+export const voiceProjectStatusSchema = z.object({
+  project_id: z.string().uuid(),
+  version: z.number().int().positive(),
+  configured: z.boolean(),
+  default_profile: z.object({
+    id: z.string(),
+    label: z.string(),
+    speaker_name: z.string(),
+    style_name: z.string(),
+    tuning: voicevoxTuningStatusSchema.partial().nullable()
+  }).nullable(),
+  summary: z.object({
+    total: z.number().int().nonnegative(),
+    ready: z.number().int().nonnegative(),
+    needs_generation: z.number().int().nonnegative(),
+    failed: z.number().int().nonnegative(),
+    queued: z.number().int().nonnegative()
+  }),
+  segments: z.array(z.object({
+    slide_id: z.string(),
+    slide_title: z.string(),
+    at: z.number().int().nonnegative(),
+    text: z.string(),
+    speaker: z.string().nullable(),
+    profile_label: z.string().nullable(),
+    effective_tuning: voicevoxTuningStatusSchema,
+    status: z.enum(["ready", "needs_generation", "queued", "failed"]),
+    audio_url: z.string().nullable()
+  })),
+  active_job: voiceJobStatusSchema.nullable(),
+  latest_job: voiceJobStatusSchema.nullable()
+});
+
+export type VoiceJob = z.infer<typeof voiceJobStatusSchema>;
+export type VoiceProjectStatus = z.infer<typeof voiceProjectStatusSchema>;
 
 export class VoiceGenerationError extends Error {
   constructor(
@@ -164,7 +177,7 @@ const generationInputSchema = z.object({
 });
 
 function toJob(row: VoiceJobRow): VoiceJob {
-  return {
+  return voiceJobStatusSchema.parse({
     job_id: row.id,
     project_id: row.project_id,
     requested_version: row.requested_version,
@@ -182,7 +195,7 @@ function toJob(row: VoiceJobRow): VoiceJob {
     started_at: row.started_at,
     completed_at: row.completed_at,
     status_url: `/api/projects/${row.project_id}/voice/jobs/${row.id}`
-  };
+  });
 }
 
 async function buildVoicePlan(
@@ -433,7 +446,7 @@ export async function getVoiceProjectStatus(
           audio_url: null
         }))
       ) ?? []);
-  return {
+  return voiceProjectStatusSchema.parse({
     project_id: projectId,
     version: project.version,
     configured: defaultProfile !== undefined,
@@ -461,7 +474,7 @@ export async function getVoiceProjectStatus(
         ? latestJob
         : null,
     latest_job: latestJob
-  };
+  });
 }
 
 async function sendVoiceMessages(

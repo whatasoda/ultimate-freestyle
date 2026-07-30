@@ -10,6 +10,8 @@ import {
 import {
   createVoiceGenerationJob,
   getVoiceProjectStatus,
+  voiceJobStatusSchema,
+  voiceProjectStatusSchema,
   VoiceGenerationError
 } from "./service";
 
@@ -26,58 +28,6 @@ const voiceErrorSchema = z.object({
     "INTERNAL_ERROR"
   ]),
   message: z.string()
-});
-
-const voiceJobSchema = z.object({
-  job_id: z.string().uuid(),
-  project_id: z.string().uuid(),
-  requested_version: z.number().int().positive(),
-  status: z.string(),
-  total_segments: z.number().int().nonnegative(),
-  completed_segments: z.number().int().nonnegative(),
-  failed_segments: z.number().int().nonnegative(),
-  cached_segments: z.number().int().nonnegative(),
-  total_characters: z.number().int().nonnegative(),
-  error: z.object({ code: z.string(), message: z.string() }).nullable(),
-  created_at: z.string().datetime(),
-  started_at: z.string().datetime().nullable(),
-  completed_at: z.string().datetime().nullable(),
-  status_url: z.string()
-});
-
-const voiceStatusSchema = z.object({
-  project_id: z.string().uuid(),
-  version: z.number().int().positive(),
-  configured: z.boolean(),
-  default_profile: z
-    .object({
-      id: z.string(),
-      label: z.string(),
-      speaker_name: z.string(),
-      style_name: z.string()
-    })
-    .nullable(),
-  summary: z.object({
-    total: z.number().int().nonnegative(),
-    ready: z.number().int().nonnegative(),
-    needs_generation: z.number().int().nonnegative(),
-    failed: z.number().int().nonnegative(),
-    queued: z.number().int().nonnegative()
-  }),
-  segments: z.array(
-    z.object({
-      slide_id: z.string(),
-      slide_title: z.string(),
-      at: z.number().int().nonnegative(),
-      text: z.string(),
-      speaker: z.string().nullable(),
-      profile_label: z.string(),
-      status: z.enum(["ready", "needs_generation", "queued", "failed"]),
-      audio_url: z.string().nullable()
-    })
-  ),
-  active_job: voiceJobSchema.nullable(),
-  latest_job: voiceJobSchema.nullable()
 });
 
 function normalizeVoiceError(error: unknown): z.infer<typeof voiceErrorSchema> {
@@ -124,7 +74,7 @@ export function registerVoiceTools(
       outputSchema: {
         ok: z.boolean(),
         request_id: z.string().uuid(),
-        voice: voiceStatusSchema.nullable(),
+        voice: voiceProjectStatusSchema.nullable(),
         error: voiceErrorSchema.nullable()
       },
       annotations: {
@@ -186,7 +136,7 @@ export function registerVoiceTools(
         project_id: z.string().uuid(),
         version: z.number().int().positive().nullable(),
         replayed: z.boolean(),
-        job: voiceJobSchema.nullable(),
+        job: voiceJobStatusSchema.nullable(),
         error: voiceErrorSchema.nullable()
       },
       annotations: {
