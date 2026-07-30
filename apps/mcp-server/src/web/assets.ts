@@ -1,6 +1,10 @@
-export const DASHBOARD_ASSET_VERSION = "152";
+export const DASHBOARD_ASSET_VERSION = "153";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const fragmentIdFromHash = (hash) => {
+    const value = hash.startsWith("#") ? hash.slice(1) : hash;
+    try { return decodeURIComponent(value); } catch { return value; }
+  };
   const revealFragmentTarget = (target) => {
     if (!(target instanceof HTMLElement)) return;
     let details = target instanceof HTMLDetailsElement ? target : target.closest("details");
@@ -10,7 +14,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
   };
   if (location.hash.length > 1) {
-    const fragmentTarget = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    const fragmentTarget = document.getElementById(fragmentIdFromHash(location.hash));
     if (fragmentTarget instanceof HTMLElement) {
       revealFragmentTarget(fragmentTarget);
       if (fragmentTarget.tabIndex === -1) {
@@ -21,7 +25,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const link of document.querySelectorAll('a[href^="#"]')) {
     if (!(link instanceof HTMLAnchorElement) || link.hash.length <= 1) continue;
     link.addEventListener("click", () => {
-      const target = document.getElementById(decodeURIComponent(link.hash.slice(1)));
+      const target = document.getElementById(fragmentIdFromHash(link.hash));
       if (target instanceof HTMLElement) revealFragmentTarget(target);
     });
   }

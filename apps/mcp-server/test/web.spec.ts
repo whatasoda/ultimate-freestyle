@@ -444,8 +444,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=152"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=152"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=153"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=153"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -772,7 +772,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=152"'
+      'href="/assets/dashboard.css?v=153"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -791,6 +791,7 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain('panel.removeAttribute("role")');
     expect(DASHBOARD_SCRIPT).toContain("revealFragmentTarget(fragmentTarget)");
     expect(DASHBOARD_SCRIPT).toContain("if (fragmentTarget.tabIndex === -1)");
+    expect(DASHBOARD_SCRIPT).toContain("try { return decodeURIComponent(value); } catch { return value; }");
     expect(DASHBOARD_SCRIPT).toContain("details.open = true");
     expect(workspaceHtml).toContain('data-mobile-preview-badge');
     expect(workspaceHtml).toContain('data-markdown-action="heading"');
@@ -950,7 +951,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=152"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=153"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -959,7 +960,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=152"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=153"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);

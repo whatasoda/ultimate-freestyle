@@ -1412,3 +1412,9 @@
 - 初期表示のfragment展開をプログラムfocus対象と同じ条件へ入れたため、`tabindex=-1`のない一覧見出しでは親detailsを開かなかった。研究項目削除後の`#research-list-findings`が代表例だった。
 - 存在する全fragment targetで親detailsを開き、focusだけを`tabindex=-1`の対象へ限定する二段階へ分けた。通常見出しではブラウザ本来のscroll・focusを維持する。
 - 初期展開と限定focusが別条件であることをscript契約へ追加し、dashboard assetを`v152`へ更新した。
+
+## 改善ループ372
+
+- 初期表示とanchor clickでfragmentを直接`decodeURIComponent`へ渡していたため、不完全なpercent escapeを含むURLでは例外がdashboard script全体を止めた。fragment以外の保存・preview・音声操作まで初期化されなくなる。
+- fragment IDの安全な復号関数を共通化し、正常な日本語IDは復号、壊れたescapeは生値へ戻して対象なしとして継続する。
+- 例外を局所化するfallbackをscript契約へ追加し、dashboard assetを`v153`へ更新した。
