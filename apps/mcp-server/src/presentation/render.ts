@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@100";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@101";
 
 function escapeHtml(value: string): string {
   return value
@@ -1492,8 +1492,10 @@ export function renderPresentationHtml(
       while (current instanceof HTMLElement) {
         const style = getComputedStyle(current);
         if (style.backgroundImage && style.backgroundImage !== 'none') complex = true;
+        const opacity = Math.min(1, Math.max(0, Number.parseFloat(style.opacity) || 0));
+        if (opacity < .99) complex = true;
         const color = parseRenderedColor(style.backgroundColor);
-        if (color) background = compositeColor(background, color);
+        if (color) background = compositeColor(background, { ...color, alpha: color.alpha * opacity });
         if (background.alpha >= .99 || current === slideElement) break;
         current = current.parentElement;
       }
@@ -1522,17 +1524,28 @@ export function renderPresentationHtml(
       for (const candidate of candidates) {
         const style = getComputedStyle(candidate);
         const foreground = parseRenderedColor(style.color);
-        if (!foreground || foreground.alpha < .99 || Number(style.opacity) < .99) continue;
+        if (!foreground) continue;
         const background = renderedBackground(candidate, slideElement);
+        let effectiveOpacity = foreground.alpha;
+        let current = candidate;
+        while (current instanceof HTMLElement) {
+          effectiveOpacity *= Math.min(1, Math.max(0, Number.parseFloat(getComputedStyle(current).opacity) || 0));
+          if (current === slideElement) break;
+          current = current.parentElement;
+        }
+        const displayedForeground = compositeColor(
+          { ...foreground, alpha: effectiveOpacity },
+          background.color
+        );
         const fontSize = Number.parseFloat(style.fontSize);
         const fontWeight = Number.parseInt(style.fontWeight, 10) || 400;
         const required = fontSize >= 24 || (fontSize >= 18.66 && fontWeight >= 700) ? 3 : 4.5;
-        const ratio = contrastRatio(foreground, background.color);
+        const ratio = contrastRatio(displayedForeground, background.color);
         if (ratio + .05 >= required || (lowest && lowest.ratio <= ratio)) continue;
         const dark = { red: 17, green: 24, blue: 39, alpha: 1 };
         const light = { red: 248, green: 250, blue: 252, alpha: 1 };
         const suggested = contrastRatio(dark, background.color) >= contrastRatio(light, background.color) ? dark : light;
-        lowest = { ratio, required, estimated: background.complex, suggested_foreground: colorHex(suggested) };
+        lowest = { ratio, required, estimated: background.complex || effectiveOpacity < .99, suggested_foreground: colorHex(suggested) };
       }
       return lowest;
     };

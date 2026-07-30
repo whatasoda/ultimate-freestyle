@@ -2416,7 +2416,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           appendDiagnostic(item, item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。");
         }
         for (const item of contrasts) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1" + (item.estimated ? "（背景模様を除く概算）" : "") + "です（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
+          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1" + (item.estimated ? "（背景模様・透明度を含む概算のため目視確認）" : "") + "です（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
         }
         for (const item of clamps) {
           appendDiagnostic(item, "読み上げ枠で約" + item.hidden_lines + "行が省略されています。最大行数、文字倍率、枠の大きさを調整してください。");

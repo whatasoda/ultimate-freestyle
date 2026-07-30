@@ -184,7 +184,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@100");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@101");
+    expect(html).toContain("effectiveOpacity *=");
+    expect(html).toContain("background.complex || effectiveOpacity < .99");
     expect(html).toContain('--aspect-font-scale: 1;');
     expect(html).toContain('--aspect-font-scale: 1.3333;');
     expect(html).toContain('rendered * 1080 / slideHeight');
