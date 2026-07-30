@@ -439,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=118"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=119"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
@@ -2620,6 +2620,31 @@ describe("Web dashboard", () => {
     expect(longSlideWorkspaceHtml).toContain("data-slide-split");
     const splitContent = "## 前半\n\n観察した条件を詳しく説明します。\n\n## 後半\n\n結果と考察を詳しく説明します。";
     const splitOffset = splitContent.indexOf("## 後半");
+    const beforeSplitRow = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const beforeSplitDocument = JSON.parse(beforeSplitRow!.document_json);
+    const longSlide = beforeSplitDocument.deck.slides.find(
+      (item: { id: string }) => item.id === longSlideResult.slide_id
+    );
+    const narrationTemplate = beforeSplitDocument.deck.slides[0].narration;
+    const segmentTemplate = narrationTemplate.segments[0];
+    longSlide.reveal_steps = 3;
+    longSlide.reveal_blocks = [
+      { at: 1, markdown: "前半の追加情報" },
+      { at: 3, markdown: "後半の追加情報" }
+    ];
+    longSlide.narration = {
+      ...narrationTemplate,
+      segments: [
+        { ...segmentTemplate, at: 0, text: "前半の導入", audio_src: null },
+        { ...segmentTemplate, at: 2, text: "後半の導入", audio_src: null },
+        { ...segmentTemplate, at: 3, text: "後半の結論", audio_src: null }
+      ]
+    };
+    await env.DB.prepare(
+      "UPDATE research_projects SET document_json = ? WHERE id = ?"
+    ).bind(JSON.stringify(beforeSplitDocument), "10000000-0000-4000-8000-000000000001").run();
     const splitLongSlide = await requestProvider(
       provider,
       new Request(
@@ -2665,18 +2690,28 @@ describe("Web dashboard", () => {
       title: "長文を分ける",
       content_markdown: "## 前半\n\n観察した条件を詳しく説明します。",
       sidebar_markdown: "前半だけの補足",
-      narration: null
+      reveal_steps: 1,
+      reveal_blocks: [{ at: 1, markdown: "前半の追加情報" }],
+      narration: { segments: [{ at: 0, text: "前半の導入" }] }
     });
     expect(splitAfter).toMatchObject({
       title: "長文を分ける（続き）",
       content_markdown: "## 後半\n\n結果と考察を詳しく説明します。",
-      sidebar_markdown: null,
-      narration: null,
+      sidebar_markdown: "前半だけの補足",
+      reveal_steps: 1,
+      reveal_blocks: [{ at: 1, markdown: "後半の追加情報" }],
+      narration: {
+        segments: [
+          { at: 0, text: "後半の導入" },
+          { at: 1, text: "後半の結論" }
+        ]
+      },
       composition: null
     });
     expect(splitBefore.duration_seconds + splitAfter.duration_seconds).toBe(60);
     expect(DASHBOARD_SCRIPT).toContain("本文の先頭と末尾以外へカーソルを置いてください");
     expect(DASHBOARD_SCRIPT).toContain("内容以外の未保存設定を先に保存してください");
+    expect(DASHBOARD_SCRIPT).toContain("段階表示と読み上げは想定時間の位置に応じて前後へ分けます");
     expect(DASHBOARD_SCRIPT).toContain("sessionStorage.removeItem(form.dataset.draftKey)");
 
     const unsupportedUpload = await requestProvider(

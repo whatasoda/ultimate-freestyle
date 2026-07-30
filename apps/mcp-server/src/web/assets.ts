@@ -1947,7 +1947,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         content.focus();
         return;
       }
-      if (!confirm("カーソル位置で本文を2枚へ分けますか？ 見た目は引き継ぎ、読み上げと補足欄は前のスライドに残ります。")) return;
+      if (!confirm("カーソル位置で本文を2枚へ分けますか？ 見た目と補足欄は両方へ引き継ぎ、段階表示と読み上げは想定時間の位置に応じて前後へ分けます。STEP 0の読み上げは前半に残ります。")) return;
       setButtonBusy(splitSlideButton, true);
       showSavingState();
       feedback.textContent = "本文を2枚のスライドへ分けています…";

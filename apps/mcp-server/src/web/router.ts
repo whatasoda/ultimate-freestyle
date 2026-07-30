@@ -1745,10 +1745,29 @@ async function handleSlideSplit(
           1,
           parsed.data.duration_seconds - beforeDuration
         );
+        const totalSteps = slide.reveal_steps + 1;
+        const splitStep = totalSteps < 2
+          ? totalSteps
+          : Math.min(totalSteps - 1, Math.max(1, Math.round(totalSteps * beforeRatio)));
+        const originalReveals = slide.reveal_blocks;
+        const originalNarration = slide.narration;
+        const beforeReveals = originalReveals.filter((block) => block.at < splitStep);
+        const afterReveals = originalReveals
+          .filter((block) => block.at >= splitStep)
+          .map((block) => ({ ...block, at: block.at - splitStep }));
+        const beforeSegments = originalNarration?.segments.filter((segment) => segment.at < splitStep) ?? [];
+        const afterSegments = originalNarration?.segments
+          .filter((segment) => segment.at >= splitStep)
+          .map((segment) => ({ ...segment, at: segment.at - splitStep })) ?? [];
         slide.title = parsed.data.title;
         slide.content_markdown = before;
         slide.sidebar_markdown = parsed.data.sidebar_markdown.trim() || null;
         slide.duration_seconds = beforeDuration;
+        slide.reveal_steps = Math.max(0, splitStep - 1);
+        slide.reveal_blocks = beforeReveals;
+        slide.narration = originalNarration === null
+          ? null
+          : { ...originalNarration, segments: beforeSegments };
         const suffix = "（続き）";
         const nextTitle = `${parsed.data.title.slice(0, 120 - suffix.length)}${suffix}`;
         const nextSlide = projectSlideSchema.parse({
@@ -1756,13 +1775,15 @@ async function handleSlideSplit(
           id: nextSlideId,
           title: nextTitle,
           duration_seconds: afterDuration,
-          reveal_steps: 0,
+          reveal_steps: Math.max(0, totalSteps - splitStep - 1),
           role: "content",
           cover_layout: "center",
           content_markdown: after,
-          reveal_blocks: [],
-          sidebar_markdown: null,
-          narration: null,
+          reveal_blocks: afterReveals,
+          sidebar_markdown: parsed.data.sidebar_markdown.trim() || null,
+          narration: originalNarration === null || afterSegments.length === 0
+            ? null
+            : { ...originalNarration, segments: afterSegments },
           composition: null
         });
         deck.slides.splice(slideIndex + 1, 0, nextSlide);
