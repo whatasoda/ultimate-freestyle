@@ -444,8 +444,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=158"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=158"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=159"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=159"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -707,7 +707,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@113"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@114"');
 
     const voicePage = await requestProvider(
       provider,
@@ -772,7 +772,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=158"'
+      'href="/assets/dashboard.css?v=159"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -841,7 +841,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("data-narration-segment-delete");
     expect(workspaceHtml).toContain('data-inspector-section="design"');
     expect(workspaceHtml).toContain('data-inspector-section="narration"');
-    expect(workspaceHtml).toContain("ブラウザ仮試聴では速度・高さ・音量を近似");
+    expect(workspaceHtml).toContain("ブラウザ仮試聴は速度・高さ・音量と休符を近似");
     expect(workspaceHtml).toContain("この区間を保存");
     expect(workspaceHtml).toContain('id="narration-segment-0"');
     expect(workspaceHtml).toContain("最初の読み上げ文");
@@ -851,6 +851,7 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-slide-action="move"');
     expect(workspaceHtml).toContain('data-slide-action="delete"');
     expect(workspaceHtml).toContain("現在有効な設定");
+    expect(workspaceHtml).toContain("この編集画面の使い方");
     expect(workspaceHtml).toContain("data-preview-templates");
     expect(workspaceHtml).toContain("&quot;background&quot;:&quot;#111827&quot;");
     expect(workspaceHtml).toContain("&quot;sidebar_width_percent&quot;:30");
@@ -890,6 +891,10 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("編集できるテンプレートを追加");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-editor");
+    expect(workspaceHtml).toContain("data-voice-cue");
+    expect(workspaceHtml).toContain("声を変える位置を追加");
+    expect(workspaceHtml).toContain("読み上げ前後の余白");
+    expect(workspaceHtml).toContain("はじめての読み上げ設定");
     expect(workspaceHtml).toContain("VOICEVOX音声が未生成");
     expect(workspaceHtml).toContain("ずんだもん・ノーマル");
     expect(workspaceHtml).toContain("data-component-select");
@@ -953,7 +958,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=158"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=159"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -962,7 +967,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=158"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=159"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);

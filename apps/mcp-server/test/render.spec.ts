@@ -184,7 +184,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@113");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@114");
+    expect(html).toContain("startVoiceDelay");
+    expect(html).toContain("読み上げ前の間");
+    expect(html).toContain("休符 · ");
     expect(html).toContain("const isEditorTargetVisible = (item)");
     expect(html).toContain(
       "item.closest('.reveal-block[aria-hidden=\"true\"]') === null"
@@ -198,7 +201,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const pauseProgressClock = () =>");
     expect(html).toContain("progressClock?.kind === 'auto'");
     expect(html).toContain("startProgressClock(delay, 0, 'auto')");
-    expect(html).toContain("startProgressClock(estimated * 1000, 0, 'voice')");
+    expect(html).toContain("startProgressClock(estimated, 0, 'voice')");
     expect(html).toContain("const autoRemaining = autoDeadline === null");
     expect(html).toContain("unitStartedAt += performance.now() - paused.hiddenAt");
     expect(html).toContain("container: presentation-space / size");
@@ -286,7 +289,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("音声開始待ち · 「音声を開始」を押す");
     expect(html).toContain("if (run !== voiceRun) return;");
     expect(html).toContain("if (run !== voiceRun || activeAudio !== player) return;");
-    expect(html).toContain("activeAudio = null;\n        finishVoice();");
+    expect(html).toContain("activeAudio = null;\n        finishVoice(segment);");
     expect(html).toContain("ultimate-freestyle:save-component");
     expect(html).toContain("ultimate-freestyle:save-status");
     expect(html).toContain("Control+S Meta+S");

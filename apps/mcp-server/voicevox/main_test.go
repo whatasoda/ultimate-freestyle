@@ -16,6 +16,7 @@ type fakeEngine struct {
 	speakerData  []byte
 	wav          []byte
 	lastText     string
+	texts        []string
 	lastStyleID  int
 	lastTuning   voiceTuning
 	err          error
@@ -31,6 +32,7 @@ func (f *fakeEngine) speakers(context.Context) ([]byte, error) {
 
 func (f *fakeEngine) synthesize(_ context.Context, text string, styleID int, tuning voiceTuning) ([]byte, error) {
 	f.lastText = text
+	f.texts = append(f.texts, text)
 	f.lastStyleID = styleID
 	f.lastTuning = tuning
 	return f.wav, f.err
@@ -106,6 +108,37 @@ func TestSynthesizeRejectsUnsafeInput(t *testing.T) {
 				t.Fatalf("body = %s", response.Body.String())
 			}
 		})
+	}
+}
+
+func TestSynthesizeSequenceChangesToneAndAddsPause(t *testing.T) {
+	engine := &fakeEngine{wav: []byte("wav")}
+	api := newHandler(
+		engine,
+		func(context.Context, []byte) ([]byte, error) { return []byte("single"), nil },
+		func(_ context.Context, parts []audioSequencePart) ([]byte, error) {
+			if len(parts) != 3 || parts[0].PauseMS != 0 || parts[1].PauseMS != 800 || parts[2].PauseMS != 0 {
+				t.Fatalf("unexpected sequence: %#v", parts)
+			}
+			return []byte("sequence-mp3"), nil
+		},
+	)
+	body := `{"parts":[
+		{"kind":"speech","text":"まず普通に。","style_id":3,"tuning":{"speedScale":1,"pitchScale":0,"intonationScale":1,"volumeScale":1,"pauseLengthScale":1,"prePhonemeLength":0.1,"postPhonemeLength":0.1}},
+		{"kind":"pause","duration_ms":800},
+		{"kind":"speech","text":"ここは強調。","style_id":1,"tuning":{"speedScale":0.9,"pitchScale":0.05,"intonationScale":1.4,"volumeScale":1,"pauseLengthScale":1,"prePhonemeLength":0.1,"postPhonemeLength":0.1}}
+	]}`
+	request := httptest.NewRequest(http.MethodPost, "/synthesize-sequence", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	api.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK || response.Body.String() != "sequence-mp3" {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if strings.Join(engine.texts, "/") != "まず普通に。/ここは強調。" || engine.lastStyleID != 1 {
+		t.Fatalf("speech sequence was not forwarded: %#v", engine)
 	}
 }
 

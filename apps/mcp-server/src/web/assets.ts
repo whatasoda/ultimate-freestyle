@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "158";
+export const DASHBOARD_ASSET_VERSION = "159";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
@@ -1085,11 +1085,34 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const value = optionalNumberValue(data, "tuning_" + key);
         if (value !== undefined) tuning[key] = value;
       }
+      const voiceCues = [...form.querySelectorAll("[data-voice-cue]")].map((cue, index) => {
+        const value = (name) => cue.querySelector('[name="' + name + '"]');
+        const stringValue = (name) => value(name) instanceof HTMLInputElement || value(name) instanceof HTMLTextAreaElement || value(name) instanceof HTMLSelectElement
+          ? value(name).value
+          : "";
+        const cueTuning = {};
+        for (const key of ["speedScale", "pitchScale", "intonationScale"]) {
+          const raw = stringValue("cue_" + key).trim();
+          if (raw !== "" && Number.isFinite(Number(raw))) cueTuning[key] = Number(raw);
+        }
+        const pauseSeconds = Number(stringValue("cue_pause_after_seconds") || 0);
+        return {
+          id: stringValue("cue_id") || "cue-" + (index + 1),
+          text: stringValue("cue_text"),
+          voice_profile_id: stringValue("cue_profile_id") || null,
+          voice_tuning: Object.keys(cueTuning).length ? cueTuning : null,
+          pause_after_ms: Math.round(Math.max(0, pauseSeconds) * 10) * 100
+        };
+      });
+      const composedText = voiceCues.map((cue) => cue.text).join("");
       Object.assign(body, {
-        text: String(data.get("text") || ""),
+        text: composedText || String(data.get("text") || ""),
         speaker: String(data.get("speaker") || "").trim() || null,
         voice_profile_id: String(data.get("voice_profile_id") || "") || null,
-        voice_tuning: Object.keys(tuning).length ? tuning : null
+        voice_tuning: Object.keys(tuning).length ? tuning : null,
+        voice_cues: voiceCues,
+        pause_before_ms: Math.round(Math.max(0, Number(data.get("pause_before_seconds") || 0)) * 10) * 100,
+        pause_after_ms: Math.round(Math.max(0, Number(data.get("pause_after_seconds") || 0.35)) * 10) * 100
       });
     }
     return body;
@@ -2964,10 +2987,33 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const fallback = inherited[name] ?? (name === "speedScale" ? 1 : 0);
     return value === "" || !Number.isFinite(Number(value)) ? Number(fallback) : Number(value);
   };
+  const voiceCueElements = (form) => [...form.querySelectorAll("[data-voice-cue]")].filter((cue) => cue instanceof HTMLFieldSetElement);
+  const voiceCueField = (cue, name) => cue.querySelector('[name="' + name + '"]');
+  const voiceCueFieldValue = (cue, name) => {
+    const field = voiceCueField(cue, name);
+    return field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement ? field.value : "";
+  };
+  const syncVoiceCueForm = (form) => {
+    const cues = voiceCueElements(form);
+    const text = cues.map((cue) => voiceCueFieldValue(cue, "cue_text")).join("");
+    const composed = form.elements.namedItem("text");
+    if (composed instanceof HTMLTextAreaElement) composed.value = text;
+    const preview = form.querySelector("[data-composed-narration-preview]");
+    if (preview instanceof HTMLElement) preview.textContent = text || "発話ブロックへ文章を入力してください。";
+    cues.forEach((cue, index) => {
+      const label = cue.querySelector("[data-voice-cue-label]");
+      if (label instanceof HTMLElement) label.textContent = "発話 " + (index + 1);
+      const remove = cue.querySelector("[data-remove-voice-cue]");
+      if (remove instanceof HTMLButtonElement) remove.disabled = cues.length === 1;
+    });
+    const add = form.querySelector("[data-add-voice-cue]");
+    if (add instanceof HTMLButtonElement) add.disabled = cues.length >= 8;
+  };
   const updateSegmentDuration = (form) => {
     const output = form.querySelector("[data-segment-duration]");
     const text = form.elements.namedItem("text");
     if (!(output instanceof HTMLElement) || !(text instanceof HTMLTextAreaElement)) return;
+    if (form.matches("[data-segment-editor]")) syncVoiceCueForm(form);
     const inherited = segmentInheritedTuning(form);
     for (const field of form.querySelectorAll('input[name^="tuning_"]')) {
       if (!(field instanceof HTMLInputElement)) continue;
@@ -2975,7 +3021,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       field.placeholder = "実効 " + (inherited[key] ?? "-");
     }
     const stepDuration = Number(form.dataset.stepDuration || 0);
-    const estimated = Math.max(1.5, text.value.length / (7 * segmentTuningValue(form, "speedScale")));
+    const cues = voiceCueElements(form);
+    const speechSeconds = cues.length > 0
+      ? cues.reduce((total, cue) => {
+          const speedValue = Number(voiceCueFieldValue(cue, "cue_speedScale"));
+          const speed = voiceCueFieldValue(cue, "cue_speedScale").trim() === "" || !Number.isFinite(speedValue)
+            ? segmentTuningValue(form, "speedScale")
+            : speedValue;
+          return total + Math.max(1.2, voiceCueFieldValue(cue, "cue_text").length / (7 * speed)) + Math.max(0, Number(voiceCueFieldValue(cue, "cue_pause_after_seconds") || 0));
+        }, 0)
+      : Math.max(1.5, text.value.length / (7 * segmentTuningValue(form, "speedScale")));
+    const estimated = speechSeconds + Math.max(0, Number(new FormData(form).get("pause_before_seconds") || 0)) + Math.max(0, Number(new FormData(form).get("pause_after_seconds") || 0));
     const previewButton = form.querySelector("[data-segment-speech-preview]");
     if (previewButton instanceof HTMLButtonElement) previewButton.disabled = text.value.trim() === "";
     output.textContent = "概算 " + estimated.toFixed(1) + "秒 / STEP目安 " + stepDuration.toFixed(1) + "秒";
@@ -2985,12 +3041,73 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(form instanceof HTMLFormElement)) continue;
     updateSegmentDuration(form);
     form.addEventListener("input", () => updateSegmentDuration(form));
+    form.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !form.matches("[data-segment-editor]")) return;
+      const addButton = target.closest("[data-add-voice-cue]");
+      if (addButton instanceof HTMLButtonElement) {
+        const template = form.querySelector("[data-voice-cue-template]");
+        const list = form.querySelector("[data-voice-cue-list]");
+        if (!(template instanceof HTMLTemplateElement) || !(list instanceof HTMLElement) || voiceCueElements(form).length >= 8) return;
+        const fragment = template.content.cloneNode(true);
+        const cue = fragment.querySelector("[data-voice-cue]");
+        const cueId = cue?.querySelector('[name="cue_id"]');
+        if (cueId instanceof HTMLInputElement) cueId.value = "cue-" + Date.now().toString(36) + "-" + (voiceCueElements(form).length + 1);
+        list.append(fragment);
+        syncVoiceCueForm(form);
+        updateSegmentDuration(form);
+        const textField = list.lastElementChild?.querySelector('[name="cue_text"]');
+        if (textField instanceof HTMLTextAreaElement) textField.focus();
+        form.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+      const removeButton = target.closest("[data-remove-voice-cue]");
+      if (removeButton instanceof HTMLButtonElement) {
+        const cues = voiceCueElements(form);
+        if (cues.length <= 1) return;
+        removeButton.closest("[data-voice-cue]")?.remove();
+        syncVoiceCueForm(form);
+        updateSegmentDuration(form);
+        form.dispatchEvent(new Event("input", { bubbles: true }));
+        return;
+      }
+      const presetButton = target.closest("[data-voice-cue-preset]");
+      if (!(presetButton instanceof HTMLButtonElement)) return;
+      const cue = presetButton.closest("[data-voice-cue]");
+      if (!(cue instanceof HTMLFieldSetElement)) return;
+      const presets = {
+        standard: { speedScale: 1, pitchScale: 0, intonationScale: 1 },
+        emphasis: { speedScale: 1.08, pitchScale: 0.04, intonationScale: 1.35 },
+        calm: { speedScale: 0.9, pitchScale: -0.03, intonationScale: 0.8 },
+        quick: { speedScale: 1.3, pitchScale: 0.01, intonationScale: 1.1 }
+      };
+      const preset = presets[presetButton.dataset.voiceCuePreset];
+      if (!preset) return;
+      for (const [key, value] of Object.entries(preset)) {
+        const field = voiceCueField(cue, "cue_" + key);
+        if (field instanceof HTMLInputElement) field.value = String(value);
+      }
+      updateSegmentDuration(form);
+      form.dispatchEvent(new Event("input", { bubbles: true }));
+    });
   }
 
   let segmentSampleButton = null;
   let segmentSamplePlayer = null;
   let segmentSampleObjectUrl = "";
   let segmentSampleAbort = null;
+  let segmentSpeechPreviewTimer = 0;
+  let segmentSpeechPreviewButton = null;
+  const stopSegmentSpeechPreview = () => {
+    clearTimeout(segmentSpeechPreviewTimer);
+    segmentSpeechPreviewTimer = 0;
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    if (segmentSpeechPreviewButton instanceof HTMLButtonElement) {
+      segmentSpeechPreviewButton.setAttribute("aria-pressed", "false");
+      segmentSpeechPreviewButton.textContent = "ブラウザで仮試聴";
+    }
+    segmentSpeechPreviewButton = null;
+  };
   const stopSegmentVoicevoxSample = (message = "") => {
     segmentSampleAbort?.abort();
     segmentSampleAbort = null;
@@ -3026,12 +3143,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         return;
       }
       if (button.getAttribute("aria-pressed") === "true") {
-        speechSynthesis.cancel();
-        button.setAttribute("aria-pressed", "false");
-        button.textContent = "ブラウザで仮試聴";
+        stopSegmentSpeechPreview();
         return;
       }
-      speechSynthesis.cancel();
+      stopSegmentSpeechPreview();
       for (const other of document.querySelectorAll("[data-segment-speech-preview]")) {
         if (other instanceof HTMLButtonElement) {
           other.setAttribute("aria-pressed", "false");
@@ -3040,23 +3155,53 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
       const form = button.closest("[data-segment-preview]");
       if (!(form instanceof HTMLFormElement)) return;
-      const data = new FormData(form);
-      const utterance = new SpeechSynthesisUtterance(String(data.get("text") || ""));
-      utterance.lang = "ja-JP";
-      utterance.rate = Math.min(2, Math.max(0.5, segmentTuningValue(form, "speedScale")));
-      utterance.pitch = Math.min(2, Math.max(0.5, 1 + segmentTuningValue(form, "pitchScale") * 2));
-      utterance.volume = Math.min(1, Math.max(0, segmentTuningValue(form, "volumeScale")));
+      syncVoiceCueForm(form);
       const japaneseVoice = speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("ja"));
-      if (japaneseVoice) utterance.voice = japaneseVoice;
-      const finish = () => {
-        button.setAttribute("aria-pressed", "false");
-        button.textContent = "ブラウザで仮試聴";
+      const cues = voiceCueElements(form);
+      const previewCues = cues.length > 0
+        ? cues.map((cue) => ({
+            text: voiceCueFieldValue(cue, "cue_text"),
+            speed: Number(voiceCueFieldValue(cue, "cue_speedScale") || segmentTuningValue(form, "speedScale")),
+            pitch: Number(voiceCueFieldValue(cue, "cue_pitchScale") || segmentTuningValue(form, "pitchScale")),
+            pause: Math.max(0, Number(voiceCueFieldValue(cue, "cue_pause_after_seconds") || 0) * 1000)
+          }))
+        : [{ text: String(new FormData(form).get("text") || ""), speed: segmentTuningValue(form, "speedScale"), pitch: segmentTuningValue(form, "pitchScale"), pause: 0 }];
+      const finish = (postPause = true) => {
+        const delay = postPause ? Math.max(0, Number(new FormData(form).get("pause_after_seconds") || 0) * 1000) : 0;
+        if (delay > 0) {
+          button.textContent = "読み上げ後の余白…";
+          segmentSpeechPreviewTimer = setTimeout(() => finish(false), delay);
+          return;
+        }
+        stopSegmentSpeechPreview();
       };
-      utterance.addEventListener("end", finish, { once: true });
-      utterance.addEventListener("error", finish, { once: true });
+      const playCue = (index) => {
+        if (segmentSpeechPreviewButton !== button) return;
+        const cue = previewCues[index];
+        if (!cue) { finish(); return; }
+        const utterance = new SpeechSynthesisUtterance(cue.text);
+        utterance.lang = "ja-JP";
+        utterance.rate = Math.min(2, Math.max(0.5, cue.speed));
+        utterance.pitch = Math.min(2, Math.max(0.5, 1 + cue.pitch * 2));
+        utterance.volume = Math.min(1, Math.max(0, segmentTuningValue(form, "volumeScale")));
+        if (japaneseVoice) utterance.voice = japaneseVoice;
+        utterance.addEventListener("end", () => {
+          if (cue.pause > 0) {
+            button.textContent = "休符 " + (cue.pause / 1000).toFixed(1) + "秒…";
+            segmentSpeechPreviewTimer = setTimeout(() => { button.textContent = "試聴を停止"; playCue(index + 1); }, cue.pause);
+          } else playCue(index + 1);
+        }, { once: true });
+        utterance.addEventListener("error", () => finish(false), { once: true });
+        speechSynthesis.speak(utterance);
+      };
+      segmentSpeechPreviewButton = button;
       button.setAttribute("aria-pressed", "true");
       button.textContent = "試聴を停止";
-      speechSynthesis.speak(utterance);
+      const prePause = Math.max(0, Number(new FormData(form).get("pause_before_seconds") || 0) * 1000);
+      if (prePause > 0) {
+        button.textContent = "読み上げ前の間…";
+        segmentSpeechPreviewTimer = setTimeout(() => { button.textContent = "試聴を停止"; playCue(0); }, prePause);
+      } else playCue(0);
     });
   }
 
@@ -3069,7 +3214,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         return;
       }
       stopSegmentVoicevoxSample();
-      if ("speechSynthesis" in window) speechSynthesis.cancel();
+      stopSegmentSpeechPreview();
       for (const speechButton of document.querySelectorAll("[data-segment-speech-preview]")) {
         if (speechButton instanceof HTMLButtonElement) {
           speechButton.setAttribute("aria-pressed", "false");

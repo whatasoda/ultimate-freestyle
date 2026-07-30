@@ -5,7 +5,8 @@ export function invalidateInheritedVoiceAudio(
 ): void {
   for (const slide of document.deck?.slides ?? []) {
     for (const segment of slide.narration?.segments ?? []) {
-      if (segment.voice_profile_id === null || segment.voice_profile_id === undefined) {
+      const segmentInherits = segment.voice_profile_id === null || segment.voice_profile_id === undefined;
+      if (segmentInherits) {
         segment.audio_src = null;
       }
     }
@@ -22,7 +23,12 @@ export function invalidateVoiceProfileAudio(
       const inheritsProfile =
         (segment.voice_profile_id === null || segment.voice_profile_id === undefined) &&
         defaultProfileId === profileId;
-      if (segment.voice_profile_id === profileId || inheritsProfile) {
+      const cueUsesProfile = segment.voice_cues?.some((cue) => {
+        if (cue.voice_profile_id === profileId) return true;
+        return (cue.voice_profile_id === null || cue.voice_profile_id === undefined) &&
+          (segment.voice_profile_id === profileId || inheritsProfile);
+      }) ?? false;
+      if (segment.voice_profile_id === profileId || inheritsProfile || cueUsesProfile) {
         segment.audio_src = null;
       }
     }

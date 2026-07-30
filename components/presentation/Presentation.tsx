@@ -348,7 +348,7 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
   }, [pauseTimer, startTimer, timerRunning]);
 
   const finishNarration = useCallback(
-    (id: number, duration: number) => {
+    (id: number, duration: number, pauseAfterMs = 450) => {
       if (id !== playbackId.current) return;
       if (speechProgressTimer.current !== null) {
         window.clearInterval(speechProgressTimer.current);
@@ -358,29 +358,30 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       setNarrationElapsed(duration);
       setNarrationDuration(duration);
       setNarrating(false);
-      scheduleAutoAdvance();
+      scheduleAutoAdvance(pauseAfterMs);
     },
     [scheduleAutoAdvance]
   );
 
   const speakWithBrowser = useCallback(
-    (text: string, id: number) => {
+    (segment: NarrationSegment, id: number) => {
       if (!("speechSynthesis" in window) || id !== playbackId.current) {
         setNarrating(false);
         scheduleAutoAdvance(1000);
         return;
       }
 
-      const estimatedDuration = Math.max(1.5, text.length * 0.16);
+      const cues = segment.voiceCues?.length
+        ? segment.voiceCues
+        : [{ id: "default", text: segment.text, voiceTuning: segment.voiceTuning, pauseAfterMs: 0 }];
+      const estimatedDuration = cues.reduce(
+        (total, cue) => total + Math.max(1.2, cue.text.length * 0.16 / (cue.voiceTuning?.speedScale ?? segment.voiceTuning?.speedScale ?? 1)) + (cue.pauseAfterMs ?? 0) / 1000,
+        0
+      );
       const startedAt = performance.now();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "ja-JP";
-      utterance.rate = 1;
-      utterance.volume = volumeRef.current;
       const japaneseVoice = window.speechSynthesis
         .getVoices()
         .find((voice) => voice.lang.startsWith("ja"));
-      if (japaneseVoice) utterance.voice = japaneseVoice;
 
       setNarrationDuration(estimatedDuration);
       speechProgressTimer.current = window.setInterval(() => {
@@ -391,18 +392,29 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
         );
         setNarrationElapsed(current);
       }, 100);
-      utterance.onboundary = (event) => {
-        if (id !== playbackId.current || !text.length) return;
-        setNarrationElapsed(
-          Math.min(
-            estimatedDuration * 0.95,
-            (event.charIndex / text.length) * estimatedDuration
-          )
-        );
+      const playCue = (index: number) => {
+        if (id !== playbackId.current) return;
+        const cue = cues[index];
+        if (!cue) {
+          finishNarration(id, estimatedDuration, segment.pauseAfterMs ?? 450);
+          return;
+        }
+        const tuning = { ...segment.voiceTuning, ...cue.voiceTuning };
+        const utterance = new SpeechSynthesisUtterance(cue.text);
+        utterance.lang = "ja-JP";
+        utterance.rate = Math.min(2, Math.max(0.5, tuning.speedScale ?? 1));
+        utterance.pitch = Math.min(1.5, Math.max(0.5, 1 + (tuning.pitchScale ?? 0) * 4));
+        utterance.volume = Math.min(1, Math.max(0, volumeRef.current * (tuning.volumeScale ?? 1)));
+        if (japaneseVoice) utterance.voice = japaneseVoice;
+        utterance.onend = () => {
+          const pause = Math.max(0, cue.pauseAfterMs ?? 0);
+          if (pause === 0) playCue(index + 1);
+          else autoAdvanceTimer.current = window.setTimeout(() => playCue(index + 1), pause);
+        };
+        utterance.onerror = () => finishNarration(id, estimatedDuration, segment.pauseAfterMs ?? 450);
+        window.speechSynthesis.speak(utterance);
       };
-      utterance.onend = () => finishNarration(id, estimatedDuration);
-      utterance.onerror = () => finishNarration(id, estimatedDuration);
-      window.speechSynthesis.speak(utterance);
+      playCue(0);
     },
     [finishNarration, scheduleAutoAdvance]
   );
@@ -413,43 +425,50 @@ export function Presentation({ deck }: { deck: ResearchDeck }) {
       const id = playbackId.current;
       setNarrating(true);
 
-      const generatedAudioSrc = USE_GENERATED_AUDIO
-        ? `${GENERATED_AUDIO_ROOT}/${deck.slug}/audio/${slide.id}-${segment.at}.mp3`
-        : undefined;
-      const audioSrc = segment.audioSrc ?? generatedAudioSrc;
-
-      if (!audioSrc) {
-        speakWithBrowser(segment.text, id);
-        return;
-      }
-
-      const player = new Audio(resolvePublicAssetUrl(audioSrc));
-      player.volume = volumeRef.current;
-      let usingFallback = false;
-      const fallback = () => {
-        if (usingFallback || id !== playbackId.current) return;
-        usingFallback = true;
-        audio.current = null;
-        speakWithBrowser(segment.text, id);
-      };
-      player.preload = "metadata";
-      player.onloadedmetadata = () => {
-        if (id !== playbackId.current || !Number.isFinite(player.duration)) return;
-        setNarrationDuration(player.duration);
-      };
-      player.ontimeupdate = () => {
+      const startPlayback = () => {
         if (id !== playbackId.current) return;
-        setNarrationElapsed(player.currentTime);
-        if (Number.isFinite(player.duration)) setNarrationDuration(player.duration);
+        const generatedAudioSrc = USE_GENERATED_AUDIO
+          ? `${GENERATED_AUDIO_ROOT}/${deck.slug}/audio/${slide.id}-${segment.at}.mp3`
+          : undefined;
+        const audioSrc = segment.audioSrc ?? generatedAudioSrc;
+
+        if (!audioSrc) {
+          speakWithBrowser(segment, id);
+          return;
+        }
+
+        const player = new Audio(resolvePublicAssetUrl(audioSrc));
+        player.volume = volumeRef.current;
+        let usingFallback = false;
+        const fallback = () => {
+          if (usingFallback || id !== playbackId.current) return;
+          usingFallback = true;
+          audio.current = null;
+          speakWithBrowser(segment, id);
+        };
+        player.preload = "metadata";
+        player.onloadedmetadata = () => {
+          if (id !== playbackId.current || !Number.isFinite(player.duration)) return;
+          setNarrationDuration(player.duration);
+        };
+        player.ontimeupdate = () => {
+          if (id !== playbackId.current) return;
+          setNarrationElapsed(player.currentTime);
+          if (Number.isFinite(player.duration)) setNarrationDuration(player.duration);
+        };
+        player.onended = () =>
+          finishNarration(
+            id,
+            Number.isFinite(player.duration) ? player.duration : player.currentTime,
+            segment.pauseAfterMs ?? 450
+          );
+        player.onerror = fallback;
+        audio.current = player;
+        void player.play().catch(fallback);
       };
-      player.onended = () =>
-        finishNarration(
-          id,
-          Number.isFinite(player.duration) ? player.duration : player.currentTime
-        );
-      player.onerror = fallback;
-      audio.current = player;
-      void player.play().catch(fallback);
+      const pauseBefore = Math.max(0, segment.pauseBeforeMs ?? 0);
+      if (pauseBefore > 0) autoAdvanceTimer.current = window.setTimeout(startPlayback, pauseBefore);
+      else startPlayback();
     },
     [deck.slug, finishNarration, slide.id, speakWithBrowser, stopNarration]
   );

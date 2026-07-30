@@ -319,8 +319,16 @@ const narrationSettingsRequestSchema = z.object({
   appearance: narrationAppearanceSchema
 });
 
-const narrationSegmentRequestSchema = narrationSegmentSchema
-  .pick({ text: true, speaker: true, voice_profile_id: true, voice_tuning: true })
+const narrationSegmentRequestSchema = z
+  .object({
+    text: narrationSegmentSchema.shape.text,
+    speaker: narrationSegmentSchema.shape.speaker,
+    voice_profile_id: narrationSegmentSchema.shape.voice_profile_id,
+    voice_tuning: narrationSegmentSchema.shape.voice_tuning,
+    voice_cues: narrationSegmentSchema.shape.voice_cues,
+    pause_before_ms: narrationSegmentSchema.shape.pause_before_ms,
+    pause_after_ms: narrationSegmentSchema.shape.pause_after_ms
+  })
   .required({ speaker: true, voice_profile_id: true, voice_tuning: true })
   .extend({ expected_version: z.number().int().positive() });
 
@@ -3596,11 +3604,22 @@ async function handleNarrationSegmentUpdate(
           Object.assign(error, { code: "VOICE_PROFILE_NOT_FOUND" });
           throw error;
         }
+        const missingCueProfile = parsed.data.voice_cues?.find(
+          (cue) => cue.voice_profile_id !== null && cue.voice_profile_id !== undefined &&
+            !document.deck?.voicevox?.profiles.some((profile) => profile.id === cue.voice_profile_id)
+        );
+        if (missingCueProfile !== undefined) {
+          const error = new Error("The VOICEVOX cue profile does not exist.");
+          Object.assign(error, { code: "VOICE_PROFILE_NOT_FOUND" });
+          throw error;
+        }
         const invalidatesAudio =
           segment.text !== parsed.data.text ||
           (segment.voice_profile_id ?? null) !== parsed.data.voice_profile_id ||
           JSON.stringify(segment.voice_tuning ?? null) !==
-            JSON.stringify(parsed.data.voice_tuning);
+            JSON.stringify(parsed.data.voice_tuning) ||
+          (parsed.data.voice_cues !== undefined &&
+            JSON.stringify(segment.voice_cues ?? null) !== JSON.stringify(parsed.data.voice_cues));
         voiceGenerationRequired = invalidatesAudio || segment.audio_src === null;
         Object.assign(segment, {
           text: parsed.data.text,
@@ -3609,6 +3628,10 @@ async function handleNarrationSegmentUpdate(
           voice_tuning: parsed.data.voice_tuning,
           audio_src: invalidatesAudio ? null : segment.audio_src
         });
+        if (parsed.data.voice_cues !== undefined) segment.voice_cues = parsed.data.voice_cues;
+        if (parsed.data.pause_before_ms !== undefined) segment.pause_before_ms = parsed.data.pause_before_ms;
+        if (parsed.data.pause_after_ms !== undefined) segment.pause_after_ms = parsed.data.pause_after_ms;
+        narrationSegmentSchema.parse(segment);
       }
     });
     await recordWebAudit(env.DB, {

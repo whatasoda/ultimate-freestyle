@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@113";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@114";
 
 function escapeHtml(value: string): string {
   return value
@@ -463,11 +463,12 @@ export function renderPresentationHtml(
         (slide) =>
           slide.narration?.segments.flatMap((segment) => {
             if (segment.audio_src === null) return [];
-            const profile =
-              (segment.voice_profile_id
-                ? profiles.get(segment.voice_profile_id)
-                : undefined) ?? defaultProfile;
-            return profile ? [`VOICEVOX:${profile.speaker_name}`] : [];
+            const segmentProfile =
+              (segment.voice_profile_id ? profiles.get(segment.voice_profile_id) : undefined) ?? defaultProfile;
+            const usedProfiles = segment.voice_cues?.map((cue) =>
+              (cue.voice_profile_id ? profiles.get(cue.voice_profile_id) : undefined) ?? segmentProfile
+            ) ?? [segmentProfile];
+            return usedProfiles.flatMap((profile) => profile ? [`VOICEVOX:${profile.speaker_name}`] : []);
           }) ?? []
       )
     )
@@ -494,6 +495,8 @@ export function renderPresentationHtml(
             : undefined) ?? defaultProfile;
         return {
           ...segment,
+          pauseBeforeMs: segment.pause_before_ms ?? 0,
+          pauseAfterMs: segment.pause_after_ms ?? 350,
           voiceProfileLabel: profile?.label ?? null,
           voiceSpeakerName: profile?.speaker_name ?? null,
           voiceStyleName: profile?.style_name ?? null,
@@ -507,7 +510,30 @@ export function renderPresentationHtml(
             postPhonemeLength: 0.1,
             ...(profile?.tuning ?? {}),
             ...(segment.voice_tuning ?? {})
-          }
+          },
+          voiceCues: segment.voice_cues?.map((cue) => {
+            const cueProfile =
+              (cue.voice_profile_id ? profiles.get(cue.voice_profile_id) : undefined) ?? profile;
+            return {
+              ...cue,
+              pauseAfterMs: cue.pause_after_ms ?? 0,
+              voiceProfileLabel: cueProfile?.label ?? null,
+              voiceSpeakerName: cueProfile?.speaker_name ?? null,
+              voiceStyleName: cueProfile?.style_name ?? null,
+              effectiveTuning: {
+                speedScale: 1,
+                pitchScale: 0,
+                intonationScale: 1,
+                volumeScale: 1,
+                pauseLengthScale: 1,
+                prePhonemeLength: 0.1,
+                postPhonemeLength: 0.1,
+                ...(cueProfile?.tuning ?? profile?.tuning ?? {}),
+                ...(segment.voice_tuning ?? {}),
+                ...(cue.voice_tuning ?? {})
+              }
+            };
+          }) ?? null
         };
       });
       return {
@@ -1145,7 +1171,7 @@ export function renderPresentationHtml(
     const editorPrelude = document.body.dataset.editorPrelude === 'true';
     const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let swipeStart = null, suppressStageClick = false, editorGridSnap = false;
-    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0, visibilityPause = null, progressClock = null, autoDeadline = null;
+    let slide = 0, step = 0, speech = true, auto = false, started = editorFrame || !DECK.loadingScreen.enabled, startedAt = Date.now(), elapsedAccumulated = 0, timerRunning = started, unitStartedAt = performance.now(), voiceTimer, voiceDelayTimer, autoTimer, activeAudio, fitFrame, voiceRun = 0, visibilityPause = null, progressClock = null, autoDeadline = null, voiceDelayDeadline = null, voiceDelayCallback = null;
     const units = DECK.slides.reduce((sum, item) => sum + item.revealSteps + 1, 0);
     const format = (seconds) => String(Math.floor(seconds / 60)).padStart(2, '0') + ':' + String(Math.floor(seconds % 60)).padStart(2, '0');
     const clamp = (value, minimum, maximum) => Math.min(Math.max(value, minimum), maximum);
@@ -1327,6 +1353,17 @@ export function renderPresentationHtml(
       stopProgressClock();
       return paused;
     };
+    const startVoiceDelay = (delay, callback) => {
+      clearTimeout(voiceDelayTimer);
+      const remaining = Math.max(0, delay);
+      voiceDelayDeadline = performance.now() + remaining;
+      voiceDelayCallback = callback;
+      voiceDelayTimer = setTimeout(() => {
+        voiceDelayDeadline = null;
+        voiceDelayCallback = null;
+        callback();
+      }, remaining);
+    };
     const startAdvanceTimer = (delay) => {
       clearTimeout(autoTimer);
       const remaining = Math.max(0, delay);
@@ -1342,13 +1379,26 @@ export function renderPresentationHtml(
       voiceRun += 1;
       if ('speechSynthesis' in window) speechSynthesis.cancel();
       stopProgressClock();
+      clearTimeout(voiceDelayTimer);
+      voiceDelayDeadline = null;
+      voiceDelayCallback = null;
       clearTimeout(autoTimer);
       autoDeadline = null;
       if (activeAudio) { activeAudio.pause(); activeAudio.removeAttribute('src'); activeAudio.load(); activeAudio = null; }
       setVoiceProgress(0);
       setVoiceStatus('idle', '音声待機');
     };
-    const finishVoice = () => { stopProgressClock(); setVoiceProgress(100); if (auto) startAdvanceTimer(350); };
+    const finishVoice = (segment) => {
+      stopProgressClock();
+      setVoiceProgress(100);
+      if (!auto) { setVoiceStatus('complete', '読み上げ完了'); return; }
+      const delay = Math.max(0, Number(segment?.pauseAfterMs ?? 350));
+      setSecondaryProgressLabel(delay > 0 ? '読み上げ後の余白' : '自動送りまで');
+      setVoiceStatus('pause', delay > 0 ? '余白 · ' + (delay / 1000).toFixed(1) + '秒' : '次へ進みます');
+      setVoiceProgress(0);
+      startProgressClock(Math.max(1, delay), 0, 'auto');
+      startAdvanceTimer(delay);
+    };
     const reportPreviewCompletion = () => {
       if (typeof DECK.previewRevisionId !== 'string') return;
       const detail = {
@@ -1430,33 +1480,46 @@ export function renderPresentationHtml(
       if (!('speechSynthesis' in window)) { setVoiceStatus('failed', '音声を利用できません'); scheduleAutoAdvance(); return; }
       setSecondaryProgressLabel('読み上げ進捗');
       const browserSpeaker = segment.speaker || '読み上げ';
-      setVoiceStatus(fallback ? 'fallback' : 'browser', (fallback ? 'VOICEVOX失敗 → ' : '') + 'ブラウザ音声 · ' + browserSpeaker);
+      const cues = Array.isArray(segment.voiceCues) && segment.voiceCues.length > 0
+        ? segment.voiceCues
+        : [{ text: segment.text, effectiveTuning: segment.effectiveTuning, pauseAfterMs: 0 }];
+      setVoiceStatus(fallback ? 'fallback' : 'browser', (fallback ? 'VOICEVOX失敗 → ' : '') + 'ブラウザ音声 · ' + browserSpeaker + (cues.length > 1 ? ' · ' + cues.length + '区間' : ''));
       const run = voiceRun;
-      const tuning = segment.effectiveTuning || {};
-      const utterance = new SpeechSynthesisUtterance(segment.text);
-      utterance.lang = 'ja-JP';
-      utterance.rate = clamp(Number(tuning.speedScale || 1), .5, 2);
-      utterance.pitch = clamp(1 + Number(tuning.pitchScale || 0) * 4, .5, 1.5);
-      utterance.volume = clamp(Number(volume.value) * Number(tuning.volumeScale || 1), 0, 1);
-      const estimated = Math.max(1.5, segment.text.length / (7 * utterance.rate));
-      startProgressClock(estimated * 1000, 0, 'voice');
-      utterance.onstart = () => { if (run === voiceRun) hideVoiceUnlock(); };
-      utterance.onend = () => { if (run === voiceRun) finishVoice(); };
-      utterance.onerror = (event) => {
+      const estimated = cues.reduce((total, cue) => {
+        const rate = clamp(Number(cue.effectiveTuning?.speedScale || 1), .5, 2);
+        return total + Math.max(1.2, cue.text.length / (7 * rate)) * 1000 + Number(cue.pauseAfterMs || 0);
+      }, 0);
+      startProgressClock(estimated, 0, 'voice');
+      const playCue = (index) => {
         if (run !== voiceRun) return;
-        stopProgressClock();
-        setVoiceProgress(0);
-        if (event.error === 'not-allowed') showVoiceUnlock();
-        else { setVoiceStatus('failed', 'ブラウザ音声の読み上げ失敗'); scheduleAutoAdvance(); }
+        const cue = cues[index];
+        if (!cue) { finishVoice(segment); return; }
+        const tuning = cue.effectiveTuning || segment.effectiveTuning || {};
+        const utterance = new SpeechSynthesisUtterance(cue.text);
+        utterance.lang = 'ja-JP';
+        utterance.rate = clamp(Number(tuning.speedScale || 1), .5, 2);
+        utterance.pitch = clamp(1 + Number(tuning.pitchScale || 0) * 4, .5, 1.5);
+        utterance.volume = clamp(Number(volume.value) * Number(tuning.volumeScale || 1), 0, 1);
+        utterance.onstart = () => { if (run === voiceRun) hideVoiceUnlock(); };
+        utterance.onend = () => {
+          if (run !== voiceRun) return;
+          const pause = Math.max(0, Number(cue.pauseAfterMs || 0));
+          if (pause === 0) { playCue(index + 1); return; }
+          setVoiceStatus('pause', '休符 · ' + (pause / 1000).toFixed(1) + '秒');
+          startVoiceDelay(pause, () => playCue(index + 1));
+        };
+        utterance.onerror = (event) => {
+          if (run !== voiceRun) return;
+          stopProgressClock();
+          setVoiceProgress(0);
+          if (event.error === 'not-allowed') showVoiceUnlock();
+          else { setVoiceStatus('failed', 'ブラウザ音声の読み上げ失敗'); scheduleAutoAdvance(); }
+        };
+        speechSynthesis.speak(utterance);
       };
-      speechSynthesis.speak(utterance);
+      playCue(0);
     };
-    const speak = () => {
-      stopVoice();
-      if (editorFrame) { hideVoiceUnlock(); setVoiceProgress(0); return; }
-      const segment = narration();
-      if (!started) return;
-      if (!speech || !segment) { hideVoiceUnlock(); setVoiceStatus('idle', segment ? '音声 OFF' : '読み上げなし'); scheduleAutoAdvance(); return; }
+    const playSegmentVoice = (segment) => {
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
       const run = voiceRun;
@@ -1471,7 +1534,7 @@ export function renderPresentationHtml(
       player.addEventListener('ended', () => {
         if (run !== voiceRun || activeAudio !== player) return;
         activeAudio = null;
-        finishVoice();
+        finishVoice(segment);
       }, { once: true });
       const fallback = () => {
         if (activeAudio !== player) return;
@@ -1483,6 +1546,24 @@ export function renderPresentationHtml(
           player.pause(); activeAudio = null; showVoiceUnlock(); return;
         }
         fallback();
+      });
+    };
+    const speak = () => {
+      stopVoice();
+      if (editorFrame) { hideVoiceUnlock(); setVoiceProgress(0); return; }
+      const segment = narration();
+      if (!started) return;
+      if (!speech || !segment) { hideVoiceUnlock(); setVoiceStatus('idle', segment ? '音声 OFF' : '読み上げなし'); scheduleAutoAdvance(); return; }
+      const pauseBefore = Math.max(0, Number(segment.pauseBeforeMs || 0));
+      if (pauseBefore === 0) { playSegmentVoice(segment); return; }
+      const run = voiceRun;
+      setSecondaryProgressLabel('読み上げ前の間');
+      setVoiceStatus('pause', '読み上げまで · ' + (pauseBefore / 1000).toFixed(1) + '秒');
+      startProgressClock(pauseBefore, 0, 'voice');
+      startVoiceDelay(pauseBefore, () => {
+        if (run !== voiceRun) return;
+        stopProgressClock();
+        playSegmentVoice(segment);
       });
     };
     const createClippedOverflowProbe = (target) => {
@@ -2801,10 +2882,14 @@ export function renderPresentationHtml(
         if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed, paused.progress.kind);
         speechSynthesis.resume();
       }
+      if (paused.delayCallback && paused.delayRemaining !== null) {
+        if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed, paused.progress.kind);
+        startVoiceDelay(paused.delayRemaining, paused.delayCallback);
+      }
       if (auto && paused.autoRemaining !== null) {
         if (paused.progress) startProgressClock(paused.progress.duration, paused.progress.elapsed, paused.progress.kind);
         startAdvanceTimer(paused.autoRemaining);
-      } else if (auto && !paused.audio && !paused.speech) scheduleAutoAdvance();
+      } else if (auto && !paused.audio && !paused.speech && !paused.delayCallback) scheduleAutoAdvance();
       stage?.focus();
     });
     restartButton?.addEventListener('click', () => {
@@ -2826,13 +2911,18 @@ export function renderPresentationHtml(
         if (visibilityPause) return;
         const audioPlaying = Boolean(activeAudio && !activeAudio.paused);
         const speechPlaying = 'speechSynthesis' in window && speechSynthesis.speaking && !speechSynthesis.paused;
-        if (!timerRunning && !audioPlaying && !speechPlaying && !auto) return;
+        if (!timerRunning && !audioPlaying && !speechPlaying && !auto && voiceDelayDeadline === null) return;
         const autoRemaining = autoDeadline === null ? null : Math.max(0, autoDeadline - performance.now());
+        const delayRemaining = voiceDelayDeadline === null ? null : Math.max(0, voiceDelayDeadline - performance.now());
+        const delayCallback = voiceDelayCallback;
         const progress = pauseProgressClock();
-        visibilityPause = { timer: timerRunning, audio: audioPlaying, speech: speechPlaying, auto, autoRemaining, progress, hiddenAt: performance.now() };
+        visibilityPause = { timer: timerRunning, audio: audioPlaying, speech: speechPlaying, auto, autoRemaining, delayRemaining, delayCallback, progress, hiddenAt: performance.now() };
         if (timerRunning) setTimerRunning(false);
         clearTimeout(autoTimer);
         autoDeadline = null;
+        clearTimeout(voiceDelayTimer);
+        voiceDelayDeadline = null;
+        voiceDelayCallback = null;
         if (audioPlaying) activeAudio.pause();
         if (speechPlaying) speechSynthesis.pause();
       } else if (visibilityPause && presentationResume instanceof HTMLButtonElement) {

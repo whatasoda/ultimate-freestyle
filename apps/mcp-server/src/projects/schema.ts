@@ -554,36 +554,75 @@ export const presentationTemplateSchema = z.object({
 
 export type PresentationTemplate = z.infer<typeof presentationTemplateSchema>;
 
-export const narrationSegmentSchema = z.object({
-  at: z.number().int().nonnegative().max(100),
-  text: z.string().min(1).max(2_000),
-  audio_src: z.string().max(500).nullable(),
-  speaker: z.string().max(80).nullable().optional(),
+const narrationVoiceTuningSchema = z
+  .object(
+    Object.fromEntries(
+      Object.entries(VOICEVOX_TUNING_LIMITS).map(([key, range]) => [
+        key,
+        z.number().min(range.min).max(range.max).multipleOf(0.01).optional()
+      ])
+    ) as {
+      speedScale: z.ZodOptional<z.ZodNumber>;
+      pitchScale: z.ZodOptional<z.ZodNumber>;
+      intonationScale: z.ZodOptional<z.ZodNumber>;
+      volumeScale: z.ZodOptional<z.ZodNumber>;
+      pauseLengthScale: z.ZodOptional<z.ZodNumber>;
+      prePhonemeLength: z.ZodOptional<z.ZodNumber>;
+      postPhonemeLength: z.ZodOptional<z.ZodNumber>;
+    }
+  )
+  .nullable()
+  .optional();
+
+export const narrationVoiceCueSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
+  text: z.string().min(1).max(500),
   voice_profile_id: z
     .string()
     .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
     .nullable()
     .optional(),
-  voice_tuning: z
-    .object(
-      Object.fromEntries(
-        Object.entries(VOICEVOX_TUNING_LIMITS).map(([key, range]) => [
-          key,
-          z.number().min(range.min).max(range.max).multipleOf(0.01).optional()
-        ])
-      ) as {
-        speedScale: z.ZodOptional<z.ZodNumber>;
-        pitchScale: z.ZodOptional<z.ZodNumber>;
-        intonationScale: z.ZodOptional<z.ZodNumber>;
-        volumeScale: z.ZodOptional<z.ZodNumber>;
-        pauseLengthScale: z.ZodOptional<z.ZodNumber>;
-        prePhonemeLength: z.ZodOptional<z.ZodNumber>;
-        postPhonemeLength: z.ZodOptional<z.ZodNumber>;
-      }
-    )
-    .nullable()
-    .optional()
+  voice_tuning: narrationVoiceTuningSchema,
+  pause_after_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional()
 });
+
+export const narrationSegmentSchema = z
+  .object({
+    at: z.number().int().nonnegative().max(100),
+    text: z.string().min(1).max(2_000),
+    audio_src: z.string().max(500).nullable(),
+    speaker: z.string().max(80).nullable().optional(),
+    voice_profile_id: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+      .nullable()
+      .optional(),
+    voice_tuning: narrationVoiceTuningSchema,
+    voice_cues: z.array(narrationVoiceCueSchema).min(1).max(8).optional(),
+    pause_before_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional(),
+    pause_after_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional()
+  })
+  .superRefine((segment, context) => {
+    if (segment.voice_cues === undefined) return;
+    const cueIds = new Set<string>();
+    for (const [index, cue] of segment.voice_cues.entries()) {
+      if (cueIds.has(cue.id)) {
+        context.addIssue({
+          code: "custom",
+          path: ["voice_cues", index, "id"],
+          message: "Narration voice cue IDs must be unique."
+        });
+      }
+      cueIds.add(cue.id);
+    }
+    if (segment.voice_cues.map((cue) => cue.text).join("") !== segment.text) {
+      context.addIssue({
+        code: "custom",
+        path: ["voice_cues"],
+        message: "Narration voice cue text must exactly compose the displayed narration text."
+      });
+    }
+  });
 
 export const voicevoxProfileSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -816,6 +855,29 @@ export const projectDocumentSchema = z
             ],
             message: "The referenced VOICEVOX profile does not exist."
           });
+        }
+        for (const [cueIndex, cue] of (segment.voice_cues ?? []).entries()) {
+          if (
+            cue.voice_profile_id !== undefined &&
+            cue.voice_profile_id !== null &&
+            !profiles.has(cue.voice_profile_id)
+          ) {
+            context.addIssue({
+              code: "custom",
+              path: [
+                "deck",
+                "slides",
+                slideIndex,
+                "narration",
+                "segments",
+                segmentIndex,
+                "voice_cues",
+                cueIndex,
+                "voice_profile_id"
+              ],
+              message: "The referenced VOICEVOX profile does not exist."
+            });
+          }
         }
       }
     }

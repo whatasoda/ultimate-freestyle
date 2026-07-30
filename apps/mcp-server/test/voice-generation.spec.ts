@@ -1,5 +1,6 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { createVoiceGenerationInput } from "@ultimate-freestyle/research-schema/voice-generation";
 
 import { getProject } from "../src/projects/repository";
 import { createEmptyProject } from "../src/projects/schema";
@@ -17,6 +18,35 @@ import {
 } from "../src/voicevox/service";
 
 describe("VOICEVOX generation", () => {
+  it("builds a deterministic speech and pause sequence", () => {
+    const input = createVoiceGenerationInput({
+      text: "静かに。強く。",
+      speakerUuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
+      styleId: 3,
+      sequence: [
+        {
+          text: "静かに。",
+          speakerUuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
+          styleId: 3,
+          segmentTuning: { speedScale: 0.9, intonationScale: 0.8 },
+          pauseAfterMs: 800
+        },
+        {
+          text: "強く。",
+          speakerUuid: "388f246b-8c41-4ac1-8e2d-5d79f3ff56d9",
+          styleId: 1,
+          segmentTuning: { pitchScale: 0.05, intonationScale: 1.4 }
+        }
+      ]
+    });
+
+    expect(input.sequence).toEqual([
+      expect.objectContaining({ kind: "speech", text: "静かに。", styleId: 3, tuning: expect.objectContaining({ speedScale: 0.9, intonationScale: 0.8 }) }),
+      { kind: "pause", durationMs: 800 },
+      expect.objectContaining({ kind: "speech", text: "強く。", styleId: 1, tuning: expect.objectContaining({ pitchScale: 0.05, intonationScale: 1.4 }) })
+    ]);
+  });
+
   it("selects a repeatable bounded batch and reports oversized segments", () => {
     const items = [
       { id: "oversized", text: "😀".repeat(501) },
@@ -188,7 +218,22 @@ describe("VOICEVOX generation", () => {
               {
                 at: 0,
                 text: "ずんだもんの音声を生成します。",
-                audio_src: null
+                audio_src: null,
+                pause_before_ms: 500,
+                pause_after_ms: 1_000,
+                voice_cues: [
+                  {
+                    id: "calm",
+                    text: "ずんだもんの音声を",
+                    voice_tuning: { speedScale: 0.9, intonationScale: 0.8 },
+                    pause_after_ms: 800
+                  },
+                  {
+                    id: "emphasis",
+                    text: "生成します。",
+                    voice_tuning: { pitchScale: 0.05, intonationScale: 1.4 }
+                  }
+                ]
               }
             ]
           }
@@ -245,9 +290,11 @@ describe("VOICEVOX generation", () => {
 
     const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0x00, 0x00]);
     let synthesisBody: unknown;
+    let synthesisUrl = "";
     const container = {
       startAndWaitForPorts: async () => undefined,
-      fetch: async (_url: string, init: RequestInit) => {
+      fetch: async (url: string, init: RequestInit) => {
+        synthesisUrl = url;
         synthesisBody = JSON.parse(String(init.body));
         return new Response(mp3, {
           headers: {
@@ -269,10 +316,13 @@ describe("VOICEVOX generation", () => {
       queued[0]!
     );
 
+    expect(synthesisUrl).toBe("http://voicevox/synthesize-sequence");
     expect(synthesisBody).toMatchObject({
-      text: "ずんだもんの音声を生成します。",
-      style_id: 3,
-      tuning: { speedScale: 1.05 }
+      parts: [
+        { kind: "speech", text: "ずんだもんの音声を", style_id: 3, tuning: { speedScale: 0.9, intonationScale: 0.8 } },
+        { kind: "pause", duration_ms: 800 },
+        { kind: "speech", text: "生成します。", style_id: 3, tuning: { pitchScale: 0.05, intonationScale: 1.4 } }
+      ]
     });
     const job = await getVoiceGenerationJob(
       env.DB,

@@ -58,6 +58,23 @@ type synthesizeRequest struct {
 	Tuning  *voiceTuningInput `json:"tuning"`
 }
 
+type synthesizeSequencePart struct {
+	Kind       string            `json:"kind"`
+	Text       string            `json:"text"`
+	StyleID    *int              `json:"style_id"`
+	Tuning     *voiceTuningInput `json:"tuning"`
+	DurationMS *int              `json:"duration_ms"`
+}
+
+type synthesizeSequenceRequest struct {
+	Parts []synthesizeSequencePart `json:"parts"`
+}
+
+type audioSequencePart struct {
+	WAV     []byte
+	PauseMS int
+}
+
 type engineAPI interface {
 	version(context.Context) (string, error)
 	speakers(context.Context) ([]byte, error)
@@ -65,11 +82,13 @@ type engineAPI interface {
 }
 
 type mp3Encoder func(context.Context, []byte) ([]byte, error)
+type sequenceMP3Encoder func(context.Context, []audioSequencePart) ([]byte, error)
 
 type handler struct {
-	engine engineAPI
-	encode mp3Encoder
-	slot   chan struct{}
+	engine         engineAPI
+	encode         mp3Encoder
+	encodeSequence sequenceMP3Encoder
+	slot           chan struct{}
 }
 
 type engineClient struct {
@@ -118,7 +137,7 @@ func run() error {
 		baseURL: "http://127.0.0.1:50021",
 		client:  &http.Client{Timeout: requestTimeout},
 	}
-	api := newHandler(client, ffmpegEncoder(ffmpegPath))
+	api := newHandler(client, ffmpegEncoder(ffmpegPath), ffmpegSequenceEncoder(ffmpegPath))
 	server := &http.Server{
 		Addr:              ":" + port,
 		Handler:           api,
@@ -173,8 +192,12 @@ func environment(name, fallback string) string {
 	return fallback
 }
 
-func newHandler(engine engineAPI, encode mp3Encoder) http.Handler {
-	return &handler{engine: engine, encode: encode, slot: make(chan struct{}, 1)}
+func newHandler(engine engineAPI, encode mp3Encoder, sequence ...sequenceMP3Encoder) http.Handler {
+	var encodeSequence sequenceMP3Encoder
+	if len(sequence) > 0 {
+		encodeSequence = sequence[0]
+	}
+	return &handler{engine: engine, encode: encode, encodeSequence: encodeSequence, slot: make(chan struct{}, 1)}
 }
 
 func (h *handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -187,6 +210,8 @@ func (h *handler) ServeHTTP(response http.ResponseWriter, request *http.Request)
 		h.listSpeakers(response, request)
 	case "/synthesize":
 		h.synthesize(response, request)
+	case "/synthesize-sequence":
+		h.synthesizeSequence(response, request)
 	default:
 		writeError(response, http.StatusNotFound, "NOT_FOUND", "The endpoint does not exist.")
 	}
@@ -285,6 +310,116 @@ func (h *handler) synthesize(response http.ResponseWriter, request *http.Request
 	response.Header().Set("Content-Length", strconv.Itoa(len(mp3)))
 	response.WriteHeader(http.StatusOK)
 	_, _ = response.Write(mp3)
+}
+
+func (h *handler) synthesizeSequence(response http.ResponseWriter, request *http.Request) {
+	if request.Method != http.MethodPost {
+		methodNotAllowed(response, http.MethodPost)
+		return
+	}
+	mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
+	if err != nil || mediaType != "application/json" {
+		writeError(response, http.StatusUnsupportedMediaType, "CONTENT_TYPE_REQUIRED", "Content-Type must be application/json.")
+		return
+	}
+	if h.encodeSequence == nil {
+		writeError(response, http.StatusServiceUnavailable, "SEQUENCE_UNAVAILABLE", "Sequence synthesis is unavailable.")
+		return
+	}
+	var input synthesizeSequenceRequest
+	request.Body = http.MaxBytesReader(response, request.Body, maxRequestBytes)
+	decoder := json.NewDecoder(request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeError(response, http.StatusRequestEntityTooLarge, "REQUEST_TOO_LARGE", "The request body is too large.")
+			return
+		}
+		writeError(response, http.StatusBadRequest, "INVALID_JSON", "The request body is invalid.")
+		return
+	}
+	if err := ensureJSONEnd(decoder); err != nil {
+		writeError(response, http.StatusBadRequest, "INVALID_JSON", "The request body must contain one JSON value.")
+		return
+	}
+	validated, code, message := validateSynthesisSequence(input)
+	if code != "" {
+		writeError(response, http.StatusUnprocessableEntity, code, message)
+		return
+	}
+	select {
+	case h.slot <- struct{}{}:
+		defer func() { <-h.slot }()
+	default:
+		writeError(response, http.StatusTooManyRequests, "SYNTHESIS_BUSY", "Another synthesis is in progress.")
+		return
+	}
+	context, cancel := context.WithTimeout(request.Context(), requestTimeout)
+	defer cancel()
+	parts := make([]audioSequencePart, 0, len(validated))
+	for _, part := range validated {
+		if part.PauseMS > 0 {
+			parts = append(parts, audioSequencePart{PauseMS: part.PauseMS})
+			continue
+		}
+		wav, err := h.engine.synthesize(context, part.Text, part.StyleID, part.Tuning)
+		if err != nil {
+			log.Printf("VOICEVOX sequence synthesis failed: %v", err)
+			writeError(response, http.StatusBadGateway, "SYNTHESIS_FAILED", "VOICEVOX could not synthesize the narration sequence.")
+			return
+		}
+		parts = append(parts, audioSequencePart{WAV: wav})
+	}
+	mp3, err := h.encodeSequence(context, parts)
+	if err != nil {
+		log.Printf("MP3 sequence encoding failed: %v", err)
+		writeError(response, http.StatusInternalServerError, "ENCODING_FAILED", "The narration sequence could not be encoded.")
+		return
+	}
+	response.Header().Set("Content-Type", "audio/mpeg")
+	response.Header().Set("Content-Length", strconv.Itoa(len(mp3)))
+	response.WriteHeader(http.StatusOK)
+	_, _ = response.Write(mp3)
+}
+
+type validatedSequencePart struct {
+	Text    string
+	StyleID int
+	Tuning  voiceTuning
+	PauseMS int
+}
+
+func validateSynthesisSequence(input synthesizeSequenceRequest) ([]validatedSequencePart, string, string) {
+	if len(input.Parts) == 0 || len(input.Parts) > 15 {
+		return nil, "PARTS_INVALID", "parts must contain between 1 and 15 items."
+	}
+	validated := make([]validatedSequencePart, 0, len(input.Parts))
+	totalRunes := 0
+	for _, part := range input.Parts {
+		switch part.Kind {
+		case "speech":
+			tuning, code, message := validateSynthesis(synthesizeRequest{
+				Text: part.Text, StyleID: part.StyleID, Tuning: part.Tuning,
+			})
+			if code != "" {
+				return nil, code, message
+			}
+			totalRunes += utf8.RuneCountInString(part.Text)
+			if totalRunes > 2000 {
+				return nil, "TEXT_TOO_LONG", "sequence speech must not exceed 2000 characters in total."
+			}
+			validated = append(validated, validatedSequencePart{Text: part.Text, StyleID: *part.StyleID, Tuning: tuning})
+		case "pause":
+			if part.DurationMS == nil || *part.DurationMS < 100 || *part.DurationMS > 10000 || *part.DurationMS%100 != 0 {
+				return nil, "PAUSE_INVALID", "duration_ms must be from 100 to 10000 in 100ms steps."
+			}
+			validated = append(validated, validatedSequencePart{PauseMS: *part.DurationMS})
+		default:
+			return nil, "PART_KIND_INVALID", "part kind must be speech or pause."
+		}
+	}
+	return validated, "", ""
 }
 
 func ensureJSONEnd(decoder *json.Decoder) error {
@@ -474,6 +609,57 @@ func ffmpegEncoder(path string) mp3Encoder {
 			"-map_metadata", "-1", "-f", "mp3", "pipe:1",
 		)
 		command.Stdin = bytes.NewReader(wav)
+		var output bytes.Buffer
+		var errorOutput bytes.Buffer
+		command.Stdout = &output
+		command.Stderr = &errorOutput
+		if err := command.Run(); err != nil {
+			return nil, fmt.Errorf("ffmpeg failed: %w: %s", err, strings.TrimSpace(errorOutput.String()))
+		}
+		if output.Len() == 0 || output.Len() > maxMP3Bytes {
+			return nil, errors.New("encoded MP3 is empty or exceeds its size limit")
+		}
+		return output.Bytes(), nil
+	}
+}
+
+func ffmpegSequenceEncoder(path string) sequenceMP3Encoder {
+	return func(context context.Context, parts []audioSequencePart) ([]byte, error) {
+		if len(parts) == 0 {
+			return nil, errors.New("audio sequence is empty")
+		}
+		directory, err := os.MkdirTemp("", "voicevox-sequence-")
+		if err != nil {
+			return nil, err
+		}
+		defer os.RemoveAll(directory)
+		arguments := []string{"-hide_banner", "-loglevel", "error", "-nostdin"}
+		filters := make([]string, 0, len(parts)+1)
+		inputs := make([]string, 0, len(parts))
+		for index, part := range parts {
+			if part.PauseMS > 0 {
+				arguments = append(arguments,
+					"-f", "lavfi", "-t", strconv.FormatFloat(float64(part.PauseMS)/1000, 'f', 3, 64),
+					"-i", "anullsrc=r=24000:cl=mono",
+				)
+			} else {
+				filename := fmt.Sprintf("%s/part-%02d.wav", directory, index)
+				if err := os.WriteFile(filename, part.WAV, 0o600); err != nil {
+					return nil, err
+				}
+				arguments = append(arguments, "-i", filename)
+			}
+			label := fmt.Sprintf("p%d", index)
+			filters = append(filters, fmt.Sprintf("[%d:a]aresample=24000,aformat=sample_fmts=s16:channel_layouts=mono[%s]", index, label))
+			inputs = append(inputs, "["+label+"]")
+		}
+		filters = append(filters, strings.Join(inputs, "")+fmt.Sprintf("concat=n=%d:v=0:a=1[out]", len(parts)))
+		arguments = append(arguments,
+			"-filter_complex", strings.Join(filters, ";"), "-map", "[out]",
+			"-vn", "-ac", "1", "-ar", "24000", "-codec:a", "libmp3lame", "-b:a", "64k",
+			"-map_metadata", "-1", "-f", "mp3", "pipe:1",
+		)
+		command := exec.CommandContext(context, path, arguments...)
 		var output bytes.Buffer
 		var errorOutput bytes.Buffer
 		command.Stdout = &output

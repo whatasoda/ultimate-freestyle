@@ -3,6 +3,7 @@ import {
   VOICEVOX_ENGINE,
   ZUNDAMON_NORMAL_PROFILE
 } from "@ultimate-freestyle/research-schema/voice-generation";
+import { VOICEVOX_TUNING_LIMITS } from "@ultimate-freestyle/research-schema/voice";
 import {
   findVoicevoxCatalogProfile
 } from "@ultimate-freestyle/research-schema/voicevox-catalog";
@@ -64,6 +65,18 @@ const mutationOutput = {
     .object({ code: z.string(), message: z.string() })
     .nullable()
 };
+
+const narrationVoiceCueInputSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
+  text: z.string().min(1).max(500),
+  voice_profile_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
+  voice_tuning: z.object({
+    speedScale: z.number().min(VOICEVOX_TUNING_LIMITS.speedScale.min).max(VOICEVOX_TUNING_LIMITS.speedScale.max).optional(),
+    pitchScale: z.number().min(VOICEVOX_TUNING_LIMITS.pitchScale.min).max(VOICEVOX_TUNING_LIMITS.pitchScale.max).optional(),
+    intonationScale: z.number().min(VOICEVOX_TUNING_LIMITS.intonationScale.min).max(VOICEVOX_TUNING_LIMITS.intonationScale.max).optional()
+  }).nullable().optional(),
+  pause_after_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional()
+});
 
 const templateMutableInput = {
   name: presentationTemplateSchema.shape.name.optional(),
@@ -2397,7 +2410,7 @@ export function registerProjectMutationTools(
     {
       title: "読み上げsegmentの音声設定を部分更新",
       description:
-        "本文を再送せず、指定stepの話者表示、VOICEVOX profile、調声値だけを更新します。音声設定を変えると生成済み音声は無効化されます。",
+        "声・調声・休符・発話ブロックを更新します。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -2405,7 +2418,10 @@ export function registerProjectMutationTools(
         speaker: narrationSegmentSchema.shape.speaker.optional(),
         voice_profile_id:
           narrationSegmentSchema.shape.voice_profile_id.optional(),
-        voice_tuning: narrationSegmentSchema.shape.voice_tuning.optional()
+        voice_tuning: narrationSegmentSchema.shape.voice_tuning.optional(),
+        voice_cues: z.array(narrationVoiceCueInputSchema).min(1).max(8).nullable().optional(),
+        pause_before_ms: narrationSegmentSchema.shape.pause_before_ms.optional(),
+        pause_after_ms: narrationSegmentSchema.shape.pause_after_ms.optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -2437,6 +2453,19 @@ export function registerProjectMutationTools(
               "The narration segment does not exist."
             );
           }
+          const profileIds = new Set(
+            document.deck?.voicevox?.profiles.map((profile) => profile.id) ?? []
+          );
+          const referencedProfileIds = [
+            fields.voice_profile_id,
+            ...(fields.voice_cues?.map((cue) => cue.voice_profile_id) ?? [])
+          ].filter((profileId): profileId is string => typeof profileId === "string");
+          if (referencedProfileIds.some((profileId) => !profileIds.has(profileId))) {
+            throw new ProjectToolError(
+              "INVALID_CHANGE",
+              "The requested VOICEVOX profile does not exist."
+            );
+          }
           if (fields.speaker !== undefined) segment.speaker = fields.speaker;
           if (fields.voice_profile_id !== undefined) {
             segment.voice_profile_id = fields.voice_profile_id;
@@ -2452,6 +2481,21 @@ export function registerProjectMutationTools(
                   };
             segment.audio_src = null;
           }
+          if (fields.voice_cues !== undefined) {
+            if (fields.voice_cues === null) delete segment.voice_cues;
+            else {
+              segment.voice_cues = fields.voice_cues;
+              segment.text = fields.voice_cues.map((cue) => cue.text).join("");
+            }
+            segment.audio_src = null;
+          }
+          if (fields.pause_before_ms !== undefined) {
+            segment.pause_before_ms = fields.pause_before_ms;
+          }
+          if (fields.pause_after_ms !== undefined) {
+            segment.pause_after_ms = fields.pause_after_ms;
+          }
+          narrationSegmentSchema.parse(segment);
         }
       })
   );
@@ -2524,7 +2568,11 @@ export function registerProjectMutationTools(
               audio_src:
                 previous?.text === nextText
                   ? (previous?.audio_src ?? null)
-                  : null
+                  : null,
+              voice_cues:
+                previous?.text === nextText
+                  ? previous?.voice_cues
+                  : undefined
             });
             if (index === -1) slide.narration.segments.push(segment);
             else slide.narration.segments[index] = segment;

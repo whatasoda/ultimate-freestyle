@@ -125,6 +125,47 @@ describe("VOICEVOX project schema", () => {
     expect(projectDocumentSchema.safeParse(voiceProject()).success).toBe(true);
   });
 
+  it("accepts composed voice cues and pause timings", () => {
+    const project = voiceProject();
+    const segment = project.deck!.slides[0]!.narration!.segments[0]!;
+    segment.text = "ここは静かに。ここから強く。";
+    segment.pause_before_ms = 500;
+    segment.pause_after_ms = 1_200;
+    segment.voice_cues = [
+      {
+        id: "calm",
+        text: "ここは静かに。",
+        voice_profile_id: "zundamon-normal",
+        voice_tuning: { speedScale: 0.9, intonationScale: 0.8 },
+        pause_after_ms: 800
+      },
+      {
+        id: "emphasis",
+        text: "ここから強く。",
+        voice_profile_id: null,
+        voice_tuning: { pitchScale: 0.05, intonationScale: 1.4 },
+        pause_after_ms: 0
+      }
+    ];
+
+    expect(projectDocumentSchema.safeParse(project).success).toBe(true);
+  });
+
+  it("rejects voice cues that do not compose the displayed narration", () => {
+    const project = voiceProject();
+    const segment = project.deck!.slides[0]!.narration!.segments[0]!;
+    segment.voice_cues = [{ id: "different", text: "別の文章", pause_after_ms: 0 }];
+
+    const parsed = projectDocumentSchema.safeParse(project);
+
+    expect(parsed.success).toBe(false);
+    if (!parsed.success) {
+      expect(parsed.error.issues.map((issue) => issue.message)).toContain(
+        "Narration voice cue text must exactly compose the displayed narration text."
+      );
+    }
+  });
+
   it("rejects missing profile references and unsafe tuning ranges", () => {
     const project = voiceProject();
     const segment = project.deck!.slides[0]!.narration!.segments[0]!;

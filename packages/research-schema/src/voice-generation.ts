@@ -42,6 +42,16 @@ export type VoiceGenerationInput = {
   speakerUuid: string;
   styleId: number;
   tuning: VoicevoxTuning;
+  sequence?: Array<
+    | {
+        kind: "speech";
+        text: string;
+        speakerUuid: string;
+        styleId: number;
+        tuning: VoicevoxTuning;
+      }
+    | { kind: "pause"; durationMs: number }
+  >;
   engine: typeof VOICEVOX_ENGINE;
   codec: typeof VOICEVOX_MP3_CODEC;
 };
@@ -64,8 +74,16 @@ export function createVoiceGenerationInput(options: {
   styleId: number;
   profileTuning?: VoicevoxTuningOverride | null;
   segmentTuning?: VoicevoxTuningOverride | null;
+  sequence?: Array<{
+    text: string;
+    speakerUuid: string;
+    styleId: number;
+    profileTuning?: VoicevoxTuningOverride | null;
+    segmentTuning?: VoicevoxTuningOverride | null;
+    pauseAfterMs?: number;
+  }>;
 }): VoiceGenerationInput {
-  return {
+  const input: VoiceGenerationInput = {
     text: options.text,
     speakerUuid: options.speakerUuid,
     styleId: options.styleId,
@@ -76,6 +94,24 @@ export function createVoiceGenerationInput(options: {
     engine: VOICEVOX_ENGINE,
     codec: VOICEVOX_MP3_CODEC
   };
+  if (options.sequence !== undefined) {
+    input.sequence = options.sequence.flatMap((part, index) => [
+      {
+        kind: "speech" as const,
+        text: part.text,
+        speakerUuid: part.speakerUuid,
+        styleId: part.styleId,
+        tuning: mergeVoicevoxTuning(
+          part.profileTuning ?? undefined,
+          part.segmentTuning ?? undefined
+        )
+      },
+      ...(part.pauseAfterMs && index < options.sequence!.length - 1
+        ? [{ kind: "pause" as const, durationMs: part.pauseAfterMs }]
+        : [])
+    ]);
+  }
+  return input;
 }
 
 export function serializeVoiceGenerationInput(

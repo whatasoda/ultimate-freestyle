@@ -26,6 +26,15 @@ export type NarrationSegment = {
   voiceProfileId?: string;
   /** この文だけに適用する調声差分。 */
   voiceTuning?: VoicevoxTuningOverride;
+  voiceCues?: Array<{
+    id: string;
+    text: string;
+    voiceProfileId?: string;
+    voiceTuning?: VoicevoxTuningOverride;
+    pauseAfterMs?: number;
+  }>;
+  pauseBeforeMs?: number;
+  pauseAfterMs?: number;
 };
 
 export type Narration = {

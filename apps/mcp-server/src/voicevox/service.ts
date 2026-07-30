@@ -59,14 +59,16 @@ export type VoiceArtifactRow = {
 
 export function selectVoiceGenerationBatch<T>(
   items: readonly T[],
-  textOf: (item: T) => string
+  textOf: (item: T) => string,
+  exceedsItemLimit: (item: T, characters: number) => boolean = (_item, characters) =>
+    characters > MAX_SEGMENT_CHARACTERS
 ): { selected: T[]; oversized: T[]; totalCharacters: number } {
   const selected: T[] = [];
   const oversized: T[] = [];
   let totalCharacters = 0;
   for (const item of items) {
     const characters = [...textOf(item)].length;
-    if (characters > MAX_SEGMENT_CHARACTERS) {
+    if (exceedsItemLimit(item, characters)) {
       oversized.push(item);
       continue;
     }
@@ -188,19 +190,34 @@ export class VoiceGenerationError extends Error {
   }
 }
 
+const effectiveVoiceTuningSchema = z.object({
+  speedScale: z.number(),
+  pitchScale: z.number(),
+  intonationScale: z.number(),
+  volumeScale: z.number(),
+  pauseLengthScale: z.number(),
+  prePhonemeLength: z.number(),
+  postPhonemeLength: z.number()
+});
+
 const generationInputSchema = z.object({
   text: z.string().min(1).max(2_000),
   speakerUuid: z.string().uuid(),
   styleId: z.number().int().nonnegative(),
-  tuning: z.object({
-    speedScale: z.number(),
-    pitchScale: z.number(),
-    intonationScale: z.number(),
-    volumeScale: z.number(),
-    pauseLengthScale: z.number(),
-    prePhonemeLength: z.number(),
-    postPhonemeLength: z.number()
-  }),
+  tuning: effectiveVoiceTuningSchema,
+  sequence: z.array(z.discriminatedUnion("kind", [
+    z.object({
+      kind: z.literal("speech"),
+      text: z.string().min(1).max(500),
+      speakerUuid: z.string().uuid(),
+      styleId: z.number().int().nonnegative(),
+      tuning: effectiveVoiceTuningSchema
+    }),
+    z.object({
+      kind: z.literal("pause"),
+      durationMs: z.number().int().min(100).max(10_000).multipleOf(100)
+    })
+  ])).min(1).max(15).optional(),
   engine: z.object({
     version: z.string(),
     imageDigest: z.string(),
@@ -262,6 +279,28 @@ async function buildVoicePlan(
           ? profiles.get(segment.voice_profile_id)
           : undefined) ?? defaultProfile;
       if (profile === undefined) continue;
+      const cueSequence = segment.voice_cues?.map((cue) => {
+        const cueProfile =
+          (cue.voice_profile_id
+            ? profiles.get(cue.voice_profile_id)
+            : undefined) ?? profile;
+        return {
+          text: cue.text,
+          speakerUuid: cueProfile.speaker_uuid,
+          styleId: cueProfile.style_id,
+          profileTuning: cueProfile.tuning,
+          segmentTuning: {
+            ...(segment.voice_tuning ?? {}),
+            ...(cue.voice_tuning ?? {})
+          },
+          pauseAfterMs: cue.pause_after_ms
+        };
+      });
+      const cueProfileLabels = new Set(
+        segment.voice_cues?.map((cue) =>
+          ((cue.voice_profile_id ? profiles.get(cue.voice_profile_id) : undefined) ?? profile).label
+        ) ?? []
+      );
       unresolved.push({
         segmentId: `${slide.id}:${segment.at}`,
         slideId: slide.id,
@@ -271,13 +310,14 @@ async function buildVoicePlan(
         speaker:
           segment.speaker ?? slide.narration?.speaker ?? deck.narration_defaults?.speaker ?? null,
         profileId: profile.id,
-        profileLabel: profile.label,
+        profileLabel: cueProfileLabels.size > 1 ? "複数の声" : profile.label,
         input: createVoiceGenerationInput({
           text: segment.text,
           speakerUuid: profile.speaker_uuid,
           styleId: profile.style_id,
           profileTuning: profile.tuning,
-          segmentTuning: segment.voice_tuning
+          segmentTuning: segment.voice_tuning,
+          sequence: cueSequence
         })
       });
     }
@@ -701,11 +741,20 @@ export async function createVoiceGenerationJob(
     throw new VoiceGenerationError("NO_NARRATION", "生成する読み上げ原稿がありません。");
   }
   const missingPlan = fullPlan.filter((segment) => segment.artifact === null);
-  const batch = selectVoiceGenerationBatch(missingPlan, (segment) => segment.text);
+  const oversizedSequence = missingPlan.filter((segment) =>
+    segment.input.sequence?.some(
+      (part) => part.kind === "speech" && [...part.text].length > MAX_SEGMENT_CHARACTERS
+    ) ?? [...segment.text].length > MAX_SEGMENT_CHARACTERS
+  );
+  const batch = selectVoiceGenerationBatch(
+    missingPlan.filter((segment) => !oversizedSequence.includes(segment)),
+    (segment) => segment.text,
+    (segment, characters) => segment.input.sequence === undefined && characters > MAX_SEGMENT_CHARACTERS
+  );
   if (missingPlan.length > 0 && batch.selected.length === 0) {
     throw new VoiceGenerationError(
       "VOICE_CHARACTER_LIMIT",
-      `生成待ちの${batch.oversized.length}区間が${MAX_SEGMENT_CHARACTERS}文字を超えています。原稿を分割してください。`
+      `生成待ちの${oversizedSequence.length + batch.oversized.length}区間に${MAX_SEGMENT_CHARACTERS}文字を超える声の区間があります。文中の声区間を分割してください。`
     );
   }
   const plan = missingPlan.length > 0
@@ -910,7 +959,7 @@ function isMp3(bytes: Uint8Array): boolean {
 
 async function synthesizeVoicevoxMp3(
   binding: Env["VOICEVOX_CONTAINER"],
-  input: Pick<VoiceGenerationInput, "text" | "styleId" | "tuning">
+  input: Pick<VoiceGenerationInput, "text" | "styleId" | "tuning" | "sequence">
 ): Promise<Uint8Array> {
   const container = binding.getByName("voicevox-production");
   await container.startAndWaitForPorts({
@@ -921,15 +970,28 @@ async function synthesizeVoicevoxMp3(
       waitInterval: 1_000
     }
   });
-  const response = await container.fetch("http://voicevox/synthesize", {
+  const sequence = input.sequence?.map((part) =>
+    part.kind === "pause"
+      ? { kind: part.kind, duration_ms: part.durationMs }
+      : {
+          kind: part.kind,
+          text: part.text,
+          style_id: part.styleId,
+          tuning: part.tuning
+        }
+  );
+  const response = await container.fetch(
+    sequence === undefined
+      ? "http://voicevox/synthesize"
+      : "http://voicevox/synthesize-sequence",
+    {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      text: input.text,
-      style_id: input.styleId,
-      tuning: input.tuning
-    })
-  });
+    body: JSON.stringify(sequence === undefined
+      ? { text: input.text, style_id: input.styleId, tuning: input.tuning }
+      : { parts: sequence })
+    }
+  );
   if (!response.ok) {
     throw new VoiceGenerationError(
       "VOICE_GENERATION_FAILED",
