@@ -184,7 +184,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@105");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@106");
     expect(html).toContain("effectiveOpacity *=");
     expect(html).toContain("background.complex || effectiveOpacity < .99");
     expect(html).toContain('--aspect-font-scale: 1;');
@@ -828,6 +828,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const occlusions = editorFrame ? collectOcclusions(currentSlide) : []");
     expect(html).toContain("const syncEditorTabStops = () =>");
     expect(html).toContain("item.tabIndex = item === active ? 0 : -1");
+    expect(html).toContain('aria-labelledby="prelude-title"');
+    expect(html).toContain("stage?.focus({ preventScroll: true })");
     expect(html).toContain("boundary.getBoundingClientRect()");
     expect(html).toContain("overflow.x > 1 || overflow.y > 1");
     expect(html).toContain("scale > .45");

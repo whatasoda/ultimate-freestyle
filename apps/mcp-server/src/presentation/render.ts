@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@105";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@106";
 
 function escapeHtml(value: string): string {
   return value
@@ -1029,10 +1029,10 @@ export function renderPresentationHtml(
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
     <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p><p class="sr-only" data-slide-announcer aria-live="polite" aria-atomic="true"></p><p class="sr-only" data-voice-announcer aria-live="polite" aria-atomic="true"></p>
-      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}" style="--prelude-accent-foreground:${preludeAccentForeground}"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
+      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}" aria-labelledby="prelude-title" style="--prelude-accent-foreground:${preludeAccentForeground}"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
-          <h1>${escapeHtml(project.document.title)}</h1>
+          <h1 id="prelude-title">${escapeHtml(project.document.title)}</h1>
           <p class="prelude-message">${escapeHtml(loadingScreen.message)}</p>
           <div class="prelude-meter"${loadingScreen.show_progress ? "" : " hidden"} role="progressbar" aria-label="素材の準備" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i data-prelude-progress></i></div>
           <p class="prelude-status" data-prelude-status aria-live="polite">コンテンツを確認しています…</p>
@@ -2740,9 +2740,10 @@ export function renderPresentationHtml(
       else startedAt = Date.now();
       history.pushState(null, '', '?slide=1&step=0');
       slide = 0;
-      step = 0;
-      render();
-    });
+       step = 0;
+       render();
+       stage?.focus({ preventScroll: true });
+     });
     setInterval(() => { if (started) updateElapsed(); }, 250);
     preparePrelude();
     restore();
