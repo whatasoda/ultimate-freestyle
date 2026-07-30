@@ -458,10 +458,13 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:set-position");
     expect(detailHtml).toContain("data-copy-public");
     expect(detailHtml).toContain('data-published-current="false"');
+    expect(detailHtml).toContain('data-preview-current="false"');
     expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
     expect(DASHBOARD_SCRIPT).toContain("大きな画像を圧縮しています");
     expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
     expect(DASHBOARD_SCRIPT).toContain("publicationBaseDisabled");
+    expect(DASHBOARD_SCRIPT).toContain('publishButton.dataset.previewCurrent = "false"');
+    expect(DASHBOARD_SCRIPT).toContain('publishButton.dataset.previewReviewed = "false"');
     expect(DASHBOARD_SCRIPT).not.toContain("disabledBeforeDirty");
     expect(DASHBOARD_SCRIPT).toContain("templates[templateId]?.template_name");
     expect(DASHBOARD_SCRIPT).toContain("result.affected_slides.total");

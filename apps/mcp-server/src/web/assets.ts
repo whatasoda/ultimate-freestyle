@@ -39,7 +39,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (button.matches("[data-create-preview]")) return button.dataset.canPreview !== "true";
     if (button.matches("[data-review-preview]")) return button.dataset.reviewAvailable !== "true";
     if (button.matches("[data-publish-preview]")) {
-      return button.dataset.durationValid !== "true" || button.dataset.previewReviewed !== "true" || button.dataset.publishedCurrent === "true";
+      return button.dataset.durationValid !== "true" || button.dataset.previewCurrent !== "true" || button.dataset.previewReviewed !== "true" || button.dataset.publishedCurrent === "true";
     }
     return false;
   };
@@ -124,6 +124,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const publishButton = document.querySelector("[data-publish-preview]");
     if (publishButton instanceof HTMLButtonElement) {
       publishButton.disabled = true;
+      publishButton.dataset.previewCurrent = "false";
+      publishButton.dataset.previewReviewed = "false";
       publishButton.dataset.publishedCurrent = "false";
       publishButton.textContent = "確認した版を公開";
     }
@@ -3284,6 +3286,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.classList.add("success");
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.revision = result.revision.revision_id;
+          publishButton.dataset.previewCurrent = "true";
           publishButton.dataset.previewReviewed = "false";
           publishButton.disabled = true;
         }
@@ -3346,7 +3349,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (previewReviewStatus instanceof HTMLElement) previewReviewStatus.textContent = "確認済み";
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.previewReviewed = "true";
-          publishButton.disabled = publishButton.dataset.durationValid !== "true" || publishButton.dataset.publishedCurrent === "true";
+          publishButton.disabled = publicationBaseDisabled(publishButton);
         }
         publishFeedback.textContent = "この固定プレビューを公開できます。";
         publishFeedback.classList.add("success");
