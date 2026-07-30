@@ -10,6 +10,7 @@ import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { DASHBOARD_SCRIPT } from "../src/web/assets";
 import { createEmptyProject } from "../src/projects/schema";
+import { MAX_PROJECT_DOCUMENT_BYTES, projectDocumentBytes } from "../src/projects/repository";
 import type { Fetcher } from "../src/auth/twitch";
 import {
   VOICEVOX_ENGINE
@@ -433,6 +434,8 @@ describe("Web dashboard", () => {
     const detailHtml = await detail.text();
     expect(detail.status).toBe(200);
     expect(detailHtml).toContain("研究の概要です");
+    expect(detailHtml).toContain("保存容量");
+    expect(detailHtml).toContain(`progress max="${MAX_PROJECT_DOCUMENT_BYTES}"`);
     expect(detailHtml).toContain("なぜこうなるのか？");
     expect(detailHtml).toContain("観察した結果");
     expect(detailHtml).toContain(
@@ -441,8 +444,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=138"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=138"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=139"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=139"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -757,7 +760,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=138"'
+      'href="/assets/dashboard.css?v=139"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -929,7 +932,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=138"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=139"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -938,7 +941,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=138"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=139"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1244,6 +1247,38 @@ describe("Web dashboard", () => {
         ).bind(listItemProjectId).first<{ document_json: string }>())!.document_json
       ).findings
     ).toEqual([]);
+    const nearLimitDocument = createEmptyProject("容量境界の表示確認");
+    while (nearLimitDocument.findings.length < 100) {
+      const candidate = structuredClone(nearLimitDocument);
+      candidate.findings.push("観".repeat(4_000));
+      if (projectDocumentBytes(candidate) > MAX_PROJECT_DOCUMENT_BYTES) break;
+      nearLimitDocument.findings = candidate.findings;
+    }
+    expect(nearLimitDocument.findings.length).toBeGreaterThan(0);
+    await env.DB.prepare(
+      "UPDATE research_projects SET title = ?, document_json = ? WHERE id = ?"
+    ).bind(
+      nearLimitDocument.title,
+      JSON.stringify(nearLimitDocument),
+      listItemProjectId
+    ).run();
+    const oversizedListItem = await mutateListItem({
+      expected_version: 4,
+      action: "add",
+      list: "findings",
+      value: "観".repeat(4_000)
+    });
+    expect(oversizedListItem.status).toBe(422);
+    expect(await oversizedListItem.json()).toMatchObject({
+      ok: false,
+      error: {
+        code: "PROJECT_TOO_LARGE",
+        details: {
+          current_bytes: projectDocumentBytes(nearLimitDocument),
+          limit_bytes: MAX_PROJECT_DOCUMENT_BYTES
+        }
+      }
+    });
     const maximumListDocument = createEmptyProject("最大件数の表示確認");
     maximumListDocument.findings = Array.from(
       { length: 100 },

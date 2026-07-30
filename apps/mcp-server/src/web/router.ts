@@ -32,7 +32,8 @@ import {
   listDashboardProjects,
   listProjectDraftRevisions,
   mutateProject,
-  restoreProjectDraftRevision
+  restoreProjectDraftRevision,
+  ProjectRepositoryError
 } from "../projects/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import {
@@ -608,6 +609,9 @@ async function handleDraftRevisionRestore(
       request_id: crypto.randomUUID()
     });
   } catch (error) {
+    if (error instanceof ProjectRepositoryError && error.code === "PROJECT_TOO_LARGE") {
+      return projectMutationErrorResponse(error, "下書きを復元できませんでした。");
+    }
     const code = error instanceof Error && "code" in error
       ? String((error as { code: unknown }).code)
       : "INTERNAL_ERROR";
@@ -1316,6 +1320,9 @@ async function handleProjectFieldsUpdate(
       request_id: crypto.randomUUID()
     });
   } catch (error) {
+    if (error instanceof ProjectRepositoryError && error.code === "PROJECT_TOO_LARGE") {
+      return projectMutationErrorResponse(error, "変更を保存できませんでした。");
+    }
     const code =
       error instanceof Error && "code" in error
         ? String((error as { code: unknown }).code)
@@ -1672,6 +1679,9 @@ async function handleSlideFieldsUpdate(
       request_id: crypto.randomUUID()
     });
   } catch (error) {
+    if (error instanceof ProjectRepositoryError && error.code === "PROJECT_TOO_LARGE") {
+      return projectMutationErrorResponse(error, "スライドを保存できませんでした。");
+    }
     const code =
       error instanceof Error && "code" in error
         ? String((error as { code: unknown }).code)
@@ -3055,6 +3065,7 @@ function projectMutationErrorResponse(
     INVALID_COMPOSITION_MODE: "このスライドの構成形式では操作できません。",
     INVALID_FIELDS: "入力内容を確認してください。",
     LAST_SLIDE_REQUIRED: "最後の1枚は削除できません。先に別のスライドを複製または追加してください。",
+    PROJECT_TOO_LARGE: "研究データが512 KiBの保存上限を超えます。文章や不要なスライドを減らしてから保存してください。",
     PROJECT_VERSION_CONFLICT: "別の場所で更新されました。画面を読み込み直してください。"
   };
   const status =
@@ -3075,14 +3086,15 @@ function projectMutationErrorResponse(
           code === "NARRATION_SEGMENT_EXISTS" ||
           code === "LAST_SLIDE_REQUIRED"
         ? 409
-        : code === "INVALID_FIELDS" || code === "INVALID_NARRATION_STEP"
+        : code === "INVALID_FIELDS" || code === "INVALID_NARRATION_STEP" || code === "PROJECT_TOO_LARGE"
           ? 422
           : 500;
+  const details = error instanceof ProjectRepositoryError ? error.size : undefined;
   return jsonResponse(
     {
       ok: false,
       current_version: currentVersion,
-      error: { code, message: messages[code] ?? fallbackMessage },
+      error: { code, message: messages[code] ?? fallbackMessage, details },
       request_id: crypto.randomUUID()
     },
     status
@@ -3783,6 +3795,9 @@ async function handleSlideNarrationUpdate(
       request_id: crypto.randomUUID()
     });
   } catch (error) {
+    if (error instanceof ProjectRepositoryError && error.code === "PROJECT_TOO_LARGE") {
+      return projectMutationErrorResponse(error, "読み上げ文を保存できませんでした。");
+    }
     const code =
       error instanceof Error && "code" in error
         ? String((error as { code: unknown }).code)

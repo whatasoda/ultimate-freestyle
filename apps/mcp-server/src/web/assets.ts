@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "138";
+export const DASHBOARD_ASSET_VERSION = "139";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const link of document.querySelectorAll(".project-section-nav a[href^='#']")) {
@@ -18,7 +18,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       VOICE_PROFILE_NOT_FOUND: "選んだ声が見つかりません。声を選び直してください。",
       VOICE_JOB_NOT_FOUND: "音声生成の状況が見つかりません。音声仕上げ画面を再読み込みしてください。",
       ASSET_IN_USE: "この画像はスライドで使用中です。スライドから外してから削除してください。",
-      ASSET_NOT_FOUND: "画像が見つかりません。画面を再読み込みしてください。"
+      ASSET_NOT_FOUND: "画像が見つかりません。画面を再読み込みしてください。",
+      PROJECT_TOO_LARGE: "研究データが512 KiBの保存上限を超えます。文章や不要なスライドを減らしてから保存してください。"
     };
     const code = result?.error?.code;
     return (code && messages[code]) || result?.error?.message || fallback;

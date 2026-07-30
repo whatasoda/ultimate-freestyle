@@ -11,6 +11,13 @@ export type ProjectRepositoryErrorCode =
   | "PROJECT_LIMIT_REACHED"
   | "PROJECT_TOO_LARGE";
 
+export type ProjectSizeDetails = {
+  current_bytes: number | null;
+  proposed_bytes: number;
+  limit_bytes: number;
+  exceeded_by_bytes: number;
+};
+
 export type ProjectDraftRevisionSummary = {
   project_id: string;
   version: number;
@@ -49,7 +56,8 @@ export class ProjectRepositoryError extends Error {
   constructor(
     readonly code: ProjectRepositoryErrorCode,
     message: string,
-    readonly currentVersion?: number
+    readonly currentVersion?: number,
+    readonly size?: ProjectSizeDetails
   ) {
     super(message);
   }
@@ -66,17 +74,28 @@ type ProjectRow = {
 };
 
 const MAX_PROJECTS_PER_USER = 20;
-const MAX_PROJECT_DOCUMENT_BYTES = 512 * 1024;
+export const MAX_PROJECT_DOCUMENT_BYTES = 512 * 1024;
 export const PROJECT_DRAFT_REVISION_LIMIT = 50;
 export const PROJECT_DRAFT_REVISION_MINIMUM = 10;
 export const PROJECT_DRAFT_REVISION_BYTE_BUDGET = 8 * 1024 * 1024;
 
-function assertProjectSize(document: ProjectDocument): void {
-  const byteLength = new TextEncoder().encode(JSON.stringify(document)).length;
-  if (byteLength > MAX_PROJECT_DOCUMENT_BYTES) {
+export function projectDocumentBytes(document: ProjectDocument): number {
+  return new TextEncoder().encode(JSON.stringify(document)).length;
+}
+
+function assertProjectSize(document: ProjectDocument, current?: ProjectDocument): void {
+  const proposedBytes = projectDocumentBytes(document);
+  if (proposedBytes > MAX_PROJECT_DOCUMENT_BYTES) {
     throw new ProjectRepositoryError(
       "PROJECT_TOO_LARGE",
-      `The project document must not exceed ${MAX_PROJECT_DOCUMENT_BYTES} bytes.`
+      `The project document must not exceed ${MAX_PROJECT_DOCUMENT_BYTES} bytes.`,
+      undefined,
+      {
+        current_bytes: current === undefined ? null : projectDocumentBytes(current),
+        proposed_bytes: proposedBytes,
+        limit_bytes: MAX_PROJECT_DOCUMENT_BYTES,
+        exceeded_by_bytes: proposedBytes - MAX_PROJECT_DOCUMENT_BYTES
+      }
     );
   }
 }
@@ -270,6 +289,8 @@ export async function createProject(
       `A user can own at most ${MAX_PROJECTS_PER_USER} projects.`
     );
   }
+
+  assertProjectSize(options.document);
 
   const now = (options.now ?? new Date()).toISOString();
   const projectId = crypto.randomUUID();
@@ -549,6 +570,7 @@ export async function mutateProject(
   const document = structuredClone(current.document);
   options.mutate(document);
   const validated = projectDocumentSchema.parse(document);
+  assertProjectSize(validated, current.document);
   return updateProject(db, {
     ownerUserId: options.ownerUserId,
     projectId: options.projectId,

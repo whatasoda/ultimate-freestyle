@@ -12,9 +12,11 @@ import type {
   ProjectDraftRevisionSummary
 } from "../projects/repository";
 import {
+  MAX_PROJECT_DOCUMENT_BYTES,
   PROJECT_DRAFT_REVISION_BYTE_BUDGET,
   PROJECT_DRAFT_REVISION_LIMIT,
-  PROJECT_DRAFT_REVISION_MINIMUM
+  PROJECT_DRAFT_REVISION_MINIMUM,
+  projectDocumentBytes
 } from "../projects/repository";
 import {
   DEFAULT_VOICEVOX_TUNING,
@@ -393,6 +395,9 @@ const DASHBOARD_STYLE = String.raw`
       .stat-list dt { color: var(--muted); }
       .stat-list dd { margin: 0; font-weight: 750; text-align: right; }
       .stat-list dd[data-state="warning"] { color: #ffd681; }
+      .project-storage { display: grid; gap: .4rem; margin-top: 1rem; }
+      .project-storage progress { width: 100%; accent-color: #74e6b2; }
+      .project-storage[data-state="warning"] progress { accent-color: #ffbb66; }
       .log { padding: .8rem 0; border-top: 1px solid var(--line); }
       .log:first-of-type { padding-top: 0; border-top: 0; }
       .log small { color: var(--muted); }
@@ -1380,6 +1385,9 @@ export function projectDetailPage(options: {
   } | null;
 }): Response {
   const document = options.project.document;
+  const projectBytes = projectDocumentBytes(document);
+  const projectStoragePercent = Math.round(projectBytes / MAX_PROJECT_DOCUMENT_BYTES * 100);
+  const projectStorageWarning = projectBytes >= MAX_PROJECT_DOCUMENT_BYTES * 0.75;
   const projectFieldsPath = `/api/projects/${escapeHtml(options.project.project_id)}/fields`;
   const projectListItemsPath = `/api/projects/${escapeHtml(options.project.project_id)}/list-items`;
   const renderResearchListEditor = (
@@ -1947,7 +1955,7 @@ export function projectDetailPage(options: {
                <dt>ログ</dt><dd>${document.logs.length}件</dd>
                <dt>スライド</dt><dd>${slides.length}枚</dd>
                <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
-             </dl></section>
+             </dl><div class="project-storage" data-state="${projectStorageWarning ? "warning" : "ok"}"><span class="meta">保存容量 ${Math.ceil(projectBytes / 1024)} / ${MAX_PROJECT_DOCUMENT_BYTES / 1024} KiB（${projectStoragePercent}%）</span><progress max="${MAX_PROJECT_DOCUMENT_BYTES}" value="${projectBytes}">${projectStoragePercent}%</progress><small class="inherit-note">${projectStorageWarning ? "上限に近づいています。不要なログやスライドを整理してください。" : `残り約${Math.floor((MAX_PROJECT_DOCUMENT_BYTES - projectBytes) / 1024)} KiBです。`}</small></div></section>
              ${draftHistoryPanel}
              <section class="panel" id="presentation-structure" tabindex="-1"><h2>発表構成</h2><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
              ${evaluationPanel}
