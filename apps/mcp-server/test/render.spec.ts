@@ -893,7 +893,7 @@ describe("presentation artifact renderer", () => {
     expect(overLimitHtml).toContain("20分以内を3分20秒超えています");
     expect(overLimitHtml).toContain('<dt>想定時間</dt><dd data-state="warning">23分20秒 · 20分超過</dd>');
     expect(overLimitHtml).toContain("発表を20分以内に収める");
-    expect(overLimitHtml).toContain('data-duration-valid="false" data-published-current="false" disabled');
+    expect(overLimitHtml).toContain('data-duration-valid="false" data-preview-reviewed="false" data-published-current="false" disabled');
 
     const voiceLimitHtml = await voiceFinishPage({
       twitchLogin: "researcher",
