@@ -439,7 +439,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=124"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=125"');
     expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
@@ -978,6 +978,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('positionUrl.searchParams.set("narration", workspace.dataset.selectedNarration)');
     expect(dashboardScriptText).toContain("data-component-search");
     expect(dashboardScriptText).toContain('row.hidden = !matches');
+    expect(dashboardScriptText).toContain('sessionStorage.removeItem(form.dataset.draftKey)');
+    expect(dashboardScriptText).toContain('Number(link.dataset.narrationSelect) !== deletedAt');
     expect(dashboardScriptText).toContain("ultimate-freestyle:set-editor-selection");
     expect(dashboardScriptText).toContain("navigateToComponent(data.component_id)");
     expect(dashboardScriptText).toContain("component.frame = null");

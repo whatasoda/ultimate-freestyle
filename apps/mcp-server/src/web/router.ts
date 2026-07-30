@@ -734,11 +734,19 @@ async function handleVoicePage(
     getVoiceProjectStatus(env.DB, session.userId, projectId)
   ]);
   if (project === null || voice === null) return projectNotFoundPage();
+  const url = new URL(request.url);
+  const page = Number(url.searchParams.get("page") ?? "1");
+  const status = url.searchParams.get("status");
   return voiceFinishPage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
     project,
-    voice: { ...voice, ok: true }
+    voice: { ...voice, ok: true },
+    page: Number.isInteger(page) && page > 0 ? page : 1,
+    query: (url.searchParams.get("q") ?? "").slice(0, 100),
+    status: ["ready", "needs_generation", "failed"].includes(status ?? "")
+      ? status as "ready" | "needs_generation" | "failed"
+      : "all"
   });
 }
 

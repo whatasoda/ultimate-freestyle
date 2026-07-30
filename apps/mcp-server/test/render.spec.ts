@@ -1215,6 +1215,49 @@ describe("presentation artifact renderer", () => {
     expect(voiceLimitHtml).toContain("32,000字");
     expect(voiceLimitHtml).toContain("生成対象が1回の上限30,000字を超えています");
     expect(voiceLimitHtml).toContain('data-voice-generate="/api/projects/63ab1ec4-20a0-4cf6-a1a0-f74ced56778a/voice/jobs" disabled>原稿を短縮してください</button>');
+
+    const pagedVoiceHtml = await voiceFinishPage({
+      twitchLogin: "researcher",
+      csrfToken: "csrf-token",
+      project,
+      page: 2,
+      query: "区間",
+      status: "needs_generation",
+      voice: {
+        ok: true,
+        project_id: project.project_id,
+        version: project.version,
+        configured: true,
+        default_profile: null,
+        summary: { total: 81, ready: 0, needs_generation: 81, failed: 0, queued: 0 },
+        segments: Array.from({ length: 81 }, (_, index) => ({
+          slide_id: "rich-result",
+          slide_title: "結果",
+          at: index % 101,
+          text: `区間 ${index}`,
+          speaker: null,
+          profile_label: null,
+          effective_tuning: {
+            speedScale: 1,
+            pitchScale: 0,
+            intonationScale: 1,
+            volumeScale: 1,
+            pauseLengthScale: 1,
+            prePhonemeLength: 0.1,
+            postPhonemeLength: 0.1
+          },
+          status: "needs_generation" as const,
+          audio_url: null
+        })),
+        active_job: null,
+        latest_job: null
+      }
+    }).text();
+    expect(pagedVoiceHtml.match(/data-voice-segment /g)).toHaveLength(40);
+    expect(pagedVoiceHtml).toContain("2 / 3ページ · 81件");
+    expect(pagedVoiceHtml).toContain('name="q" value="区間"');
+    expect(pagedVoiceHtml).toContain("?status=needs_generation&amp;q=%E5%8C%BA%E9%96%93&amp;page=3");
+    expect(new TextEncoder().encode(pagedVoiceHtml).byteLength).toBeLessThan(400_000);
   });
 
   it("maps every safe visual and font preset and renders bounded narration variants", () => {

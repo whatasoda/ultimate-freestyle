@@ -1347,15 +1347,20 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "読み上げ区間を削除できませんでした。"));
         form.dataset.dirty = "false";
+        try { if (form.dataset.draftKey) sessionStorage.removeItem(form.dataset.draftKey); } catch {}
         feedback.textContent = "読み上げ区間を削除しました。画面を更新します…";
         feedback.classList.add("success");
-        if (action === "duplicate" && result.result_block_id) navigateToComponent(String(result.result_block_id));
-        else {
-          const url = new URL(location.href);
-          url.searchParams.delete("component");
-          document.body.dataset.internalNavigation = "true";
-          location.assign(url);
+        const deletedAt = Number(form.dataset.segmentAt || -1);
+        const remaining = [...document.querySelectorAll("[data-narration-select]")]
+          .filter((link) => link instanceof HTMLAnchorElement && Number(link.dataset.narrationSelect) !== deletedAt)
+          .sort((left, right) => Math.abs(Number(left.dataset.narrationSelect) - deletedAt) - Math.abs(Number(right.dataset.narrationSelect) - deletedAt));
+        const url = remaining[0] instanceof HTMLAnchorElement ? new URL(remaining[0].href) : new URL(location.href);
+        if (remaining.length === 0) {
+          url.searchParams.delete("narration");
+          url.hash = "";
         }
+        document.body.dataset.internalNavigation = "true";
+        location.assign(url);
       } catch (error) {
         feedback.textContent = caughtErrorMessage(error, "読み上げ区間を削除できませんでした。");
         feedback.classList.add("warning");

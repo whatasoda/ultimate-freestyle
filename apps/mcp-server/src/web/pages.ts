@@ -215,7 +215,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=124";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=125";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -641,6 +641,8 @@ function shell(title: string, body: string): string {
       .segment-outline { display: flex; gap: .4rem; overflow-x: auto; padding: .15rem 0 .5rem; scrollbar-width: thin; }
       .segment-outline a { flex: 0 0 auto; padding: .45rem .65rem; border: 1px solid var(--line); border-radius: .5rem; color: var(--muted); text-decoration: none; font: 700 .75rem/1 ui-monospace, monospace; }
       .segment-outline a:hover, .segment-outline a[aria-current="true"] { border-color: #9d7bff; background: #8062df30; color: white; }
+      .voice-pager { display: flex; align-items: center; justify-content: center; gap: .65rem; margin-top: 1rem; }
+      .voice-pager span { color: var(--muted); font-size: .82rem; }
       .component-step { padding: .2rem .38rem; border-radius: 999px; background: #8062df20; color: #c7b9ff; font: 750 .68rem/1 ui-monospace, monospace; white-space: nowrap; }
       .narration-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
       .narration-head .stage { font-size: .68rem; }
@@ -1863,6 +1865,9 @@ export function voiceFinishPage(options: {
   csrfToken: string;
   project: ProjectRecord;
   voice: VoiceFinishState;
+  page?: number;
+  query?: string;
+  status?: "all" | "ready" | "needs_generation" | "failed";
 }): Response {
   const projectId = escapeHtml(options.project.project_id);
   const summary = options.voice.summary;
@@ -1911,9 +1916,6 @@ export function voiceFinishPage(options: {
   const quickProfiles = [3, 2, 8]
     .map((styleId) => VOICEVOX_CATALOG.find((profile) => profile.styleId === styleId))
     .filter((profile): profile is typeof VOICEVOX_CATALOG[number] => profile !== undefined);
-  const attentionSegmentIndex = options.voice.segments.findIndex(
-    (segment) => segment.status !== "ready"
-  );
   const estimatedNarrationSeconds = Math.ceil(
     options.voice.segments.reduce(
       (total, segment) => total + Math.max(
@@ -1926,8 +1928,28 @@ export function voiceFinishPage(options: {
   const generationCharacterCount = options.voice.segments
     .filter((segment) => ["needs_generation", "failed"].includes(segment.status))
     .reduce((total, segment) => total + segment.text.length, 0);
-  const segmentList = options.voice.segments.length
-    ? options.voice.segments
+  const voiceQuery = (options.query ?? "").trim().toLocaleLowerCase("ja");
+  const voiceStatus = options.status ?? "all";
+  const filteredSegments = options.voice.segments.filter((segment) => {
+    const matchesStatus = voiceStatus === "all" || segment.status === voiceStatus ||
+      (voiceStatus === "needs_generation" && ["needs_generation", "queued", "failed"].includes(segment.status));
+    const searchText = `${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja");
+    return matchesStatus && (voiceQuery.length === 0 || searchText.includes(voiceQuery));
+  });
+  const voicePageSize = 40;
+  const voicePageCount = Math.max(1, Math.ceil(filteredSegments.length / voicePageSize));
+  const voicePage = Math.min(Math.max(options.page ?? 1, 1), voicePageCount);
+  const pageSegments = filteredSegments.slice((voicePage - 1) * voicePageSize, voicePage * voicePageSize);
+  const voiceFilterHref = (status: "all" | "ready" | "needs_generation" | "failed", page = 1) => {
+    const query = new URLSearchParams();
+    if (status !== "all") query.set("status", status);
+    if (voiceQuery.length > 0) query.set("q", options.query?.trim() ?? "");
+    if (page > 1) query.set("page", String(page));
+    const value = query.toString();
+    return value.length > 0 ? `?${value}` : "?";
+  };
+  const segmentList = pageSegments.length
+    ? pageSegments
         .map((segment, index) => {
           const statusLabel =
             VOICE_SEGMENT_STATUS_LABELS[segment.status] ?? segment.status;
@@ -1935,13 +1957,18 @@ export function voiceFinishPage(options: {
           const tuningDetails = (Object.keys(TUNING_LABELS) as Array<keyof VoicevoxTuning>)
             .map((key) => `<dt>${TUNING_LABELS[key]}</dt><dd>${segment.effective_tuning[key]}</dd>`)
             .join("");
-          return `<details class="voice-review"${index === (attentionSegmentIndex === -1 ? 0 : attentionSegmentIndex) ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}">
-            <summary><span class="component-step">${String(index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
+          return `<details class="voice-review"${index === 0 ? " open" : ""} data-voice-segment data-state="${escapeHtml(segment.status)}" data-search-text="${escapeHtml(`${segment.slide_title} ${segment.text} ${segment.profile_label ?? defaultProfileLabel} ${segment.speaker ?? ""}`.toLocaleLowerCase("ja"))}">
+            <summary><span class="component-step">${String((voicePage - 1) * voicePageSize + index + 1).padStart(2, "0")}</span><span class="voice-review-title"><strong>${escapeHtml(segment.slide_title)} · STEP ${segment.at}</strong><small>${escapeHtml(segment.profile_label ?? defaultProfileLabel)}${segment.speaker ? ` · ${escapeHtml(segment.speaker)}` : ""}</small></span><span class="voice-status ${escapeHtml(segment.status)}">${escapeHtml(statusLabel)}</span></summary>
             <div class="voice-review-body"><p>${escapeHtml(segment.text)}</p><details class="component-detail"><summary>実効調声を確認</summary><dl class="setting-table">${tuningDetails}</dl></details>${generated ? `<div class="voice-audio-timeline"><input type="range" min="0" max="0" step="0.05" value="0" data-voice-preview-seek aria-label="生成音声の再生位置" disabled><output data-voice-preview-time>00:00 / --:--</output></div>` : ""}<div class="actions"><button class="ghost voice-play" type="button" data-voice-preview data-audio-url="${escapeHtml(segment.audio_url ?? "")}" data-voice-text="${escapeHtml(segment.text)}" data-effective-tuning="${escapeHtml(JSON.stringify(segment.effective_tuning))}" aria-pressed="false">${generated ? "生成音声を試聴" : "ブラウザ音声で仮試聴"}</button><a class="button ghost" href="/dashboard/projects/${projectId}/slides/${escapeHtml(segment.slide_id)}?step=${segment.at}&narration=${segment.at}#narration-segment-${segment.at}">この区間を編集</a></div><p class="feedback" data-voice-preview-feedback aria-live="polite"></p></div>
           </details>`;
         })
         .join("")
-    : `<section class="empty"><h2>読み上げ原稿がありません</h2><p>先にAIクライアントまたはスライド編集画面から、読み上げ区間を追加してください。</p></section>`;
+    : options.voice.segments.length === 0
+      ? `<section class="empty"><h2>読み上げ原稿がありません</h2><p>先にAIクライアントまたはスライド編集画面から、読み上げ区間を追加してください。</p></section>`
+      : `<section class="empty"><h2>条件に一致する区間がありません</h2><p>検索語または状態を変更してください。</p></section>`;
+  const voicePager = voicePageCount <= 1
+    ? ""
+    : `<nav class="voice-pager" aria-label="読み上げ区間のページ">${voicePage > 1 ? `<a class="button ghost" href="${escapeHtml(voiceFilterHref(voiceStatus, voicePage - 1))}">← 前へ</a>` : ""}<span>${voicePage} / ${voicePageCount}ページ · ${filteredSegments.length}件</span>${voicePage < voicePageCount ? `<a class="button ghost" href="${escapeHtml(voiceFilterHref(voiceStatus, voicePage + 1))}">次へ →</a>` : ""}</nav>`;
   const generateDisabled =
     !options.voice.configured ||
     summary.needs_generation === 0 ||
@@ -1967,7 +1994,7 @@ export function voiceFinishPage(options: {
                <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.total === 0 ? "読み上げ原稿がありません" : generationCharacterCount > MAX_JOB_CHARACTERS ? "原稿を短縮してください" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback${generationCharacterCount > MAX_JOB_CHARACTERS ? " warning" : ""}" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.total === 0 ? "各スライドへ読み上げ原稿を追加すると生成できます。" : generationCharacterCount > MAX_JOB_CHARACTERS ? `生成対象が1回の上限${MAX_JOB_CHARACTERS.toLocaleString()}字を超えています。原稿を短縮してから生成してください。` : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : `生成対象は${generationCharacterCount.toLocaleString()} / ${MAX_JOB_CHARACTERS.toLocaleString()}字です。生成中もこの画面を閉じて構いません。`}</p>
                ${voiceJobCard(currentJob)}
              </section>
-             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><div class="voice-filter" aria-label="区間の絞り込み"><input class="voice-search" type="search" data-voice-search placeholder="スライド名・原稿・声を検索" autocomplete="off"><button class="ghost" type="button" data-voice-filter="all" aria-pressed="true">すべて ${summary.total}</button><button class="ghost" type="button" data-voice-filter="needs_generation" aria-pressed="false">要生成（失敗含む） ${summary.needs_generation}</button><button class="ghost" type="button" data-voice-filter="ready" aria-pressed="false">生成済み ${summary.ready}</button><button class="ghost" type="button" data-voice-filter="failed" aria-pressed="false">失敗 ${summary.failed}</button><output class="voice-result-count" data-voice-visible aria-live="polite">${summary.total} / ${summary.total}件表示</output></div><p class="search-empty" data-voice-filter-empty hidden>この条件に一致する読み上げ区間はありません。</p><div class="voice-segment-list" data-voice-segments>${segmentList}</div></section>
+             <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><form class="voice-filter" method="get" aria-label="区間の絞り込み"><input class="voice-search" type="search" name="q" value="${escapeHtml(options.query ?? "")}" data-voice-search placeholder="スライド名・原稿・声を検索" autocomplete="off"><input type="hidden" name="status" value="${voiceStatus === "all" ? "" : voiceStatus}"><button class="ghost" type="submit">全区間から検索</button><a class="button ghost" data-voice-filter="all" href="${escapeHtml(voiceFilterHref("all"))}"${voiceStatus === "all" ? ' aria-current="page"' : ""}>すべて ${summary.total}</a><a class="button ghost" data-voice-filter="needs_generation" href="${escapeHtml(voiceFilterHref("needs_generation"))}"${voiceStatus === "needs_generation" ? ' aria-current="page"' : ""}>要生成（失敗含む） ${summary.needs_generation}</a><a class="button ghost" data-voice-filter="ready" href="${escapeHtml(voiceFilterHref("ready"))}"${voiceStatus === "ready" ? ' aria-current="page"' : ""}>生成済み ${summary.ready}</a><a class="button ghost" data-voice-filter="failed" href="${escapeHtml(voiceFilterHref("failed"))}"${voiceStatus === "failed" ? ' aria-current="page"' : ""}>失敗 ${summary.failed}</a><output class="voice-result-count" data-voice-visible aria-live="polite">${pageSegments.length} / ${filteredSegments.length}件表示</output></form><p class="search-empty" data-voice-filter-empty hidden>このページ内で一致する読み上げ区間はありません。全区間から探すには検索ボタンを押してください。</p><div class="voice-segment-list" data-voice-segments>${segmentList}</div>${voicePager}</section>
            </div>
            <aside class="panel voice-next"><p class="eyebrow">Next step</p><h2>確認できたら</h2><ol><li>必要な区間だけVOICEVOXを生成</li><li>気になる区間を試聴</li><li>固定プレビューを作成</li><li>プレビューを確認して公開</li></ol><a class="button" href="/dashboard/projects/${projectId}#publication">プレビューと公開へ進む</a><p class="inherit-note">音声生成は任意です。未生成区間はブラウザ音声で代替してプレビューできます。</p></aside>
          </div>
