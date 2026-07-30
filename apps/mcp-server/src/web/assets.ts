@@ -34,6 +34,48 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (busy) button.setAttribute("aria-busy", "true");
     else button.removeAttribute("aria-busy");
   };
+  const publicationActionSelector = "[data-create-preview], [data-review-preview], [data-publish-preview], [data-unpublish], [data-publish-rollback]";
+  const syncPublicationDirtyState = (dirtyCount) => {
+    const panel = document.querySelector("[data-publication]");
+    const notice = document.querySelector("[data-publication-dirty]");
+    const blocked = dirtyCount > 0;
+    if (panel instanceof HTMLElement) panel.dataset.dirtyBlocked = String(blocked);
+    if (notice instanceof HTMLElement) {
+      notice.hidden = !blocked;
+      notice.textContent = blocked ? "未保存の変更が" + dirtyCount + "件あります。先に保存してから固定プレビュー・公開を操作してください。" : "";
+    }
+    for (const button of document.querySelectorAll(publicationActionSelector)) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      if (blocked) {
+        if (button.dataset.disabledBeforeDirty === undefined) button.dataset.disabledBeforeDirty = String(button.disabled);
+        button.disabled = true;
+      } else if (button.dataset.disabledBeforeDirty !== undefined) {
+        button.disabled = button.dataset.disabledBeforeDirty === "true";
+        delete button.dataset.disabledBeforeDirty;
+      }
+    }
+  };
+  const guardPublicationAction = () => {
+    const dirtyForms = [...document.querySelectorAll('[data-dirty="true"]')];
+    if (dirtyForms.length === 0) return false;
+    syncPublicationDirtyState(dirtyForms.length);
+    const first = dirtyForms[0];
+    if (first instanceof HTMLElement) {
+      first.scrollIntoView({ block: "center", behavior: "smooth" });
+      const field = first.querySelector("input:not([type=hidden]), textarea, select");
+      if (field instanceof HTMLElement) field.focus({ preventScroll: true });
+    }
+    return true;
+  };
+  const reloadPublicationWhenSafe = (feedback) => {
+    setTimeout(() => {
+      if (document.querySelector('[data-dirty="true"]') === null) location.reload();
+      else if (feedback instanceof HTMLElement) {
+        feedback.textContent += " 未保存の入力を保護するため自動再読み込みを止めました。保存後に画面を再読み込みすると履歴も更新されます。";
+        feedback.classList.add("warning");
+      }
+    }, 700);
+  };
   const saveState = document.querySelector("[data-save-state]");
   const syncSaveState = () => {
     if (!(saveState instanceof HTMLElement)) return;
@@ -42,6 +84,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     saveState.textContent = dirtyCount > 0 ? "未保存 " + dirtyCount + "件" : "保存済み";
     if (dirtyCount > 0 && document.body.dataset.mobilePane !== "preview") document.body.dataset.mobilePreviewPending = "true";
     if (dirtyCount === 0) document.body.dataset.mobilePreviewPending = "false";
+    syncPublicationDirtyState(dirtyCount);
     const previewBadge = document.querySelector("[data-mobile-preview-badge]");
     if (previewBadge instanceof HTMLElement) previewBadge.hidden = document.body.dataset.mobilePreviewPending !== "true";
   };
@@ -342,64 +385,6 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
     }
   }
-  const editor = document.querySelector("[data-project-editor]");
-  if (editor instanceof HTMLFormElement) {
-    const feedback = editor.querySelector("[data-editor-feedback]");
-    const versionLabel = editor.querySelector("[data-editor-version]");
-    const submit = editor.querySelector('button[type="submit"]');
-    editor.addEventListener("input", () => { editor.dataset.dirty = "true"; syncSaveState(); });
-    editor.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      if (!(feedback instanceof HTMLElement)) return;
-      setButtonBusy(submit, true);
-      showSavingState();
-      feedback.textContent = "変更を保存しています…";
-      feedback.classList.remove("success", "warning");
-      const data = new FormData(editor);
-      const nullableText = (name) => String(data.get(name) || "");
-      const textList = (name) => String(data.get(name) || "")
-        .split(/\n+/)
-        .map((value) => value.trim())
-        .filter(Boolean);
-      try {
-        const response = await fetch(editor.action, {
-          method: "PATCH",
-          headers: {
-            "content-type": "application/json",
-            "x-csrf-token": editor.dataset.csrf || ""
-          },
-          body: JSON.stringify({
-            expected_version: Number(editor.dataset.version),
-            title: String(data.get("title") || ""),
-            stage: String(data.get("stage") || ""),
-            summary: nullableText("summary"),
-            question: nullableText("question"),
-            hypothesis: nullableText("hypothesis"),
-            method: nullableText("method"),
-            findings: textList("findings"),
-            limitations: textList("limitations")
-          })
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(apiErrorMessage(result, "保存できませんでした。"));
-        syncPageVersion(result.version);
-        editor.dataset.dirty = "false";
-        if (versionLabel instanceof HTMLElement) versionLabel.textContent = "v" + result.version;
-        feedback.textContent = "v" + result.version + " として保存しました。";
-        feedback.classList.add("success");
-        markDraftChanged();
-        setTimeout(() => location.reload(), 500);
-      } catch (error) {
-        feedback.textContent = caughtErrorMessage(error, "保存できませんでした。");
-        feedback.classList.remove("success");
-        feedback.classList.add("warning");
-      } finally {
-        setButtonBusy(submit, false);
-        syncSaveState();
-      }
-    });
-  }
-
   const slideEditor = document.querySelector("[data-slide-editor]");
   const typographyEditor = document.querySelector("[data-typography-editor]");
   const templateEditor = document.querySelector("[data-template-editor]");
@@ -756,6 +741,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const serializeVersionedForm = (form) => {
     const data = new FormData(form);
     const body = { expected_version: Number(form.dataset.version) };
+    if (form.matches("[data-project-editor]")) Object.assign(body, {
+      title: String(data.get("title") || ""),
+      stage: String(data.get("stage") || ""),
+      summary: String(data.get("summary") || ""),
+      question: String(data.get("question") || ""),
+      hypothesis: String(data.get("hypothesis") || ""),
+      method: String(data.get("method") || ""),
+      findings: String(data.get("findings") || "").split(/\n+/).map((value) => value.trim()).filter(Boolean),
+      limitations: String(data.get("limitations") || "").split(/\n+/).map((value) => value.trim()).filter(Boolean)
+    });
     if (form.matches("[data-slide-editor]")) Object.assign(body, {
       title: String(data.get("title") || ""),
       duration_seconds: numberValue(data, "duration_seconds"),
@@ -890,7 +885,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     return body;
   };
-  const versionedForms = [...document.querySelectorAll("[data-versioned-form]")];
+  const versionedForms = [...document.querySelectorAll("[data-versioned-form], [data-project-editor]")];
   const selectedOptionLabel = (form, name) => {
     const field = form.elements.namedItem(name);
     return field instanceof HTMLSelectElement ? field.selectedOptions[0]?.textContent?.trim() || "" : "";
@@ -1012,7 +1007,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     addEventListener("ultimate-freestyle:version-changed", persistDraft);
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      const feedback = form.querySelector("[data-form-feedback]");
+      const feedback = form.querySelector("[data-form-feedback], [data-editor-feedback]");
       const submitButtons = [...form.querySelectorAll('button[type="submit"]')];
       const nextUrl = event.submitter instanceof HTMLButtonElement
         ? event.submitter.dataset.saveNext
@@ -1080,6 +1075,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           feedback.classList.add("warning");
         }
         markDraftChanged();
+        if (form.matches("[data-project-editor]")) {
+          setTimeout(() => location.reload(), 500);
+          return;
+        }
         if (nextUrl) {
           location.href = nextUrl;
           return;
@@ -2934,6 +2933,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const unpublishButton = document.querySelector("[data-unpublish]");
   if (previewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     previewButton.addEventListener("click", async () => {
+      if (guardPublicationAction()) return;
       previewButton.disabled = true;
       publishFeedback.textContent = "現在の下書きから固定プレビューを生成しています…";
       publishFeedback.classList.remove("warning", "success");
@@ -3071,6 +3071,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       addEventListener("pagehide", () => reviewChannel.close(), { once: true });
     }
     reviewButton.addEventListener("click", () => {
+      if (guardPublicationAction()) return;
       if (pendingReviewDetail !== null) void recordCompletedPreview(pendingReviewDetail);
       else readStoredCompletion();
     });
@@ -3080,6 +3081,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
 
   if (publishButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     publishButton.addEventListener("click", async () => {
+      if (guardPublicationAction()) return;
       if (!confirm("確認したこのプレビューを公開しますか？")) return;
       publishButton.disabled = true;
       publishFeedback.textContent = "公開版を切り替えています…";
@@ -3111,7 +3113,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           unpublishButton.disabled = false;
           unpublishButton.hidden = false;
         }
-        setTimeout(() => location.reload(), 700);
+        reloadPublicationWhenSafe(publishFeedback);
       } catch (error) {
         publishFeedback.textContent = caughtErrorMessage(error, "公開できませんでした。");
         publishFeedback.classList.add("warning");
@@ -3121,6 +3123,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
   if (unpublishButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     unpublishButton.addEventListener("click", async () => {
+      if (guardPublicationAction()) return;
       if (!confirm("公開ページを停止しますか？ 固定プレビューと下書きは残ります。")) return;
       unpublishButton.disabled = true;
       publishFeedback.textContent = "公開を停止しています…";
@@ -3147,7 +3150,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         publishFeedback.textContent = "公開を停止しました。固定プレビューと編集内容は残っています。";
         publishFeedback.classList.add("success");
-        setTimeout(() => location.reload(), 700);
+        reloadPublicationWhenSafe(publishFeedback);
       } catch (error) {
         unpublishButton.disabled = false;
         publishFeedback.textContent = caughtErrorMessage(error, "公開を停止できませんでした。");
@@ -3158,6 +3161,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   for (const rollbackButton of document.querySelectorAll("[data-publish-rollback]")) {
     if (!(rollbackButton instanceof HTMLButtonElement) || !(publishFeedback instanceof HTMLElement)) continue;
     rollbackButton.addEventListener("click", async () => {
+      if (guardPublicationAction()) return;
       if (!confirm("以前に公開したこの版へ戻しますか？ 現在の下書きは変更されません。")) return;
       setButtonBusy(rollbackButton, true, "切替中…");
       publishFeedback.textContent = "以前の公開版へ切り替えています…";
@@ -3175,7 +3179,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (!response.ok) throw new Error(apiErrorMessage(result, "以前の公開版へ戻せませんでした。"));
         publishFeedback.textContent = "以前の公開版へ戻しました。下書きは変更していません。";
         publishFeedback.classList.add("success");
-        location.reload();
+        reloadPublicationWhenSafe(publishFeedback);
       } catch (error) {
         setButtonBusy(rollbackButton, false);
         publishFeedback.textContent = caughtErrorMessage(error, "以前の公開版へ戻せませんでした。");

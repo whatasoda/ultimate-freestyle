@@ -436,7 +436,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=113"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=114"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -802,7 +802,10 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("publicLink.hidden = false");
     expect(dashboardScriptText).toContain("到達記録を再試行");
     expect(dashboardScriptText).toContain("500 * (2 ** (reviewRetryCount - 1))");
-    expect(dashboardScriptText).toContain("setTimeout(() => location.reload(), 700)");
+    expect(dashboardScriptText).toContain("reloadPublicationWhenSafe(publishFeedback)");
+    expect(dashboardScriptText).toContain('[data-versioned-form], [data-project-editor]');
+    expect(dashboardScriptText).toContain("syncPublicationDirtyState(dirtyCount)");
+    expect(dashboardScriptText).toContain("未保存の入力を保護するため自動再読み込みを止めました");
     expect(dashboardScriptText).toContain("result.voice_generation_required");
     expect(dashboardScriptText).toContain("VOICEVOX音声を再生成してください");
     expect(dashboardScriptText).toContain("ultimate-freestyle:voice-selection:");

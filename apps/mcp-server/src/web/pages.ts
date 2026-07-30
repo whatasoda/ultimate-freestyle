@@ -248,7 +248,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=113";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=114";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1585,6 +1585,7 @@ export function projectDetailPage(options: {
   const preflightChecklist = `<details${previewCurrent ? "" : " open"}><summary>公開前チェック · 基本 ${corePreflightItems.filter((item) => item.complete).length}/${corePreflightItems.length} · おすすめ ${recommendedPreflightItems.filter((item) => item.complete).length}/${recommendedPreflightItems.length}</summary><ul class="preflight-list">${preflightItems.map((item) => `<li class="preflight-item" data-state="${item.complete ? "complete" : item.recommended ? "recommendation" : "attention"}"><span><strong>${escapeHtml(item.label)}${item.recommended ? " · おすすめ" : ""}</strong><small>${escapeHtml(item.detail)}</small></span>${item.complete ? "" : `<a class="preflight-action" href="${item.href}">${item.recommended ? "確認へ" : "修正へ"} →</a>`}</li>`).join("")}</ul></details>`;
   const publicationPanel = `<section class="panel publish-state" id="publication" data-publication>
     <h2>プレビューと公開</h2>
+    <p class="feedback warning" data-publication-dirty aria-live="polite" hidden></p>
     ${preflightChecklist}
     <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
     <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
