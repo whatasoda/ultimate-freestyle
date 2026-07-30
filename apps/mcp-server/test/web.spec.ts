@@ -444,8 +444,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=157"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=157"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=158"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=158"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -772,7 +772,7 @@ describe("Web dashboard", () => {
     expect(workspace.status).toBe(200);
     expect(workspaceHtml).toContain("スライド編集");
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=157"'
+      'href="/assets/dashboard.css?v=158"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -953,7 +953,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=157"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=158"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -962,7 +962,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=157"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=158"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1182,6 +1182,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("delete owner[key]");
     expect(dashboardScriptText).toContain("changingConfiguredVoice");
     expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
+    expect(dashboardScriptText).toContain('[data-research-log-delete]');
+    expect(dashboardScriptText).toContain("この研究ログを削除しますか？この操作は元に戻せません。");
 
     const rejectedUpload = await requestProvider(
       provider,
@@ -1213,9 +1215,17 @@ describe("Web dashboard", () => {
     )?.[1];
     expect(csrfToken).toBeTruthy();
     const listItemProjectId = "90000000-0000-4000-8000-000000000009";
+    const researchLogEntryId = "91000000-0000-4000-8000-000000000019";
     const listItemDocument = createEmptyProject("項目編集の契約確認");
     listItemDocument.question = "選択フォームを開けるか？";
     listItemDocument.method = "選択URLから確認する";
+    listItemDocument.logs.push({
+      id: researchLogEntryId,
+      occurred_at: now,
+      kind: "observation",
+      text: "削除導線を確認する研究ログ",
+      source_url: null
+    });
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO research_projects (
@@ -1297,6 +1307,8 @@ describe("Web dashboard", () => {
     const selectedListItemHtml = await selectedListItemDetail.text();
     expect(selectedListItemHtml).toContain('id="basic-information" tabindex="-1" open');
     expect(selectedListItemHtml).toContain('id="research-item-findings-0" tabindex="-1"');
+    expect(selectedListItemHtml).toContain(`action="/api/projects/${listItemProjectId}/logs/${researchLogEntryId}"`);
+    expect(selectedListItemHtml).toContain("このログを削除");
     const deleteListItem = await mutateListItem({
       expected_version: 3,
       action: "delete",
@@ -1317,6 +1329,36 @@ describe("Web dashboard", () => {
         ).bind(listItemProjectId).first<{ document_json: string }>())!.document_json
       ).findings
     ).toEqual([]);
+    const deleteResearchLog = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/api/projects/${listItemProjectId}/logs/${researchLogEntryId}`,
+        {
+          method: "DELETE",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ expected_version: 4 })
+        }
+      ),
+      authEnv
+    );
+    expect(deleteResearchLog.status).toBe(200);
+    expect(await deleteResearchLog.json()).toMatchObject({
+      ok: true,
+      version: 5,
+      entry_id: researchLogEntryId,
+      next_url: `/dashboard/projects/${listItemProjectId}#research-log`
+    });
+    expect(
+      JSON.parse(
+        (await env.DB.prepare(
+          "SELECT document_json FROM research_projects WHERE id = ?"
+        ).bind(listItemProjectId).first<{ document_json: string }>())!.document_json
+      ).logs
+    ).toEqual([]);
     const nearLimitDocument = createEmptyProject("容量境界の表示確認");
     while (nearLimitDocument.findings.length < 100) {
       const candidate = structuredClone(nearLimitDocument);
@@ -1333,7 +1375,7 @@ describe("Web dashboard", () => {
       listItemProjectId
     ).run();
     const oversizedListItem = await mutateListItem({
-      expected_version: 4,
+      expected_version: 5,
       action: "add",
       list: "findings",
       value: "観".repeat(4_000)

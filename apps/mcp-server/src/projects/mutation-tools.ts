@@ -917,29 +917,48 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
-    "append_research_log",
+    "edit_research_log",
     {
-      title: "研究ログを一件追加",
-      description: "観察、実験、判断、出典、メモを一件だけ追記します。",
+      title: "研究ログを一件編集",
+      description: "観察、実験、判断、出典、メモを一件追加するか、IDを指定して一件削除します。entryとdelete_entry_idの片方だけを指定します。",
       inputSchema: {
         ...projectIdInput,
-        entry: researchLogEntrySchema
+        entry: researchLogEntrySchema.optional(),
+        delete_entry_id: z.string().uuid().optional()
       },
       outputSchema: mutationOutput,
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, entry }) =>
+    async ({ project_id, expected_version, entry, delete_entry_id }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
-        changedKind: "log_appended",
-        changedId: entry.id,
+        changedKind: entry === undefined ? "log_deleted" : "log_appended",
+        changedId: entry?.id ?? delete_entry_id,
         mutate: (document) => {
+          if ((entry === undefined) === (delete_entry_id === undefined)) {
+            throw new ProjectToolError(
+              "INVALID_FIELDS",
+              "Specify exactly one of entry or delete_entry_id."
+            );
+          }
+          if (delete_entry_id !== undefined) {
+            const index = document.logs.findIndex((item) => item.id === delete_entry_id);
+            if (index === -1) {
+              throw new ProjectToolError(
+                "LOG_ENTRY_NOT_FOUND",
+                "The research log entry does not exist."
+              );
+            }
+            document.logs.splice(index, 1);
+            return;
+          }
+          if (entry === undefined) return;
           if (document.logs.some((item) => item.id === entry.id)) {
             throw new ProjectToolError(
               "LOG_ENTRY_EXISTS",

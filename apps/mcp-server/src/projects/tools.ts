@@ -35,6 +35,7 @@ const projectErrorCodeSchema = z.enum([
   "TEMPLATE_NOT_FOUND",
   "TEMPLATE_IN_USE",
   "LOG_ENTRY_EXISTS",
+  "LOG_ENTRY_NOT_FOUND",
   "INVALID_POSITION",
   "INVALID_CHANGE",
   "INVALID_FIELDS",

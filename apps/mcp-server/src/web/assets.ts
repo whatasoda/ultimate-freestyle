@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "157";
+export const DASHBOARD_ASSET_VERSION = "158";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
@@ -1258,6 +1258,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       if (event.submitter instanceof HTMLButtonElement && event.submitter.dataset.projectListAction === "delete" && !confirm("この項目を削除しますか？")) return;
+      if (form.matches("[data-research-log-delete]") && !confirm("この研究ログを削除しますか？この操作は元に戻せません。")) return;
       const feedback = form.querySelector("[data-form-feedback], [data-editor-feedback]");
       const submitButtons = [...form.querySelectorAll('button[type="submit"]')];
       const nextUrl = event.submitter instanceof HTMLButtonElement
@@ -1332,7 +1333,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           feedback.classList.add("warning");
         }
         markDraftChanged();
-        if (form.matches("[data-project-list-item]") && result.next_url) {
+        if (form.matches("[data-project-list-item], [data-research-log-delete]") && result.next_url) {
           location.href = result.next_url;
           return;
         }

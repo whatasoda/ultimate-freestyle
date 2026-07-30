@@ -1454,3 +1454,9 @@
 - 未定義tokenによる表示低下を個別文字列テストだけで守ると、別名のtypoを追加した場合は再び目視まで発見できない。
 - 配信dashboard CSSからcustom propertyの定義と`var()`参照を抽出し、SSRが要素ごとに与えるaspect・palette・indent・swatchの明示list以外に未定義参照があれば失敗させる契約を追加した。
 - hover色やsticky背景に限らず、今後増える配色・レイアウトtokenを同じ検査で保護する。
+
+## 改善ループ379
+
+- 保存容量の内訳で研究ログが大きいと分かっても、ログは追記専用でWeb UIにも削除導線がなく、利用者もAIも上限を解消できなかった。
+- MCPの既存`append_research_log`を、追加とID指定削除を排他的に受ける`edit_research_log`へ置き換えた。tool数36件の上限は維持し、削除可能な契約を`destructiveHint`にも反映した。
+- Web UIの最新20件へ確認付き削除を追加し、CSRF、所有者、期待version、監査記録を既存の変更契約へ揃えた。削除後は研究ログ節へ戻り、dashboard assetを`v158`へ更新した。

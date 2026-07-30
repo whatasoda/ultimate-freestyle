@@ -1469,7 +1469,7 @@ export function projectDetailPage(options: {
   const logs = recentLogs.length
     ? recentLogs
         .map(
-          (entry) => `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p></article>`
+          (entry) => `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p><form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="ghost danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`
         )
         .join("")
     : `<p class="prose">まだ研究ログがありません。</p>`;

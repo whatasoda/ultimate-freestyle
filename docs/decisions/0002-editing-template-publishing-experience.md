@@ -23,7 +23,7 @@
 
 1. `list_projects` で対象を選ぶ。
 2. `get_project_outline` または対象 section / slide を読み、現在 version を得る。
-3. `update_project_fields`、`append_research_log`、`create_slide`、`update_slide`、`delete_slide`、`move_slide` など、変更目的に合う tool を一回呼ぶ。
+3. `update_project_fields`、`edit_research_log`、`create_slide`、`update_slide`、`delete_slide`、`move_slide` など、変更目的に合う tool を一回呼ぶ。
 4. 競合時だけ該当範囲を再取得して相談・再試行する。
 5. 発表を構成したら Web UI のプレビュー確認を案内する。
 

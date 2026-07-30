@@ -1443,6 +1443,68 @@ async function handleProjectListItemUpdate(
   }
 }
 
+async function handleResearchLogDelete(
+  request: Request,
+  env: Env,
+  projectId: string,
+  entryId: string
+): Promise<Response> {
+  if (request.method !== "DELETE") {
+    return new Response(null, { status: 405, headers: { allow: "DELETE" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = previewRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      { ok: false, error: { code: "INVALID_FIELDS", message: "入力内容を確認してください。" }, request_id: crypto.randomUUID() },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const index = document.logs.findIndex((entry) => entry.id === entryId);
+        if (index === -1) {
+          const error = new Error("log entry not found") as Error & { code: string };
+          error.code = "LOG_ENTRY_NOT_FOUND";
+          throw error;
+        }
+        document.logs.splice(index, 1);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.research_log_deleted",
+      outcome: "succeeded",
+      details: { project_id: projectId, entry_id: entryId, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      project_id: projectId,
+      entry_id: entryId,
+      version: project.version,
+      updated_at: project.updated_at,
+      next_url: `/dashboard/projects/${projectId}#research-log`,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "研究ログを削除できませんでした。");
+  }
+}
+
 async function handleRenderedQualityReportSave(
   request: Request,
   env: Env,
@@ -3065,6 +3127,7 @@ function projectMutationErrorResponse(
     DECK_REQUIRED: "発表スライドを先に作成してください。",
     NARRATION_NOT_FOUND: "このスライドには読み上げがありません。",
     NARRATION_SEGMENT_NOT_FOUND: "読み上げ区間が見つかりません。",
+    LOG_ENTRY_NOT_FOUND: "研究ログが見つかりません。",
     NARRATION_SEGMENT_EXISTS: "このSTEPにはすでに読み上げ区間があります。",
     INVALID_NARRATION_STEP: "表示段階の範囲内からSTEPを選んでください。",
     VOICE_PROFILE_NOT_FOUND: "VOICEVOX profileが見つかりません。",
@@ -3083,6 +3146,7 @@ function projectMutationErrorResponse(
     code === "TEMPLATE_NOT_FOUND" ||
     code === "NARRATION_NOT_FOUND" ||
     code === "NARRATION_SEGMENT_NOT_FOUND" ||
+    code === "LOG_ENTRY_NOT_FOUND" ||
     code === "VOICE_PROFILE_NOT_FOUND" ||
     code === "COMPONENT_NOT_FOUND" ||
     code === "BLOCK_NOT_FOUND"
@@ -4494,6 +4558,12 @@ export async function handleWebRequest(
   );
   if (projectListItemMatch?.[1] !== undefined) {
     return handleProjectListItemUpdate(request, env, projectListItemMatch[1]);
+  }
+  const researchLogMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/logs/${UUID_PATH}$`, "i")
+  );
+  if (researchLogMatch?.[1] !== undefined && researchLogMatch[2] !== undefined) {
+    return handleResearchLogDelete(request, env, researchLogMatch[1], researchLogMatch[2]);
   }
   const qualityReportMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/quality-report$`, "i")

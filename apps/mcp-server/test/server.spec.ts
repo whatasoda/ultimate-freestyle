@@ -66,6 +66,7 @@ describe("MCP contract", () => {
           "update_slide_component",
           "delete_slide_component",
           "update_project_fields",
+          "edit_research_log",
           "configure_deck",
           "create_presentation_template",
           "update_presentation_template_fields",
@@ -87,6 +88,7 @@ describe("MCP contract", () => {
       expect(tools.map((tool) => tool.name)).not.toContain("get_project");
       expect(tools.map((tool) => tool.name)).not.toContain("get_project_slide");
       expect(tools.map((tool) => tool.name)).not.toContain("evaluate_project");
+      expect(tools.map((tool) => tool.name)).not.toContain("append_research_log");
       const largestInputSchema = Math.max(
         ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
       );
@@ -137,6 +139,12 @@ describe("MCP contract", () => {
         (tool) => tool.name === "set_project_list_item"
       );
       expect(JSON.stringify(projectListItemTool?.inputSchema)).toContain('"text_edit"');
+      expect(tools).toContainEqual(
+        expect.objectContaining({
+          name: "edit_research_log",
+          annotations: expect.objectContaining({ destructiveHint: true })
+        })
+      );
       const componentContentTool = tools.find(
         (tool) => tool.name === "update_slide_component_content"
       );
@@ -1425,6 +1433,54 @@ describe("MCP contract", () => {
         version: 20,
         current_version: 20,
         restored_from_version: 1
+      });
+      const editableLogId = "44000000-0000-4000-8000-000000000044";
+      const addedLog = await client.callTool({
+        name: "edit_research_log",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 20,
+          entry: {
+            id: editableLogId,
+            occurred_at: now,
+            kind: "decision",
+            text: "ログの追加と削除を同じ小さな契約で扱う。",
+            source_url: null
+          }
+        }
+      });
+      expect(addedLog.structuredContent).toMatchObject({
+        ok: true,
+        version: 21
+      });
+      const deletedLog = await client.callTool({
+        name: "edit_research_log",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 21,
+          delete_entry_id: editableLogId
+        }
+      });
+      expect(deletedLog.structuredContent).toMatchObject({
+        ok: true,
+        version: 22
+      });
+      const afterLogDelete = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/research/logs/pages/1`
+      );
+      expect(afterLogDelete).toMatchObject({ total_items: 0, items: [] });
+      const missingLog = await client.callTool({
+        name: "edit_research_log",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 22,
+          delete_entry_id: editableLogId
+        }
+      });
+      expect(missingLog).toMatchObject({
+        isError: true,
+        structuredContent: { error: { code: "LOG_ENTRY_NOT_FOUND" } }
       });
 
       const otherSubjectId = "twitch-other-project-owner";
