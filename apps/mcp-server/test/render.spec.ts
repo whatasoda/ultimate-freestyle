@@ -182,7 +182,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@98");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@99");
+    expect(html).toContain('--aspect-font-scale: 1;');
+    expect(html).toContain('--aspect-font-scale: 1.3333;');
+    expect(html).toContain('rendered * 1080 / slideHeight');
     expect(html).toContain("const pauseProgressClock = () =>");
     expect(html).toContain("progressClock?.kind === 'auto'");
     expect(html).toContain("startProgressClock(delay, 0, 'auto')");
