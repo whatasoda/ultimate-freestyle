@@ -1478,3 +1478,9 @@
 - `source_url`付きの研究ログはMCPから取得できる一方、Web UIでは本文しか表示せず、出典を確認してから残す・削除する判断ができなかった。
 - 各ログに新しいtabで開く「出典を開く」導線を追加し、保存済みの不正protocolが混ざってもHTTP(S)以外はリンク化しない防御を入れた。
 - 新規入力schemaもHTTP(S)へ限定し、`javascript:`を拒否するschema契約と、queryを含むURLのHTML escape・`noopener noreferrer`をSSR契約で検証した。
+
+## 改善ループ383
+
+- 20件のログに同じ「出典を開く」リンクが並ぶと、screen readerのリンク一覧では対象を区別できず、画面上でも遷移先を開くまで判断できなかった。
+- URL検証時にhostnameも取り出し、表示を「出典 · example.com」の形に変更した。アクセシブルな名前にはログ日付、hostname、新しいtabで開くことを含めた。
+- query付きURLのescapeに加え、日付と遷移先を含むリンク名をSSR契約で固定した。

@@ -1332,7 +1332,7 @@ describe("Web dashboard", () => {
     expect(olderLogHtml).toContain("2 / 2ページ · 全21件");
     expect(olderLogHtml).toContain("← 新しいログ");
     expect(olderLogHtml).toContain('href="https://example.com/evidence?trial=1&amp;result=ok"');
-    expect(olderLogHtml).toContain('rel="noopener noreferrer">出典を開く ↗</a>');
+    expect(olderLogHtml).toContain('aria-label="2026/07/26の出典 example.com を新しいタブで開く">出典 · example.com ↗</a>');
     const deleteListItem = await mutateListItem({
       expected_version: 3,
       action: "delete",

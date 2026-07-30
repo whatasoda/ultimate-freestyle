@@ -824,11 +824,13 @@ function formatDate(iso: string): string {
   return date?.replaceAll("-", "/") ?? iso;
 }
 
-function safeResearchSourceUrl(value: string | null): string | null {
+function safeResearchSourceUrl(value: string | null): { href: string; hostname: string } | null {
   if (value === null) return null;
   try {
     const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+    return url.protocol === "https:" || url.protocol === "http:"
+      ? { href: url.href, hostname: url.hostname }
+      : null;
   } catch {
     return null;
   }
@@ -1487,7 +1489,7 @@ export function projectDetailPage(options: {
         .map(
           (entry) => {
             const sourceUrl = safeResearchSourceUrl(entry.source_url);
-            return `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p>${sourceUrl === null ? "" : `<p><a class="back" href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">出典を開く ↗</a></p>`}<form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}?log_page=${logPage}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="ghost danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`;
+            return `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p>${sourceUrl === null ? "" : `<p><a class="back" href="${escapeHtml(sourceUrl.href)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(formatDate(entry.occurred_at))}の出典 ${escapeHtml(sourceUrl.hostname)} を新しいタブで開く">出典 · ${escapeHtml(sourceUrl.hostname)} ↗</a></p>`}<form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}?log_page=${logPage}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="ghost danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`;
           }
         )
         .join("")
