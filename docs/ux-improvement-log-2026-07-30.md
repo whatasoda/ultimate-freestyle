@@ -1328,3 +1328,9 @@
 - 選択中フォームへのfragmentで画面位置は合うが、キーボードとscreen readerのfocusは文書先頭へ戻るため、保存直後にTabを押すと意図しない操作列から再開した。
 - 明示的なfragmentがあり、その対象が`tabindex=-1`のプログラムfocus先として設計されている場合だけ、初期描画後にfocusを一致させる。研究内ナビの節と選択中研究項目で共通利用する。
 - fragmentなしの通常表示ではfocusを奪わず、ブラウザ本来のscroll位置決定も変更しない。dashboard assetを`v146`へ更新した。
+
+## 改善ループ358
+
+- VOICEVOXの話者・既定調声更新は研究repositoryを使うが、音声専用error handlerはrepository errorを認識しなかった。別画面やAIが先に更新した場合、本来のversion競合がWebの500になり得た。容量超過も同じ経路だった。
+- 音声error handlerの入口で`ProjectRepositoryError`を研究変更の共通応答へ渡し、存在しない研究は404、競合は現在version付き409、容量超過はdetails付き422へ揃える。VOICEVOX生成・回数制限の専用errorは従来どおり扱う。
+- 既定調声を保存した直後に古いversionで再送し、409と現在versionを返すWeb契約テストを追加した。

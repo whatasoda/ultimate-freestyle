@@ -721,6 +721,9 @@ async function handleSlideFrame(
 }
 
 function voiceErrorResponse(error: unknown): Response {
+  if (error instanceof ProjectRepositoryError) {
+    return projectMutationErrorResponse(error, "VOICEVOX設定を保存できませんでした。");
+  }
   if (error instanceof VoiceGenerationError) {
     const status =
       error.code === "PROJECT_NOT_FOUND" || error.code === "VOICE_JOB_NOT_FOUND"

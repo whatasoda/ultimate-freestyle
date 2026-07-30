@@ -2442,6 +2442,38 @@ describe("Web dashboard", () => {
       version: 11,
       voice_generation_required: true
     });
+    const staleProfileTuningUpdate = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/voice/profile/tuning",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 10,
+            tuning: {
+              speedScale: 1,
+              pitchScale: 0,
+              intonationScale: 1,
+              volumeScale: 1,
+              pauseLengthScale: 1,
+              prePhonemeLength: 0.1,
+              postPhonemeLength: 0.1
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(staleProfileTuningUpdate.status).toBe(409);
+    expect(await staleProfileTuningUpdate.json()).toMatchObject({
+      current_version: 11,
+      error: { code: "PROJECT_VERSION_CONFLICT" }
+    });
     const tunedDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
