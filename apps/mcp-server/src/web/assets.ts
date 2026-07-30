@@ -2231,6 +2231,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const updateStep = (nextStep) => {
       currentStep = Math.min(Math.max(nextStep, 0), maxStep);
       stepOutput.value = "STEP " + currentStep + " / " + maxStep;
+      const workspace = document.querySelector(".slide-workspace");
+      const positionUrl = new URL(location.href);
+      positionUrl.searchParams.set("step", String(currentStep));
+      if (workspace instanceof HTMLElement && workspace.dataset.selectedComponent) {
+        positionUrl.searchParams.set("component", workspace.dataset.selectedComponent);
+      }
+      history.replaceState(history.state, "", positionUrl);
       slideFrame.contentWindow?.postMessage({
         type: "ultimate-freestyle:set-position",
         slide: Number(new URL(slideFrame.src).searchParams.get("slide") || 1),
