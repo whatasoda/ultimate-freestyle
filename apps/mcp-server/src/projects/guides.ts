@@ -371,7 +371,8 @@ export function registerResearchGuides(
                   count: project.document.logs.length,
                   page_size: 10,
                   pages: Math.ceil(project.document.logs.length / 10),
-                  uri_template: `research://projects/${project.project_id}/research/logs/pages/{page}`
+                  uri_template: `research://projects/${project.project_id}/research/logs/pages/{page}`,
+                  item_uri_template: `research://projects/${project.project_id}/research/logs/{logId}`
                 }
               }
             };
@@ -427,11 +428,57 @@ export function registerResearchGuides(
               : null,
             items: source.slice(start, start + pageSize).map((item, index) => ({
               position: start + index + 1,
-              ...(typeof item === "string" ? { text: item } : { log: item })
+              ...(typeof item === "string"
+                ? { text: item }
+                : {
+                    log: {
+                      id: item.id,
+                      occurred_at: item.occurred_at,
+                      kind: item.kind,
+                      text_preview: item.text.slice(0, 160),
+                      character_count: [...item.text].length,
+                      source_url: item.source_url,
+                      uri: `research://projects/${project.project_id}/research/logs/${item.id}`
+                    }
+                  })
             }))
           };
         }
       }
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
+    }
+  );
+
+  server.registerResource(
+    "research-project-log",
+    new ResourceTemplate("research://projects/{id}/research/logs/{logId}", { list: undefined }),
+    {
+      title: "研究ログ一件",
+      description: "研究ログ索引から選んだ一件の全文と出典を取得します。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const logId = variables.logId;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const log = project !== null && typeof logId === "string"
+        ? project.document.logs.find((item) => item.id === logId) ?? null
+        : null;
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : project === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : log === null
+            ? { ok: false, error: { code: "RESEARCH_LOG_NOT_FOUND" } }
+            : {
+                ok: true,
+                project_id: project.project_id,
+                version: project.version,
+                log
+              };
       return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
     }
   );

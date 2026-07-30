@@ -609,6 +609,9 @@ describe("MCP contract", () => {
               "research://projects/{id}/slides/{slideId}/elements/{elementId}"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/research/logs/{logId}"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/voice"
           }),
           expect.objectContaining({
@@ -641,6 +644,46 @@ describe("MCP contract", () => {
         total_items: 0,
         total_pages: 0,
         items: []
+      });
+      const longLogId = "43000000-0000-4000-8000-000000000004";
+      const projectRow = await env.DB.prepare(
+        "SELECT document_json FROM research_projects WHERE id = ?"
+      ).bind(firstProject.project_id).first<{ document_json: string }>();
+      const projectDocument = JSON.parse(projectRow!.document_json);
+      projectDocument.logs = [{
+        id: longLogId,
+        occurred_at: "2026-07-30T09:00:00.000Z",
+        kind: "observation",
+        text: "長".repeat(10_000),
+        source_url: "https://example.com/evidence"
+      }];
+      await env.DB.prepare(
+        "UPDATE research_projects SET document_json = ? WHERE id = ?"
+      ).bind(JSON.stringify(projectDocument), firstProject.project_id).run();
+      const logsPage = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/research/logs/pages/1`
+      );
+      expect(logsPage).toMatchObject({
+        section: "logs",
+        items: [{
+          position: 1,
+          log: {
+            id: longLogId,
+            character_count: 10_000,
+            uri: `research://projects/${firstProject.project_id}/research/logs/${longLogId}`
+          }
+        }]
+      });
+      expect(new TextEncoder().encode(JSON.stringify(logsPage)).byteLength).toBeLessThan(8 * 1024);
+      const logResource = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/research/logs/${longLogId}`
+      );
+      expect(logResource).toMatchObject({
+        ok: true,
+        version: 2,
+        log: { id: longLogId, text: "長".repeat(10_000) }
       });
       const qualityResource = await readJsonResource(
         client,
