@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@104";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@105";
 
 function escapeHtml(value: string): string {
   return value
@@ -1135,6 +1135,13 @@ export function renderPresentationHtml(
     const announceEditor = (message) => {
       if (editorAnnouncer instanceof HTMLElement) editorAnnouncer.textContent = message;
     };
+    const syncEditorTabStops = () => {
+      if (!editorFrame) return;
+      const targets = [...document.querySelectorAll('[data-block-id], [data-node-id]')].filter((item) => item instanceof HTMLElement);
+      const visible = targets.filter((item) => item.closest('.slide') === slides[slide] && item.getAttribute('aria-hidden') !== 'true' && item.offsetParent !== null);
+      const active = visible.find((item) => item.dataset.editorSelected === 'true') || visible[0] || null;
+      for (const item of targets) item.tabIndex = item === active ? 0 : -1;
+    };
     const setEditorSelection = (componentId) => {
       document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
       const target = [...document.querySelectorAll('[data-block-id], [data-node-id]')].find((item) =>
@@ -1142,6 +1149,7 @@ export function renderPresentationHtml(
       );
       if (!(target instanceof HTMLElement)) return null;
       target.dataset.editorSelected = 'true';
+      syncEditorTabStops();
       return target;
     };
     const selectEditorTarget = (target) => {
@@ -1161,7 +1169,7 @@ export function renderPresentationHtml(
         if (!(target instanceof HTMLElement)) return;
         const id = target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '';
         const positioned = target.hasAttribute('data-block-id') || target.dataset.positioned === 'true';
-        target.tabIndex = 0;
+        target.tabIndex = -1;
         target.setAttribute('aria-label', '表示パーツ ' + id + '（' + (positioned ? '自由配置' : '自動配置') + '）');
         target.setAttribute('aria-keyshortcuts', 'Control+S Meta+S');
       });
@@ -2275,6 +2283,7 @@ export function renderPresentationHtml(
       updateControls();
       stopVoice(); slides.forEach((item, index) => { const active = index === slide; item.hidden = !active; item.dataset.state = active ? 'active' : 'inactive'; });
       slides[slide].querySelectorAll('[data-reveal]').forEach((item) => { const visible = Number(item.dataset.reveal) <= step; item.classList.toggle('is-visible', visible); item.setAttribute('aria-hidden', String(!visible)); });
+      syncEditorTabStops();
       const segment = narration(); const narrationRegion = slides[slide].querySelector('.narration');
       narrationRegion.dataset.active = String(Boolean(segment) || narrationRegion.dataset.display === 'inline');
       const speaker = segment?.speaker || DECK.slides[slide].narration?.speaker || '';
