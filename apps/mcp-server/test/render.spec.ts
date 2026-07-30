@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@87");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@88");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
@@ -199,6 +199,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("String(value).match(/^rgba?[(][ ]*([0-9.]+)");
     expect(html).not.toContain("rgba?(s*([d.]+)");
     expect(html).toContain("const withoutStart = trimmed.startsWith('|')");
+    expect(html).toContain('data-voice-status data-state="idle"');
+    expect(html).toContain("VOICEVOX失敗 → ");
+    expect(html).toContain("voiceProfileLabel");
+    expect(html).toContain("音声クレジット</summary>");
     expect(html).toContain('"previewRevisionId":"50000000-0000-4000-8000-000000000005"');
     expect(html).toContain("ultimate-freestyle:preview-completed:");
     expect(html).toContain("reportPreviewCompletion();");
@@ -262,7 +266,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const critical = DECK.preload.slides[requested]");
     expect(html).not.toContain("DECK.preload.images.map");
     expect(html).not.toContain("background.complex && ratio >= 2");
-    expect(html).toContain("else scheduleAutoAdvance();");
+    expect(html).toContain("else { setVoiceStatus('failed', 'ブラウザ音声の読み上げ失敗'); scheduleAutoAdvance(); }");
     expect(html).toContain("ultimate-freestyle:preview-fields");
     expect(html).toContain("ultimate-freestyle:preview-scene-component");
     expect(html).toContain("ultimate-freestyle:preview-canvas-block");

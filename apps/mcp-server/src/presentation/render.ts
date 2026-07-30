@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@87";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@88";
 
 function escapeHtml(value: string): string {
   return value
@@ -465,6 +465,9 @@ export function renderPresentationHtml(
             : undefined) ?? defaultProfile;
         return {
           ...segment,
+          voiceProfileLabel: profile?.label ?? null,
+          voiceSpeakerName: profile?.speaker_name ?? null,
+          voiceStyleName: profile?.style_name ?? null,
           effectiveTuning: {
             speedScale: 1,
             pitchScale: 0,
@@ -913,6 +916,9 @@ export function renderPresentationHtml(
     .completion-time strong { color: #fff; font-size: 1.25em; }
     .completion-time small { color: #9fb0c3; }
     .completion-time[data-state="over"] small { color: #ffc6a8; }
+    .completion-credit { margin: 0 0 1.2em; color: #9fb0c3; font-size: .82em; }
+    .completion-credit summary { cursor: pointer; font-weight: 800; }
+    .completion-credit p { margin: .45em 0 0; overflow-wrap: anywhere; }
     .completion-actions { display: flex; justify-content: center; gap: .7em; }
     .completion-actions button { padding: .65em 1em; }
     .completion-actions .primary { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 32%, #172131); }
@@ -953,6 +959,9 @@ export function renderPresentationHtml(
     .slide:not([hidden])[data-animation="wipe"] { animation: slide-wipe var(--motion-duration) var(--motion-ease) both; }
     footer { justify-content: center; }
     .voice-credit { max-width: 22ch; overflow: hidden; color: #9caabd; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .voice-mode { max-width: 24ch; overflow: hidden; color: #aebed0; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+    .voice-mode[data-state="voicevox"] { color: #8ee6bc; }
+    .voice-mode[data-state="fallback"], .voice-mode[data-state="blocked"], .voice-mode[data-state="failed"] { color: #ffd18e; }
     .progress { flex: 1; max-width: 520px; height: 7px; overflow: hidden; border-radius: 99px; background: #263244; }
     .progress i, .voice-progress i { display: block; width: 0; height: 100%; background: var(--accent); transition: width .25s ease; }
     .voice-progress { width: 120px; height: 5px; overflow: hidden; border-radius: 99px; background: #263244; }
@@ -974,9 +983,10 @@ export function renderPresentationHtml(
       .time-part:nth-child(3), .time > span[aria-hidden] { display: none; }
       .pace { display: none; }
       header .meta, .voice-credit { display: none; }
+      .voice-mode { max-width: 12ch; }
       footer { display: grid; grid-template-columns: auto minmax(3rem, 1fr) auto; gap: 6px 8px; min-height: 76px; }
       footer .progress { width: 100%; }
-      .voice-progress { width: 64px; }
+      .voice-progress { grid-column: 1 / -1; width: 100%; }
       .controls { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, minmax(44px, auto)); width: 100%; }
       .controls button { min-height: 42px; }
       .controls label { grid-column: 1 / -1; justify-content: center; }
@@ -1015,6 +1025,7 @@ export function renderPresentationHtml(
           <h2 id="completion-title">発表はここまでです</h2>
           <p>${deck.slides.length}枚の発表を最後まで確認しました。</p>
           <p class="completion-time" data-completion-time><strong>実 00:00 / 想定 ${formattedTotalDuration}</strong><small>結果を集計しています…</small></p>
+          <details class="completion-credit"><summary>音声クレジット</summary><p>${escapeHtml(voiceCredits.length > 0 ? voiceCredits.join(" / ") : "生成音声なし · ブラウザ音声を使う場合があります")}</p></details>
           <div class="completion-actions"><button class="primary" type="button" data-restart>最初から見る</button><button type="button" data-dismiss-completion>最後のスライドに戻る</button></div>
         </div>
       </section>
@@ -1036,7 +1047,7 @@ export function renderPresentationHtml(
       </section>
     </div></div>
     <footer>
-      <span id="counter">1 / ${deck.slides.length}</span><div class="progress" role="progressbar" aria-label="発表の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="スライド 1 / ${deck.slides.length}"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span>
+      <span id="counter">1 / ${deck.slides.length}</span><div class="progress" role="progressbar" aria-label="発表の進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="スライド 1 / ${deck.slides.length}"><i id="progress"></i></div><span class="voice-credit" title="${escapeHtml(voiceCredits.join(" / "))}">${escapeHtml(voiceCredits.join(" / "))}</span><span class="voice-mode" data-voice-status data-state="idle" role="status" aria-live="polite">音声待機</span>
       <div class="voice-progress" title="読み上げ進捗" role="progressbar" aria-label="読み上げ進捗" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="voice-progress"></i></div>
       <div class="controls">
         <button id="prev" aria-label="前へ" aria-keyshortcuts="ArrowLeft ArrowUp PageUp Backspace" title="前へ（← / PageUp）">←</button><button id="next" aria-label="次へ" aria-keyshortcuts="ArrowRight ArrowDown PageDown Space Enter" title="次へ（→ / Space / PageDown）">→</button>
@@ -1077,6 +1088,7 @@ export function renderPresentationHtml(
     const preludeStatus = document.querySelector('[data-prelude-status]');
     const stage = document.querySelector('.stage');
     const voiceUnlock = document.querySelector('[data-voice-unlock]');
+    const voiceStatus = document.querySelector('[data-voice-status]');
     const presentationResume = document.querySelector('[data-presentation-resume]');
     const completion = document.querySelector('[data-completion]');
     const restartButton = document.querySelector('[data-restart]');
@@ -1205,9 +1217,16 @@ export function renderPresentationHtml(
       meter?.setAttribute('aria-label', label);
       if (meter instanceof HTMLElement) meter.title = label;
     };
+    const setVoiceStatus = (state, label) => {
+      if (!(voiceStatus instanceof HTMLElement)) return;
+      voiceStatus.dataset.state = state;
+      voiceStatus.textContent = label;
+      voiceStatus.title = label;
+    };
     const showVoiceUnlock = () => {
       if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = false;
       stage?.setAttribute('data-voice-blocked', 'true');
+      setVoiceStatus('blocked', '音声開始待ち · 画面を操作');
     };
     const hideVoiceUnlock = () => {
       if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = true;
@@ -1220,6 +1239,7 @@ export function renderPresentationHtml(
       clearTimeout(autoTimer);
       if (activeAudio) { activeAudio.pause(); activeAudio.removeAttribute('src'); activeAudio.load(); activeAudio = null; }
       setVoiceProgress(0);
+      setVoiceStatus('idle', '音声待機');
     };
     const finishVoice = () => { clearInterval(voiceTimer); setVoiceProgress(100); if (auto) autoTimer = setTimeout(advance, 350); };
     const reportPreviewCompletion = () => {
@@ -1298,9 +1318,11 @@ export function renderPresentationHtml(
       voiceTimer = setInterval(() => setVoiceProgress((performance.now() - begin) / delay * 100), 100);
       autoTimer = setTimeout(() => { clearInterval(voiceTimer); setVoiceProgress(100); advance(); }, delay);
     };
-    const speakWithBrowser = (segment) => {
-      if (!('speechSynthesis' in window)) { scheduleAutoAdvance(); return; }
+    const speakWithBrowser = (segment, fallback = false) => {
+      if (!('speechSynthesis' in window)) { setVoiceStatus('failed', '音声を利用できません'); scheduleAutoAdvance(); return; }
       setSecondaryProgressLabel('読み上げ進捗');
+      const browserSpeaker = segment.speaker || '読み上げ';
+      setVoiceStatus(fallback ? 'fallback' : 'browser', (fallback ? 'VOICEVOX失敗 → ' : '') + 'ブラウザ音声 · ' + browserSpeaker);
       const run = voiceRun;
       const tuning = segment.effectiveTuning || {};
       const utterance = new SpeechSynthesisUtterance(segment.text);
@@ -1318,7 +1340,7 @@ export function renderPresentationHtml(
         clearInterval(voiceTimer);
         setVoiceProgress(0);
         if (event.error === 'not-allowed') showVoiceUnlock();
-        else scheduleAutoAdvance();
+        else { setVoiceStatus('failed', 'ブラウザ音声の読み上げ失敗'); scheduleAutoAdvance(); }
       };
       speechSynthesis.speak(utterance);
     };
@@ -1327,11 +1349,12 @@ export function renderPresentationHtml(
       if (editorFrame) { hideVoiceUnlock(); setVoiceProgress(0); return; }
       const segment = narration();
       if (!started) return;
-      if (!speech || !segment) { hideVoiceUnlock(); scheduleAutoAdvance(); return; }
+      if (!speech || !segment) { hideVoiceUnlock(); setVoiceStatus('idle', segment ? '音声 OFF' : '読み上げなし'); scheduleAutoAdvance(); return; }
       if (!segment.audio_src) { speakWithBrowser(segment); return; }
       const player = new Audio(segment.audio_src);
       const run = voiceRun;
       setSecondaryProgressLabel('読み上げ進捗');
+      setVoiceStatus('voicevox', 'VOICEVOX · ' + (segment.voiceProfileLabel || segment.voiceSpeakerName || '生成音声') + (segment.voiceStyleName ? ' / ' + segment.voiceStyleName : ''));
       activeAudio = player;
       player.preload = 'auto';
       player.volume = clamp(Number(volume.value), 0, 1);
@@ -1345,7 +1368,7 @@ export function renderPresentationHtml(
       }, { once: true });
       const fallback = () => {
         if (activeAudio !== player) return;
-        player.pause(); activeAudio = null; setVoiceProgress(0); speakWithBrowser(segment);
+        player.pause(); activeAudio = null; setVoiceProgress(0); speakWithBrowser(segment, true);
       };
       player.addEventListener('error', fallback, { once: true });
       player.play().then(hideVoiceUnlock).catch((error) => {
