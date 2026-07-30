@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@72";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@73";
 
 function escapeHtml(value: string): string {
   return value
@@ -1097,6 +1097,7 @@ export function renderPresentationHtml(
         const positioned = target.hasAttribute('data-block-id') || target.dataset.positioned === 'true';
         target.tabIndex = 0;
         target.setAttribute('aria-label', '表示パーツ ' + id + '（' + (positioned ? '自由配置' : '自動配置') + '）');
+        target.setAttribute('aria-keyshortcuts', 'Control+S Meta+S');
       });
     }
     const normalizeVolume = (value) => Number.isFinite(Number(value)) ? clamp(Number(value), 0, 1) : 1;
@@ -2105,6 +2106,22 @@ export function renderPresentationHtml(
     showVolume();
     addEventListener('keydown', (event) => {
       if (editorFrame) {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+          const target = document.querySelector('[data-editor-selected="true"]');
+          if (!(target instanceof HTMLElement)) {
+            announceEditor('保存する表示パーツを先に選択してください。');
+          } else {
+            const id = target.getAttribute('data-node-id') || target.getAttribute('data-block-id') || '';
+            parent.postMessage({
+              type: 'ultimate-freestyle:save-component',
+              component_type: target.hasAttribute('data-node-id') ? 'scene' : 'canvas',
+              component_id: id
+            }, location.origin);
+            announceEditor('表示パーツ「' + id + '」の保存を開始します。');
+          }
+          event.preventDefault();
+          return;
+        }
         if (event.key === 'Escape') {
           document.querySelectorAll('[data-editor-selected="true"]').forEach((item) => { item.dataset.editorSelected = 'false'; });
           stage?.focus();
@@ -2310,6 +2327,7 @@ export function renderPresentationHtml(
       else if (event.data?.type === 'ultimate-freestyle:preview-appearance') previewAppearance(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-narration-settings') previewNarrationSettings(event.data);
       else if (event.data?.type === 'ultimate-freestyle:preview-narration-segment') previewNarrationSegment(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:save-status' && typeof event.data.message === 'string') announceEditor(event.data.message);
     });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));

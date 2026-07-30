@@ -859,6 +859,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     return body;
   };
   const versionedForms = [...document.querySelectorAll("[data-versioned-form]")];
+  const postEditorSaveStatus = (form, message) => {
+    if (!form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) return;
+    const frame = document.querySelector("[data-slide-frame]");
+    if (frame instanceof HTMLIFrameElement) frame.contentWindow?.postMessage({ type: "ultimate-freestyle:save-status", message }, location.origin);
+  };
   for (const [formIndex, form] of versionedForms.entries()) {
     if (!(form instanceof HTMLFormElement)) continue;
     const draftKey = "ultimate-freestyle:form-draft:" + location.pathname + ":" + new URL(form.action).pathname + ":" + formIndex;
@@ -923,6 +928,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         feedback.textContent = "v" + result.version + " として保存し、実表示を更新しました。";
         feedback.classList.add("success");
+        postEditorSaveStatus(form, "v" + result.version + " として保存しました。");
         if (form.matches("[data-segment-editor]") && result.voice_generation_required) {
           const audioState = form.querySelector(".audio-state");
           if (audioState instanceof HTMLElement) {
@@ -942,6 +948,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       } catch (error) {
         feedback.textContent = caughtErrorMessage(error, "保存できませんでした。");
         feedback.classList.add("warning");
+        postEditorSaveStatus(form, feedback.textContent);
       } finally {
         for (const button of submitButtons) {
           setButtonBusy(button, false);
@@ -1868,6 +1875,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           layoutStatus.textContent = "「" + data.component_id + "」を x " + data.frame.x + "%・y " + data.frame.y + "%・幅 " + data.frame.width + "%・高さ " + data.frame.height + "%へ調整しました。保存すると確定します。";
           layoutStatus.dataset.level = "ok";
         }
+        return;
+      }
+      if (data?.type === "ultimate-freestyle:save-component" && typeof data.component_id === "string") {
+        const forms = data.component_type === "scene"
+          ? [...document.querySelectorAll("[data-scene-component-editor]")]
+          : [...document.querySelectorAll("[data-canvas-block-editor]")];
+        const target = forms.find((form) => form instanceof HTMLFormElement && (data.component_type === "scene" ? form.dataset.componentId : form.dataset.blockId) === data.component_id);
+        if (!(target instanceof HTMLFormElement)) return;
+        if (target.dataset.dirty !== "true") {
+          slideFrame.contentWindow?.postMessage({ type: "ultimate-freestyle:save-status", message: "選択中のパーツに未保存の変更はありません。" }, location.origin);
+          return;
+        }
+        target.requestSubmit();
         return;
       }
       if (data?.type === "ultimate-freestyle:select-component" && typeof data.component_id === "string") {

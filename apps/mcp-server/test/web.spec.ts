@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=96"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=97"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -682,6 +682,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("70%未満まで縮小");
     expect(dashboardScriptText).toContain("小さすぎる文字");
     expect(dashboardScriptText).toContain("表示パーツの重なり");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:save-component");
+    expect(dashboardScriptText).toContain("未保存の変更はありません");
     expect(dashboardScriptText).toContain("syncPageVersion(result.version)");
     expect(dashboardScriptText).toContain('addEventListener("beforeunload"');
     expect(dashboardScriptText).toContain("ultimate-freestyle:form-draft:");
