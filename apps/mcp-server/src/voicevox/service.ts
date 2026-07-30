@@ -23,7 +23,8 @@ import {
 const MAX_JOBS_PER_MONTH = 20;
 const MAX_CHARACTERS_PER_MONTH = 200_000;
 export const MAX_JOB_CHARACTERS = 30_000;
-const MAX_SEGMENTS_PER_JOB = 100;
+export const MAX_SEGMENTS_PER_JOB = 100;
+export const MAX_SEGMENT_CHARACTERS = 500;
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 const FINGERPRINT_QUERY_BATCH_SIZE = 80;
 
@@ -55,6 +56,26 @@ export type VoiceArtifactRow = {
   byte_size: number;
   created_at: string;
 };
+
+export function selectVoiceGenerationBatch<T>(
+  items: readonly T[],
+  textOf: (item: T) => string
+): { selected: T[]; oversized: T[]; totalCharacters: number } {
+  const selected: T[] = [];
+  const oversized: T[] = [];
+  let totalCharacters = 0;
+  for (const item of items) {
+    const characters = [...textOf(item)].length;
+    if (characters > MAX_SEGMENT_CHARACTERS) {
+      oversized.push(item);
+      continue;
+    }
+    if (selected.length >= MAX_SEGMENTS_PER_JOB || totalCharacters + characters > MAX_JOB_CHARACTERS) continue;
+    selected.push(item);
+    totalCharacters += characters;
+  }
+  return { selected, oversized, totalCharacters };
+}
 
 type VoiceJobRow = {
   id: string;
@@ -675,29 +696,22 @@ export async function createVoiceGenerationJob(
       "先にVOICEVOXの声を設定してください。"
     );
   }
-  const plan = await buildVoicePlan(env.DB, options.ownerUserId, project);
-  if (plan.length === 0) {
+  const fullPlan = await buildVoicePlan(env.DB, options.ownerUserId, project);
+  if (fullPlan.length === 0) {
     throw new VoiceGenerationError("NO_NARRATION", "生成する読み上げ原稿がありません。");
   }
-  if (plan.length > MAX_SEGMENTS_PER_JOB) {
-    throw new VoiceGenerationError(
-      "VOICE_JOB_LIMIT",
-      `1回に生成できる読み上げは${MAX_SEGMENTS_PER_JOB}区間までです。`
-    );
-  }
-  const totalCharacters = plan.reduce((sum, segment) => sum + segment.text.length, 0);
-  if (plan.some((segment) => [...segment.text].length > 500)) {
+  const missingPlan = fullPlan.filter((segment) => segment.artifact === null);
+  const batch = selectVoiceGenerationBatch(missingPlan, (segment) => segment.text);
+  if (missingPlan.length > 0 && batch.selected.length === 0) {
     throw new VoiceGenerationError(
       "VOICE_CHARACTER_LIMIT",
-      "1つの読み上げ区間は500文字までです。原稿を分割してください。"
+      `生成待ちの${batch.oversized.length}区間が${MAX_SEGMENT_CHARACTERS}文字を超えています。原稿を分割してください。`
     );
   }
-  if (totalCharacters > MAX_JOB_CHARACTERS) {
-    throw new VoiceGenerationError(
-      "VOICE_CHARACTER_LIMIT",
-      `1回に生成できる原稿は${MAX_JOB_CHARACTERS}文字までです。`
-    );
-  }
+  const plan = missingPlan.length > 0
+    ? batch.selected
+    : fullPlan.slice(0, MAX_SEGMENTS_PER_JOB);
+  const totalCharacters = missingPlan.length > 0 ? batch.totalCharacters : 0;
   const monthKey = new Date().toISOString().slice(0, 7);
   const usage = await env.DB
     .prepare(

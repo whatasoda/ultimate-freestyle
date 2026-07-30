@@ -1223,8 +1223,8 @@ describe("presentation artifact renderer", () => {
       }
     }).text();
     expect(voiceLimitHtml).toContain("32,000字");
-    expect(voiceLimitHtml).toContain("生成対象が1回の上限30,000字を超えています");
-    expect(voiceLimitHtml).toContain('data-voice-generate="/api/projects/63ab1ec4-20a0-4cf6-a1a0-f74ced56778a/voice/jobs" disabled>原稿を短縮してください</button>');
+    expect(voiceLimitHtml).toContain("16区間は500文字を超えるため、区間を分けてください");
+    expect(voiceLimitHtml).toContain('data-voice-generate="/api/projects/63ab1ec4-20a0-4cf6-a1a0-f74ced56778a/voice/jobs" disabled>500文字を超える原稿を分割してください</button>');
 
     const pagedVoiceHtml = await voiceFinishPage({
       twitchLogin: "researcher",

@@ -39,7 +39,11 @@ import {
   staticSlideQuality
 } from "../projects/quality";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
-import { MAX_JOB_CHARACTERS } from "../voicevox/service";
+import {
+  MAX_JOB_CHARACTERS,
+  MAX_SEGMENT_CHARACTERS,
+  selectVoiceGenerationBatch
+} from "../voicevox/service";
 
 const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
   discovery: "発見",
@@ -1927,7 +1931,11 @@ export function voiceFinishPage(options: {
   );
   const generationCharacterCount = options.voice.segments
     .filter((segment) => ["needs_generation", "failed"].includes(segment.status))
-    .reduce((total, segment) => total + segment.text.length, 0);
+    .reduce((total, segment) => total + [...segment.text].length, 0);
+  const generationCandidates = options.voice.segments.filter(
+    (segment) => ["needs_generation", "failed"].includes(segment.status)
+  );
+  const generationBatch = selectVoiceGenerationBatch(generationCandidates, (segment) => segment.text);
   const voiceQuery = (options.query ?? "").trim().toLocaleLowerCase("ja");
   const voiceStatus = options.status ?? "all";
   const filteredSegments = options.voice.segments.filter((segment) => {
@@ -1973,7 +1981,7 @@ export function voiceFinishPage(options: {
     !options.voice.configured ||
     summary.needs_generation === 0 ||
     jobActive ||
-    generationCharacterCount > MAX_JOB_CHARACTERS;
+    generationBatch.selected.length === 0;
   return new Response(
     shell(
       `音声を仕上げる — ${options.project.document.title}`,
@@ -1990,8 +1998,8 @@ export function voiceFinishPage(options: {
                ${options.voice.configured ? `<details class="component-detail"><summary>既定のトーンを細かく調整</summary><form class="editor" data-voice-profile-tuning data-default-tuning="${escapeHtml(JSON.stringify(DEFAULT_VOICEVOX_TUNING))}" action="/api/projects/${projectId}/voice/profile/tuning"><div class="tuning-grid">${(Object.keys(DEFAULT_VOICEVOX_TUNING) as Array<keyof VoicevoxTuning>).map((key) => `<label>${TUNING_LABELS[key]}<input name="tuning_${key}" type="number" min="${VOICEVOX_TUNING_LIMITS[key].min}" max="${VOICEVOX_TUNING_LIMITS[key].max}" step="0.01" required value="${defaultProfileTuning[key]}"></label>`).join("")}</div><p class="inherit-note">profile未指定の区間へ共通で適用されます。保存すると、この声を使う生成済み音声は再生成が必要です。ブラウザ仮試聴は話速・高さ・音量の近似で、抑揚・間・前後無音はVOICEVOX生成後に確認します。</p><div class="actions"><button class="ghost" type="button" data-voice-profile-tuning-preview aria-pressed="false">ブラウザで仮試聴</button><button class="ghost" type="button" data-voice-profile-tuning-reset>VOICEVOX標準値へ戻す</button><button type="submit"${jobActive ? " disabled" : ""}>既定のトーンを保存</button></div><p class="feedback" data-voice-profile-tuning-feedback aria-live="polite"></p></form></details>` : ""}
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">2</span><div><h2>不足分を生成する</h2><p>設定や原稿が変わった区間だけを生成します。生成済みの音声は再利用します。</p></div></div>
-               <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat"><span>音声概算</span><strong>${formatDuration(estimatedNarrationSeconds)}</strong></div><div class="voice-stat"><span>生成対象</span><strong>${generationCharacterCount.toLocaleString()}字</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成<small>失敗含む</small></span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>
-               <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.total === 0 ? "読み上げ原稿がありません" : generationCharacterCount > MAX_JOB_CHARACTERS ? "原稿を短縮してください" : summary.needs_generation > 0 ? `不足している${summary.needs_generation}区間を生成` : "すべて生成済み"}</button></div><p class="feedback${generationCharacterCount > MAX_JOB_CHARACTERS ? " warning" : ""}" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.total === 0 ? "各スライドへ読み上げ原稿を追加すると生成できます。" : generationCharacterCount > MAX_JOB_CHARACTERS ? `生成対象が1回の上限${MAX_JOB_CHARACTERS.toLocaleString()}字を超えています。原稿を短縮してから生成してください。` : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : `生成対象は${generationCharacterCount.toLocaleString()} / ${MAX_JOB_CHARACTERS.toLocaleString()}字です。生成中もこの画面を閉じて構いません。`}</p>
+               <div class="voice-stats"><div class="voice-stat"><span>原稿</span><strong data-voice-total>${summary.total}</strong></div><div class="voice-stat"><span>音声概算</span><strong>${formatDuration(estimatedNarrationSeconds)}</strong></div><div class="voice-stat"><span>次の生成</span><strong>${generationBatch.totalCharacters.toLocaleString()}字</strong></div><div class="voice-stat ready"><span>生成済み</span><strong data-voice-ready>${summary.ready}</strong></div><div class="voice-stat pending"><span>要生成<small>失敗含む</small></span><strong data-voice-needed>${summary.needs_generation}</strong></div><div class="voice-stat"><span>失敗</span><strong data-voice-failed>${summary.failed}</strong></div></div>
+               <div class="actions"><button type="button" data-voice-generate="/api/projects/${projectId}/voice/jobs"${generateDisabled ? " disabled" : ""}>${jobActive ? "生成中です" : summary.total === 0 ? "読み上げ原稿がありません" : generationBatch.selected.length > 0 ? `次の${generationBatch.selected.length}区間を生成` : generationBatch.oversized.length > 0 ? "500文字を超える原稿を分割してください" : "すべて生成済み"}</button></div><p class="feedback${generationBatch.oversized.length > 0 ? " warning" : ""}" data-voice-generate-feedback aria-live="polite">${!options.voice.configured ? "先に声を設定してください。" : summary.total === 0 ? "各スライドへ読み上げ原稿を追加すると生成できます。" : summary.needs_generation === 0 ? "生成が必要な区間はありません。" : `${generationBatch.selected.length}区間・${generationBatch.totalCharacters.toLocaleString()} / ${MAX_JOB_CHARACTERS.toLocaleString()}字を次に生成します。${generationCharacterCount > generationBatch.totalCharacters ? `完了後、残り${(generationCharacterCount - generationBatch.totalCharacters).toLocaleString()}字はもう一度生成できます。` : ""}${generationBatch.oversized.length > 0 ? `${generationBatch.oversized.length}区間は${MAX_SEGMENT_CHARACTERS}文字を超えるため、区間を分けてください。` : ""} 生成中もこの画面を閉じて構いません。`}</p>
                ${voiceJobCard(currentJob)}
              </section>
              <section class="panel voice-step"><div class="voice-step-head"><span class="voice-step-number">3</span><div><h2>区間ごとに試聴する</h2><p>生成済み音声を確認できます。未生成の区間はブラウザ音声で仮試聴します。</p></div></div><form class="voice-filter" method="get" aria-label="区間の絞り込み"><input class="voice-search" type="search" name="q" value="${escapeHtml(options.query ?? "")}" data-voice-search placeholder="スライド名・原稿・声を検索" autocomplete="off"><input type="hidden" name="status" value="${voiceStatus === "all" ? "" : voiceStatus}"><button class="ghost" type="submit">全区間から検索</button><a class="button ghost" data-voice-filter="all" href="${escapeHtml(voiceFilterHref("all"))}"${voiceStatus === "all" ? ' aria-current="page"' : ""}>すべて ${summary.total}</a><a class="button ghost" data-voice-filter="needs_generation" href="${escapeHtml(voiceFilterHref("needs_generation"))}"${voiceStatus === "needs_generation" ? ' aria-current="page"' : ""}>要生成（失敗含む） ${summary.needs_generation}</a><a class="button ghost" data-voice-filter="ready" href="${escapeHtml(voiceFilterHref("ready"))}"${voiceStatus === "ready" ? ' aria-current="page"' : ""}>生成済み ${summary.ready}</a><a class="button ghost" data-voice-filter="failed" href="${escapeHtml(voiceFilterHref("failed"))}"${voiceStatus === "failed" ? ' aria-current="page"' : ""}>失敗 ${summary.failed}</a><output class="voice-result-count" data-voice-visible aria-live="polite">${pageSegments.length} / ${filteredSegments.length}件表示</output></form><p class="search-empty" data-voice-filter-empty hidden>このページ内で一致する読み上げ区間はありません。全区間から探すには検索ボタンを押してください。</p><div class="voice-segment-list" data-voice-segments>${segmentList}</div>${voicePager}</section>

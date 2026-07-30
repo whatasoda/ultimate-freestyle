@@ -639,7 +639,7 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain('name="tuning_speedScale"');
     expect(voicePageHtml).toContain("実効調声を確認");
     expect(voicePageHtml).toContain("音声概算");
-    expect(voicePageHtml).toContain("生成対象");
+    expect(voicePageHtml).toContain("次の生成");
     expect(voicePageHtml).toContain("30,000字");
     expect(voicePageHtml).toContain("data-effective-tuning");
     expect(voicePageHtml).toContain("data-voice-profile-tuning-preview");

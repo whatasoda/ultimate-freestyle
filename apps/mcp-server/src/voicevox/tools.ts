@@ -407,7 +407,7 @@ export function registerVoiceTools(
     {
       title: "VOICEVOX音声の差分生成を開始",
       description:
-        "原稿、話者、style、調声値が変わった区間だけを非同期生成します。同じidempotency_keyの再送は同じjobを返します。開始後はget_voice_generation_statusから一枚・一区間resourceを順に確認してください。",
+        "原稿、話者、style、調声値が変わった区間から、1回の上限に収まる不足分だけを非同期生成します。残りがあればjob完了後に新しいidempotency_keyでもう一度呼びます。500文字を超える一区間は先に分割してください。同じidempotency_keyの再送は同じjobを返します。開始後はget_voice_generation_statusから一枚・一区間resourceを順に確認してください。",
       inputSchema: {
         project_id: z.string().uuid(),
         expected_version: z.number().int().positive(),

@@ -11,11 +11,25 @@ import {
   hydrateProjectVoice,
   processVoiceGenerationMessage,
   resolveVoiceArtifacts,
+  selectVoiceGenerationBatch,
   setupZundamonProfile,
   type VoiceGenerationMessage
 } from "../src/voicevox/service";
 
 describe("VOICEVOX generation", () => {
+  it("selects a repeatable bounded batch and reports oversized segments", () => {
+    const items = [
+      { id: "oversized", text: "😀".repeat(501) },
+      ...Array.from({ length: 101 }, (_, index) => ({ id: String(index), text: "あ".repeat(300) }))
+    ];
+    const batch = selectVoiceGenerationBatch(items, (item) => item.text);
+
+    expect(batch.selected).toHaveLength(100);
+    expect(batch.totalCharacters).toBe(30_000);
+    expect(batch.oversized.map((item) => item.id)).toEqual(["oversized"]);
+    expect(batch.selected.at(-1)?.id).toBe("99");
+  });
+
   it("generates an exact style sample once and reuses the shared cache", async () => {
     const mp3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x01]);
     let synthesisCount = 0;
