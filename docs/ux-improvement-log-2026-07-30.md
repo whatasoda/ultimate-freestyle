@@ -721,3 +721,9 @@
 - 公開状態resourceが複数のbooleanだけを返し、AI Agentが「preview作成・終了確認・公開・完了」のどれを案内すべきか組み立てる必要をなくした。`next_action`を4状態で返し、公開中の現在版へ再度`can_publish`を出さないよう意味を整理した。
 - 操作はWeb UIに限定したまま、ログインが必要な研究詳細、最新固定preview、公開ページの絶対URLをresourceへ追加した。Agentは独自の公開toolを推測せず、利用者を正しい画面へ案内できる。
 - preview未作成時のaction、readiness、URLをRemote MCPのcontract testで固定した。
+
+## 改善ループ257
+
+- AI Agentが下書き一覧から復元版を選ぶ際、Web UIでしか中身と差を確認できなかったため、`research://projects/{id}/revisions/{version}`を追加した。過去版の研究内容、発表全体設定、スライド要約、現在版との差、復元前確認URLを返す。
+- 大きなデッキ全体を返さず一枚だけ詳しく読める`research://projects/{id}/revisions/{version}/slides/{slideId}`も追加した。現在版の同一IDと比較し、変更なし・変更あり・過去版だけを明示する。
+- 認証、所有権、存在確認を既存project resourceと同じ境界で行う。研究段階と問いが変わったv1を現在v2と比較するcontract testで、差分とresource templateを固定した。

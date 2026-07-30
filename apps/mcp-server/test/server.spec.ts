@@ -506,6 +506,13 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/revisions"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/revisions/{version}"
+          }),
+          expect.objectContaining({
+            uriTemplate:
+              "research://projects/{id}/revisions/{version}/slides/{slideId}"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/publication"
           }),
           expect.objectContaining({
@@ -529,6 +536,38 @@ describe("MCP contract", () => {
           text: expect.stringContaining(updatedQuestion)
         })
       );
+      const revisionResource = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/revisions/1`
+      );
+      expect(revisionResource).toMatchObject({
+        ok: true,
+        project_id: firstProject.project_id,
+        current_version: 2,
+        revision: {
+          version: 1,
+          research: {
+            title: "記憶と泥団子の研究",
+            question: null,
+            log_count: 0
+          },
+          presentation: null
+        },
+        diff: {
+          research_fields: expect.arrayContaining(["stage", "question"]),
+          presentation_settings: [],
+          current_only_slides: [],
+          duration_delta_seconds: 0
+        }
+      });
+      const missingRevisionSlide = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/revisions/1/slides/missing`
+      );
+      expect(missingRevisionSlide).toMatchObject({
+        ok: false,
+        error: { code: "SLIDE_NOT_FOUND" }
+      });
       const publicationResource = await readJsonResource(
         client,
         `research://projects/${firstProject.project_id}/publication`

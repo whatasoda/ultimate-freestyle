@@ -10,7 +10,11 @@ import { z } from "zod";
 
 import { twitchGrantPropsSchema } from "../auth/types";
 import { getPublicationStatus } from "../publications/service";
-import { getProject, listProjectDraftRevisions } from "./repository";
+import {
+  getProject,
+  getProjectDraftRevision,
+  listProjectDraftRevisions
+} from "./repository";
 import { RUBRIC_MARKDOWN } from "./rubric";
 
 const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
@@ -332,6 +336,217 @@ export function registerResearchGuides(
             text: JSON.stringify(body)
           }
         ]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-revision",
+    new ResourceTemplate("research://projects/{id}/revisions/{version}", {
+      list: undefined
+    }),
+    {
+      title: "研究の下書き一版",
+      description:
+        "復元前に読む、過去版の研究内容、発表設定、スライド要約と現在版との差です。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const versionValue = variables.version;
+      const version = typeof versionValue === "string" && /^\d+$/.test(versionValue)
+        ? Number(versionValue)
+        : null;
+      const [current, revision] = !(
+        "error" in auth
+      ) && typeof id === "string" && version !== null
+        ? await Promise.all([
+            getProject(db, auth.ownerUserId, id),
+            getProjectDraftRevision(db, auth.ownerUserId, id, version)
+          ])
+        : [null, null];
+      let body: Record<string, unknown>;
+      if ("error" in auth) {
+        body = { ok: false, error: { code: auth.error } };
+      } else if (typeof id !== "string" || version === null) {
+        body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+      } else if (current === null) {
+        body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+      } else if (revision === null) {
+        body = { ok: false, error: { code: "REVISION_NOT_FOUND" } };
+      } else {
+        const selected = revision.document;
+        const currentDocument = current.document;
+        const selectedSlides = selected.deck?.slides ?? [];
+        const currentSlides = currentDocument.deck?.slides ?? [];
+        const currentById = new Map(currentSlides.map((slide, index) => [slide.id, { slide, index }]));
+        const selectedIds = new Set(selectedSlides.map((slide) => slide.id));
+        const researchFields = [
+          "title",
+          "stage",
+          "summary",
+          "question",
+          "hypothesis",
+          "method",
+          "findings",
+          "limitations",
+          "logs"
+        ] as const;
+        const deckFields = [
+          "short_title",
+          "description",
+          "author",
+          "year",
+          "accent",
+          "layout",
+          "aspect_ratio",
+          "loading_screen",
+          "templates",
+          "default_template_id",
+          "narration_defaults",
+          "voicevox"
+        ] as const;
+        const changedResearchFields = researchFields.filter(
+          (field) => JSON.stringify(selected[field]) !== JSON.stringify(currentDocument[field])
+        );
+        const changedDeckFields = deckFields.filter(
+          (field) => JSON.stringify(selected.deck?.[field] ?? null) !== JSON.stringify(currentDocument.deck?.[field] ?? null)
+        );
+        const slideSummaries = selectedSlides.map((slide, index) => {
+          const currentMatch = currentById.get(slide.id);
+          return {
+            slide_id: slide.id,
+            title: slide.title,
+            position: index + 1,
+            current_position: currentMatch === undefined ? null : currentMatch.index + 1,
+            state: currentMatch === undefined
+              ? "revision_only"
+              : JSON.stringify(currentMatch.slide) !== JSON.stringify(slide)
+                ? "changed"
+                : currentMatch.index !== index
+                  ? "reordered"
+                  : "unchanged"
+          };
+        });
+        const selectedDuration = selectedSlides.reduce((sum, slide) => sum + slide.duration_seconds, 0);
+        const currentDuration = currentSlides.reduce((sum, slide) => sum + slide.duration_seconds, 0);
+        body = {
+          ok: true,
+          project_id: current.project_id,
+          current_version: current.version,
+          revision: {
+            version: revision.version,
+            source: revision.source,
+            created_at: revision.created_at,
+            research: {
+              title: selected.title,
+              stage: selected.stage,
+              summary: selected.summary,
+              question: selected.question,
+              hypothesis: selected.hypothesis,
+              method: selected.method,
+              findings: selected.findings,
+              limitations: selected.limitations,
+              log_count: selected.logs.length,
+              recent_logs: selected.logs.slice(-5)
+            },
+            presentation: selected.deck === null ? null : {
+              settings: Object.fromEntries(
+                deckFields.map((field) => [field, selected.deck?.[field] ?? null])
+              ),
+              slide_count: selectedSlides.length,
+              total_duration_seconds: selectedDuration,
+              slides: slideSummaries
+            }
+          },
+          diff: {
+            research_fields: changedResearchFields,
+            presentation_settings: changedDeckFields,
+            changed_slide_ids: slideSummaries.filter((slide) => slide.state === "changed").map((slide) => slide.slide_id),
+            reordered_slide_ids: slideSummaries.filter((slide) => slide.state === "reordered").map((slide) => slide.slide_id),
+            revision_only_slide_ids: slideSummaries.filter((slide) => slide.state === "revision_only").map((slide) => slide.slide_id),
+            current_only_slides: currentSlides
+              .filter((slide) => !selectedIds.has(slide.id))
+              .map((slide) => ({ slide_id: slide.id, title: slide.title, current_position: currentSlides.indexOf(slide) + 1 })),
+            duration_delta_seconds: selectedDuration - currentDuration
+          },
+          web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${current.project_id}/revisions/${revision.version}`
+        };
+      }
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(body)
+        }]
+      };
+    }
+  );
+
+  server.registerResource(
+    "research-project-revision-slide",
+    new ResourceTemplate(
+      "research://projects/{id}/revisions/{version}/slides/{slideId}",
+      { list: undefined }
+    ),
+    {
+      title: "研究の下書き一版にあるスライド",
+      description:
+        "過去版の指定スライド一枚と、現在版にある同一IDのスライドとの差です。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const slideId = variables.slideId;
+      const versionValue = variables.version;
+      const version = typeof versionValue === "string" && /^\d+$/.test(versionValue)
+        ? Number(versionValue)
+        : null;
+      const [current, revision] = !("error" in auth) && typeof id === "string" && version !== null
+        ? await Promise.all([
+            getProject(db, auth.ownerUserId, id),
+            getProjectDraftRevision(db, auth.ownerUserId, id, version)
+          ])
+        : [null, null];
+      const selectedSlide = revision !== null && typeof slideId === "string"
+        ? revision.document.deck?.slides.find((slide) => slide.id === slideId)
+        : undefined;
+      const currentSlide = current !== null && typeof slideId === "string"
+        ? current.document.deck?.slides.find((slide) => slide.id === slideId)
+        : undefined;
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : typeof id !== "string" || typeof slideId !== "string" || version === null
+          ? { ok: false, error: { code: "INVALID_RESOURCE_URI" } }
+          : current === null
+            ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+            : revision === null
+              ? { ok: false, error: { code: "REVISION_NOT_FOUND" } }
+              : selectedSlide === undefined
+                ? { ok: false, error: { code: "SLIDE_NOT_FOUND" } }
+                : {
+                    ok: true,
+                    project_id: current.project_id,
+                    current_version: current.version,
+                    revision_version: revision.version,
+                    slide: selectedSlide,
+                    comparison: {
+                      state: currentSlide === undefined
+                        ? "revision_only"
+                        : JSON.stringify(currentSlide) === JSON.stringify(selectedSlide)
+                          ? "unchanged"
+                          : "changed",
+                      current_slide: currentSlide ?? null
+                    }
+                  };
+      return {
+        contents: [{
+          uri: uri.href,
+          mimeType: "application/json",
+          text: JSON.stringify(body)
+        }]
       };
     }
   );
