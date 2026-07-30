@@ -546,6 +546,12 @@ describe("MCP contract", () => {
             uriTemplate: "research://projects/{id}/deck"
           }),
           expect.objectContaining({
+            uriTemplate: "research://projects/{id}/research"
+          }),
+          expect.objectContaining({
+            uriTemplate: "research://projects/{id}/research/{section}/pages/{page}"
+          }),
+          expect.objectContaining({
             uriTemplate: "research://projects/{id}/revisions"
           }),
           expect.objectContaining({
@@ -577,7 +583,7 @@ describe("MCP contract", () => {
         ])
       );
       const projectResource = await client.readResource({
-        uri: `research://projects/${firstProject.project_id}`
+        uri: `research://projects/${firstProject.project_id}/research`
       });
       expect(projectResource.contents).toContainEqual(
         expect.objectContaining({
@@ -585,6 +591,19 @@ describe("MCP contract", () => {
           text: expect.stringContaining(updatedQuestion)
         })
       );
+      const emptyFindingsPage = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/research/findings/pages/1`
+      );
+      expect(emptyFindingsPage).toMatchObject({
+        ok: true,
+        section: "findings",
+        page: 1,
+        page_size: 10,
+        total_items: 0,
+        total_pages: 0,
+        items: []
+      });
       const qualityResource = await readJsonResource(
         client,
         `research://projects/${firstProject.project_id}/quality`
@@ -842,20 +861,32 @@ describe("MCP contract", () => {
       expect(granularProject).toMatchObject({
         ok: true,
         project: {
+          project_id: firstProject.project_id,
           version: 8,
-          document: {
-            deck: {
-              templates: [{ id: "mud-biim" }],
-              slides: [
-                {
-                  id: "question",
-                  template_id: "mud-biim",
-                  reveal_steps: 1,
-                  narration: { segments: [{ at: 0 }] }
-                }
-              ]
-            }
+          title: "記憶と泥団子の研究",
+          counts: {
+            slides: 1
           }
+        }
+      });
+      expect(JSON.stringify(granularProject)).not.toContain("reveal_blocks");
+      const granularDeck = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/deck`
+      );
+      expect(granularDeck).toMatchObject({
+        ok: true,
+        version: 8,
+        deck: {
+          settings: {
+            templates: [{ id: "mud-biim" }]
+          },
+          slides: [{
+            slide_id: "question",
+            reveal_steps: 1,
+            narration_segments: 1,
+            uri: `research://projects/${firstProject.project_id}/slides/question`
+          }]
         }
       });
 
@@ -1570,14 +1601,13 @@ describe("MCP contract", () => {
 
       const result = await readJsonResource(
         client,
-        `research://projects/${projectId}`
+        `research://projects/${projectId}/deck`
       );
       expect(result).toMatchObject({
         ok: true,
-        project: {
-          version: 15,
-          document: {
-            deck: {
+        version: 15,
+        deck: {
+          settings: {
               default_template_id: "research-paper",
               narration_defaults: {
                 display: "subtitle",
@@ -1602,28 +1632,6 @@ describe("MCP contract", () => {
                   }
                 ]
               },
-              slides: [
-                {
-                  id: "intro",
-                  role: "cover",
-                  cover_layout: "statement",
-                  enter_animation: "blur",
-                  narration: {
-                    display: "minimal",
-                    appearance: { placement: "bottom", text_scale: 1.1 },
-                    segments: [
-                      {
-                        at: 0,
-                        text: "研究のきっかけから始めます。",
-                        speaker: "ずんだもん",
-                        voice_profile_id: "guide-voice",
-                        voice_tuning: { pitchScale: -0.02 },
-                        audio_src: null
-                      }
-                    ]
-                  }
-                }
-              ],
               aspect_ratio: "4:3",
               loading_screen: {
                 enabled: true,
@@ -1632,7 +1640,31 @@ describe("MCP contract", () => {
                 show_progress: true,
                 minimum_duration_ms: 800
               }
-            }
+          },
+          slides: [{ slide_id: "intro", role: "cover", narration_segments: 1 }]
+        }
+      });
+      const detailedSlide = await readJsonResource(
+        client,
+        `research://projects/${projectId}/slides/intro`
+      );
+      expect(detailedSlide).toMatchObject({
+        ok: true,
+        slide: {
+          id: "intro",
+          cover_layout: "statement",
+          enter_animation: "blur",
+          narration: {
+            display: "minimal",
+            appearance: { placement: "bottom", text_scale: 1.1 },
+            segments: [{
+              at: 0,
+              text: "研究のきっかけから始めます。",
+              speaker: "ずんだもん",
+              voice_profile_id: "guide-voice",
+              voice_tuning: { pitchScale: -0.02 },
+              audio_src: null
+            }]
           }
         }
       });

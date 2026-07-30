@@ -901,3 +901,9 @@
 - MCPの公開状態はスライド・音声・時間だけを事前判定し、参照画像が存在しない、30件超、合計30MiB超でも`create_preview`を次操作として返していた。Agentは既知の失敗を固定プレビュー作成時まで把握できなかった。
 - `research://projects/{id}/publication`で研究内の画像metadataと発表参照を照合し、件数、発見数、合計bytes、各上限を返す。欠落IDは最大10件へ抑え、画像件数・容量とともにpreview/publish blockerへ加える。
 - R2上の画像実体、生成音声100MiB、最終HTML 2MiBはD1だけでは確定しないため、合格と偽らず`runtime_checks`として明示する。これらは固定プレビュー作成時に引き続き強制検証する。
+
+## 改善ループ287
+
+- MCPのprojectとdeck resourceは保存上限512KiBの文書全体を返し、一枚または一つの記録だけを直すAgentにも全スライド・全ログ・全原稿をcontextへ入れさせていた。
+- project resourceをID、version、題名、段階、件数、各詳細URIだけのoverviewへ変更した。研究本文は`/research`、発見・限界・ログは10件ずつのpage resource、発表は設定と一枚ごとのoutlineだけの`/deck`から段階取得する。
+- deckの各outlineは既存slide resourceへ直接つなぎ、collection pageは前後URIと通し位置を返す。評価・発表構成promptと部分編集ガイドも新しい読取順へ更新し、全量応答の互換層は作らない。

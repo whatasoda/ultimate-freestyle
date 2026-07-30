@@ -115,7 +115,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - 読み上げ本文は \`set_slide_narration\`、segmentの話者・VOICEVOX profile・調声値は \`update_slide_narration_voice\` で別々に更新する。
 - VOICEVOXの声は \`research://guide/voicevox-catalog\` から選び、\`set_voicevox_profile\`へ \`catalog_profile_id\` を渡す。話者UUIDやstyle IDは手入力しない。
 - profileの基準調声値だけを変える場合は \`update_voicevox_profile_tuning\` を使う。本文や音声設定が変わると、古い生成音声は無効になる。
-- 生成数とjobの要約はget_voice_generation_status、区間ごとの原稿・実効調声・生成状態は返却されたresearch://projects/{id}/voice resourceで確認する。
+- 生成数とjobの要約はget_voice_generation_statusまたはresearch://projects/{id}/voice、区間ごとの原稿・実効調声・生成状態はそこから案内される一枚単位のvoice resourceで確認する。
 - 任意の音声URLは入力できない。音声fileの参照は管理された生成処理だけが設定する。
 
 各toolの成功時に返るversionを、次のtoolの\`expected_version\`へ渡す。`;
@@ -123,7 +123,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 const EDIT_CONTRACT_GUIDE = `# 最自由研究 部分編集契約
 
 1. 最初に \`get_project_outline\` で対象と現在versionを読む。
-2. 研究本文はproject resource、スライドはslide resource、scene/canvasの一件はelement resourceを読み、変更対象と現在値を特定する。
+2. 研究本文はresearch://projects/{id}/research、発見・限界・ログはそのpage resource、スライドはslide resource、scene/canvasの一件はelement resourceを読み、変更対象と現在値を特定する。
 3. 一回のtool callでは一つの意図だけを変更し、成功応答のversionを次の \`expected_version\` へ渡す。
 4. \`PROJECT_VERSION_CONFLICT\` では古い入力をそのまま再送せず、resourceを読み直して利用者または別Agentの変更を残した差分を作り直す。
 5. 研究本文は \`update_project_fields.text_edits\`、スライド長文は \`update_slide_fields.body_edits\` の \`replace_once\` と \`old_text\` を使う。scene本文は \`update_slide_component_content\`、グラフ・timelineの一件は \`edit_slide_data_item\` を使い、長文・デッキ・scene全体を再送しない。
@@ -289,19 +289,146 @@ export function registerResearchGuides(
         typeof id === "string"
           ? await getProject(db, auth.ownerUserId, id)
           : null;
+      const body = project === null
+        ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+        : {
+            ok: true,
+            project: {
+              project_id: project.project_id,
+              version: project.version,
+              title: project.document.title,
+              stage: project.document.stage,
+              updated_at: project.updated_at,
+              created_at: project.created_at,
+              research_uri: `research://projects/${project.project_id}/research`,
+              deck_uri: `research://projects/${project.project_id}/deck`,
+              quality_uri: `research://projects/${project.project_id}/quality`,
+              publication_uri: `research://projects/${project.project_id}/publication`,
+              voice_uri: `research://projects/${project.project_id}/voice`,
+              revisions_uri: `research://projects/${project.project_id}/revisions`,
+              counts: {
+                findings: project.document.findings.length,
+                limitations: project.document.limitations.length,
+                logs: project.document.logs.length,
+                slides: project.document.deck?.slides.length ?? 0
+              }
+            }
+          };
       return {
-        contents: [
-          {
-            uri: uri.href,
-            mimeType: "application/json",
-            text: JSON.stringify(
-              project === null
-                ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
-                : { ok: true, project }
-            )
-          }
-        ]
+        contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }]
       };
+    }
+  );
+
+  server.registerResource(
+    "research-project-content",
+    new ResourceTemplate("research://projects/{id}/research", { list: undefined }),
+    {
+      title: "研究本文と記録索引",
+      description: "研究本文と、発見・限界・ログを10件ずつ読むpage URIです。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const body = "error" in auth
+        ? { ok: false, error: { code: auth.error } }
+        : project === null
+          ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
+          : {
+              ok: true,
+              project_id: project.project_id,
+              version: project.version,
+              research: {
+                title: project.document.title,
+                stage: project.document.stage,
+                summary: project.document.summary,
+                question: project.document.question,
+                hypothesis: project.document.hypothesis,
+                method: project.document.method
+              },
+              collections: {
+                findings: {
+                  count: project.document.findings.length,
+                  page_size: 10,
+                  pages: Math.ceil(project.document.findings.length / 10),
+                  uri_template: `research://projects/${project.project_id}/research/findings/pages/{page}`
+                },
+                limitations: {
+                  count: project.document.limitations.length,
+                  page_size: 10,
+                  pages: Math.ceil(project.document.limitations.length / 10),
+                  uri_template: `research://projects/${project.project_id}/research/limitations/pages/{page}`
+                },
+                logs: {
+                  count: project.document.logs.length,
+                  page_size: 10,
+                  pages: Math.ceil(project.document.logs.length / 10),
+                  uri_template: `research://projects/${project.project_id}/research/logs/pages/{page}`
+                }
+              }
+            };
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
+    }
+  );
+
+  server.registerResource(
+    "research-project-content-page",
+    new ResourceTemplate("research://projects/{id}/research/{section}/pages/{page}", { list: undefined }),
+    {
+      title: "研究記録の1page",
+      description: "発見、限界、研究ログのうち指定した10件だけを取得します。pageは1から始まります。",
+      mimeType: "application/json"
+    },
+    async (uri, variables) => {
+      const auth = projectResourceBody(getAuthProps, "research:read");
+      const id = variables.id;
+      const section = variables.section;
+      const page = typeof variables.page === "string" && /^\d+$/.test(variables.page)
+        ? Number(variables.page)
+        : 0;
+      const project = !("error" in auth) && typeof id === "string"
+        ? await getProject(db, auth.ownerUserId, id)
+        : null;
+      const validSection = section === "findings" || section === "limitations" || section === "logs";
+      let body: unknown;
+      if ("error" in auth) body = { ok: false, error: { code: auth.error } };
+      else if (project === null) body = { ok: false, error: { code: "PROJECT_NOT_FOUND" } };
+      else if (!validSection || page < 1) body = { ok: false, error: { code: "INVALID_RESOURCE_URI" } };
+      else {
+        const source = project.document[section];
+        const pageSize = 10;
+        const pageCount = Math.ceil(source.length / pageSize);
+        if (page > Math.max(1, pageCount)) {
+          body = { ok: false, error: { code: "PAGE_NOT_FOUND" } };
+        } else {
+          const start = (page - 1) * pageSize;
+          body = {
+            ok: true,
+            project_id: project.project_id,
+            version: project.version,
+            section,
+            page,
+            page_size: pageSize,
+            total_items: source.length,
+            total_pages: pageCount,
+            previous_uri: page > 1
+              ? `research://projects/${project.project_id}/research/${section}/pages/${page - 1}`
+              : null,
+            next_uri: page < pageCount
+              ? `research://projects/${project.project_id}/research/${section}/pages/${page + 1}`
+              : null,
+            items: source.slice(start, start + pageSize).map((item, index) => ({
+              position: start + index + 1,
+              ...(typeof item === "string" ? { text: item } : { log: item })
+            }))
+          };
+        }
+      }
+      return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(body) }] };
     }
   );
 
@@ -325,12 +452,34 @@ export function registerResearchGuides(
           ? { ok: false, error: { code: auth.error } }
           : project === null
             ? { ok: false, error: { code: "PROJECT_NOT_FOUND" } }
-            : {
-                ok: true,
-                project_id: project.project_id,
-                version: project.version,
-                deck: project.document.deck
-              };
+            : (() => {
+                const deck = project.document.deck;
+                if (deck === null) {
+                  return { ok: true, project_id: project.project_id, version: project.version, deck: null };
+                }
+                const { slides, ...settings } = deck;
+                return {
+                  ok: true,
+                  project_id: project.project_id,
+                  version: project.version,
+                  deck: {
+                    settings,
+                    slide_count: slides.length,
+                    total_duration_seconds: slides.reduce((sum, slide) => sum + slide.duration_seconds, 0),
+                    slides: slides.map((slide, index) => ({
+                      slide_id: slide.id,
+                      position: index + 1,
+                      title: slide.title,
+                      role: slide.role,
+                      duration_seconds: slide.duration_seconds,
+                      reveal_steps: slide.reveal_steps,
+                      composition_mode: slide.composition?.mode ?? "flow",
+                      narration_segments: slide.narration?.segments.length ?? 0,
+                      uri: `research://projects/${project.project_id}/slides/${slide.id}`
+                    }))
+                  }
+                };
+              })();
       return {
         contents: [
           {
@@ -1054,7 +1203,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `research://projects/${project_id}とresearch://guide/evaluationを読んでください。根拠不足はNEとし、各評価にproject内の根拠を示してください。強み、最大のリスク、最優先の改善を一つずつ挙げ、最後は改善につながる質問一問だけで終えてください。`
+            text: `research://projects/${project_id}/researchとresearch://guide/evaluationを読んでください。発見・限界・ログは各collectionのpage URIから必要な範囲だけ取得してください。根拠不足はNEとし、各評価にproject内の根拠を示してください。強み、最大のリスク、最優先の改善を一つずつ挙げ、最後は改善につながる質問一問だけで終えてください。`
           }
         }
       ]
@@ -1075,7 +1224,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、必要な内容だけresearch://projects/${project_id}またはresearch://projects/${project_id}/slides/{slideId}から読んでください。research://guide/edit-contract、research://guide/presentation-components、research://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、研究本文はresearch://projects/${project_id}/research、発見・限界・ログはそこにあるpage URI、既存の一枚はresearch://projects/${project_id}/slides/{slideId}から必要な範囲だけ読んでください。research://guide/edit-contract、research://guide/presentation-components、research://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
           }
         }
       ]
