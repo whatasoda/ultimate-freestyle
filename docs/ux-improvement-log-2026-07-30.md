@@ -763,3 +763,9 @@
 - 下書き版resourceが最大100件のfindings・limitationsと長文ログ、全設定をそのまま返し、一枚resourceでは過去版と現在版を二重に返して最大約1MiBになり得る構成を縮小した。
 - 研究本文は長さを制限したpreview、配列は件数と先頭10件、ログは直近5件の短いpreviewにする。発表設定は復元判断に必要なtemplate・話者の要約へ絞り、件数差とslide ID差は維持する。
 - 過去版の一枚resourceは過去slideだけを返し、現在slideは既存resource URIを示す。小型fixtureにも16KiBの応答予算を設け、同じデータの二重投入を防ぐ契約にした。
+
+## 改善ループ264
+
+- 過去版frameは画像を`/media/{assetId}`で表示できる一方、0ページ目のpreload一覧には`assetUrls`で明示された画像しか含めず、開始後に初めて読み込む不一致を修正した。private表示のfallback画像も開始前に準備する。
+- 音声開始ボタンを操作して非表示になった直後、フォーカスがbodyへ落ちる問題を修正した。ボタンにフォーカスがあった場合だけ発表枠へ戻し、完了画面へ入る際も古い許可待ち状態を必ず解除する。
+- dynamic viewportと端末のsafe areaを発表appへ反映し、430px以下では操作ガイドを1列にする。計測中の表示済みcomponentはユーザー設定opacityを維持して診断する。rendererを@92へ更新した。

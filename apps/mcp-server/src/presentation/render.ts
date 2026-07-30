@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@91";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@92";
 
 function escapeHtml(value: string): string {
   return value
@@ -425,7 +425,7 @@ export function renderPresentationHtml(
         ? slide.composition.nodes.flatMap((node) => node.kind === "image" ? [node.asset_id] : [])
         : [];
     return {
-      images: [...new Set(assetIds.flatMap((assetId) => options.assetUrls?.[assetId] ? [options.assetUrls[assetId]] : []))],
+      images: [...new Set(assetIds.map((assetId) => options.assetUrls?.[assetId] ?? `/media/${encodeURIComponent(assetId)}`))],
       audio: [...new Set(slide.narration?.segments.flatMap((segment) => segment.audio_src === null ? [] : [segment.audio_src]) ?? [])]
     };
   });
@@ -634,10 +634,10 @@ export function renderPresentationHtml(
   <style nonce="saijiyu-static">
     :root { color-scheme: dark; --accent: ${escapeHtml(deck.accent)}; --stage-ratio: 16 / 9; --stage-width: 16; --stage-height: 9; font-family: Inter, "Noto Sans JP", system-ui, sans-serif; }
     * { box-sizing: border-box; }
-    body { margin: 0; min-height: 100vh; overflow: hidden; background: #090d14; color: #f8fafc; }
+    body { margin: 0; min-height: 100vh; min-height: 100dvh; overflow: hidden; background: #090d14; color: #f8fafc; }
     button, input { font: inherit; }
     .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
-    .app { width: 100%; min-width: 0; height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; padding: 12px; }
+    .app { width: 100%; min-width: 0; height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; padding: calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
     body[data-editor-frame="true"] .app { grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0; }
     body[data-editor-frame="true"] header, body[data-editor-frame="true"] footer { display: none; }
     body[data-editor-frame="true"] .stage-wrap { grid-row: 1; }
@@ -884,7 +884,7 @@ export function renderPresentationHtml(
     .reveal-block[data-animation="wipe"] { clip-path: inset(0 100% 0 0); translate: none; }
     .reveal-block[data-animation="wipe"].is-visible { clip-path: inset(0); }
     .stage[data-measuring="true"] .reveal-block { transition: none !important; translate: 0 0 !important; scale: 1 !important; filter: none !important; clip-path: inset(0) !important; }
-    .stage[data-measuring="true"] .reveal-block.is-visible { opacity: 1 !important; }
+    .stage[data-measuring="true"] .reveal-block.is-visible { opacity: var(--component-opacity, 1) !important; }
     .stage[data-measuring="true"] .reveal-block:not(.is-visible) { opacity: 0 !important; }
     .reveal-block p, .reveal-block li { font-size: calc(1.65cqw * var(--template-font-scale) * var(--slide-body-scale) * var(--fit-scale)); line-height: var(--body-line-height); overflow-wrap: anywhere; }
     .slide-sidebar h2, .slide-sidebar h3, .slide-sidebar h4 { color: var(--accent); }
@@ -979,7 +979,7 @@ export function renderPresentationHtml(
     input[type="range"] { width: 80px; accent-color: var(--accent); }
     .volume-value { min-width: 3.2em; color: #dce5f2; font-variant-numeric: tabular-nums; text-align: end; }
     @media (max-width: 680px) {
-      .app { gap: 6px; padding: 6px; }
+      .app { gap: 6px; padding: calc(6px + env(safe-area-inset-top)) calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left)); }
       header { gap: 7px; min-height: 30px; font-size: 12px; }
       .time-label { display: none; }
       .time-total { display: none; }
@@ -1005,6 +1005,7 @@ export function renderPresentationHtml(
       .completion { padding: 4%; }
       .completion-card { width: 100%; padding: 1.25em; }
       .completion-actions { display: grid; }
+      .shortcut-grid { grid-template-columns: 1fr; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; } }
   </style>
@@ -1242,8 +1243,10 @@ export function renderPresentationHtml(
       setVoiceStatus('blocked', '音声開始待ち · 「音声を開始」を押す');
     };
     const hideVoiceUnlock = () => {
+      const restoreStageFocus = voiceUnlock instanceof HTMLButtonElement && document.activeElement === voiceUnlock;
       if (voiceUnlock instanceof HTMLButtonElement) voiceUnlock.hidden = true;
       stage?.removeAttribute('data-voice-blocked');
+      if (restoreStageFocus) stage?.focus({ preventScroll: true });
     };
     const stopVoice = () => {
       voiceRun += 1;
@@ -1276,6 +1279,7 @@ export function renderPresentationHtml(
     const showCompletion = () => {
       if (editorFrame || !(completion instanceof HTMLElement)) return;
       stopVoice();
+      hideVoiceUnlock();
       auto = false;
       autoButton.setAttribute('aria-pressed', 'false');
       autoButton.textContent = '自動 OFF';

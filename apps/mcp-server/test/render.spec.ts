@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@91");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@92");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
@@ -331,7 +331,11 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("event.key.toLowerCase() === 't'");
     expect(html).toContain("data-restart");
     expect(html).toContain("else { showCompletion(); return false; }");
-    expect(html).toContain('.stage[data-measuring="true"] .reveal-block.is-visible { opacity: 1 !important; }');
+    expect(html).toContain('.stage[data-measuring="true"] .reveal-block.is-visible { opacity: var(--component-opacity, 1) !important; }');
+    expect(html).toContain("min-height: 100dvh");
+    expect(html).toContain("env(safe-area-inset-bottom)");
+    expect(html).toContain(".shortcut-grid { grid-template-columns: 1fr; }");
+    expect(html).toContain("if (restoreStageFocus) stage?.focus({ preventScroll: true })");
     expect(html).toContain("if (completion instanceof HTMLElement && !completion.hidden) return;");
     expect(html).toContain("textarea, summary, details");
     expect(html).toContain('id="volume-value"');
@@ -518,6 +522,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal-at="1"');
     expect(html).toContain("left: 8%; top: 8%");
     expect(html).toContain(`/presentation-assets/revision/${assetId}`);
+    expect(renderPresentationHtml(project)).toContain(`/media/${assetId}`);
     expect(html).toContain("#102030");
     expect(html).toContain("&lt;自由&gt;な見出し");
     expect(html).not.toContain("legacy fallback");
