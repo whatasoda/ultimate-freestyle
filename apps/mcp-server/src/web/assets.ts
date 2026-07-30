@@ -56,6 +56,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     const previewButton = document.querySelector("[data-create-preview]");
     if (previewButton instanceof HTMLButtonElement) previewButton.dataset.version = value;
+    dispatchEvent(new CustomEvent("ultimate-freestyle:version-changed", { detail: { version } }));
   };
   const markDraftChanged = () => {
     const publishButton = document.querySelector("[data-publish-preview]");
@@ -740,9 +741,30 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     return body;
   };
-  for (const form of document.querySelectorAll("[data-versioned-form]")) {
+  const versionedForms = [...document.querySelectorAll("[data-versioned-form]")];
+  for (const [formIndex, form] of versionedForms.entries()) {
     if (!(form instanceof HTMLFormElement)) continue;
-    form.addEventListener("input", () => { form.dataset.dirty = "true"; syncSaveState(); });
+    const draftKey = "ultimate-freestyle:form-draft:" + location.pathname + ":" + new URL(form.action).pathname + ":" + formIndex;
+    let draftTimer;
+    const draftFields = () => [...form.elements].flatMap((field) => {
+      if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement) || !field.name || ["submit", "button", "file", "hidden"].includes(field.type)) return [];
+      return [{ name: field.name, value: field.value, checked: field instanceof HTMLInputElement && field.type === "checkbox" ? field.checked : null }];
+    });
+    const persistDraft = () => {
+      if (form.dataset.dirty !== "true") return;
+      try { sessionStorage.setItem(draftKey, JSON.stringify({ version: Number(form.dataset.version), fields: draftFields() })); } catch {}
+    };
+    const removeDraft = () => {
+      clearTimeout(draftTimer);
+      try { sessionStorage.removeItem(draftKey); } catch {}
+    };
+    form.addEventListener("input", () => {
+      form.dataset.dirty = "true";
+      clearTimeout(draftTimer);
+      draftTimer = setTimeout(persistDraft, 180);
+      syncSaveState();
+    });
+    addEventListener("ultimate-freestyle:version-changed", persistDraft);
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const feedback = form.querySelector("[data-form-feedback]");
@@ -768,8 +790,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         });
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "保存できませんでした。"));
-        syncPageVersion(result.version);
         form.dataset.dirty = "false";
+        removeDraft();
+        syncPageVersion(result.version);
         if (form.matches("[data-template-create], [data-narration-segment-create]")) {
           location.reload();
           return;
@@ -802,6 +825,33 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         syncSaveState();
       }
     });
+    let restored = false;
+    try {
+      const draft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
+      if (draft?.version === Number(form.dataset.version) && Array.isArray(draft.fields)) {
+        for (const saved of draft.fields) {
+          const field = form.elements.namedItem(String(saved.name || ""));
+          if (!(field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement)) continue;
+          if (field instanceof HTMLInputElement && field.type === "checkbox") field.checked = saved.checked === true;
+          else field.value = String(saved.value ?? "");
+        }
+        restored = true;
+      } else if (draft !== null) sessionStorage.removeItem(draftKey);
+    } catch { removeDraft(); }
+    if (restored) {
+      const notice = document.createElement("p");
+      notice.className = "draft-recovery";
+      notice.append(document.createTextNode("更新前の未保存入力を復元しました。"));
+      const discard = document.createElement("button");
+      discard.type = "button";
+      discard.className = "ghost";
+      discard.textContent = "復元内容を破棄";
+      discard.addEventListener("click", () => { removeDraft(); location.reload(); });
+      notice.append(discard);
+      form.prepend(notice);
+      form.dataset.dirty = "true";
+      form.dispatchEvent(new Event("input", { bubbles: true }));
+    }
   }
 
   for (const button of document.querySelectorAll("[data-narration-segment-delete]")) {

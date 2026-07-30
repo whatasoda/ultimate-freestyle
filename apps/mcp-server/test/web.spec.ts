@@ -649,6 +649,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("70%未満まで縮小");
     expect(dashboardScriptText).toContain("syncPageVersion(result.version)");
     expect(dashboardScriptText).toContain('addEventListener("beforeunload"');
+    expect(dashboardScriptText).toContain("ultimate-freestyle:form-draft:");
+    expect(dashboardScriptText).toContain("更新前の未保存入力を復元しました");
+    expect(dashboardScriptText).toContain("ultimate-freestyle:version-changed");
     expect(dashboardScriptText).toContain('field.maxLength * 0.9');
     expect(dashboardScriptText).toContain('event.key.toLowerCase() !== "s"');
     expect(dashboardScriptText).toContain("form.requestSubmit()");

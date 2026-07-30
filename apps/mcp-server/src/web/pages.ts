@@ -574,6 +574,8 @@ function shell(title: string, body: string): string {
       .warning { color: #ffd681 !important; }
       .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
       .feedback { min-height: 1.4em; margin: 0; color: #9fddf5; font-size: .88rem; }
+      .draft-recovery { display: flex; align-items: center; justify-content: space-between; gap: .7rem; margin: 0; padding: .65rem .75rem; border: 1px solid #826b30; border-radius: .65rem; background: #2a210d; color: #ffe09a; font-size: .78rem; line-height: 1.5; }
+      .draft-recovery button { min-height: 2rem; padding: .35rem .55rem; white-space: nowrap; font-size: .72rem; }
       .notice { max-width: 42rem; margin: 3rem auto; text-align: center; }
       main.workspace-main { width: min(96vw, 100rem); padding-top: 1rem; }
       .workspace-head { display: grid; gap: .75rem; margin-bottom: 1rem; }
