@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@77";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@78";
 
 function escapeHtml(value: string): string {
   return value
@@ -198,6 +198,7 @@ export type PresentationRenderOptions = {
   assetUrls?: Readonly<Record<string, string>>;
   frameAncestors?: "'none'" | "'self'";
   editorFrame?: boolean;
+  revisionId?: string;
 };
 
 export function listPresentationAssetIds(project: ProjectRecord): string[] {
@@ -444,6 +445,8 @@ export function renderPresentationHtml(
   const runtimeDeck = {
     projectId: project.project_id,
     version: project.version,
+    rendererVersion: PRESENTATION_RENDERER_VERSION,
+    previewRevisionId: options.revisionId ?? null,
     title: project.document.title,
     shortTitle: deck.short_title,
     layout: deck.layout,
@@ -1204,6 +1207,24 @@ export function renderPresentationHtml(
       setVoiceProgress(0);
     };
     const finishVoice = () => { clearInterval(voiceTimer); setVoiceProgress(100); if (auto) autoTimer = setTimeout(advance, 350); };
+    const reportPreviewCompletion = () => {
+      if (typeof DECK.previewRevisionId !== 'string') return;
+      const detail = {
+        project_id: DECK.projectId,
+        project_version: DECK.version,
+        renderer_version: DECK.rendererVersion,
+        revision_id: DECK.previewRevisionId,
+        completed_at: new Date().toISOString()
+      };
+      try {
+        localStorage.setItem('ultimate-freestyle:preview-completed:' + DECK.previewRevisionId, JSON.stringify(detail));
+      } catch {}
+      if ('BroadcastChannel' in window) {
+        const channel = new BroadcastChannel('ultimate-freestyle:preview-review');
+        channel.postMessage(detail);
+        channel.close();
+      }
+    };
     const showCompletion = () => {
       if (editorFrame || !(completion instanceof HTMLElement)) return;
       auto = false;
@@ -1223,6 +1244,7 @@ export function renderPresentationHtml(
           : '想定より' + format(Math.abs(difference)) + (difference > 0 ? '長い結果です。' : '短い結果です。');
         completionTime.dataset.state = difference > 0 ? 'over' : 'within';
       }
+      reportPreviewCompletion();
       openModal(completion, restartButton);
     };
     const hideCompletion = () => {

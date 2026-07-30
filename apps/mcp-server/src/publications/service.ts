@@ -400,7 +400,10 @@ export async function createPresentationPreview(
             snapshot.segment.at === segment.at
         )?.contentUrl ?? ""
     );
-    const html = renderPresentationHtml(hydratedProject, { assetUrls });
+    const html = renderPresentationHtml(hydratedProject, {
+      assetUrls,
+      revisionId
+    });
     const bytes = new TextEncoder().encode(html);
     if (bytes.byteLength > MAX_PRESENTATION_BYTES) {
       throw new PublicationError(

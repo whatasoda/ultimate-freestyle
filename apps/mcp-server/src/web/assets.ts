@@ -68,7 +68,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const reviewButton = document.querySelector("[data-review-preview]");
     if (reviewButton instanceof HTMLButtonElement) {
       reviewButton.disabled = true;
-      reviewButton.textContent = "最後まで確認した";
+      reviewButton.textContent = "終了画面の到達待ち";
     }
     const reviewStatus = document.querySelector("[data-preview-review-status]");
     if (reviewStatus instanceof HTMLElement) reviewStatus.textContent = "対象なし";
@@ -2602,14 +2602,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         if (reviewButton instanceof HTMLButtonElement) {
           reviewButton.dataset.revision = result.revision.revision_id;
+          reviewButton.dataset.project = result.revision.project_id;
+          reviewButton.dataset.version = String(result.revision.project_version);
+          reviewButton.dataset.renderer = result.revision.renderer_version;
           reviewButton.dataset.reviewPreview = "/api/projects/" + result.revision.project_id + "/previews/" + result.revision.revision_id + "/review";
-          reviewButton.disabled = false;
-          reviewButton.textContent = "最後まで確認した";
+          reviewButton.disabled = true;
+          reviewButton.textContent = "終了画面の到達待ち";
         }
         if (previewStatus instanceof HTMLElement) {
           previewStatus.textContent = "v" + result.revision.project_version + " · " + result.revision.renderer_version;
         }
-        if (previewReviewStatus instanceof HTMLElement) previewReviewStatus.textContent = "未確認";
+        if (previewReviewStatus instanceof HTMLElement) previewReviewStatus.textContent = "終了画面の到達待ち";
         if (previewLink instanceof HTMLAnchorElement) {
           previewLink.href = result.preview_url;
           previewLink.hidden = false;
@@ -2627,10 +2630,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   if (reviewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
-    reviewButton.addEventListener("click", async () => {
-      if (!confirm("固定プレビューを最後の終了画面まで確認しましたか？")) return;
+    let recordingReview = false;
+    const recordCompletedPreview = async (detail) => {
+      if (recordingReview || reviewButton.textContent === "プレビュー確認済み") return;
+      if (!detail || detail.revision_id !== reviewButton.dataset.revision) return;
+      if (detail.project_id !== reviewButton.dataset.project) return;
+      if (String(detail.project_version) !== reviewButton.dataset.version) return;
+      if (detail.renderer_version !== reviewButton.dataset.renderer) return;
+      recordingReview = true;
       reviewButton.disabled = true;
-      publishFeedback.textContent = "プレビューの確認を記録しています…";
+      reviewButton.textContent = "到達を記録中…";
+      publishFeedback.textContent = "終了画面への到達を記録しています…";
       publishFeedback.classList.remove("warning", "success");
       try {
         const response = await fetch(reviewButton.dataset.reviewPreview || "", {
@@ -2645,11 +2655,32 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.textContent = "この固定プレビューを公開できます。";
         publishFeedback.classList.add("success");
       } catch (error) {
-        reviewButton.disabled = false;
+        reviewButton.textContent = "終了画面の到達待ち";
         publishFeedback.textContent = caughtErrorMessage(error, "確認状態を記録できませんでした。");
         publishFeedback.classList.add("warning");
+      } finally {
+        recordingReview = false;
       }
+    };
+    const readStoredCompletion = () => {
+      const revisionId = reviewButton.dataset.revision;
+      if (!revisionId) return;
+      try {
+        const stored = localStorage.getItem("ultimate-freestyle:preview-completed:" + revisionId);
+        if (stored) void recordCompletedPreview(JSON.parse(stored));
+      } catch {}
+    };
+    addEventListener("storage", (event) => {
+      if (event.key !== "ultimate-freestyle:preview-completed:" + reviewButton.dataset.revision || !event.newValue) return;
+      try { void recordCompletedPreview(JSON.parse(event.newValue)); } catch {}
     });
+    if ("BroadcastChannel" in window) {
+      const reviewChannel = new BroadcastChannel("ultimate-freestyle:preview-review");
+      reviewChannel.addEventListener("message", (event) => { void recordCompletedPreview(event.data); });
+      addEventListener("pagehide", () => reviewChannel.close(), { once: true });
+    }
+    readStoredCompletion();
+    addEventListener("ultimate-freestyle:preview-created", readStoredCompletion);
   }
 
   if (publishButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {

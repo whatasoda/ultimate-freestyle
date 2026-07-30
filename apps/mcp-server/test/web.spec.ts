@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=97"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=98"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -444,6 +444,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
     expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");
+    expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:preview-review");
+    expect(DASHBOARD_SCRIPT).toContain("recordCompletedPreview");
     expect(detailHtml).toContain("公開前チェック ·");
     expect(detailHtml).toContain("基本 2/4 · おすすめ 3/4");
     expect(detailHtml).toContain("公開版の画像容量");
@@ -480,7 +482,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("data-review-preview");
-    expect(detailHtml).toContain("最後まで確認した");
+    expect(detailHtml).toContain("終了画面の到達待ち");
+    expect(DASHBOARD_SCRIPT).not.toContain("固定プレビューを最後の終了画面まで確認しましたか？");
     expect(detailHtml).toContain("data-public-link");
     expect(detailHtml).toContain("data-upload-preview");
     expect(detailHtml).toContain("保存時に最大2560pxのWebPへ圧縮");
@@ -1083,6 +1086,8 @@ describe("Web dashboard", () => {
     const previewHtml = await previewPage.text();
     expect(previewHtml).toContain("Webで微調整した研究");
     expect(previewHtml).toContain("Webで調整した読み上げ文");
+    expect(previewHtml).toContain(`"previewRevisionId":"${previewResult.revision.revision_id}"`);
+    expect(previewHtml).toContain("ultimate-freestyle:preview-completed:");
     expect(previewHtml).not.toContain("/stale-audio.mp3");
     const presentationAudioUrl = `/presentation-audio/${previewResult.revision.revision_id}/intro/0.mp3`;
     expect(previewHtml).toContain(presentationAudioUrl);

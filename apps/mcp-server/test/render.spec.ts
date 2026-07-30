@@ -158,6 +158,7 @@ describe("presentation artifact renderer", () => {
     });
 
     const html = renderPresentationHtml(project, {
+      revisionId: "50000000-0000-4000-8000-000000000005",
       assetUrls: {
         "40000000-0000-4000-8000-000000000004":
           "/presentation-assets/revision/image"
@@ -179,7 +180,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const collectOcclusions =");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@77");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@78");
+    expect(html).toContain('"previewRevisionId":"50000000-0000-4000-8000-000000000005"');
+    expect(html).toContain("ultimate-freestyle:preview-completed:");
+    expect(html).toContain("reportPreviewCompletion();");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
