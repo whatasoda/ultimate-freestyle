@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@97";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@98";
 
 function escapeHtml(value: string): string {
   return value
@@ -2119,6 +2119,28 @@ export function renderPresentationHtml(
       currentSlide.dataset.density = String(template.density || 'comfortable');
       currentSlide.dataset.motionStyle = String(template.motion_style || 'calm');
       currentSlide.dataset.animation = String(data.enter_animation || template.enter_animation || 'fade');
+      for (const [property, value] of Object.entries({
+        '--template-background': template.background,
+        '--template-surface': template.surface,
+        '--template-foreground': template.foreground,
+        '--template-muted': template.muted,
+        '--template-accent': template.accent,
+        '--template-accent-secondary': template.accent_secondary,
+        '--template-border': template.border,
+        '--template-radius': Number(template.corner_radius_px) / 16 + 'cqw',
+        '--template-spacing': template.spacing_scale,
+        '--template-font-scale': template.font_scale,
+        '--template-sidebar-width': template.sidebar_width_percent + '%',
+        '--body-weight': template.body_weight,
+        '--heading-weight': template.heading_weight,
+        '--body-letter-spacing': template.letter_spacing_em + 'em'
+      })) {
+        if (value === undefined || value === null || String(value).includes('NaN')) currentSlide.style.removeProperty(property);
+        else currentSlide.style.setProperty(property, String(value));
+      }
+      if (template.apply_line_height && Number.isFinite(Number(template.line_height))) {
+        currentSlide.style.setProperty('--body-line-height', String(template.line_height));
+      }
       currentSlide.style.animation = 'none';
       currentSlide.getBoundingClientRect();
       currentSlide.style.removeProperty('animation');

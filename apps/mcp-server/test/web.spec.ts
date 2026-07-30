@@ -472,6 +472,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("templates[templateId]?.template_name");
     expect(DASHBOARD_SCRIPT).toContain("result.affected_slides.total");
     expect(DASHBOARD_SCRIPT).toContain("appearanceEditor.dataset.previewTemplates = JSON.stringify(templates)");
+    expect(DASHBOARD_SCRIPT).toContain("...template");
+    expect(DASHBOARD_SCRIPT).toContain("apply_line_height");
     expect(DASHBOARD_SCRIPT).toContain('templates[""] = previewTemplate(result.default_template)');
     expect(DASHBOARD_SCRIPT).toContain("activeFilmstrip.dataset.roleLabel = nextRole");
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
@@ -561,7 +563,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@97"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@98"');
 
     const voicePage = await requestProvider(
       provider,
@@ -695,6 +697,9 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-slide-action="move"');
     expect(workspaceHtml).toContain('data-slide-action="delete"');
     expect(workspaceHtml).toContain("現在有効な設定");
+    expect(workspaceHtml).toContain("data-preview-templates");
+    expect(workspaceHtml).toContain("&quot;background&quot;:&quot;#111827&quot;");
+    expect(workspaceHtml).toContain("&quot;sidebar_width_percent&quot;:30");
     expect(workspaceHtml).toContain("data-workspace-duration");
     expect(workspaceHtml).toContain("実験ノート");
     expect(workspaceHtml).toContain("サイエンス");

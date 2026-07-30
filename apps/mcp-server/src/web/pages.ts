@@ -2100,18 +2100,35 @@ export function slideWorkspacePage(options: {
     const template = (deck.templates ?? []).find(
       (item) => item.id === resolvedTemplateId
     );
+    const preset = template?.visual_preset ?? (deck.layout === "minimal" ? "paper" : "studio");
+    const defaults = TEMPLATE_PRESET_DEFAULTS[preset];
     return {
       template_name: template?.name ?? "組み込み",
       template_id: template?.id ?? `builtin-${deck.layout}`,
       user_template: template !== undefined,
       region_layout: template?.region_layout ?? "sidebar-right",
-      visual_preset:
-        template?.visual_preset ?? (deck.layout === "minimal" ? "paper" : "studio"),
-      body_font: template?.body_font ?? "system-sans",
-      heading_font: template?.heading_font ?? "system-sans",
-      density: template?.density ?? "comfortable",
-      motion_style: template?.motion_style ?? "calm",
-      enter_animation: template?.enter_animation ?? "fade"
+      visual_preset: preset,
+      body_font: template?.body_font ?? defaults.body_font ?? "system-sans",
+      heading_font: template?.heading_font ?? defaults.heading_font ?? "system-sans",
+      density: template?.density ?? defaults.density ?? "comfortable",
+      motion_style: template?.motion_style ?? defaults.motion_style ?? "calm",
+      enter_animation: template?.enter_animation ?? defaults.enter_animation,
+      sidebar_width_percent: template?.sidebar_width_percent ?? defaults.sidebar_width_percent,
+      background: template?.background ?? defaults.background,
+      surface: template?.surface ?? defaults.surface,
+      foreground: template?.foreground ?? defaults.foreground,
+      muted: template?.muted ?? defaults.muted,
+      accent: template?.accent ?? defaults.accent,
+      accent_secondary: template?.accent_secondary ?? defaults.accent_secondary ?? defaults.accent,
+      border: template?.border ?? defaults.border ?? defaults.muted,
+      corner_radius_px: template?.corner_radius_px ?? defaults.corner_radius_px,
+      spacing_scale: template?.spacing_scale ?? defaults.spacing_scale,
+      font_scale: template?.font_scale ?? defaults.font_scale,
+      body_weight: template?.body_weight ?? defaults.body_weight ?? 400,
+      heading_weight: template?.heading_weight ?? defaults.heading_weight ?? 800,
+      line_height: template?.line_height ?? defaults.line_height ?? 1.5,
+      letter_spacing_em: template?.letter_spacing_em ?? defaults.letter_spacing_em ?? 0,
+      apply_line_height: (slide.typography?.preset ?? "standard") === "standard" && slide.typography?.line_height === undefined
     };
   };
   const appearancePreviewTemplates = Object.fromEntries([

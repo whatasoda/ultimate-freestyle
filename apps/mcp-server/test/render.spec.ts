@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@97");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@98");
     expect(html).toContain("const pauseProgressClock = () =>");
     expect(html).toContain("progressClock?.kind === 'auto'");
     expect(html).toContain("startProgressClock(delay, 0, 'auto')");
@@ -309,6 +309,8 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const previewTemplate =");
     expect(html).toContain("ultimate-freestyle:preview-appearance");
     expect(html).toContain("const previewAppearance =");
+    expect(html).toContain("'--template-background': template.background");
+    expect(html).toContain("'--template-sidebar-width': template.sidebar_width_percent + '%'");
     expect(html).toContain('role="region" tabindex="0"');
     expect(html).toContain("target.closest('button, a, input, select, textarea')");
     expect(html).toContain("if (editorFrame) {");
