@@ -1777,6 +1777,26 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     addEventListener("message", (event) => {
       if (event.origin !== location.origin || event.source !== slideFrame.contentWindow) return;
       const data = event.data;
+      if (data?.type === "ultimate-freestyle:move-component" && typeof data.component_id === "string" && data.frame && Number.isFinite(data.frame.x) && Number.isFinite(data.frame.y)) {
+        const forms = data.component_type === "scene"
+          ? [...document.querySelectorAll("[data-scene-component-editor]")]
+          : [...document.querySelectorAll("[data-canvas-block-editor]")];
+        const target = forms.find((form) => form instanceof HTMLFormElement && (data.component_type === "scene" ? form.dataset.componentId : form.dataset.blockId) === data.component_id);
+        if (!(target instanceof HTMLFormElement)) return;
+        const frameToggle = target.querySelector("[data-component-frame-toggle]");
+        if (frameToggle instanceof HTMLInputElement && !frameToggle.checked) return;
+        for (const axis of ["x", "y"]) {
+          const input = target.querySelector('[data-component-path="frame.' + axis + '"]');
+          if (!(input instanceof HTMLInputElement)) continue;
+          input.value = String(data.frame[axis]);
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (layoutStatus instanceof HTMLElement) {
+          layoutStatus.textContent = "「" + data.component_id + "」を x " + data.frame.x + "%・y " + data.frame.y + "%へ移動しました。保存すると確定します。";
+          layoutStatus.dataset.level = "ok";
+        }
+        return;
+      }
       if (data?.type === "ultimate-freestyle:select-component" && typeof data.component_id === "string") {
         const forms = data.component_type === "scene"
           ? [...document.querySelectorAll("[data-scene-component-editor]")]

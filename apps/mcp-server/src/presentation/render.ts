@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@61";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@62";
 
 function escapeHtml(value: string): string {
   return value
@@ -640,7 +640,7 @@ export function renderPresentationHtml(
     .stage { position: relative; width: min(100%, calc((100vh - 118px) * var(--stage-width) / var(--stage-height))); aspect-ratio: var(--stage-ratio); overflow: hidden; container: presentation-stage / size; border: 1px solid #334155; background: #111827; box-shadow: 0 18px 60px #0009; cursor: pointer; touch-action: pan-y; }
     .stage:focus-visible { outline: .2rem solid var(--accent); outline-offset: .18rem; }
     body[data-editor-frame="true"] .stage { cursor: default; }
-    body[data-editor-frame="true"] :is(.canvas-block, .scene-node) { cursor: pointer; }
+    body[data-editor-frame="true"] :is(.canvas-block, .scene-node[data-positioned="true"]) { cursor: move; touch-action: none; user-select: none; }
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node):hover { outline: max(2px, .18cqw) dashed color-mix(in srgb, var(--accent) 78%, white); outline-offset: max(1px, .1cqw); }
     body[data-editor-frame="true"] :is(.canvas-block, .scene-node)[data-editor-selected="true"] { outline: max(3px, .24cqw) solid var(--accent); outline-offset: max(1px, .12cqw); }
     .slide { --template-font-scale: 1; --template-spacing: 1; --component-font-scale: 1; --fit-scale: 1; --body-weight: 400; --heading-weight: 800; --body-line-height: 1.5; --body-letter-spacing: 0; --slide-body-scale: 1; --slide-heading-scale: 1; --slide-paragraph-spacing: .65em; --slide-column-gap: 2.5em; --theme-background: #111827; --theme-surface: #05080dcc; --theme-foreground: #f8fafc; --theme-muted: #a9b5c7; --theme-border: #ffffff25; --density-scale: 1; --motion-duration: .4s; --motion-ease: cubic-bezier(.2,.8,.2,1); --slide-base: var(--theme-background); position: absolute; inset: 0; display: grid; grid-template: minmax(0, 1fr) auto / minmax(0, 1fr) minmax(0, 28%); overflow: hidden; background: var(--slide-base); color: var(--theme-foreground); font-family: var(--font-body, system-ui, sans-serif); font-weight: var(--body-weight); line-height: var(--body-line-height); letter-spacing: var(--body-letter-spacing); }
@@ -1992,6 +1992,51 @@ export function renderPresentationHtml(
       else if (event.key.toLowerCase() === 'f') { event.preventDefault(); fullscreenButton.click(); }
       else if (event.key === '?') { event.preventDefault(); showShortcuts(); }
     });
+    let editorDrag = null;
+    stage?.addEventListener('pointerdown', (event) => {
+      if (!editorFrame || event.button !== 0 || !(event.target instanceof Element)) return;
+      const target = event.target.closest('[data-block-id], [data-node-id][data-positioned="true"]');
+      if (!(target instanceof HTMLElement)) return;
+      const boundary = target.offsetParent;
+      if (!(boundary instanceof HTMLElement)) return;
+      const targetRect = target.getBoundingClientRect();
+      const boundaryRect = boundary.getBoundingClientRect();
+      if (boundaryRect.width <= 0 || boundaryRect.height <= 0) return;
+      editorDrag = {
+        target,
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        boundaryRect,
+        x: (targetRect.left - boundaryRect.left) / boundaryRect.width * 100,
+        y: (targetRect.top - boundaryRect.top) / boundaryRect.height * 100,
+        width: targetRect.width / boundaryRect.width * 100,
+        height: targetRect.height / boundaryRect.height * 100
+      };
+      target.setPointerCapture?.(event.pointerId);
+      event.preventDefault();
+    });
+    stage?.addEventListener('pointermove', (event) => {
+      if (!editorDrag || editorDrag.pointerId !== event.pointerId) return;
+      const x = clamp(editorDrag.x + (event.clientX - editorDrag.startX) / editorDrag.boundaryRect.width * 100, 0, 100 - editorDrag.width);
+      const y = clamp(editorDrag.y + (event.clientY - editorDrag.startY) / editorDrag.boundaryRect.height * 100, 0, 100 - editorDrag.height);
+      editorDrag.target.style.left = x + '%';
+      editorDrag.target.style.top = y + '%';
+      parent.postMessage({
+        type: 'ultimate-freestyle:move-component',
+        component_type: editorDrag.target.hasAttribute('data-node-id') ? 'scene' : 'canvas',
+        component_id: editorDrag.target.getAttribute('data-node-id') || editorDrag.target.getAttribute('data-block-id') || '',
+        frame: { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 }
+      }, location.origin);
+      event.preventDefault();
+    });
+    const endEditorDrag = (event) => {
+      if (!editorDrag || editorDrag.pointerId !== event.pointerId) return;
+      editorDrag.target.releasePointerCapture?.(event.pointerId);
+      editorDrag = null;
+    };
+    stage?.addEventListener('pointerup', endEditorDrag);
+    stage?.addEventListener('pointercancel', endEditorDrag);
     stage?.addEventListener('pointerdown', (event) => {
       if (!started || editorFrame || event.pointerType === 'mouse' || !event.isPrimary) return;
       if (shortcuts instanceof HTMLElement && !shortcuts.hidden) return;
