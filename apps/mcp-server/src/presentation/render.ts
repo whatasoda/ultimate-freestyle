@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@56";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@57";
 
 function escapeHtml(value: string): string {
   return value
@@ -1314,6 +1314,7 @@ export function renderPresentationHtml(
       const backgroundLuminance = relativeLuminance(background);
       return (Math.max(foregroundLuminance, backgroundLuminance) + .05) / (Math.min(foregroundLuminance, backgroundLuminance) + .05);
     };
+    const colorHex = (color) => '#' + [color.red, color.green, color.blue].map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('');
     const collectContrast = (target, slideElement) => {
       const candidates = [target, ...target.querySelectorAll('*')].filter((item) => {
         if (!(item instanceof HTMLElement) || item.hidden || item.offsetParent === null) return false;
@@ -1331,7 +1332,10 @@ export function renderPresentationHtml(
         const ratio = contrastRatio(foreground, background.color);
         if (background.complex && ratio >= 2) continue;
         if (ratio + .05 >= required || (lowest && lowest.ratio <= ratio)) continue;
-        lowest = { ratio, required, estimated: background.complex };
+        const dark = { red: 17, green: 24, blue: 39, alpha: 1 };
+        const light = { red: 248, green: 250, blue: 252, alpha: 1 };
+        const suggested = contrastRatio(dark, background.color) >= contrastRatio(light, background.color) ? dark : light;
+        lowest = { ratio, required, estimated: background.complex, suggested_foreground: colorHex(suggested) };
       }
       return lowest;
     };
@@ -1357,7 +1361,7 @@ export function renderPresentationHtml(
         fits.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', fit_scale: scale });
         if (overflowing) diagnostics.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', overflow_x: clippedOverflow.x, overflow_y: clippedOverflow.y, fit_scale: scale });
         const contrast = collectContrast(target, currentSlide);
-        if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated });
+        if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground });
       });
       if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts }, location.origin);
     };

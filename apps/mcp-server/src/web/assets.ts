@@ -1387,15 +1387,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const layoutStatus = document.querySelector("[data-layout-status]");
     const qualitySummary = document.querySelector("[data-quality-summary]");
     const qualityList = document.querySelector("[data-quality-list]");
-    const diagnosticTarget = (id) => {
+    const diagnosticTarget = (id, preferredPath = "") => {
       let sectionName = "structure";
       let target = null;
       if (id.startsWith("node:")) {
         const componentId = id.slice(5);
         target = [...document.querySelectorAll("[data-scene-component-editor]")].find((form) => form instanceof HTMLFormElement && form.dataset.componentId === componentId) || null;
       } else if (id === "flow:main" || id === "flow:sidebar") {
-        sectionName = "content";
-        target = document.querySelector("[data-slide-editor]");
+        sectionName = preferredPath ? "design" : "content";
+        target = preferredPath ? document.querySelector("[data-template-editor]") : document.querySelector("[data-slide-editor]");
       } else if (id === "narration") {
         sectionName = "narration";
         target = document.querySelector("[data-narration-settings-editor]");
@@ -1408,8 +1408,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const row = document.createElement("li");
       row.dataset.layoutWarning = "true";
       row.append(document.createTextNode(message));
-      const { section, target } = diagnosticTarget(item.id);
+      const { section, target } = diagnosticTarget(item.id, preferredPath);
       if (section instanceof HTMLDetailsElement && target instanceof HTMLElement) {
+        const preferredField = preferredPath
+          ? target.querySelector('[data-component-path="' + preferredPath + '"]') || (target instanceof HTMLFormElement ? target.elements.namedItem(item.id === "flow:sidebar" ? "muted" : "foreground") : null)
+          : null;
         const button = document.createElement("button");
         button.type = "button";
         button.className = "ghost";
@@ -1420,11 +1423,26 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           const componentDetail = target.closest("details.component-detail");
           if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
           target.scrollIntoView({ block: "center", behavior: "smooth" });
-          const preferredField = preferredPath ? target.querySelector('[data-component-path="' + preferredPath + '"]') : null;
           const field = preferredField || target.querySelector("textarea, input, select");
           if (field instanceof HTMLElement) field.focus({ preventScroll: true });
         });
         row.append(button);
+        if (preferredField instanceof HTMLInputElement && /^#[0-9a-f]{6}$/i.test(String(item.suggested_foreground || ""))) {
+          const suggestion = document.createElement("button");
+          suggestion.type = "button";
+          suggestion.className = "ghost";
+          suggestion.textContent = "推奨色を入力";
+          suggestion.addEventListener("click", () => {
+            section.open = true;
+            const componentDetail = target.closest("details.component-detail");
+            if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
+            preferredField.value = item.suggested_foreground;
+            preferredField.dispatchEvent(new Event("input", { bubbles: true }));
+            preferredField.scrollIntoView({ block: "center", behavior: "smooth" });
+            preferredField.focus();
+          });
+          row.append(suggestion);
+        }
       }
       qualityList.append(row);
     };

@@ -430,6 +430,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("段階を順番に描画");
     expect(DASHBOARD_SCRIPT).toContain("advanceQualitySweep");
     expect(DASHBOARD_SCRIPT).toContain("Number(data.step) !== sweepStep");
+    expect(DASHBOARD_SCRIPT).toContain("推奨色を入力");
+    expect(DASHBOARD_SCRIPT).toContain('item.id === "flow:sidebar" ? "muted" : "foreground"');
     expect(detailHtml).toContain("data-quality-sweep-cancel");
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:set-position");
     expect(detailHtml).toContain("data-copy-public");
