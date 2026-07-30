@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@65";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@66";
 
 function escapeHtml(value: string): string {
   return value
@@ -1356,11 +1356,31 @@ export function renderPresentationHtml(
       }
       return lowest;
     };
+    const collectNarrationClamp = (slideElement) => {
+      const region = slideElement.querySelector('.narration[data-active="true"]:not([data-display="inline"])');
+      const text = region?.querySelector('.narration-text');
+      const track = region?.querySelector('.narration-track');
+      if (!(text instanceof HTMLElement) || !(track instanceof HTMLElement) || !text.textContent?.trim()) return null;
+      const range = document.createRange();
+      range.selectNodeContents(text);
+      const boundary = track.getBoundingClientRect();
+      const rects = [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0);
+      range.detach();
+      const hidden = rects.filter((rect) => rect.bottom > boundary.bottom + 1 || rect.top < boundary.top - 1);
+      if (hidden.length === 0) return null;
+      return {
+        id: 'narration',
+        region: '読み上げ枠',
+        hidden_lines: hidden.length,
+        overflow_y: Math.max(...hidden.map((rect) => rect.bottom - boundary.bottom), 0)
+      };
+    };
     const fitAndReport = () => {
       const currentSlide = slides[slide];
       const diagnostics = [];
       const fits = [];
       const contrasts = [];
+      const clamps = [];
       currentSlide.querySelectorAll('[data-fit-content]').forEach((target) => {
         if (!(target instanceof HTMLElement) || target.hidden || target.offsetParent === null) return;
         target.style.setProperty('--fit-scale', '1');
@@ -1380,7 +1400,9 @@ export function renderPresentationHtml(
         const contrast = collectContrast(target, currentSlide);
         if (contrast) contrasts.push({ id: target.dataset.fitId || '', region: target.dataset.fitRegion || '', ratio: Number(contrast.ratio.toFixed(2)), required: contrast.required, estimated: contrast.estimated, suggested_foreground: contrast.suggested_foreground });
       });
-      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts }, location.origin);
+      const narrationClamp = collectNarrationClamp(currentSlide);
+      if (narrationClamp) clamps.push(narrationClamp);
+      if (editorFrame && parent !== window) parent.postMessage({ type: 'ultimate-freestyle:render-diagnostics', slide_id: DECK.slides[slide].id, step, overflows: diagnostics, fits, contrasts, clamps }, location.origin);
     };
     const scheduleFit = () => { cancelAnimationFrame(fitFrame); fitFrame = requestAnimationFrame(() => requestAnimationFrame(fitAndReport)); };
     const appendDraftInline = (target, text) => {

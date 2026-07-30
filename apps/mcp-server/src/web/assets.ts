@@ -241,11 +241,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const contrasts = Array.isArray(data.contrasts)
         ? data.contrasts.filter((item) => Number.isFinite(item?.ratio) && Number.isFinite(item?.required) && item.ratio < item.required)
         : [];
-      if (overflows.length || compressed.length || contrasts.length) {
+      const clamps = Array.isArray(data.clamps)
+        ? data.clamps.filter((item) => Number.isFinite(item?.hidden_lines) && item.hidden_lines > 0)
+        : [];
+      if (overflows.length || compressed.length || contrasts.length || clamps.length) {
         const details = [
           overflows.length ? "見切れ" + overflows.length + "か所" : "",
           compressed.length ? "70%未満の縮小" + compressed.length + "か所" : "",
-          contrasts.length ? "文字コントラスト不足" + contrasts.length + "か所" : ""
+          contrasts.length ? "文字コントラスト不足" + contrasts.length + "か所" : "",
+          clamps.length ? "読み上げ文の省略" + clamps.length + "か所" : ""
         ].filter(Boolean).join("、");
         currentSlideFindings.push("STEP " + sweepStep + ": " + details);
       }
@@ -1879,6 +1883,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const contrasts = Array.isArray(data.contrasts)
         ? data.contrasts.filter((item) => item && typeof item.id === "string" && typeof item.region === "string" && Number.isFinite(item.ratio) && Number.isFinite(item.required) && item.ratio < item.required)
         : [];
+      const clamps = Array.isArray(data.clamps)
+        ? data.clamps.filter((item) => item && typeof item.id === "string" && Number.isFinite(item.hidden_lines) && item.hidden_lines > 0)
+        : [];
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = overflows.length
           ? overflows.length + "か所で文字が収まりません。品質確認から対象を確認してください。"
@@ -1886,8 +1893,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             ? compressed.length + "か所の文字を70%未満まで縮小しています。組版か文章量を見直してください。"
           : contrasts.length
             ? contrasts.length + "か所で文字と背景のコントラストが不足しています。配色を見直してください。"
+          : clamps.length
+            ? "読み上げ枠で文章の一部が省略されています。枠の大きさ・文字倍率・最大行数を見直してください。"
           : "このSTEPの文字は" + (slideFrame.dataset.aspectRatio || "16:9") + "の枠内に収まっています。";
-        layoutStatus.dataset.level = overflows.length || compressed.length || contrasts.length ? "warning" : "ok";
+        layoutStatus.dataset.level = overflows.length || compressed.length || contrasts.length || clamps.length ? "warning" : "ok";
       }
       if (qualityList instanceof HTMLElement) {
         qualityList.querySelectorAll("[data-layout-warning]").forEach((item) => item.remove());
@@ -1900,10 +1909,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         for (const item of contrasts) {
           appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1" + (item.estimated ? "（背景模様を除く概算）" : "") + "です（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
         }
+        for (const item of clamps) {
+          appendDiagnostic(item, "読み上げ枠で約" + item.hidden_lines + "行が省略されています。最大行数、文字倍率、枠の大きさを調整してください。");
+        }
       }
       if (qualitySummary instanceof HTMLElement) {
         const baseCount = Number(qualitySummary.dataset.baseCount || 0);
-        const total = baseCount + overflows.length + compressed.length + contrasts.length;
+        const total = baseCount + overflows.length + compressed.length + contrasts.length + clamps.length;
         qualitySummary.dataset.level = total ? "warning" : "ok";
         qualitySummary.textContent = overflows.length
           ? total + "件の確認事項があります（うち見切れ" + overflows.length + "件）。"
@@ -1911,6 +1923,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             ? total + "件の確認事項があります（うち過剰な自動縮小" + compressed.length + "件）。"
           : contrasts.length
             ? total + "件の確認事項があります（うち文字コントラスト不足" + contrasts.length + "件）。"
+          : clamps.length
+            ? total + "件の確認事項があります（うち読み上げ文の省略" + clamps.length + "件）。"
           : baseCount
             ? baseCount + "件の確認事項があります。"
             : "保存データ上の確認事項はありません。";

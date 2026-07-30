@@ -172,7 +172,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-reveal="1"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@65");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@66");
     expect(html).toContain('<meta property="og:site_name" content="最自由研究">');
     expect(html).toContain('<meta name="twitter:card" content="summary">');
     expect(html).toContain('id="fullscreen"');
@@ -714,6 +714,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("target.focus({ preventScroll: true })");
     expect(html).toContain("ultimate-freestyle:set-editor-options");
     expect(html).toContain("background-size: 5% 5%");
+    expect(html).toContain("const collectNarrationClamp =");
+    expect(html).toContain("hidden_lines: hidden.length");
+    expect(html).toContain("overflows: diagnostics, fits, contrasts, clamps");
     expect(html).toContain('data-editor-selected="true"');
     expect(html).not.toContain(">fallback<");
 

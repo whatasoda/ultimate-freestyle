@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=91"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=92"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -739,6 +739,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("form.dataset.component = JSON.stringify");
     expect(dashboardScriptText).toContain("data-slide-create");
     expect(dashboardScriptText).toContain("data-composition-create");
+    expect(dashboardScriptText).toContain("読み上げ文の省略");
+    expect(dashboardScriptText).toContain("data.clamps");
     expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain("data-scene-component-create");
     expect(dashboardScriptText).toContain("data-scene-item-action");
