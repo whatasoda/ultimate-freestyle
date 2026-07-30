@@ -463,6 +463,7 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("templates[templateId]?.template_name");
     expect(DASHBOARD_SCRIPT).toContain("result.affected_slides.total");
     expect(DASHBOARD_SCRIPT).toContain("appearanceEditor.dataset.previewTemplates = JSON.stringify(templates)");
+    expect(DASHBOARD_SCRIPT).toContain('templates[""] = previewTemplate(result.default_template)');
     expect(DASHBOARD_SCRIPT).toContain("activeFilmstrip.dataset.roleLabel = nextRole");
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
@@ -1544,6 +1545,13 @@ describe("Web dashboard", () => {
         enter_animation: "slide-left"
       },
       default_template_id: "lab",
+      default_template: {
+        id: "lab",
+        visual_preset: "editorial",
+        body_font: "mincho",
+        region_layout: "sidebar-left"
+      },
+      deck_layout: "minimal",
       affected_slides: { direct: 1, inherited: 0, total: 1 },
       version: 5
     });

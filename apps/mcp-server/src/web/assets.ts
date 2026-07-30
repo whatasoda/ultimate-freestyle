@@ -988,14 +988,39 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (appearanceEditor instanceof HTMLFormElement) {
         let templates = {};
         try { templates = JSON.parse(appearanceEditor.dataset.previewTemplates || "{}"); } catch {}
-        templates[templateId] = {
-          ...(templates[templateId] || {}),
-          template_name: templateName,
-          enter_animation: result.template.enter_animation
+        const previewTemplate = (template) => template ? {
+          template_name: template.name,
+          template_id: template.id,
+          user_template: true,
+          region_layout: template.region_layout,
+          visual_preset: template.visual_preset,
+          body_font: template.body_font,
+          heading_font: template.heading_font,
+          density: template.density,
+          motion_style: template.motion_style,
+          enter_animation: template.enter_animation
+        } : {
+          template_name: "組み込み",
+          template_id: "builtin-" + String(result.deck_layout || "cinematic"),
+          user_template: false,
+          region_layout: "sidebar-right",
+          visual_preset: result.deck_layout === "minimal" ? "paper" : "studio",
+          body_font: "system-sans",
+          heading_font: "system-sans",
+          density: "comfortable",
+          motion_style: "calm",
+          enter_animation: "fade"
         };
+        templates[templateId] = previewTemplate(result.template);
+        templates[""] = previewTemplate(result.default_template);
         appearanceEditor.dataset.previewTemplates = JSON.stringify(templates);
       }
       setSettingValue("template", templateName);
+      setSettingValue("palette", selectedOptionLabel(form, "visual_preset"));
+      setSettingValue("fonts", selectedOptionLabel(form, "body_font") + " / " + selectedOptionLabel(form, "heading_font"));
+      setSettingValue("region", selectedOptionLabel(form, "region_layout"));
+      setSettingValue("density", selectedOptionLabel(form, "density"));
+      setSettingValue("motion", selectedOptionLabel(form, "motion_style"));
       const impact = form.querySelector("[data-template-impact]");
       if (impact instanceof HTMLElement && result.affected_slides) {
         impact.textContent = "保存すると現在" + result.affected_slides.total + "枚へ反映されます（直接指定 " + result.affected_slides.direct + "枚・既定を継承 " + result.affected_slides.inherited + "枚）。";

@@ -2900,6 +2900,8 @@ async function handleTemplateFieldsUpdate(
       template_id: templateId,
       template,
       default_template_id: deck.default_template_id ?? null,
+      default_template: deck.templates?.find((item) => item.id === deck.default_template_id) ?? null,
+      deck_layout: deck.layout,
       affected_slides: {
         direct: directSlideCount,
         inherited: inheritedSlideCount,

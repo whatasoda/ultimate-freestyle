@@ -2315,8 +2315,11 @@ export function slideWorkspacePage(options: {
     <span class="setting-chip"><small>レイアウト</small>${deckLayoutLabel}</span>
     <span class="setting-chip" data-workspace-duration data-total-duration="${workspaceTotalDurationSeconds}" data-slide-duration="${slide.duration_seconds}" data-state="${workspaceTotalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? "warning" : "ok"}" role="status"><small>全体時間</small><span data-workspace-duration-label>${formatDuration(workspaceTotalDurationSeconds)}${workspaceTotalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</span></span>
     <span class="setting-chip"><small>テンプレート</small><span data-setting-value="template">${escapeHtml(activeTemplate?.name ?? "組み込み")}</span></span>
-    <span class="setting-chip"><small>配色</small>${VISUAL_LABELS[visualPreset]}</span>
-    <span class="setting-chip"><small>フォント</small>${FONT_LABELS[bodyFont]} / ${FONT_LABELS[headingFont]}</span>
+    <span class="setting-chip"><small>配色</small><span data-setting-value="palette">${VISUAL_LABELS[visualPreset]}</span></span>
+    <span class="setting-chip"><small>フォント</small><span data-setting-value="fonts">${FONT_LABELS[bodyFont]} / ${FONT_LABELS[headingFont]}</span></span>
+    <span class="setting-chip"><small>領域</small><span data-setting-value="region">${({ single: "単一", "sidebar-right": "右補足", "sidebar-left": "左補足", "lower-third": "下段補足", split: "左右均等", "top-band": "上段補足", focus: "中央集中" } as const)[activeTemplate?.region_layout ?? "sidebar-right"]}</span></span>
+    <span class="setting-chip"><small>密度</small><span data-setting-value="density">${DENSITY_LABELS[density]}</span></span>
+    <span class="setting-chip"><small>動き</small><span data-setting-value="motion">${MOTION_LABELS[motion]}</span></span>
     <span class="setting-chip"><small>組版</small><span data-setting-value="typography">${SLIDE_TYPOGRAPHY_LABELS[typography.preset]} · ${typography.columns}段</span></span>
     <span class="setting-chip"><small>色調</small><span data-setting-value="tone">${TONE_LABELS[slide.tone]}</span></span>
     <span class="setting-chip"><small>アニメーション</small><span data-setting-value="animation">${ANIMATION_LABELS[effectiveEnter]}</span></span>
