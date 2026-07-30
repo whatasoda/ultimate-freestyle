@@ -361,6 +361,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const contentCapacityField = slideEditor instanceof HTMLFormElement ? slideEditor.elements.namedItem("content_markdown") : null;
   let currentPreviewTypography = {};
   try { currentPreviewTypography = JSON.parse(typographyEditor?.dataset.effectiveTypography || "{}"); } catch {}
+  const updateContentStructure = () => {
+    if (!(contentCapacityField instanceof HTMLTextAreaElement)) return;
+    const structure = document.querySelector("[data-content-structure]");
+    if (!(structure instanceof HTMLElement)) return;
+    const text = contentCapacityField.value;
+    const lines = text.split(/\r?\n/);
+    const headings = lines.filter((line) => /^\s*#{1,6}\s+\S/.test(line)).length;
+    const lists = lines.filter((line) => /^\s*(?:[-*+] |\d+\. )\S/.test(line)).length;
+    const paragraphs = text.split(/\n\s*\n/).filter((block) => {
+      const value = block.trim();
+      return value && !/^(?:#{1,6}\s|[-*+]\s|\d+\.\s)/.test(value);
+    }).length;
+    const spokenCharacters = text.replace(/[#*_>\x60|\[\]()!-]/g, "").replace(/\s/g, "").length;
+    const readingSeconds = Math.max(0, Math.ceil(spokenCharacters / 6));
+    const readingLabel = readingSeconds < 60 ? "約" + readingSeconds + "秒" : "約" + Math.floor(readingSeconds / 60) + "分" + String(readingSeconds % 60).padStart(2, "0") + "秒";
+    for (const [name, value] of [["headings", "見出し " + headings], ["paragraphs", "段落 " + paragraphs], ["lists", "箇条書き " + lists], ["reading", "音読 " + readingLabel]]) {
+      const target = structure.querySelector('[data-content-stat="' + name + '"]');
+      if (target instanceof HTMLElement) target.textContent = value;
+    }
+    const readingLayout = structure.querySelector("[data-reading-layout]");
+    const preset = String(currentPreviewTypography.preset || "standard");
+    if (readingLayout instanceof HTMLButtonElement) readingLayout.hidden = text.length < 320 || ["article", "columns", "dense"].includes(preset);
+  };
   const updateCharacterCounter = (field, counter) => {
     const recommended = Number(field.dataset.recommendedLimit || 0);
     counter.textContent = recommended > 0
@@ -383,6 +406,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     contentCapacityField.dataset.recommendedLimit = String(limit);
     const counter = contentCapacityField.nextElementSibling;
     if (counter instanceof HTMLElement && counter.classList.contains("character-count")) updateCharacterCounter(contentCapacityField, counter);
+    updateContentStructure();
   };
   let draftFrameTimer;
   let draftTypographyTimer;
@@ -440,6 +464,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       };
       durationInput.addEventListener("input", updateDurationStatus);
     }
+  }
+  const readingLayout = document.querySelector("[data-reading-layout]");
+  if (readingLayout instanceof HTMLButtonElement && typographyEditor instanceof HTMLFormElement) {
+    readingLayout.addEventListener("click", () => {
+      const preset = typographyEditor.elements.namedItem("preset");
+      if (!(preset instanceof HTMLSelectElement)) return;
+      const section = typographyEditor.closest("details.inspector-section");
+      if (section instanceof HTMLDetailsElement) section.open = true;
+      preset.value = "article";
+      preset.dispatchEvent(new Event("input", { bubbles: true }));
+      typographyEditor.scrollIntoView({ block: "center", behavior: "smooth" });
+      preset.focus({ preventScroll: true });
+    });
   }
   const syncTypographyDraft = () => {
     if (!(typographyEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;

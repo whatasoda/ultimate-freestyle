@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=70"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=71"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -555,6 +555,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("data-component-color-hex");
     expect(workspaceHtml).toContain("自由配置 1パーツ");
     expect(workspaceHtml).toContain("data-slide-frame");
+    expect(workspaceHtml).toContain("data-content-structure");
+    expect(workspaceHtml).toContain("「読み物」組版を試す");
     expect(workspaceHtml).toContain('data-aspect-ratio="16:9"');
     expect(workspaceHtml).toContain("表紙レイアウト");
     expect(workspaceHtml).toContain("左右均等");
@@ -704,6 +706,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("button.dataset.effectiveTuning");
     expect(dashboardScriptText).toContain("workspace-inspector");
     expect(dashboardScriptText).toContain("data-scene-component-editor");
+    expect(dashboardScriptText).toContain("updateContentStructure");
+    expect(dashboardScriptText).toContain("spokenCharacters / 6");
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
     expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
