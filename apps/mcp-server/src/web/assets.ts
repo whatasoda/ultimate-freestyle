@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "161";
+export const DASHBOARD_ASSET_VERSION = "162";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
@@ -4201,6 +4201,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
 
   const reviewPage = document.querySelector("[data-review-page]");
   if (reviewPage instanceof HTMLElement) {
+    const navigation = performance.getEntriesByType("navigation")[0];
+    if (!location.hash && navigation instanceof PerformanceNavigationTiming && navigation.type === "navigate") {
+      requestAnimationFrame(() => scrollTo({ top: 0, behavior: "auto" }));
+    }
     const composer = reviewPage.querySelector("[data-review-composer]");
     const selectionLabel = reviewPage.querySelector("[data-review-selection]");
     const feedback = reviewPage.querySelector("[data-review-feedback]");
