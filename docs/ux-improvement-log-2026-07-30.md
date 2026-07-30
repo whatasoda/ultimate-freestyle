@@ -1388,3 +1388,9 @@
 - モバイル用ワークスペースタブはデスクトップで非表示でも、一覧・preview・編集欄へ`tabpanel`と不可視タブの`aria-labelledby`が残った。filmstripのnavigationやsection／aside本来の意味を上書きしていた。
 - SSRでは3領域を通常のnav／section／asideとして出し、48rem以下でタブ初期化に成功した時だけ`tabpanel`と対応タブのlabelを付ける。幅を戻した場合はARIA属性を除去し、表示内容は変えない。
 - 初期HTMLに不要なtabpanelがないことと、media changeで付与・除去するscript契約を追加した。dashboard assetを`v149`へ更新した。
+
+## 改善ループ368
+
+- モバイルの編集項目は一節だけを開くtab動作になったが、各`details`は対応tabのlabelを持たず、tablistとpanelの関係が支援技術へ伝わらなかった。
+- 5つのtabへ安定IDを付け、モバイル幅では各編集節を`tabpanel`にして対応IDを`aria-labelledby`へ設定する。デスクトップへ戻したらroleとlabelを除き、通常の複数開閉`details`に戻す。
+- 内容tabのIDと動的label付与をWeb契約へ追加し、dashboard assetを`v150`へ更新した。

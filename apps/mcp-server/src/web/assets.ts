@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "149";
+export const DASHBOARD_ASSET_VERSION = "150";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (location.hash.length > 1) {
@@ -2304,6 +2304,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const mobileInspectorButtons = [...document.querySelectorAll("[data-inspector-pane]")];
   const mobileInspectorMedia = matchMedia("(max-width: 48rem)");
   if (mobileInspectorButtons.length > 0 && inspectorSections.length > 0) {
+    const syncMobileInspectorSemantics = () => {
+      for (const button of mobileInspectorButtons) {
+        if (!(button instanceof HTMLButtonElement)) continue;
+        const panelId = button.getAttribute("aria-controls");
+        const panel = panelId ? document.getElementById(panelId) : null;
+        if (!(panel instanceof HTMLElement)) continue;
+        if (mobileInspectorMedia.matches) {
+          panel.setAttribute("role", "tabpanel");
+          panel.setAttribute("aria-labelledby", button.id);
+        } else {
+          panel.removeAttribute("role");
+          panel.removeAttribute("aria-labelledby");
+        }
+      }
+    };
     const activeInspectorKey = "ultimate-freestyle:workspace-inspector-active";
     const selectInspectorPane = (name, focus = false, userInitiated = false) => {
       const target = inspectorSections.find((details) => details.dataset.inspectorSection === name);
@@ -2359,6 +2374,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
     }
     mobileInspectorMedia.addEventListener("change", (event) => {
+      syncMobileInspectorSemantics();
       if (event.matches) {
         selectInspectorPane(preferredInspector);
         return;
@@ -2369,6 +2385,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
     const mobileInspectorTabs = mobileInspectorButtons[0]?.closest(".mobile-inspector-tabs");
     if (mobileInspectorTabs instanceof HTMLElement) mobileInspectorTabs.hidden = false;
+    syncMobileInspectorSemantics();
   }
 
   const previewFocusButton = document.querySelector("[data-preview-focus]");
