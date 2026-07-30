@@ -182,7 +182,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@83");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@84");
     expect(html).toContain("container: presentation-space / size");
     expect(html).toContain("width: min(100cqw, calc(100cqh * var(--stage-width) / var(--stage-height)))");
     expect(html).toContain("let overflow = collectClippedOverflow(target)");
@@ -190,6 +190,9 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("data-heading-font=\"system-sans\"");
     expect(html).toContain("const fitPrelude = () =>");
     expect(html).toContain("prelude.dataset.fitScale = String(scale)");
+    expect(html).toContain(".slide-content > :is(h2,h3,h4,table,figure) { break-inside: avoid; }");
+    expect(html).toContain(".slide-content :is(p,li) { orphans: 2; widows: 2; }");
+    expect(html).not.toContain(".slide-content > * { break-inside: avoid; }");
     expect(html).toContain('"previewRevisionId":"50000000-0000-4000-8000-000000000005"');
     expect(html).toContain("ultimate-freestyle:preview-completed:");
     expect(html).toContain("reportPreviewCompletion();");

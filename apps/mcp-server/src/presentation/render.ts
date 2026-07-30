@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@83";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@84";
 
 function escapeHtml(value: string): string {
   return value
@@ -854,7 +854,8 @@ export function renderPresentationHtml(
     .slide-content { min-width: 0; column-gap: var(--slide-column-gap); column-fill: balance; }
     .slide-content[data-columns="2"] { column-count: 2; }
     .slide-content[data-columns="3"] { column-count: 3; }
-    .slide-content > * { break-inside: avoid; }
+    .slide-content > :is(h2,h3,h4,table,figure) { break-inside: avoid; }
+    .slide-content :is(p,li) { orphans: 2; widows: 2; }
     .slide-content h2, .slide-content h3, .slide-content h4 { margin: 0 0 .5em; break-after: avoid; font-family: var(--font-heading); line-height: 1.12; font-size: calc(4.4cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); font-weight: var(--heading-weight); overflow-wrap: anywhere; }
     .slide-content h3 { font-size: calc(3.1cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); }
     .slide-content h4 { font-size: calc(2.35cqw * var(--template-font-scale) * var(--slide-heading-scale) * var(--fit-scale)); }
