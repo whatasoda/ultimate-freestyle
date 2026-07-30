@@ -2218,17 +2218,12 @@ export function registerProjectMutationTools(
     {
       title: "読み上げを一件編集",
       description:
-        "指定stepの表示・読み上げ文を追加・置換します。textをnullにすると削除します。VOICEVOX profileと調声値も一件単位で指定できます。",
+        "指定stepの表示・読み上げ文だけを追加・置換します。textをnullにすると削除します。表示枠と音声設定は専用toolで更新します。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         at: z.number().int().nonnegative().max(100),
-        text: z.string().min(1).max(2_000).nullable(),
-        display: narrationDisplaySchema.optional(),
-        speaker: z.string().max(80).nullable().optional(),
-        voice_profile_id:
-          narrationSegmentSchema.shape.voice_profile_id.optional(),
-        voice_tuning: narrationSegmentSchema.shape.voice_tuning.optional()
+        text: z.string().min(1).max(2_000).nullable()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -2238,21 +2233,20 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, at, text, display, speaker, ...voice }) =>
+    async ({ project_id, expected_version, slide_id, at, text }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
         changedKind: "slide_narration_updated",
         changedId: `${slide_id}:${at}`,
         mutate: (document) => {
+          const deck = requireDeck(document);
           const slide = findSlide(document, slide_id);
           slide.narration ??= {
-            display: display ?? "commentary",
-            speaker: speaker ?? null,
+            display: deck.narration_defaults?.display ?? "commentary",
+            speaker: deck.narration_defaults?.speaker ?? null,
             segments: []
           };
-          if (display !== undefined) slide.narration.display = display;
-          if (speaker !== undefined) slide.narration.speaker = speaker;
           const index = slide.narration.segments.findIndex(
             (segment) => segment.at === at
           );
@@ -2261,22 +2255,13 @@ export function registerProjectMutationTools(
           } else {
             const previous = index === -1 ? null : slide.narration.segments[index];
             const segment = narrationSegmentSchema.parse({
+              ...(previous ?? {}),
               at,
               text,
               audio_src:
-                previous?.text === text &&
-                voice.voice_profile_id === undefined &&
-                voice.voice_tuning === undefined
+                previous?.text === text
                   ? (previous?.audio_src ?? null)
-                  : null,
-              voice_profile_id:
-                voice.voice_profile_id === undefined
-                  ? previous?.voice_profile_id
-                  : voice.voice_profile_id,
-              voice_tuning:
-                voice.voice_tuning === undefined
-                  ? previous?.voice_tuning
-                  : voice.voice_tuning
+                  : null
             });
             if (index === -1) slide.narration.segments.push(segment);
             else slide.narration.segments[index] = segment;

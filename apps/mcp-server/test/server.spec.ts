@@ -107,6 +107,12 @@ describe("MCP contract", () => {
       expect(
         (narrationTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("audio_src");
+      expect(
+        (narrationTool?.inputSchema as { properties?: object }).properties
+      ).not.toHaveProperty("display");
+      expect(
+        (narrationTool?.inputSchema as { properties?: object }).properties
+      ).not.toHaveProperty("voice_tuning");
       expect(tools).toContainEqual(
         expect.objectContaining({
           name: "delete_project_image",
@@ -596,8 +602,7 @@ describe("MCP contract", () => {
           expected_version: 7,
           slide_id: "question",
           at: 0,
-          text: "まず研究の問いを説明します。",
-          display: "commentary"
+          text: "まず研究の問いを説明します。"
         }
       });
       expect(narration.structuredContent).toMatchObject({ ok: true, version: 8 });
@@ -1196,12 +1201,26 @@ describe("MCP contract", () => {
         ok: true,
         version: 11
       });
+      const revisedNarration = await client.callTool({
+        name: "set_slide_narration",
+        arguments: {
+          project_id: projectId,
+          expected_version: 11,
+          slide_id: "intro",
+          at: 0,
+          text: "研究のきっかけから始めます。"
+        }
+      });
+      expect(revisedNarration.structuredContent).toMatchObject({
+        ok: true,
+        version: 12
+      });
 
       await client.callTool({
         name: "configure_deck",
         arguments: {
           project_id: projectId,
-          expected_version: 11,
+          expected_version: 12,
           aspect_ratio: "4:3",
           loading_screen: {
             style: "research-log",
@@ -1214,7 +1233,7 @@ describe("MCP contract", () => {
         name: "update_slide_fields",
         arguments: {
           project_id: projectId,
-          expected_version: 12,
+          expected_version: 13,
           slide_id: "intro",
           role: "cover",
           cover_layout: "statement",
@@ -1225,7 +1244,7 @@ describe("MCP contract", () => {
         name: "update_presentation_template_fields",
         arguments: {
           project_id: projectId,
-          expected_version: 13,
+          expected_version: 14,
           template_id: "research-paper",
           updates: [
             { field: "region_layout", value: "split" },
@@ -1236,7 +1255,7 @@ describe("MCP contract", () => {
       });
       expect(expandedTemplate.structuredContent).toMatchObject({
         ok: true,
-        version: 14
+        version: 15
       });
 
       const voiceStatus = await client.callTool({
@@ -1246,7 +1265,7 @@ describe("MCP contract", () => {
       expect(voiceStatus.structuredContent).toMatchObject({
         ok: true,
         voice: {
-          version: 14,
+          version: 15,
           configured: true,
           default_profile: {
             tuning: { speedScale: 1.1, intonationScale: 1.2 }
@@ -1270,7 +1289,7 @@ describe("MCP contract", () => {
         name: "generate_voice_audio",
         arguments: {
           project_id: projectId,
-          expected_version: 14,
+          expected_version: 15,
           idempotency_key: "72000000-0000-4000-8000-000000000007"
         }
       });
@@ -1287,7 +1306,7 @@ describe("MCP contract", () => {
       expect(result).toMatchObject({
         ok: true,
         project: {
-          version: 14,
+          version: 15,
           document: {
             deck: {
               default_template_id: "research-paper",
@@ -1326,6 +1345,7 @@ describe("MCP contract", () => {
                     segments: [
                       {
                         at: 0,
+                        text: "研究のきっかけから始めます。",
                         speaker: "ずんだもん",
                         voice_profile_id: "guide-voice",
                         voice_tuning: { pitchScale: -0.02 },

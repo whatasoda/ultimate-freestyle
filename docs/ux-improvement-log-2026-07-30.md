@@ -632,3 +632,9 @@
 - MCPのtemplate更新toolは約24個のoptional fieldを毎回`tools/list`へ展開し、AIが数項目だけ変える場合にも契約全体が大きかった。
 - `updates`配列へfield/valueを最大8件だけ渡す契約へ置換し、tool数を増やさず入力schemaを縮小した。fieldごとの正本schemaはサーバー側registryで再利用し、無効な型・色・enumは`INVALID_FIELDS`で拒否する。
 - 同じfieldの重複指定も拒否し、配列後方の値で暗黙上書きされる曖昧さをなくした。競合、複数field更新、拡張色・配置のcontract testを新契約へ移行した。
+
+## 改善ループ242
+
+- `set_slide_narration`が原稿だけでなく表示方式、共通話者、VOICEVOX profile、調声値を重複して受け、原稿修正時に音声設定まで誤って送り直せる契約を縮小した。
+- 原稿toolはslide、STEP、textだけに限定し、表示枠は`configure_slide_narration`、区間音声は`update_slide_narration_voice`へ一本化した。新規原稿では発表全体の既定表示・話者を継承する。
+- 既存区間の原稿を直したときは話者、profile、調声値を保持し、本文が変わった場合だけ生成済み音声を無効化する。調声後の原稿修正でも設定が残ることをcontract testで検証した。
