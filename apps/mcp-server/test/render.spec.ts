@@ -798,7 +798,7 @@ describe("presentation artifact renderer", () => {
     }).text();
     expect(workspaceHtml).toContain('class="component-outline-row"');
     expect(workspaceHtml).toContain('class="filmstrip-meta"');
-    expect(workspaceHtml).toContain("60秒 · 3段階 · リッチ構成 6パーツ");
+    expect(workspaceHtml).toContain('data-filmstrip-duration>60秒</span> · 3段階 · リッチ構成 6パーツ');
     expect(workspaceHtml).toContain("data-scene-component-editor");
     expect(workspaceHtml).toContain("data-slide-create");
     expect(workspaceHtml).toContain('<option value="canvas">自由配置</option>');
@@ -857,6 +857,10 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-recommended-limit=");
     expect(workspaceHtml).toContain("代替の補足情報");
     expect(workspaceHtml).toContain("data-preview-focus");
+    expect(workspaceHtml).toContain("data-current-slide-title");
+    expect(workspaceHtml).toContain("data-filmstrip-title");
+    expect(workspaceHtml).toContain("data-filmstrip-duration");
+    expect(workspaceHtml).toContain('data-setting-value="typography"');
     expect(workspaceHtml).toContain("プレビューを広げる");
     expect(workspaceHtml).toContain("別画面で開く");
     expect(workspaceHtml).toContain("標準（短文・箇条書き）");

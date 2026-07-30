@@ -241,7 +241,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=110";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=111";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -1850,7 +1850,7 @@ export function slideWorkspacePage(options: {
           ? "原稿なし"
           : `音声 ${readyVoiceSegments}/${narrationSegments.length}`;
         const searchText = `${item.title} ${item.role === "cover" ? "表紙" : "通常"} ${slideCompositionLabel(item)} ${voiceStatus}`.toLocaleLowerCase("ja");
-        return `<a class="filmstrip-link" data-filmstrip-slide data-search-text="${escapeHtml(searchText)}" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(item.title)}${item.role === "cover" ? '<small class="stage">表紙</small>' : ""}<small class="filmstrip-meta">${item.duration_seconds}秒 · ${item.reveal_steps + 1}段階 · ${escapeHtml(slideCompositionLabel(item))}<br>${voiceStatus}</small></strong></a>`;
+        return `<a class="filmstrip-link" data-filmstrip-slide data-search-text="${escapeHtml(searchText)}" data-slide-title="${escapeHtml(item.title.toLocaleLowerCase("ja"))}" data-active="${String(index === slideIndex)}"${index === slideIndex ? ' aria-current="page"' : ""} href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(item.id)}"><span>${String(index + 1).padStart(2, "0")}</span><strong><span data-filmstrip-title>${escapeHtml(item.title)}</span>${item.role === "cover" ? '<small class="stage" data-filmstrip-role>表紙</small>' : ""}<small class="filmstrip-meta"><span data-filmstrip-duration>${item.duration_seconds}秒</span> · ${item.reveal_steps + 1}段階 · ${escapeHtml(slideCompositionLabel(item))}<br>${voiceStatus}</small></strong></a>`;
       }
     )
     .join("");
@@ -2176,13 +2176,13 @@ export function slideWorkspacePage(options: {
   const effectiveSummary = `<div class="setting-summary" aria-label="現在有効な設定">
     <span class="setting-chip"><small>レイアウト</small>${deckLayoutLabel}</span>
     <span class="setting-chip" data-workspace-duration data-total-duration="${workspaceTotalDurationSeconds}" data-slide-duration="${slide.duration_seconds}" data-state="${workspaceTotalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? "warning" : "ok"}" role="status"><small>全体時間</small><span data-workspace-duration-label>${formatDuration(workspaceTotalDurationSeconds)}${workspaceTotalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</span></span>
-    <span class="setting-chip"><small>テンプレート</small>${escapeHtml(activeTemplate?.name ?? "組み込み")}</span>
+    <span class="setting-chip"><small>テンプレート</small><span data-setting-value="template">${escapeHtml(activeTemplate?.name ?? "組み込み")}</span></span>
     <span class="setting-chip"><small>配色</small>${VISUAL_LABELS[visualPreset]}</span>
     <span class="setting-chip"><small>フォント</small>${FONT_LABELS[bodyFont]} / ${FONT_LABELS[headingFont]}</span>
-    <span class="setting-chip"><small>組版</small>${SLIDE_TYPOGRAPHY_LABELS[typography.preset]} · ${typography.columns}段</span>
-    <span class="setting-chip"><small>色調</small>${TONE_LABELS[slide.tone]}</span>
-    <span class="setting-chip"><small>アニメーション</small>${ANIMATION_LABELS[effectiveEnter]}</span>
-    <span class="setting-chip"><small>読み上げ</small>${NARRATION_DISPLAY_LABELS[narrationDisplay]}</span>
+    <span class="setting-chip"><small>組版</small><span data-setting-value="typography">${SLIDE_TYPOGRAPHY_LABELS[typography.preset]} · ${typography.columns}段</span></span>
+    <span class="setting-chip"><small>色調</small><span data-setting-value="tone">${TONE_LABELS[slide.tone]}</span></span>
+    <span class="setting-chip"><small>アニメーション</small><span data-setting-value="animation">${ANIMATION_LABELS[effectiveEnter]}</span></span>
+    <span class="setting-chip"><small>読み上げ</small><span data-setting-value="narration">${NARRATION_DISPLAY_LABELS[narrationDisplay]}</span></span>
     <span class="setting-chip"><small>音声</small>${escapeHtml(defaultProfile?.label ?? "ブラウザ音声")}</span>
   </div>`;
   return new Response(
@@ -2191,7 +2191,7 @@ export function slideWorkspacePage(options: {
       `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main class="workspace-main">
          <a class="back" href="/dashboard/projects/${escapeHtml(options.project.project_id)}">← 研究詳細へ戻る</a>
-         <div class="workspace-head"><div><p class="eyebrow">スライド編集 · ${slideIndex + 1} / ${deck.slides.length}</p><h1>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a><div class="slide-actions" role="group" aria-label="スライド構成の操作"><button class="ghost" type="button" data-slide-action="move" data-position="${Math.max(0, slideIndex - 1)}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-slide-action="move" data-position="${slideIndex + 1}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === deck.slides.length - 1 ? " disabled" : ""}>↓ 後へ</button><button class="ghost" type="button" data-slide-action="duplicate" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}">複製</button><button class="ghost danger" type="button" data-slide-action="delete" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${deck.slides.length === 1 ? " disabled" : ""}>削除</button></div><span class="feedback" data-slide-action-feedback aria-live="polite"></span></div></div>
+         <div class="workspace-head"><div><p class="eyebrow">スライド編集 · ${slideIndex + 1} / ${deck.slides.length}</p><h1 data-current-slide-title>${escapeHtml(slide.title)}</h1></div><div class="workspace-version"><span class="save-state" data-save-state data-state="saved" role="status" aria-live="polite">保存済み</span><span data-workspace-version>v${options.project.version}</span>${previousSlideLink}${nextSlideLink}<button class="ghost" type="button" data-preview-focus aria-pressed="false">プレビューを広げる</button><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=0" target="_blank" rel="noopener">別画面で開く</a><div class="slide-actions" role="group" aria-label="スライド構成の操作"><button class="ghost" type="button" data-slide-action="move" data-position="${Math.max(0, slideIndex - 1)}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-slide-action="move" data-position="${slideIndex + 1}" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${slideIndex === deck.slides.length - 1 ? " disabled" : ""}>↓ 後へ</button><button class="ghost" type="button" data-slide-action="duplicate" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}">複製</button><button class="ghost danger" type="button" data-slide-action="delete" data-action-url="${slideActionPath}" data-csrf="${escapeHtml(options.csrfToken)}"${deck.slides.length === 1 ? " disabled" : ""}>削除</button></div><span class="feedback" data-slide-action-feedback aria-live="polite"></span></div></div>
          ${effectiveSummary}
          <nav class="mobile-workspace-tabs" role="tablist" aria-label="モバイル編集表示"><button class="ghost" id="mobile-tab-preview" type="button" role="tab" data-mobile-pane="preview" aria-selected="true" aria-controls="workspace-preview-pane">プレビュー<span class="tab-badge" data-mobile-preview-badge hidden>未確認</span></button><button class="ghost" id="mobile-tab-edit" type="button" role="tab" data-mobile-pane="edit" aria-selected="false" aria-controls="workspace-edit-pane" tabindex="-1">編集</button><button class="ghost" id="mobile-tab-slides" type="button" role="tab" data-mobile-pane="slides" aria-selected="false" aria-controls="workspace-slides-pane" tabindex="-1">スライド一覧</button></nav>
          <div class="slide-workspace">

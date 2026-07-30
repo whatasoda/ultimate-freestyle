@@ -888,6 +888,81 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     return body;
   };
   const versionedForms = [...document.querySelectorAll("[data-versioned-form]")];
+  const selectedOptionLabel = (form, name) => {
+    const field = form.elements.namedItem(name);
+    return field instanceof HTMLSelectElement ? field.selectedOptions[0]?.textContent?.trim() || "" : "";
+  };
+  const setSettingValue = (name, value) => {
+    const target = document.querySelector('[data-setting-value="' + name + '"]');
+    if (target instanceof HTMLElement && value) target.textContent = value;
+  };
+  const syncSavedWorkspaceMetadata = (form) => {
+    const activeFilmstrip = document.querySelector('.filmstrip-link[data-active="true"]');
+    if (form.matches("[data-slide-editor]")) {
+      const titleField = form.elements.namedItem("title");
+      const durationField = form.elements.namedItem("duration_seconds");
+      if (titleField instanceof HTMLInputElement) {
+        const title = titleField.value.trim();
+        const heading = document.querySelector("[data-current-slide-title]");
+        const filmstripTitle = activeFilmstrip?.querySelector("[data-filmstrip-title]");
+        if (heading instanceof HTMLElement) heading.textContent = title;
+        if (filmstripTitle instanceof HTMLElement) filmstripTitle.textContent = title;
+        if (slideFrame instanceof HTMLIFrameElement) slideFrame.title = title + "の実表示";
+        document.title = title + " — スライド編集";
+        if (activeFilmstrip instanceof HTMLElement) {
+          const previous = activeFilmstrip.dataset.slideTitle || "";
+          const searchText = activeFilmstrip.dataset.searchText || "";
+          const next = title.toLocaleLowerCase("ja");
+          activeFilmstrip.dataset.searchText = searchText.startsWith(previous) ? next + searchText.slice(previous.length) : next + " " + searchText;
+          activeFilmstrip.dataset.slideTitle = next;
+        }
+      }
+      if (durationField instanceof HTMLInputElement) {
+        const duration = Number(durationField.value);
+        const filmstripDuration = activeFilmstrip?.querySelector("[data-filmstrip-duration]");
+        if (filmstripDuration instanceof HTMLElement && Number.isFinite(duration)) filmstripDuration.textContent = duration + "秒";
+        const durationStatus = document.querySelector("[data-workspace-duration]");
+        if (durationStatus instanceof HTMLElement && Number.isFinite(duration)) {
+          const previous = Number(durationStatus.dataset.slideDuration);
+          const total = Math.max(0, Number(durationStatus.dataset.totalDuration) - previous + duration);
+          durationStatus.dataset.slideDuration = String(duration);
+          durationStatus.dataset.totalDuration = String(total);
+        }
+      }
+    }
+    if (form.matches("[data-appearance-editor]")) {
+      const templateLabel = selectedOptionLabel(form, "template_id").replace(/ · 発表全体の既定$/, "");
+      setSettingValue("template", templateLabel === "発表全体の既定を使う" ? "発表全体の既定" : templateLabel);
+      setSettingValue("tone", selectedOptionLabel(form, "tone"));
+      let animationLabel = selectedOptionLabel(form, "enter_animation");
+      const animationField = form.elements.namedItem("enter_animation");
+      if (animationField instanceof HTMLSelectElement && animationField.value === "") {
+        let templates = {};
+        try { templates = JSON.parse(form.dataset.previewTemplates || "{}"); } catch {}
+        const templateField = form.elements.namedItem("template_id");
+        const templateId = templateField instanceof HTMLSelectElement ? templateField.value : "";
+        const effective = templates[templateId]?.enter_animation || templates[""]?.enter_animation;
+        const effectiveOption = [...animationField.options].find((option) => option.value === effective);
+        if (effectiveOption) animationLabel = effectiveOption.textContent + "（継承）";
+      }
+      setSettingValue("animation", animationLabel);
+      if (activeFilmstrip instanceof HTMLElement) {
+        const roleField = form.elements.namedItem("role");
+        const existing = activeFilmstrip.querySelector("[data-filmstrip-role]");
+        if (roleField instanceof HTMLSelectElement && roleField.value === "cover" && !(existing instanceof HTMLElement)) {
+          const badge = document.createElement("small");
+          badge.className = "stage";
+          badge.dataset.filmstripRole = "";
+          badge.textContent = "表紙";
+          activeFilmstrip.querySelector("[data-filmstrip-title]")?.insertAdjacentElement("afterend", badge);
+        } else if (roleField instanceof HTMLSelectElement && roleField.value !== "cover" && existing instanceof HTMLElement) existing.remove();
+      }
+    }
+    if (form.matches("[data-typography-editor]")) {
+      setSettingValue("typography", selectedOptionLabel(form, "preset") + " · " + Number(currentPreviewTypography.columns || 1) + "段");
+    }
+    if (form.matches("[data-narration-settings-editor]")) setSettingValue("narration", selectedOptionLabel(form, "display"));
+  };
   const postEditorSaveStatus = (form, message) => {
     if (!form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) return;
     const frame = document.querySelector("[data-slide-frame]");
@@ -967,6 +1042,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         form.dataset.dirty = "false";
         removeDraft();
         syncPageVersion(result.version);
+        syncSavedWorkspaceMetadata(form);
         if (form.matches("[data-scene-component-editor], [data-canvas-block-editor]")) {
           form.dataset.component = JSON.stringify(sceneComponentFromForm(form));
         }
