@@ -322,7 +322,7 @@ const DASHBOARD_STYLE = String.raw`
       .project-section-nav a { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 2.75rem; padding: .5rem .7rem; border-radius: .55rem; color: var(--muted); font-size: .78rem; font-weight: 760; text-decoration: none; white-space: nowrap; }
       .project-section-nav a:hover, .project-section-nav a:focus-visible { background: #ffffff12; color: var(--text); }
       .project-section-nav a[aria-current="location"] { background: #8062df40; color: #fff; }
-      #journey, #basic-information, #presentation-structure, #research-images, #voice-finishing, #publication { scroll-margin-top: 5rem; }
+      #journey, #basic-information, #presentation-screen, #rendered-quality, #presentation-structure, #research-images, #research-log, #research-list-findings, #research-list-limitations, [id^="research-item-"], #voice-finishing, #publication { scroll-margin-top: 5rem; }
       .section-head h1 { font-size: clamp(2rem, 5vw, 3.6rem); }
       .count { color: var(--muted); }
       .dashboard-tools { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1rem; }
