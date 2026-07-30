@@ -178,9 +178,13 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("const collectSmallText =");
     expect(html).toContain("clamps, readability");
     expect(html).toContain("const collectOcclusions =");
+    expect(html).toContain("document.createTreeWalker(candidate, NodeFilter.SHOW_TEXT)");
+    expect(html).toContain("document.elementsFromPoint(sample.x, sample.y)");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@78");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@80");
+    expect(html).toContain("let overflow = collectClippedOverflow(target)");
+    expect(html).not.toContain("target.scrollHeight - target.clientHeight");
     expect(html).toContain('"previewRevisionId":"50000000-0000-4000-8000-000000000005"');
     expect(html).toContain("ultimate-freestyle:preview-completed:");
     expect(html).toContain("reportPreviewCompletion();");
@@ -724,7 +728,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-fit-scroll="true"');
     expect(html).toContain("item.scrollIntoView");
     expect(html).toContain("target.dataset.overflow = String(overflowing)");
-    expect(html).toContain("Math.max(0, target.scrollWidth - target.clientWidth)");
+    expect(html).not.toContain("Math.max(0, target.scrollWidth - target.clientWidth)");
     expect(html).toContain("const collectClippedOverflow = (target)");
     expect(html).toContain("boundary.getBoundingClientRect()");
     expect(html).toContain("overflow.x > 1 || overflow.y > 1");

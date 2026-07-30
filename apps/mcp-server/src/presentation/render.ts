@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@78";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@80";
 
 function escapeHtml(value: string): string {
   return value
@@ -1340,13 +1340,6 @@ export function renderPresentationHtml(
         fallback();
       });
     };
-    const collectOverflow = (target) => {
-      const ignoreVertical = target.dataset.fitScroll === 'true';
-      return {
-        x: Math.max(0, target.scrollWidth - target.clientWidth),
-        y: ignoreVertical ? 0 : Math.max(0, target.scrollHeight - target.clientHeight)
-      };
-    };
     const collectClippedOverflow = (target) => {
       const clips = (value) => ['auto', 'clip', 'hidden', 'scroll'].includes(value);
       let boundary = target;
@@ -1455,26 +1448,58 @@ export function renderPresentationHtml(
     const collectOcclusions = (slideElement) => {
       const candidates = [...slideElement.querySelectorAll('.canvas-block[data-fit-content], .scene-node[data-positioned="true"][data-fit-content]')]
         .filter((item) => item instanceof HTMLElement && item.offsetParent !== null && item.textContent?.trim() && Number(getComputedStyle(item).opacity) > .1);
+      const textRects = (candidate) => {
+        const boundary = candidate.getBoundingClientRect();
+        const walker = document.createTreeWalker(candidate, NodeFilter.SHOW_TEXT);
+        const rects = [];
+        while (walker.nextNode()) {
+          const node = walker.currentNode;
+          if (!node.textContent?.trim() || !(node.parentElement instanceof HTMLElement) || node.parentElement.offsetParent === null) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) {
+            const left = Math.max(rect.left, boundary.left);
+            const top = Math.max(rect.top, boundary.top);
+            const right = Math.min(rect.right, boundary.right);
+            const bottom = Math.min(rect.bottom, boundary.bottom);
+            if (right - left > 1 && bottom - top > 1) rects.push({ left, top, right, bottom, width: right - left, height: bottom - top });
+          }
+          range.detach();
+        }
+        return rects;
+      };
+      const candidateRects = candidates.map((candidate) => ({ candidate, rects: textRects(candidate) }));
       const occlusions = [];
-      for (let leftIndex = 0; leftIndex < candidates.length; leftIndex += 1) {
-        const left = candidates[leftIndex];
-        const leftRect = left.getBoundingClientRect();
-        for (let rightIndex = leftIndex + 1; rightIndex < candidates.length; rightIndex += 1) {
-          const right = candidates[rightIndex];
+      for (let leftIndex = 0; leftIndex < candidateRects.length; leftIndex += 1) {
+        const { candidate: left, rects: leftRects } = candidateRects[leftIndex];
+        for (let rightIndex = leftIndex + 1; rightIndex < candidateRects.length; rightIndex += 1) {
+          const { candidate: right, rects: rightRects } = candidateRects[rightIndex];
           if (left.contains(right) || right.contains(left)) continue;
-          const rightRect = right.getBoundingClientRect();
-          const width = Math.min(leftRect.right, rightRect.right) - Math.max(leftRect.left, rightRect.left);
-          const height = Math.min(leftRect.bottom, rightRect.bottom) - Math.max(leftRect.top, rightRect.top);
-          if (width <= 2 || height <= 2) continue;
-          const overlap = width * height;
-          const smaller = Math.min(leftRect.width * leftRect.height, rightRect.width * rightRect.height);
+          let overlap = 0;
+          let sample = null;
+          for (const leftRect of leftRects) for (const rightRect of rightRects) {
+            const width = Math.min(leftRect.right, rightRect.right) - Math.max(leftRect.left, rightRect.left);
+            const height = Math.min(leftRect.bottom, rightRect.bottom) - Math.max(leftRect.top, rightRect.top);
+            if (width <= 1 || height <= 1) continue;
+            overlap += width * height;
+            sample ??= { x: Math.max(leftRect.left, rightRect.left) + width / 2, y: Math.max(leftRect.top, rightRect.top) + height / 2 };
+          }
+          if (!sample) continue;
+          const smaller = Math.min(
+            leftRects.reduce((sum, rect) => sum + rect.width * rect.height, 0),
+            rightRects.reduce((sum, rect) => sum + rect.width * rect.height, 0)
+          );
           const ratio = smaller > 0 ? overlap / smaller : 0;
           if (ratio < .2) continue;
+          const top = document.elementsFromPoint(sample.x, sample.y).map((element) => element.closest('[data-fit-content]')).find((element) => element === left || element === right);
+          if (top !== left && top !== right) continue;
+          const hidden = top === left ? right : left;
+          const covering = top === left ? left : right;
           occlusions.push({
-            id: left.dataset.fitId || '',
-            region: left.dataset.fitRegion || '',
-            other_id: right.dataset.fitId || '',
-            other_region: right.dataset.fitRegion || '',
+            id: hidden.dataset.fitId || '',
+            region: hidden.dataset.fitRegion || '',
+            other_id: covering.dataset.fitId || '',
+            other_region: covering.dataset.fitRegion || '',
             overlap_ratio: Number(ratio.toFixed(2))
           });
         }
@@ -1511,11 +1536,11 @@ export function renderPresentationHtml(
         if (!(target instanceof HTMLElement) || target.hidden || target.offsetParent === null) return;
         target.style.setProperty('--fit-scale', '1');
         let scale = 1;
-        let overflow = collectOverflow(target);
+        let overflow = collectClippedOverflow(target);
         while ((overflow.x > 1 || overflow.y > 1) && scale > .45 && target.dataset.fitScroll !== 'true') {
           scale = Math.max(.45, Number((scale - .05).toFixed(2)));
           target.style.setProperty('--fit-scale', String(scale));
-          overflow = collectOverflow(target);
+          overflow = collectClippedOverflow(target);
         }
         const clippedOverflow = collectClippedOverflow(target);
         const overflowing = clippedOverflow.x > 1 || clippedOverflow.y > 1;
