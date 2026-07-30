@@ -1376,3 +1376,9 @@
 - 発表UIの現在仕様として読む`docs/設計.md`に、廃止済みのGitHub Pages、静的researches、音声Actions、React sidebarが現行手順の形で残り、CodexやClaudeが誤った構成を再導入し得た。
 - URL・公開方式・保存先・BIIM補足・Web component編集・VOICEVOX生成を、D1、private R2 revision、Web UI、Queue、Cloudflare Containerの実装へ更新した。音声生成前後と固定snapshot後の扱いも改善ループ362〜364の契約へ揃えた。
 - すでに実装済みのノーコード編集・theme・音声pipelineを将来範囲から外し、PDF、発表者画面、第三者template配布、隔離user code、少人数実運用を残課題として整理した。
+
+## 改善ループ366
+
+- 現行構成へ直した設計書の中にも、旧ローカル版のcamelCase field名と、緩和前の`tools/list`上限が残っていた。AIが`voiceProfileId`等を部分編集へ使うとschemaで拒否される。
+- `duration_seconds`、`speaker_uuid`、`style_id`、`voice_profile_id`、`voice_tuning`、`audio_src`へ現在schemaの表記を揃えた。
+- MCP契約値も自動テストと同じ36 tool以下、全体90KB未満、一入力12KB未満へ更新した。
