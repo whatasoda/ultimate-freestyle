@@ -24,6 +24,7 @@ export type PublicationErrorCode =
   | "PROJECT_NOT_FOUND"
   | "DECK_REQUIRED"
   | "PREVIEW_NOT_FOUND"
+  | "PREVIEW_NOT_REVIEWED"
   | "PREVIEW_STALE"
   | "PRESENTATION_DURATION_EXCEEDED"
   | "PRESENTATION_ASSET_LIMIT"
@@ -49,6 +50,7 @@ export type PresentationRevision = {
   content_hash: string;
   byte_size: number;
   created_at: string;
+  reviewed_at: string | null;
 };
 
 export type PublicationStatus = {
@@ -69,6 +71,7 @@ type RevisionRow = {
   content_hash: string;
   byte_size: number;
   created_at: string;
+  reviewed_at: string | null;
 };
 
 function toRevision(row: RevisionRow): PresentationRevision {
@@ -80,7 +83,8 @@ function toRevision(row: RevisionRow): PresentationRevision {
     object_key: row.object_key,
     content_hash: row.content_hash,
     byte_size: row.byte_size,
-    created_at: row.created_at
+    created_at: row.created_at,
+    reviewed_at: row.reviewed_at
   };
 }
 
@@ -298,7 +302,7 @@ export async function getPublicationStatus(
     const row = await db
       .prepare(
         `SELECT id, project_id, project_version, renderer_version, object_key, content_hash,
-                byte_size, created_at
+                byte_size, created_at, reviewed_at
          FROM presentation_revisions
          WHERE id = ? AND owner_user_id = ?`
       )
@@ -498,7 +502,8 @@ export async function createPresentationPreview(
         object_key: objectKey,
         content_hash: contentHash,
         byte_size: bytes.byteLength,
-        created_at: now
+        created_at: now,
+        reviewed_at: null
       },
       slug
     };
@@ -535,7 +540,7 @@ export async function publishPresentationPreview(
   const revision = await db
     .prepare(
       `SELECT id, project_id, project_version, renderer_version, object_key, content_hash,
-              byte_size, created_at
+              byte_size, created_at, reviewed_at
        FROM presentation_revisions
        WHERE id = ? AND project_id = ? AND owner_user_id = ?`
     )
@@ -559,6 +564,12 @@ export async function publishPresentationPreview(
       `プレビューは ${revision.renderer_version}、現在は ${PRESENTATION_RENDERER_VERSION} です。新しいプレビューを確認してください。`
     );
   }
+  if (revision.reviewed_at === null) {
+    throw new PublicationError(
+      "PREVIEW_NOT_REVIEWED",
+      "固定プレビューを最後まで確認し、確認済みにしてから公開してください。"
+    );
+  }
   const now = new Date().toISOString();
   const result = await db
     .prepare(
@@ -576,6 +587,47 @@ export async function publishPresentationPreview(
   }
   const updated = await getPublicationStatus(db, ownerUserId, projectId);
   if (updated === null) throw new Error("Published project could not be read.");
+  return updated;
+}
+
+export async function markPresentationPreviewReviewed(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  revisionId: string
+): Promise<PublicationStatus> {
+  const status = await getPublicationStatus(db, ownerUserId, projectId);
+  if (status === null) {
+    throw new PublicationError("PROJECT_NOT_FOUND", "研究が見つかりません。");
+  }
+  if (status.latest_preview?.revision_id !== revisionId) {
+    throw new PublicationError(
+      "PREVIEW_STALE",
+      "最新の固定プレビューを開いて確認してください。"
+    );
+  }
+  if (
+    status.latest_preview.project_version !== status.draft_version ||
+    status.latest_preview.renderer_version !== PRESENTATION_RENDERER_VERSION
+  ) {
+    throw new PublicationError(
+      "PREVIEW_STALE",
+      "下書きまたは表示エンジンが更新されています。新しい固定プレビューを作成してください。"
+    );
+  }
+  const result = await db
+    .prepare(
+      `UPDATE presentation_revisions
+       SET reviewed_at = ?
+       WHERE id = ? AND project_id = ? AND owner_user_id = ?`
+    )
+    .bind(new Date().toISOString(), revisionId, projectId, ownerUserId)
+    .run();
+  if (result.meta.changes === 0) {
+    throw new PublicationError("PREVIEW_NOT_FOUND", "固定プレビューが見つかりません。");
+  }
+  const updated = await getPublicationStatus(db, ownerUserId, projectId);
+  if (updated === null) throw new Error("Reviewed project could not be read.");
   return updated;
 }
 

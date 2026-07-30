@@ -46,6 +46,7 @@ import {
 import {
   createPresentationPreview,
   getPublicationStatus,
+  markPresentationPreviewReviewed,
   PublicationError,
   publishPresentationPreview,
   readOwnerPresentationAudio,
@@ -3295,6 +3296,42 @@ async function handlePreviewPublish(
   }
 }
 
+async function handlePreviewReview(
+  request: Request,
+  env: Env,
+  projectId: string,
+  revisionId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  try {
+    const status = await markPresentationPreviewReviewed(
+      env.DB,
+      session.userId,
+      projectId,
+      revisionId
+    );
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "presentation.preview_reviewed",
+      outcome: "succeeded",
+      details: { project_id: projectId, revision_id: revisionId },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({
+      ok: true,
+      publication: status,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  } catch (error) {
+    return publicationErrorResponse(error);
+  }
+}
+
 async function presentationResponse(
   object: R2ObjectBody | null,
   cacheControl: string
@@ -3976,6 +4013,20 @@ export async function handleWebRequest(
   );
   if (projectPreviewMatch?.[1] !== undefined) {
     return handlePreviewCreate(request, env, projectPreviewMatch[1]);
+  }
+  const projectPreviewReviewMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/previews/${UUID_PATH}/review$`, "i")
+  );
+  if (
+    projectPreviewReviewMatch?.[1] !== undefined &&
+    projectPreviewReviewMatch[2] !== undefined
+  ) {
+    return handlePreviewReview(
+      request,
+      env,
+      projectPreviewReviewMatch[1],
+      projectPreviewReviewMatch[2]
+    );
   }
   const projectPublishMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/publish$`, "i")

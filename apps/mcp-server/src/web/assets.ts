@@ -65,6 +65,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       publishButton.dataset.publishedCurrent = "false";
       publishButton.textContent = "確認した版を公開";
     }
+    const reviewButton = document.querySelector("[data-review-preview]");
+    if (reviewButton instanceof HTMLButtonElement) {
+      reviewButton.disabled = true;
+      reviewButton.textContent = "最後まで確認した";
+    }
+    const reviewStatus = document.querySelector("[data-preview-review-status]");
+    if (reviewStatus instanceof HTMLElement) reviewStatus.textContent = "対象なし";
     const previewStatus = document.querySelector("[data-preview-status]");
     if (previewStatus instanceof HTMLElement && !previewStatus.textContent.includes("要再生成")) {
       previewStatus.textContent += " · 要再生成";
@@ -2494,9 +2501,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
 
   const previewButton = document.querySelector("[data-create-preview]");
+  const reviewButton = document.querySelector("[data-review-preview]");
   const publishButton = document.querySelector("[data-publish-preview]");
   const publishFeedback = document.querySelector("[data-publish-feedback]");
   const previewStatus = document.querySelector("[data-preview-status]");
+  const previewReviewStatus = document.querySelector("[data-preview-review-status]");
   const publishedStatus = document.querySelector("[data-published-status]");
   const previewLink = document.querySelector("[data-preview-link]");
   const publicLink = document.querySelector("[data-public-link]");
@@ -2541,11 +2550,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.classList.add("success");
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.revision = result.revision.revision_id;
-          publishButton.disabled = publishButton.dataset.durationValid !== "true" || publishButton.dataset.publishedCurrent === "true";
+          publishButton.disabled = true;
+        }
+        if (reviewButton instanceof HTMLButtonElement) {
+          reviewButton.dataset.revision = result.revision.revision_id;
+          reviewButton.dataset.reviewPreview = "/api/projects/" + result.revision.project_id + "/previews/" + result.revision.revision_id + "/review";
+          reviewButton.disabled = false;
+          reviewButton.textContent = "最後まで確認した";
         }
         if (previewStatus instanceof HTMLElement) {
           previewStatus.textContent = "v" + result.revision.project_version + " · " + result.revision.renderer_version;
         }
+        if (previewReviewStatus instanceof HTMLElement) previewReviewStatus.textContent = "未確認";
         if (previewLink instanceof HTMLAnchorElement) {
           previewLink.href = result.preview_url;
           previewLink.hidden = false;
@@ -2558,6 +2574,32 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishFeedback.classList.add("warning");
       } finally {
         previewButton.disabled = false;
+      }
+    });
+  }
+
+  if (reviewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
+    reviewButton.addEventListener("click", async () => {
+      if (!confirm("固定プレビューを最後の終了画面まで確認しましたか？")) return;
+      reviewButton.disabled = true;
+      publishFeedback.textContent = "プレビューの確認を記録しています…";
+      publishFeedback.classList.remove("warning", "success");
+      try {
+        const response = await fetch(reviewButton.dataset.reviewPreview || "", {
+          method: "POST",
+          headers: { "x-csrf-token": reviewButton.dataset.csrf || "" }
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "確認状態を記録できませんでした。"));
+        reviewButton.textContent = "プレビュー確認済み";
+        if (previewReviewStatus instanceof HTMLElement) previewReviewStatus.textContent = "確認済み";
+        if (publishButton instanceof HTMLButtonElement) publishButton.disabled = publishButton.dataset.durationValid !== "true" || publishButton.dataset.publishedCurrent === "true";
+        publishFeedback.textContent = "この固定プレビューを公開できます。";
+        publishFeedback.classList.add("success");
+      } catch (error) {
+        reviewButton.disabled = false;
+        publishFeedback.textContent = caughtErrorMessage(error, "確認状態を記録できませんでした。");
+        publishFeedback.classList.add("warning");
       }
     });
   }

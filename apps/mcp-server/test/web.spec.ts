@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=93"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=94"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -479,6 +479,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("VOICEVOX音声は 0 / 1 区間まで生成済みです");
     expect(detailHtml).not.toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
+    expect(detailHtml).toContain("data-review-preview");
+    expect(detailHtml).toContain("最後まで確認した");
     expect(detailHtml).toContain("data-public-link");
     expect(detailHtml).toContain("data-upload-preview");
     expect(detailHtml).toContain("保存時に最大2560pxのWebPへ圧縮");
@@ -1201,6 +1203,50 @@ describe("Web dashboard", () => {
       JSON.stringify(ownDocument),
       "10000000-0000-4000-8000-000000000001"
     ).run();
+
+    const unreviewedPublish = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/publish",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({ revision_id: previewResult.revision.revision_id })
+        }
+      ),
+      authEnv
+    );
+    expect(unreviewedPublish.status).toBe(409);
+    expect(await unreviewedPublish.json()).toMatchObject({
+      error: { code: "PREVIEW_NOT_REVIEWED" }
+    });
+    const review = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/previews/${previewResult.revision.revision_id}/review`,
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "x-csrf-token": csrfToken ?? ""
+          }
+        }
+      ),
+      authEnv
+    );
+    expect(review.status).toBe(200);
+    expect(await review.json()).toMatchObject({
+      publication: {
+        latest_preview: {
+          revision_id: previewResult.revision.revision_id,
+          reviewed_at: expect.any(String)
+        }
+      }
+    });
 
     const publish = await requestProvider(
       provider,
