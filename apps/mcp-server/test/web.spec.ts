@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=106"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=107"');
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
@@ -747,6 +747,9 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("別の画面またはAIから先に更新されました");
     expect(dashboardScriptText).toContain("サーバーと通信できませんでした");
     expect(dashboardScriptText).toContain("publicLink.hidden = false");
+    expect(dashboardScriptText).toContain("到達記録を再試行");
+    expect(dashboardScriptText).toContain("500 * (2 ** (reviewRetryCount - 1))");
+    expect(dashboardScriptText).toContain("setTimeout(() => location.reload(), 700)");
     expect(dashboardScriptText).toContain("result.voice_generation_required");
     expect(dashboardScriptText).toContain("VOICEVOX音声を再生成してください");
     expect(dashboardScriptText).toContain("結果を反映しています");

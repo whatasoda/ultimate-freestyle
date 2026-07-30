@@ -2845,12 +2845,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
 
   if (reviewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
     let recordingReview = false;
+    let pendingReviewDetail = null;
+    let reviewRetryCount = 0;
+    let reviewRetryTimer;
     const recordCompletedPreview = async (detail) => {
       if (recordingReview || reviewButton.textContent === "プレビュー確認済み") return;
       if (!detail || detail.revision_id !== reviewButton.dataset.revision) return;
       if (detail.project_id !== reviewButton.dataset.project) return;
       if (String(detail.project_version) !== reviewButton.dataset.version) return;
       if (detail.renderer_version !== reviewButton.dataset.renderer) return;
+      pendingReviewDetail = detail;
       recordingReview = true;
       reviewButton.disabled = true;
       reviewButton.textContent = "到達を記録中…";
@@ -2871,10 +2875,20 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         publishFeedback.textContent = "この固定プレビューを公開できます。";
         publishFeedback.classList.add("success");
+        pendingReviewDetail = null;
+        reviewRetryCount = 0;
+        clearTimeout(reviewRetryTimer);
       } catch (error) {
-        reviewButton.textContent = "終了画面の到達待ち";
+        reviewRetryCount += 1;
+        reviewButton.textContent = reviewRetryCount <= 3 ? "到達記録を再試行中…" : "到達記録を再試行";
+        reviewButton.disabled = reviewRetryCount <= 3;
         publishFeedback.textContent = caughtErrorMessage(error, "確認状態を記録できませんでした。");
         publishFeedback.classList.add("warning");
+        if (reviewRetryCount <= 3) {
+          reviewRetryTimer = setTimeout(() => {
+            if (pendingReviewDetail !== null) void recordCompletedPreview(pendingReviewDetail);
+          }, 500 * (2 ** (reviewRetryCount - 1)));
+        }
       } finally {
         recordingReview = false;
       }
@@ -2896,6 +2910,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       reviewChannel.addEventListener("message", (event) => { void recordCompletedPreview(event.data); });
       addEventListener("pagehide", () => reviewChannel.close(), { once: true });
     }
+    reviewButton.addEventListener("click", () => {
+      if (pendingReviewDetail !== null) void recordCompletedPreview(pendingReviewDetail);
+      else readStoredCompletion();
+    });
     readStoredCompletion();
     addEventListener("ultimate-freestyle:preview-created", readStoredCompletion);
   }
@@ -2933,6 +2951,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           unpublishButton.disabled = false;
           unpublishButton.hidden = false;
         }
+        setTimeout(() => location.reload(), 700);
       } catch (error) {
         publishFeedback.textContent = caughtErrorMessage(error, "公開できませんでした。");
         publishFeedback.classList.add("warning");
@@ -2968,6 +2987,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         }
         publishFeedback.textContent = "公開を停止しました。固定プレビューと編集内容は残っています。";
         publishFeedback.classList.add("success");
+        setTimeout(() => location.reload(), 700);
       } catch (error) {
         unpublishButton.disabled = false;
         publishFeedback.textContent = caughtErrorMessage(error, "公開を停止できませんでした。");
