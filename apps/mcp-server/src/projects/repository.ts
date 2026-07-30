@@ -22,6 +22,14 @@ export type ProjectDraftRevisionSummary = {
   created_at: string;
 };
 
+export type ProjectDraftRevision = {
+  project_id: string;
+  version: number;
+  source: ProjectDraftRevisionSummary["source"];
+  created_at: string;
+  document: ProjectDocument;
+};
+
 export type DashboardProjectSummary = ProjectSummary & {
   voice_segment_count: number;
   voice_ready_count: number;
@@ -412,6 +420,33 @@ export async function listProjectDraftRevisions(
     ...row,
     stage: projectDocumentSchema.shape.stage.parse(row.stage)
   }));
+}
+
+export async function getProjectDraftRevision(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  version: number
+): Promise<ProjectDraftRevision | null> {
+  const row = await db.prepare(
+    `SELECT project_id, version, document_json, source, created_at
+     FROM project_draft_revisions
+     WHERE project_id = ? AND owner_user_id = ? AND version = ?`
+  ).bind(projectId, ownerUserId, version).first<{
+    project_id: string;
+    version: number;
+    document_json: string;
+    source: ProjectDraftRevisionSummary["source"];
+    created_at: string;
+  }>();
+  if (row === null) return null;
+  return {
+    project_id: row.project_id,
+    version: row.version,
+    source: row.source,
+    created_at: row.created_at,
+    document: projectDocumentSchema.parse(JSON.parse(row.document_json))
+  };
 }
 
 export async function restoreProjectDraftRevision(

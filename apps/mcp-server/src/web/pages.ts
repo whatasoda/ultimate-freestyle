@@ -8,6 +8,7 @@ import type {
 } from "../projects/schema";
 import type {
   DashboardProjectSummary,
+  ProjectDraftRevision,
   ProjectDraftRevisionSummary
 } from "../projects/repository";
 import {
@@ -606,6 +607,9 @@ function shell(title: string, body: string): string {
       .draft-revision { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .6rem; align-items: center; padding: .65rem; border: 1px solid var(--line); border-radius: .6rem; background: #08111b88; }
       .draft-revision p, .draft-revision small { margin: 0; }
       .draft-revision small { color: var(--muted); }
+      .revision-preview { width: 100%; aspect-ratio: var(--revision-aspect, 16 / 9); border: 1px solid #40516a; border-radius: .8rem; background: #05080d; }
+      .revision-slide-list { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
+      .revision-slide-list li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; gap: .6rem; padding: .65rem; border: 1px solid var(--line); border-radius: .6rem; color: #cbd6e4; }
       .success { color: #74e6b2 !important; }
       .warning { color: #ffd681 !important; }
       .upload-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
@@ -1193,6 +1197,59 @@ export function dashboardPage(options: {
   );
 }
 
+export function draftRevisionPage(options: {
+  twitchLogin: string;
+  csrfToken: string;
+  current: ProjectRecord;
+  revision: ProjectDraftRevision;
+}): Response {
+  const selected = options.revision.document;
+  const currentSlides = options.current.document.deck?.slides ?? [];
+  const selectedSlides = selected.deck?.slides ?? [];
+  const currentById = new Map(currentSlides.map((slide) => [slide.id, slide]));
+  const selectedById = new Map(selectedSlides.map((slide) => [slide.id, slide]));
+  const added = selectedSlides.filter((slide) => !currentById.has(slide.id)).length;
+  const removed = currentSlides.filter((slide) => !selectedById.has(slide.id)).length;
+  const changed = selectedSlides.filter((slide) => {
+    const currentSlide = currentById.get(slide.id);
+    return currentSlide !== undefined && JSON.stringify(currentSlide) !== JSON.stringify(slide);
+  }).length;
+  const selectedDuration = selectedSlides.reduce((total, slide) => total + slide.duration_seconds, 0);
+  const currentDuration = currentSlides.reduce((total, slide) => total + slide.duration_seconds, 0);
+  const comparedFields = ["title", "stage", "summary", "question", "hypothesis", "method"] as const;
+  const fieldChanges = comparedFields.filter(
+    (field) => JSON.stringify(selected[field]) !== JSON.stringify(options.current.document[field])
+  );
+  const sourceLabel = { created: "作成", edit: "編集", restore: "復元" }[options.revision.source];
+  const isCurrent = options.revision.version === options.current.version;
+  const frameUrl = `/dashboard/projects/${escapeHtml(options.current.project_id)}/revisions/${options.revision.version}/frame?slide=1&amp;step=0`;
+  const slideList = selectedSlides.length === 0
+    ? '<p class="prose">この版には発表スライドがありません。</p>'
+    : `<ol class="revision-slide-list">${selectedSlides.map((slide, index) => {
+        const prior = currentById.get(slide.id);
+        const state = prior === undefined ? "この版だけ" : JSON.stringify(prior) === JSON.stringify(slide) ? "同じ" : "変更";
+        return `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(slide.title)}</strong><span>${state}</span></li>`;
+      }).join("")}</ol>`;
+  return new Response(
+    shell(
+      `v${options.revision.version}を確認 — ${selected.title}`,
+      `${accountHeader(options.twitchLogin, options.csrfToken)}
+       <main><a class="back" href="/dashboard/projects/${escapeHtml(options.current.project_id)}">← 研究詳細へ戻る</a>
+         <div class="section-head"><div><p class="eyebrow">Draft revision</p><h1>v${options.revision.version}を復元前に確認</h1></div><span class="stage">${sourceLabel}</span></div>
+         <div class="detail-grid"><div class="detail-column">
+           <section class="panel"><h2>${escapeHtml(selected.title)}</h2><p class="meta">${escapeHtml(new Date(options.revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(STAGE_LABELS[selected.stage])} · ${selectedSlides.length}枚 · ${formatDuration(selectedDuration)}</p></section>
+           ${selected.deck === null ? "" : `<section class="panel"><div class="section-head"><div><h2>この版の実表示</h2><p class="meta">読み取り専用です。ページ送り・段階表示も確認できます。</p></div><a class="button ghost" href="${frameUrl}" target="_blank" rel="noopener">別画面で確認</a></div><iframe class="revision-preview" title="v${options.revision.version}の発表プレビュー" src="${frameUrl}" style="--revision-aspect:${selected.deck.aspect_ratio === "4:3" ? "4 / 3" : "16 / 9"}"></iframe></section>`}
+           <section class="panel"><h2>この版のスライド</h2>${slideList}</section>
+         </div><aside class="detail-column">
+           <section class="panel"><h2>現在版 v${options.current.version} との差</h2><dl class="stat-list"><dt>基本項目</dt><dd>${fieldChanges.length === 0 ? "変更なし" : `${fieldChanges.length}項目`}</dd><dt>スライド変更</dt><dd>${changed}枚</dd><dt>この版だけにある</dt><dd>${added}枚</dd><dt>現在版だけにある</dt><dd>${removed}枚</dd><dt>発表時間差</dt><dd>${selectedDuration - currentDuration >= 0 ? "+" : ""}${selectedDuration - currentDuration}秒</dd></dl>${fieldChanges.length === 0 ? "" : `<p class="inherit-note">変更項目: ${escapeHtml(fieldChanges.join("、"))}</p>`}</section>
+           <section class="panel"><h2>復元操作</h2><p class="prose">復元しても現在版は消えず、この内容を新しいversionとして保存します。</p>${isCurrent ? '<p class="success">これは現在の下書きです。</p>' : `<button type="button" data-draft-restore="/api/projects/${escapeHtml(options.current.project_id)}/revisions/${options.revision.version}/restore" data-target-version="${options.revision.version}" data-current-version="${options.current.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button><p class="feedback" data-draft-restore-feedback aria-live="polite"></p>`}</section>
+         </aside></div>
+       </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
+    ),
+    { headers: headers() }
+  );
+}
+
 export function projectDetailPage(options: {
   twitchLogin: string;
   csrfToken: string;
@@ -1316,7 +1373,7 @@ export function projectDetailPage(options: {
     ? ""
     : `<details class="panel panel-disclosure"><summary>下書き履歴 · ${options.draftRevisions.length}件</summary><div class="disclosure-body"><p class="inherit-note">直近50版を保存します。過去版は現在の下書きを消さず、新しいversionとして復元します。</p><div class="draft-history">${options.draftRevisions.map((revision) => {
         const current = revision.version === options.project.version;
-        return `<article class="draft-revision"><div><p><strong>v${revision.version} · ${escapeHtml(revision.title)}</strong>${current ? ' <span class="success">現在</span>' : ""}</p><small>${escapeHtml(revisionSourceLabels[revision.source])} · ${escapeHtml(STAGE_LABELS[revision.stage])} · ${revision.slide_count}枚 · ${formatDuration(revision.total_duration_seconds)} · ${escapeHtml(new Date(revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></div>${current ? "" : `<button class="ghost" type="button" data-draft-restore="/api/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}/restore" data-target-version="${revision.version}" data-current-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button>`}</article>`;
+        return `<article class="draft-revision"><div><p><strong>v${revision.version} · ${escapeHtml(revision.title)}</strong>${current ? ' <span class="success">現在</span>' : ""}</p><small>${escapeHtml(revisionSourceLabels[revision.source])} · ${escapeHtml(STAGE_LABELS[revision.stage])} · ${revision.slide_count}枚 · ${formatDuration(revision.total_duration_seconds)} · ${escapeHtml(new Date(revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></div><span class="actions"><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}">内容を確認</a>${current ? "" : `<button class="ghost" type="button" data-draft-restore="/api/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}/restore" data-target-version="${revision.version}" data-current-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button>`}</span></article>`;
       }).join("")}</div><p class="feedback" data-draft-restore-feedback aria-live="polite"></p></div></details>`;
   const researchReady =
     (document.question?.trim().length ?? 0) > 0 &&

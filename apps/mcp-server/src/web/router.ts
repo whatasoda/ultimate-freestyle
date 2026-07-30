@@ -24,6 +24,7 @@ import {
 import { readJsonCapped, readUrlEncodedFormCapped } from "../lib/http";
 import { renderPresentationHtml } from "../presentation/render";
 import {
+  getProjectDraftRevision,
   getProject,
   listDashboardProjects,
   listProjectDraftRevisions,
@@ -77,6 +78,7 @@ import { z } from "zod";
 import { dashboardScriptResponse } from "./assets";
 import {
   dashboardPage,
+  draftRevisionPage,
   landingPage,
   projectDetailPage,
   projectNotFoundPage,
@@ -431,6 +433,72 @@ async function handleProjectDetail(
     assets: await listProjectAssets(env.DB, session.userId, projectId),
     publication: (await getPublicationStatus(env.DB, session.userId, projectId))!,
     draftRevisions: await listProjectDraftRevisions(env.DB, session.userId, projectId, 20)
+  });
+}
+
+async function handleDraftRevisionPage(
+  request: Request,
+  env: Env,
+  projectId: string,
+  version: number
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return redirectPage("/", clearWebSessionCookies());
+  const [current, revision] = await Promise.all([
+    getProject(env.DB, session.userId, projectId),
+    getProjectDraftRevision(env.DB, session.userId, projectId, version)
+  ]);
+  if (current === null || revision === null) return projectNotFoundPage();
+  return draftRevisionPage({
+    twitchLogin: session.twitchLogin,
+    csrfToken: session.csrfToken,
+    current,
+    revision
+  });
+}
+
+async function handleDraftRevisionFrame(
+  request: Request,
+  env: Env,
+  projectId: string,
+  version: number
+): Promise<Response> {
+  if (request.method !== "GET") {
+    return new Response(null, { status: 405, headers: { allow: "GET" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) return new Response(null, { status: 404 });
+  const revision = await getProjectDraftRevision(env.DB, session.userId, projectId, version);
+  if (revision === null || revision.document.deck === null) return new Response(null, { status: 404 });
+  const baseProject = {
+    project_id: revision.project_id,
+    version: revision.version,
+    created_at: revision.created_at,
+    updated_at: revision.created_at,
+    document: revision.document
+  };
+  const artifacts = await resolveVoiceArtifacts(env.DB, session.userId, baseProject);
+  const project = hydrateProjectVoice(
+    baseProject,
+    artifacts,
+    (segment) => `/api/projects/${projectId}/voice/audio/${segment.fingerprint}`
+  );
+  const html = renderPresentationHtml(project, { frameAncestors: "'self'" });
+  return new Response(html, {
+    headers: {
+      "cache-control": "private, no-store",
+      "content-type": "text/html; charset=utf-8",
+      "content-security-policy":
+        "default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+      "permissions-policy":
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff",
+      "x-frame-options": "SAMEORIGIN"
+    }
   });
 }
 
@@ -3924,6 +3992,28 @@ export async function handleWebRequest(
   );
   if (voicePageMatch?.[1] !== undefined) {
     return handleVoicePage(request, env, voicePageMatch[1]);
+  }
+  const draftRevisionFrameMatch = path.match(
+    new RegExp(`^/dashboard/projects/${UUID_PATH}/revisions/(\\d{1,9})/frame$`, "i")
+  );
+  if (draftRevisionFrameMatch?.[1] !== undefined && draftRevisionFrameMatch[2] !== undefined) {
+    return handleDraftRevisionFrame(
+      request,
+      env,
+      draftRevisionFrameMatch[1],
+      Number(draftRevisionFrameMatch[2])
+    );
+  }
+  const draftRevisionPageMatch = path.match(
+    new RegExp(`^/dashboard/projects/${UUID_PATH}/revisions/(\\d{1,9})$`, "i")
+  );
+  if (draftRevisionPageMatch?.[1] !== undefined && draftRevisionPageMatch[2] !== undefined) {
+    return handleDraftRevisionPage(
+      request,
+      env,
+      draftRevisionPageMatch[1],
+      Number(draftRevisionPageMatch[2])
+    );
   }
   const projectMatch = path.match(
     new RegExp(`^/dashboard/projects/${UUID_PATH}$`, "i")

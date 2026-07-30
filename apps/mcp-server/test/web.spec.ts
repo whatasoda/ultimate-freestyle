@@ -339,6 +339,16 @@ describe("Web dashboard", () => {
         now
       ),
       env.DB.prepare(
+        `INSERT INTO project_draft_revisions (
+           project_id, owner_user_id, version, document_json, source, created_at
+         ) VALUES (?, ?, 1, ?, 'created', ?)`
+      ).bind(
+        "10000000-0000-4000-8000-000000000001",
+        "twitch-dashboard-viewer-id",
+        JSON.stringify(ownDocument),
+        now
+      ),
+      env.DB.prepare(
         `INSERT INTO research_projects (
            id, owner_user_id, title, stage, document_json, version,
            idempotency_key, created_at, updated_at
@@ -503,9 +513,36 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("data-image-alt");
     expect(detailHtml).toContain("説明を保存");
     expect(detailHtml).toContain("自由配置 1パーツ");
+    expect(detailHtml).toContain("/revisions/1\">内容を確認");
     expect(detailHtml).toContain(
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
     );
+
+    const draftRevision = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/revisions/1",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    const draftRevisionHtml = await draftRevision.text();
+    expect(draftRevision.status).toBe(200);
+    expect(draftRevisionHtml).toContain("v1を復元前に確認");
+    expect(draftRevisionHtml).toContain("現在版 v1 との差");
+    expect(draftRevisionHtml).toContain("これは現在の下書きです");
+    expect(draftRevisionHtml).toContain("/revisions/1/frame?slide=1&amp;step=0");
+
+    const draftRevisionFrame = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/revisions/1/frame?slide=1&step=0",
+        { headers: { cookie: browserCookies } }
+      ),
+      authEnv
+    );
+    expect(draftRevisionFrame.status).toBe(200);
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@90"');
 
     const voicePage = await requestProvider(
       provider,
@@ -1375,7 +1412,7 @@ describe("Web dashboard", () => {
     expect(publishedDetailHtml).toContain("公開操作履歴 · 1件");
     expect(publishedDetailHtml).toContain("公開開始");
     expect(publishedDetailHtml).toContain("非公開 → v4");
-    expect(publishedDetailHtml).toContain("下書き履歴 · 3件");
+    expect(publishedDetailHtml).toContain("下書き履歴 · 4件");
     expect(publishedDetailHtml).toContain("公開中");
     expect(publishedDetailHtml).toContain("この版を確認");
     expect(publishedDetailHtml).toContain(`/preview/${previewResult.revision.revision_id}`);
