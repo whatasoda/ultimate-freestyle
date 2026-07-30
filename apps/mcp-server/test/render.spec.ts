@@ -752,6 +752,8 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('data-component-item="before"');
     expect(workspaceHtml).toContain('data-scene-item-action="add"');
     expect(workspaceHtml).toContain('data-scene-item-action="delete"');
+    expect(workspaceHtml).toContain('data-scene-item-action="move"');
+    expect(workspaceHtml).toContain("↑ 前へ");
     expect(workspaceHtml).toContain("項目 1");
     expect(workspaceHtml).toContain("<label>ラベル");
     expect(workspaceHtml).toContain('data-component-path="items.0.value"');

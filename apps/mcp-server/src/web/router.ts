@@ -190,6 +190,12 @@ const sceneComponentItemActionRequestSchema = z.discriminatedUnion("action", [
     expected_version: z.number().int().positive(),
     action: z.literal("delete"),
     item_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+  }),
+  z.object({
+    expected_version: z.number().int().positive(),
+    action: z.literal("move"),
+    item_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+    position: z.number().int().nonnegative().max(11)
   })
 ]);
 const sceneComponentCreateRequestSchema = z.object({
@@ -1886,6 +1892,31 @@ async function handleSceneComponentItemAction(
           Object.assign(error, { code: "INVALID_FIELDS" });
           throw error;
         }
+        if (parsed.data.action === "move") {
+          const itemId = parsed.data.item_id;
+          const position = parsed.data.position;
+          if (component.kind === "bar_chart") {
+            const index = component.items.findIndex((item) => item.id === itemId);
+            const [item] = index === -1 ? [] : component.items.splice(index, 1);
+            if (item === undefined) {
+              const error = new Error("The data item does not exist.");
+              Object.assign(error, { code: "INVALID_FIELDS" });
+              throw error;
+            }
+            component.items.splice(Math.min(position, component.items.length), 0, item);
+          } else {
+            const index = component.items.findIndex((item) => item.id === itemId);
+            const [item] = index === -1 ? [] : component.items.splice(index, 1);
+            if (item === undefined) {
+              const error = new Error("The data item does not exist.");
+              Object.assign(error, { code: "INVALID_FIELDS" });
+              throw error;
+            }
+            component.items.splice(Math.min(position, component.items.length), 0, item);
+          }
+          resultItemId = itemId;
+          return;
+        }
         if (parsed.data.action === "delete") {
           const itemId = parsed.data.item_id;
           if (component.items.length <= 1) {
@@ -1923,7 +1954,7 @@ async function handleSceneComponentItemAction(
       userId: session.userId,
       eventType: "project.slide_scene_component_item_changed",
       outcome: "succeeded",
-      details: { project_id: projectId, slide_id: slideId, component_id: componentId, action: parsed.data.action, item_id: parsed.data.action === "delete" ? parsed.data.item_id : resultItemId, version: project.version },
+      details: { project_id: projectId, slide_id: slideId, component_id: componentId, action: parsed.data.action, item_id: parsed.data.action === "add" ? resultItemId : parsed.data.item_id, version: project.version },
       createdAt: new Date().toISOString()
     });
     return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, component_id: componentId, result_item_id: resultItemId, action: parsed.data.action, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });

@@ -1047,9 +1047,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) return;
       const action = button.dataset.sceneItemAction;
       if (action === "delete" && !confirm("このデータ項目を削除しますか？このパーツ内の未保存変更も失われます。")) return;
-      if (action === "add" && form.dataset.dirty === "true" && !confirm("未保存の変更があります。項目を追加すると未保存内容は失われます。続けますか？")) return;
+      if (action !== "delete" && form.dataset.dirty === "true" && !confirm("未保存の変更があります。項目を操作すると未保存内容は失われます。続けますか？")) return;
       setButtonBusy(button, true);
-      feedback.textContent = action === "add" ? "データ項目を追加しています…" : "データ項目を削除しています…";
+      feedback.textContent = action === "add" ? "データ項目を追加しています…" : action === "move" ? "データ項目を移動しています…" : "データ項目を削除しています…";
       feedback.classList.remove("success", "warning");
       try {
         const response = await fetch(form.action + "/items", {
@@ -1058,13 +1058,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           body: JSON.stringify({
             expected_version: Number(form.dataset.version),
             action,
-            ...(action === "delete" ? { item_id: button.dataset.itemId } : {})
+            ...(action === "delete" || action === "move" ? { item_id: button.dataset.itemId } : {}),
+            ...(action === "move" ? { position: Number(button.dataset.position) } : {})
           })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "データ項目を操作できませんでした。"));
         form.dataset.dirty = "false";
-        feedback.textContent = action === "add" ? "追加しました。画面を更新します…" : "削除しました。画面を更新します…";
+        feedback.textContent = action === "add" ? "追加しました。画面を更新します…" : action === "move" ? "移動しました。画面を更新します…" : "削除しました。画面を更新します…";
         feedback.classList.add("success");
         location.reload();
       } catch (error) {
