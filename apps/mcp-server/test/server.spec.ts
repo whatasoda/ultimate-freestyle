@@ -90,7 +90,7 @@ describe("MCP contract", () => {
       );
       expect(largestInputSchema).toBeLessThan(12_000);
       expect(tools.length).toBeLessThanOrEqual(38);
-      expect(JSON.stringify(tools).length).toBeLessThan(160_000);
+      expect(JSON.stringify(tools).length).toBeLessThan(120_000);
       const narrationTool = tools.find(
         (tool) => tool.name === "set_slide_narration"
       );
@@ -347,10 +347,8 @@ describe("MCP contract", () => {
       });
       expect(update.structuredContent).toMatchObject({
         ok: true,
-        current_version: 2,
-        project_id: firstProject.project_id,
-        version: 2,
-        changed: { kind: "fields_updated" }
+        current_version: null,
+        version: 2
       });
 
       const conflict = await client.callTool({
@@ -771,8 +769,7 @@ describe("MCP contract", () => {
       });
       expect(componentLayout.structuredContent).toMatchObject({
         ok: true,
-        version: 15,
-        changed: { kind: "slide_component_updated" }
+        version: 15
       });
       const componentStyle = await client.callTool({
         name: "update_slide_component",
@@ -786,8 +783,7 @@ describe("MCP contract", () => {
       });
       expect(componentStyle.structuredContent).toMatchObject({
         ok: true,
-        version: 16,
-        changed: { kind: "slide_component_updated" }
+        version: 16
       });
       const adjustedSceneSlide = await readJsonResource(
         client,

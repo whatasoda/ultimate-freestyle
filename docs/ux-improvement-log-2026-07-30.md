@@ -390,3 +390,11 @@
 - 編集画面はproject、version、renderer、revisionがすべて一致した通知だけを受け付け、確認済み状態を自動記録する。自己申告の「最後まで確認した」操作を廃止した。
 - 編集画面を後から開いた場合もlocalStorageの到達記録を照合し、公開可能状態へ復帰できるようにした。
 - rendererを@78、dashboard assetをv98へ更新した。
+
+## 改善ループ206
+
+- 28個の変更系MCP toolが繰り返していた`project_id`、`updated_at`、`changed`を出力schemaから除き、成功時は新しい`version`、競合時は`current_version`へ役割を分けた。
+- 変更対象はtool名と入力で既知で、詳細は監査ログに残るため、AIクライアントへ毎回同じメタデータを返さずに済むようにした。
+- 変更系エラーの出力は`code`と`message`の固定shapeを保ちつつ、全toolで同じ長いenumを28回展開しないようにした。
+- UUIDや正整数などの厳密な制約は入力schemaに残し、サーバー自身が生成する出力schemaでは基本型だけを示して重複展開を抑えた。
+- `tools/list`の契約テスト上限を160KBから120KBへ下げ、MCP引数・schemaが大きすぎて接続できない環境への回帰を防ぐようにした。

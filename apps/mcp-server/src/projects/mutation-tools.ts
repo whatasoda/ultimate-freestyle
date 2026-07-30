@@ -39,7 +39,6 @@ import {
 } from "./schema";
 import {
   normalizeProjectToolError,
-  projectErrorSchema,
   ProjectToolError,
   requireSubject,
   toolResult
@@ -52,15 +51,12 @@ const projectIdInput = {
 
 const mutationOutput = {
   ok: z.boolean(),
-  request_id: z.string().uuid(),
-  project_id: z.string().uuid().nullable(),
-  version: z.number().int().positive().nullable(),
-  updated_at: z.string().datetime().nullable(),
-  changed: z
-    .object({ kind: z.string(), id: z.string().nullable() })
-    .nullable(),
-  current_version: z.number().int().positive().nullable(),
-  error: projectErrorSchema.nullable()
+  request_id: z.string(),
+  version: z.number().nullable(),
+  current_version: z.number().nullable(),
+  error: z
+    .object({ code: z.string(), message: z.string() })
+    .nullable()
 };
 
 const templateMutableInput = {
@@ -269,17 +265,14 @@ async function executeMutation(
       },
       createdAt: new Date().toISOString()
     });
-    return mutationSuccess(requestId, project, context);
+    return mutationSuccess(requestId, project);
   } catch (error) {
     const normalized = normalizeProjectToolError(error);
     return toolResult(
       {
         ok: false,
         request_id: requestId,
-        project_id: context.projectId,
         version: null,
-        updated_at: null,
-        changed: null,
         current_version: normalized.currentVersion,
         error: { code: normalized.code, message: normalized.message }
       },
@@ -290,20 +283,13 @@ async function executeMutation(
 
 function mutationSuccess(
   requestId: string,
-  project: ProjectRecord,
-  context: MutationContext
+  project: ProjectRecord
 ) {
   return toolResult({
     ok: true,
     request_id: requestId,
-    project_id: project.project_id,
     version: project.version,
-    updated_at: project.updated_at,
-    changed: {
-      kind: context.changedKind,
-      id: context.changedId ?? null
-    },
-    current_version: project.version,
+    current_version: null,
     error: null
   });
 }
