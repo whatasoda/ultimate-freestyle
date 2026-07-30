@@ -395,7 +395,8 @@ async function handleSlideWorkspace(
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
     project,
-    slideId
+    slideId,
+    assets: await listProjectAssets(env.DB, session.userId, projectId)
   });
 }
 
@@ -1380,6 +1381,20 @@ async function handleSceneComponentUpdate(
       422
     );
   }
+  if (parsed.data.component.kind === "image") {
+    const imageAssetId = parsed.data.component.asset_id;
+    const assets = await listProjectAssets(env.DB, session.userId, projectId);
+    if (!assets.some((asset) => asset.asset_id === imageAssetId)) {
+      return jsonResponse(
+        {
+          ok: false,
+          error: { code: "INVALID_FIELDS", message: "この研究で利用できる画像を選んでください。" },
+          request_id: crypto.randomUUID()
+        },
+        422
+      );
+    }
+  }
   try {
     const project = await mutateProject(env.DB, {
       ownerUserId: session.userId,
@@ -1412,14 +1427,29 @@ async function handleSceneComponentUpdate(
         }
         switch (component.kind) {
           case "layer":
+            break;
           case "stack":
+            if (existing.kind === "stack") Object.assign(existing, {
+              direction: component.direction,
+              gap_px: component.gap_px,
+              align: component.align,
+              justify: component.justify,
+              wrap: component.wrap
+            });
+            break;
           case "grid":
+            if (existing.kind === "grid") Object.assign(existing, {
+              columns: component.columns,
+              gap_px: component.gap_px,
+              align: component.align
+            });
             break;
           case "hero":
             if (existing.kind === "hero") Object.assign(existing, {
               eyebrow: component.eyebrow,
               heading: component.heading,
-              subtitle: component.subtitle
+              subtitle: component.subtitle,
+              align: component.align
             });
             break;
           case "markdown":
@@ -1427,24 +1457,31 @@ async function handleSceneComponentUpdate(
             break;
           case "image":
             if (existing.kind === "image") Object.assign(existing, {
+              asset_id: component.asset_id,
               alt_text: component.alt_text,
-              caption: component.caption
+              caption: component.caption,
+              fit: component.fit
             });
             break;
           case "shape":
-            if (existing.kind === "shape") existing.label = component.label;
+            if (existing.kind === "shape") Object.assign(existing, {
+              label: component.label,
+              shape: component.shape
+            });
             break;
           case "card":
             if (existing.kind === "card") Object.assign(existing, {
               label: component.label,
-              markdown: component.markdown
+              markdown: component.markdown,
+              variant: component.variant
             });
             break;
           case "metric":
             if (existing.kind === "metric") Object.assign(existing, {
               value: component.value,
               unit: component.unit,
-              caption: component.caption
+              caption: component.caption,
+              emphasis: component.emphasis
             });
             break;
           case "quote":
@@ -1457,7 +1494,8 @@ async function handleSceneComponentUpdate(
             if (existing.kind === "callout") Object.assign(existing, {
               label: component.label,
               heading: component.heading,
-              markdown: component.markdown
+              markdown: component.markdown,
+              variant: component.variant
             });
             break;
           case "bar_chart":

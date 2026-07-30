@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@53";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@54";
 
 function escapeHtml(value: string): string {
   return value
@@ -1487,6 +1487,21 @@ export function renderPresentationHtml(
       target.style.textAlign = componentStyle.text_align === 'center' ? 'center' : componentStyle.text_align === 'end' ? 'end' : 'start';
       if (component.kind !== 'stack') target.style.justifyContent = verticalAlign;
       target.style.boxShadow = shadow;
+      if (component.kind === 'stack') {
+        const justify = { start: 'flex-start', center: 'center', end: 'flex-end', between: 'space-between', around: 'space-around' };
+        target.style.flexDirection = component.direction === 'row' ? 'row' : 'column';
+        target.style.gap = previewLength(component.gap_px);
+        target.style.alignItems = component.align === 'start' ? 'flex-start' : component.align === 'end' ? 'flex-end' : String(component.align || 'stretch');
+        target.style.justifyContent = justify[component.justify] || 'center';
+        target.style.flexWrap = component.wrap ? 'wrap' : 'nowrap';
+      } else if (component.kind === 'grid') {
+        target.style.gridTemplateColumns = 'repeat(' + clamp(Number(component.columns), 1, 6) + ', minmax(0, 1fr))';
+        target.style.gap = previewLength(component.gap_px);
+        target.style.alignItems = component.align === 'end' ? 'end' : String(component.align || 'stretch');
+      } else if (component.kind === 'hero') target.dataset.align = String(component.align || 'start');
+      else if (component.kind === 'shape') target.dataset.shape = String(component.shape || 'rectangle');
+      else if (component.kind === 'card' || component.kind === 'callout') target.dataset.variant = String(component.variant || 'plain');
+      else if (component.kind === 'metric') target.dataset.emphasis = String(component.emphasis || 'normal');
       const addText = (parent, tag, className, value) => {
         if (value === null || value === undefined) return null;
         const item = document.createElement(tag);
@@ -1505,7 +1520,11 @@ export function renderPresentationHtml(
         renderDraftMarkdown(target, component.markdown || '');
       } else if (component.kind === 'image') {
         const media = target.querySelector('img');
-        if (media instanceof HTMLImageElement) media.alt = String(component.alt_text || '');
+        if (media instanceof HTMLImageElement) {
+          media.alt = String(component.alt_text || '');
+          media.dataset.fit = String(component.fit || 'contain');
+          if (data.asset_urls && typeof data.asset_urls === 'object' && data.asset_urls[component.asset_id]) media.src = String(data.asset_urls[component.asset_id]);
+        }
         target.querySelector('small')?.remove();
         addText(target, 'small', '', component.caption);
       } else if (component.kind === 'shape') {

@@ -885,6 +885,32 @@ function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number)
     <fieldset><legend>パーツの見た目</legend><div class="editor-grid">${colorField("style.background", "背景色", style.background, "#111827")}${colorField("style.foreground", "文字色", style.foreground, "#f8fafc")}${colorField("style.border_color", "境界線色", style.border_color, "#52647c")}${numberField("style.border_width_px", "境界線の太さ", style.border_width_px ?? 0, 0, 8)}${numberField("style.corner_radius_px", "角丸", style.corner_radius_px ?? 0, 0, 64)}${numberField("style.padding_px", "内側余白", style.padding_px ?? 0, 0, 64)}${numberField("style.font_scale", "文字倍率", style.font_scale ?? 1, 0.5, 3, 0.05)}${numberField("style.opacity", "不透明度", style.opacity ?? 1, 0.1, 1, 0.05)}${selectField("style.text_align", "文字揃え", style.text_align ?? "start", [["start", "左"], ["center", "中央"], ["end", "右"]])}${selectField("style.vertical_align", "縦位置", style.vertical_align ?? "start", [["start", "上"], ["center", "中央"], ["end", "下"]])}${selectField("style.shadow", "影", style.shadow ?? "none", [["none", "なし"], ["soft", "柔らかい"], ["strong", "強い"]])}</div><p class="inherit-note">色のHEX値を空欄にすると、背景は透明、文字と境界線は周囲の設定を使います。変更は保存前からプレビューへ反映されます。</p></fieldset>`;
 }
 
+function sceneComponentKindControls(node: SlideSceneNode, assets: ProjectAsset[]): string {
+  const select = (path: string, label: string, value: string, options: Array<[string, string]>) => `<label>${label}<select name="${path}" data-component-field data-component-path="${path}" data-component-number="false" data-nullable="false">${options.map(([option, optionLabel]) => `<option value="${escapeHtml(option)}"${option === value ? " selected" : ""}>${escapeHtml(optionLabel)}</option>`).join("")}</select></label>`;
+  const number = (path: string, label: string, value: number, min: number, max: number) => `<label>${label}<input name="${path}" data-component-field data-component-path="${path}" data-component-number="true" data-nullable="false" type="number" min="${min}" max="${max}" value="${value}"></label>`;
+  let controls = "";
+  if (node.kind === "stack") {
+    controls = `${select("direction", "並べる方向", node.direction, [["row", "横"], ["column", "縦"]])}${number("gap_px", "間隔", node.gap_px, 0, 64)}${select("align", "交差方向の揃え", node.align, [["start", "先頭"], ["center", "中央"], ["end", "末尾"], ["stretch", "均等に伸ばす"]])}${select("justify", "進行方向の配置", node.justify, [["start", "先頭"], ["center", "中央"], ["end", "末尾"], ["between", "両端揃え"], ["around", "均等配置"]])}<label class="check-label"><input name="wrap" type="checkbox" data-component-field data-component-path="wrap"${node.wrap ? " checked" : ""}>折り返す</label>`;
+  } else if (node.kind === "grid") {
+    controls = `${number("columns", "列数", node.columns, 1, 6)}${number("gap_px", "間隔", node.gap_px, 0, 64)}${select("align", "縦方向の揃え", node.align, [["start", "上"], ["center", "中央"], ["end", "下"], ["stretch", "均等に伸ばす"]])}`;
+  } else if (node.kind === "hero") {
+    controls = select("align", "内容の揃え", node.align, [["start", "左"], ["center", "中央"], ["end", "右"]]);
+  } else if (node.kind === "image") {
+    const imageOptions: Array<[string, string]> = assets.map((asset) => [asset.asset_id, asset.alt_text || asset.original_filename]);
+    if (!imageOptions.some(([id]) => id === node.asset_id)) imageOptions.unshift([node.asset_id, "現在の画像"]);
+    controls = `${select("asset_id", "画像", node.asset_id, imageOptions)}${select("fit", "画像の収め方", node.fit, [["contain", "全体を収める"], ["cover", "枠を埋める"], ["fill", "枠に合わせて伸縮"]])}`;
+  } else if (node.kind === "shape") {
+    controls = select("shape", "形", node.shape, [["rectangle", "四角形"], ["ellipse", "楕円"], ["line", "線"]]);
+  } else if (node.kind === "card") {
+    controls = select("variant", "カード表現", node.variant, [["plain", "標準"], ["accent", "アクセント"], ["glass", "ガラス調"]]);
+  } else if (node.kind === "metric") {
+    controls = select("emphasis", "数値の強調", node.emphasis, [["normal", "標準"], ["strong", "強い"], ["signal", "アクセント面"]]);
+  } else if (node.kind === "callout") {
+    controls = select("variant", "意味", node.variant, [["info", "情報"], ["success", "成功"], ["warning", "注意"], ["danger", "危険"]]);
+  }
+  return controls ? `<fieldset><legend>パーツ固有の配置</legend><div class="editor-grid">${controls}</div></fieldset>` : "";
+}
+
 function sceneComponentOutline(nodes: SlideSceneNode[]): string {
   const children = new Map<string | null, SlideSceneNode[]>();
   for (const node of nodes) {
@@ -1568,6 +1594,7 @@ export function slideWorkspacePage(options: {
   csrfToken: string;
   project: ProjectRecord;
   slideId: string;
+  assets?: ProjectAsset[];
 }): Response {
   const deck = options.project.document.deck;
   const slideIndex = deck?.slides.findIndex((slide) => slide.id === options.slideId) ?? -1;
@@ -1614,7 +1641,7 @@ export function slideWorkspacePage(options: {
         : `<p class="mode-note">定型レイアウトです。本文、段階表示、補足欄から構成されます。AIから自由構成へ切り替えると、入れ子のリッチなパーツを利用できます。</p>`;
   const modeNote =
     slide.composition?.mode === "scene"
-      ? "登録済みの表示パーツで構成されています。AIから一件ずつ構造を編集でき、この画面では内容、表示STEP、アニメーション、配色、余白、文字倍率を実表示で調整できます。"
+      ? "登録済みの表示パーツで構成されています。AIから一件ずつ構造を編集でき、この画面では内容、並び方、表示STEP、アニメーション、画像、配色、余白、文字倍率を実表示で調整できます。"
       : slide.composition?.mode === "canvas"
         ? "従来の自由配置です。既存表示は維持されます。より複雑な構成は入れ子の自由構成へ移行できます。"
         : "本文と補足欄を使う定型レイアウトです。";
@@ -1628,8 +1655,10 @@ export function slideWorkspacePage(options: {
               ? `<label>${field.label}<textarea ${attributes}>${escapeHtml(String(field.value ?? ""))}</textarea></label>`
               : `<label>${field.label}<input ${attributes}${field.number === undefined ? "" : ` type="number" min="${field.number.min}" max="${field.number.max}" step="${field.number.step ?? 1}"`} value="${escapeHtml(String(field.value ?? ""))}"></label>`;
           }).join("");
+          const kindControls = sceneComponentKindControls(node, options.assets ?? []);
           const appearanceControls = sceneComponentAppearanceControls(node, slide.reveal_steps);
-          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+          const assetUrls = Object.fromEntries((options.assets ?? []).map((asset) => [asset.asset_id, asset.content_url]));
+          return `<details class="component-detail"><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-asset-urls="${escapeHtml(JSON.stringify(assetUrls))}" data-csrf="${escapeHtml(options.csrfToken)}">${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
         .join("")
     : "";

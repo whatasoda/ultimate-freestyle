@@ -625,7 +625,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (!owner || typeof owner !== "object") continue;
       const key = path.at(-1);
       if (key === undefined) continue;
-      owner[key] = field.dataset.componentNumber === "true"
+      owner[key] = field instanceof HTMLInputElement && field.type === "checkbox"
+        ? field.checked
+        : field.dataset.componentNumber === "true"
         ? Number(field.value)
         : field.dataset.nullable === "true" && field.value.trim() === ""
         ? null
@@ -891,10 +893,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(slideFrame instanceof HTMLIFrameElement)) return;
     for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
       if (!(form instanceof HTMLFormElement)) continue;
+      let assetUrls = {};
+      try { assetUrls = JSON.parse(form.dataset.assetUrls || "{}"); } catch {}
       slideFrame.contentWindow?.postMessage({
         type: "ultimate-freestyle:preview-scene-component",
         slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
-        component: sceneComponentFromForm(form)
+        component: sceneComponentFromForm(form),
+        asset_urls: assetUrls
       }, location.origin);
     }
   };
