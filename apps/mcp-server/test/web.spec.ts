@@ -421,7 +421,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=68"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=69"');
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
@@ -707,6 +707,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-component-field");
     expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
     expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
+    expect(dashboardScriptText).toContain("data-component-frame-toggle");
+    expect(dashboardScriptText).toContain("component.frame = null");
     expect(dashboardScriptText).toContain("changingConfiguredVoice");
     expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
 
@@ -1698,6 +1700,60 @@ describe("Web dashboard", () => {
     expect(deletedTemplateDeck.default_template_id).toBeNull();
     expect(deletedTemplateDeck.slides[0].template_id).toBeNull();
     expect(deletedTemplateDeck.templates.some((template: { id: string }) => template.id === "lab")).toBe(false);
+
+    const sceneDocument = JSON.parse(documentWithoutTemplate!.document_json);
+    sceneDocument.deck.slides[0].composition = {
+      mode: "scene",
+      runtime_version: "uf-runtime@1",
+      background: "#102030",
+      clip_content: true,
+      nodes: [{
+        id: "web-note",
+        kind: "markdown",
+        parent_id: null,
+        order: 0,
+        at: 0,
+        animation: "fade",
+        frame: null,
+        markdown: "Webで位置も編集する"
+      }]
+    };
+    await env.DB.prepare(
+      "UPDATE research_projects SET document_json = ? WHERE id = ?"
+    ).bind(JSON.stringify(sceneDocument), "10000000-0000-4000-8000-000000000001").run();
+    const positionComponent = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/components/web-note",
+        {
+          method: "PATCH",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": csrfToken ?? ""
+          },
+          body: JSON.stringify({
+            expected_version: 17,
+            component: {
+              ...sceneDocument.deck.slides[0].composition.nodes[0],
+              frame: { x: 8, y: 12, width: 84, height: 72 }
+            }
+          })
+        }
+      ),
+      authEnv
+    );
+    expect(positionComponent.status).toBe(200);
+    expect(await positionComponent.json()).toMatchObject({ ok: true, version: 18 });
+    const positionedDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    expect(JSON.parse(positionedDocument!.document_json).deck.slides[0].composition.nodes[0].frame).toEqual({
+      x: 8,
+      y: 12,
+      width: 84,
+      height: 72
+    });
 
     const unsupportedUpload = await requestProvider(
       provider,

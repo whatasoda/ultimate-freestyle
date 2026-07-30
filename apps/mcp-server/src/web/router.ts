@@ -1537,6 +1537,7 @@ async function handleSceneComponentUpdate(
             throw error;
           }
         }
+        existing.frame = component.frame;
         existing.at = component.at;
         existing.animation = component.animation;
         existing.style = component.style;

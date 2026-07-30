@@ -237,7 +237,7 @@ const NARRATION_DISPLAY_LABELS = {
   minimal: "最小表示"
 } as const;
 
-const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=68";
+const DASHBOARD_SCRIPT_SRC = "/assets/dashboard.js?v=69";
 
 const TUNING_LABELS: Record<keyof VoicevoxTuning, string> = {
   speedScale: "話速",
@@ -647,6 +647,7 @@ function shell(title: string, body: string): string {
       .editor .component-item { border-color: #40516a; background: #08111b80; }
       .component-item legend { color: #b9ddff; }
       .component-item legend code { margin-left: .35rem; color: var(--muted); font-size: .68rem; font-weight: 600; }
+      [data-component-frame-controls][data-enabled="false"] .editor-grid { opacity: .48; }
       .editor input[type="color"] { min-height: 2.7rem; padding: .3rem; }
       .ratio-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
       .ratio-option { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: .65rem; padding: .8rem; border: 1px solid var(--line); border-radius: .75rem; background: #0b1420; cursor: pointer; }
@@ -899,6 +900,7 @@ function sceneComponentContentControls(node: SlideSceneNode, maxStep: number): s
 
 function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number): string {
   const style = node.style ?? {};
+  const frame = node.frame ?? { x: 5, y: 5, width: 90, height: 90 };
   const numberField = (
     path: string,
     label: string,
@@ -919,7 +921,9 @@ function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number)
     value: string | null | undefined,
     fallback: string
   ) => `<label>${label}<span class="color-control"><input type="color" value="${escapeHtml(value ?? fallback)}" data-component-color-preview="${path}" aria-label="${label}を色見本から選ぶ"><input name="${path}" data-component-field data-component-color-hex data-component-path="${path}" data-component-number="false" data-nullable="true" value="${escapeHtml(value ?? "")}" placeholder="空欄で${label === "背景色" ? "透明" : "継承"}" pattern="^$|^#[0-9A-Fa-f]{6}$" maxlength="7" spellcheck="false"></span></label>`;
-  return `<fieldset><legend>表示タイミング</legend><div class="editor-grid">${numberField("at", "表示STEP", node.at, 0, maxStep)}${selectField("animation", "表示アニメーション", node.animation, Object.entries(ANIMATION_LABELS))}</div></fieldset>
+  const frameField = (path: string, label: string, value: number, minimum: number) => `<label>${label}（%）<input name="${path}" data-component-field data-component-path="${path}" data-component-number="true" data-nullable="false" data-component-frame-field type="number" min="${minimum}" max="100" step="0.1" value="${value}"${node.frame ? "" : " disabled"}></label>`;
+  return `<fieldset data-component-frame-controls data-enabled="${String(node.frame !== null && node.frame !== undefined)}"><legend>自由配置</legend><label class="check-label"><input name="frame_enabled" type="checkbox" data-component-frame-toggle${node.frame ? " checked" : ""}>親の自動配置から外し、位置と大きさを指定する</label><div class="editor-grid">${frameField("frame.x", "左から", frame.x, 0)}${frameField("frame.y", "上から", frame.y, 0)}${frameField("frame.width", "幅", frame.width, 0.1)}${frameField("frame.height", "高さ", frame.height, 0.1)}</div><p class="inherit-note">位置と大きさの合計が100%以内になるよう指定します。自動配置へ戻しても入力値は画面内に残るため、再度有効にできます。</p></fieldset>
+    <fieldset><legend>表示タイミング</legend><div class="editor-grid">${numberField("at", "表示STEP", node.at, 0, maxStep)}${selectField("animation", "表示アニメーション", node.animation, Object.entries(ANIMATION_LABELS))}</div></fieldset>
     <fieldset><legend>パーツの見た目</legend><div class="editor-grid">${colorField("style.background", "背景色", style.background, "#111827")}${colorField("style.foreground", "文字色", style.foreground, "#f8fafc")}${colorField("style.border_color", "境界線色", style.border_color, "#52647c")}${numberField("style.border_width_px", "境界線の太さ", style.border_width_px ?? 0, 0, 8)}${numberField("style.corner_radius_px", "角丸", style.corner_radius_px ?? 0, 0, 64)}${numberField("style.padding_px", "内側余白", style.padding_px ?? 0, 0, 64)}${numberField("style.font_scale", "文字倍率", style.font_scale ?? 1, 0.5, 3, 0.05)}${numberField("style.opacity", "不透明度", style.opacity ?? 1, 0.1, 1, 0.05)}${selectField("style.text_align", "文字揃え", style.text_align ?? "start", [["start", "左"], ["center", "中央"], ["end", "右"]])}${selectField("style.vertical_align", "縦位置", style.vertical_align ?? "start", [["start", "上"], ["center", "中央"], ["end", "下"]])}${selectField("style.shadow", "影", style.shadow ?? "none", [["none", "なし"], ["soft", "柔らかい"], ["strong", "強い"]])}</div><p class="inherit-note">色のHEX値を空欄にすると、背景は透明、文字と境界線は周囲の設定を使います。変更は保存前からプレビューへ反映されます。</p></fieldset>`;
 }
 

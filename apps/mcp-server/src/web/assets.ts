@@ -649,6 +649,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         ? null
         : field.value;
     }
+    const frameToggle = form.querySelector("[data-component-frame-toggle]");
+    if (frameToggle instanceof HTMLInputElement && !frameToggle.checked) component.frame = null;
     return component;
   };
   const serializeVersionedForm = (form) => {
@@ -920,6 +922,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
   };
   for (const form of document.querySelectorAll("[data-scene-component-editor]")) {
+    const frameToggle = form.querySelector("[data-component-frame-toggle]");
+    const syncFrameControls = () => {
+      if (!(frameToggle instanceof HTMLInputElement)) return;
+      const frameControls = form.querySelector("[data-component-frame-controls]");
+      if (frameControls instanceof HTMLElement) frameControls.dataset.enabled = String(frameToggle.checked);
+      for (const field of form.querySelectorAll("[data-component-frame-field]")) {
+        if (field instanceof HTMLInputElement) field.disabled = !frameToggle.checked;
+      }
+    };
+    frameToggle?.addEventListener("input", syncFrameControls);
+    syncFrameControls();
     form.addEventListener("input", () => {
       clearTimeout(draftSceneTimer);
       draftSceneTimer = setTimeout(syncSceneComponentDrafts, 120);
