@@ -19,8 +19,11 @@ import {
   animationSchema,
   compositionRevealPositions,
   coverLayoutSchema,
+  designMotifSchema,
   densitySchema,
   fontPresetSchema,
+  headingTreatmentSchema,
+  imageTreatmentSchema,
   loadingScreenSchema,
   motionStyleSchema,
   narrationAppearanceSchema,
@@ -80,6 +83,7 @@ const narrationVoiceCueInputSchema = z.object({
 
 const templateMutableInput = {
   name: presentationTemplateSchema.shape.name.optional(),
+  design_notes: presentationTemplateSchema.shape.design_notes,
   region_layout: presentationTemplateSchema.shape.region_layout.optional(),
   sidebar_width_percent:
     presentationTemplateSchema.shape.sidebar_width_percent.optional(),
@@ -107,10 +111,17 @@ const templateMutableInput = {
   body_weight: presentationTemplateSchema.shape.body_weight,
   heading_weight: presentationTemplateSchema.shape.heading_weight,
   line_height: presentationTemplateSchema.shape.line_height,
-  letter_spacing_em: presentationTemplateSchema.shape.letter_spacing_em
+  letter_spacing_em: presentationTemplateSchema.shape.letter_spacing_em,
+  motif: designMotifSchema.optional(),
+  motif_color: presentationTemplateSchema.shape.motif_color,
+  motif_opacity: presentationTemplateSchema.shape.motif_opacity,
+  motif_scale: presentationTemplateSchema.shape.motif_scale,
+  heading_treatment: headingTreatmentSchema.optional(),
+  image_treatment: imageTreatmentSchema.optional()
 };
 const templateMutableFieldSchema = z.enum([
   "name",
+  "design_notes",
   "region_layout",
   "sidebar_width_percent",
   "background",
@@ -133,7 +144,13 @@ const templateMutableFieldSchema = z.enum([
   "body_weight",
   "heading_weight",
   "line_height",
-  "letter_spacing_em"
+  "letter_spacing_em",
+  "motif",
+  "motif_color",
+  "motif_opacity",
+  "motif_scale",
+  "heading_treatment",
+  "image_treatment"
 ]);
 const slideBodyEditSchema = z.object({
   target: z.enum(["content", "sidebar"]),
@@ -171,7 +188,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "system-sans",
     heading_font: "gothic",
     density: "comfortable",
-    motion_style: "calm"
+    motion_style: "calm",
+    motif: "rings",
+    motif_color: "#9d7bff",
+    motif_opacity: 0.15,
+    motif_scale: 1.4,
+    heading_treatment: "plain",
+    image_treatment: "rounded"
   },
   paper: {
     region_layout: "single",
@@ -190,7 +213,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "mincho",
     heading_font: "serif",
     density: "spacious",
-    motion_style: "calm"
+    motion_style: "calm",
+    motif: "grid",
+    motif_color: "#a34b35",
+    motif_opacity: 0.1,
+    motif_scale: 1.1,
+    heading_treatment: "accent-line",
+    image_treatment: "framed"
   },
   editorial: {
     region_layout: "sidebar-right",
@@ -209,7 +238,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "gothic",
     heading_font: "display",
     density: "compact",
-    motion_style: "snappy"
+    motion_style: "snappy",
+    motif: "diagonal",
+    motif_color: "#d33f2f",
+    motif_opacity: 0.1,
+    motif_scale: 1.2,
+    heading_treatment: "accent-line",
+    image_treatment: "natural"
   },
   neon: {
     region_layout: "sidebar-right",
@@ -228,7 +263,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "gothic",
     heading_font: "display",
     density: "comfortable",
-    motion_style: "dramatic"
+    motion_style: "dramatic",
+    motif: "grid",
+    motif_color: "#36f1cd",
+    motif_opacity: 0.15,
+    motif_scale: 1.4,
+    heading_treatment: "outline",
+    image_treatment: "rounded"
   },
   "retro-game": {
     region_layout: "sidebar-right",
@@ -247,7 +288,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "monospace",
     heading_font: "monospace",
     density: "compact",
-    motion_style: "snappy"
+    motion_style: "snappy",
+    motif: "dots",
+    motif_color: "#ffcf4a",
+    motif_opacity: 0.15,
+    motif_scale: 0.9,
+    heading_treatment: "boxed",
+    image_treatment: "framed"
   },
   "soft-pop": {
     region_layout: "sidebar-right",
@@ -266,7 +313,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "rounded",
     heading_font: "rounded",
     density: "spacious",
-    motion_style: "calm"
+    motion_style: "calm",
+    motif: "rings",
+    motif_color: "#f05d9b",
+    motif_opacity: 0.15,
+    motif_scale: 1.6,
+    heading_treatment: "highlight",
+    image_treatment: "rounded"
   },
   scientific: {
     region_layout: "sidebar-right",
@@ -285,7 +338,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "system-sans",
     heading_font: "gothic",
     density: "compact",
-    motion_style: "calm"
+    motion_style: "calm",
+    motif: "grid",
+    motif_color: "#087e8b",
+    motif_opacity: 0.1,
+    motif_scale: 0.9,
+    heading_treatment: "accent-line",
+    image_treatment: "framed"
   },
   museum: {
     region_layout: "sidebar-right",
@@ -304,7 +363,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "mincho",
     heading_font: "serif",
     density: "spacious",
-    motion_style: "calm"
+    motion_style: "calm",
+    motif: "rings",
+    motif_color: "#a57b34",
+    motif_opacity: 0.1,
+    motif_scale: 1.8,
+    heading_treatment: "plain",
+    image_treatment: "framed"
   },
   terminal: {
     region_layout: "sidebar-right",
@@ -323,7 +388,13 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     body_font: "monospace",
     heading_font: "monospace",
     density: "compact",
-    motion_style: "snappy"
+    motion_style: "snappy",
+    motif: "grid",
+    motif_color: "#54f58a",
+    motif_opacity: 0.15,
+    motif_scale: 0.8,
+    heading_treatment: "boxed",
+    image_treatment: "monochrome"
   }
 };
 
@@ -1092,6 +1163,7 @@ export function registerProjectMutationTools(
         ...projectIdInput,
         template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         name: z.string().min(1).max(80),
+        design_notes: z.string().max(1_000).optional(),
         visual_preset: visualPresetSchema.optional(),
         copy_from_template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).optional(),
         make_default: z.boolean().optional()
@@ -1104,7 +1176,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, template_id, name, visual_preset, copy_from_template_id, make_default }) =>
+    async ({ project_id, expected_version, template_id, name, design_notes, visual_preset, copy_from_template_id, make_default }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -1132,7 +1204,8 @@ export function registerProjectMutationTools(
             presentationTemplateSchema.parse({
               ...source,
               id: template_id,
-              name
+              name,
+              ...(design_notes === undefined ? {} : { design_notes })
             })
           );
           if (make_default === true) deck.default_template_id = template_id;
@@ -1153,7 +1226,7 @@ export function registerProjectMutationTools(
           .array(
             z.object({
               field: templateMutableFieldSchema,
-              value: z.union([z.string().max(120), z.number()])
+              value: z.union([z.string().max(1_000), z.number()])
             })
           )
           .min(1)

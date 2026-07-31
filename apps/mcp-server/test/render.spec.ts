@@ -94,7 +94,14 @@ describe("presentation artifact renderer", () => {
               body_weight: 500,
               heading_weight: 900,
               line_height: 1.4,
-              letter_spacing_em: 0.02
+              letter_spacing_em: 0.02,
+              design_notes: "深海の暗さと観測機器の光を組み合わせる。",
+              motif: "rings",
+              motif_color: "#65ccff",
+              motif_opacity: 0.2,
+              motif_scale: 1.4,
+              heading_treatment: "outline",
+              image_treatment: "framed"
             }
           ],
           default_template_id: "my-biim",
@@ -184,8 +191,17 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@115");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@116");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");
+    expect(html).toContain('data-motif="rings"');
+    expect(html).toContain('data-heading-treatment="outline"');
+    expect(html).toContain('data-image-treatment="framed"');
+    expect(html).toContain('class="theme-motif" aria-hidden="true"');
+    expect(html).toContain('--motif-color: #65ccff');
+    expect(html).toContain('.slide[data-motif="waves"] .theme-motif');
+    expect(html).toContain('.slide[data-heading-treatment="highlight"]');
+    expect(html).toContain('.slide[data-image-treatment="monochrome"]');
+    expect(html).toContain("currentSlide.dataset.motif");
     expect(html).toContain("startVoiceDelay");
     expect(html).toContain("読み上げ前の間");
     expect(html).toContain("休符 · ");

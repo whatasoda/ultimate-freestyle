@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "164";
+export const DASHBOARD_ASSET_VERSION = "165";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
@@ -793,6 +793,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         heading_font: String(data.get("heading_font") || "system-sans"),
         density: String(data.get("density") || "comfortable"),
         motion_style: String(data.get("motion_style") || "calm"),
+        motif: String(data.get("motif") || "none"),
+        motif_color: String(data.get("motif_color") || data.get("accent") || "#9d7bff"),
+        motif_opacity: Number(data.get("motif_opacity")),
+        motif_scale: Number(data.get("motif_scale")),
+        heading_treatment: String(data.get("heading_treatment") || "plain"),
+        image_treatment: String(data.get("image_treatment") || "natural"),
         body_weight: Number(data.get("body_weight")),
         heading_weight: Number(data.get("heading_weight")),
         line_height: Number(data.get("line_height")),
@@ -1025,6 +1031,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
     if (form.matches("[data-template-editor]")) Object.assign(body, {
       name: String(data.get("name") || ""),
+      design_notes: String(data.get("design_notes") || ""),
       region_layout: String(data.get("region_layout") || ""),
       sidebar_width_percent: numberValue(data, "sidebar_width_percent"),
       background: String(data.get("background") || ""),
@@ -1048,11 +1055,18 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       heading_weight: numberValue(data, "heading_weight"),
       line_height: numberValue(data, "line_height"),
       letter_spacing_em: numberValue(data, "letter_spacing_em"),
+      motif: String(data.get("motif") || "none"),
+      motif_color: String(data.get("motif_color") || ""),
+      motif_opacity: numberValue(data, "motif_opacity"),
+      motif_scale: numberValue(data, "motif_scale"),
+      heading_treatment: String(data.get("heading_treatment") || "plain"),
+      image_treatment: String(data.get("image_treatment") || "natural"),
       make_default: data.has("make_default")
     });
     if (form.matches("[data-template-create]")) Object.assign(body, {
       template_id: String(data.get("template_id") || ""),
       name: String(data.get("name") || ""),
+      design_notes: String(data.get("design_notes") || "").trim() || undefined,
       visual_preset: String(data.get("visual_preset") || "studio"),
       source_template_id: String(data.get("source_template_id") || "") || null,
       make_default: data.has("make_default")
@@ -1234,6 +1248,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       setSettingValue("region", selectedOptionLabel(form, "region_layout"));
       setSettingValue("density", selectedOptionLabel(form, "density"));
       setSettingValue("motion", selectedOptionLabel(form, "motion_style"));
+      setSettingValue("motif", selectedOptionLabel(form, "motif"));
       const impact = form.querySelector("[data-template-impact]");
       if (impact instanceof HTMLElement && result.affected_slides) {
         impact.textContent = "保存すると現在" + result.affected_slides.total + "枚へ反映されます（直接指定 " + result.affected_slides.direct + "枚・既定を継承 " + result.affected_slides.inherited + "枚）。";
@@ -1909,6 +1924,19 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       form.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
+  for (const button of document.querySelectorAll("[data-design-pick]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const form = button.closest("form");
+      const fieldName = button.dataset.designField || "";
+      const field = form?.elements.namedItem(fieldName);
+      if (!(form instanceof HTMLFormElement) || !(field instanceof HTMLSelectElement)) return;
+      field.value = button.dataset.designPick || field.value;
+      syncPicker(form, '[data-design-field="' + CSS.escape(fieldName) + '"]', "designPick", field.value);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+  }
   const fontProbeContext = document.createElement("canvas").getContext("2d");
   if (fontProbeContext) {
     const probeText = "mmmmmmmmmmlli最自由研究Aa";
@@ -2061,6 +2089,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         syncPicker(form, "[data-tone-pick]", "tonePick", field.value);
       } else if (field.name === "loading_style") {
         syncPicker(form, "[data-loading-style-pick]", "loadingStylePick", field.value);
+      } else if (["motif", "heading_treatment", "image_treatment"].includes(field.name)) {
+        syncPicker(form, '[data-design-field="' + CSS.escape(field.name) + '"]', "designPick", field.value);
       } else if (field.name === "body_font" || field.name === "heading_font") {
         const body = form.elements.namedItem("body_font");
         const heading = form.elements.namedItem("heading_font");

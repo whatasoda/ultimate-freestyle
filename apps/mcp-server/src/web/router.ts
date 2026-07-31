@@ -322,6 +322,7 @@ const templateCreateRequestSchema = z.object({
   expected_version: z.number().int().positive(),
   template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
   name: z.string().min(1).max(80),
+  design_notes: z.string().max(1_000).optional(),
   visual_preset: visualPresetSchema,
   source_template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
   make_default: z.boolean()
@@ -3596,7 +3597,10 @@ async function handleTemplateCreate(
           presentationTemplateSchema.parse({
             id: parsed.data.template_id,
             name: parsed.data.name,
-            ...sourceFields
+            ...sourceFields,
+            ...(parsed.data.design_notes === undefined
+              ? {}
+              : { design_notes: parsed.data.design_notes })
           })
         );
         if (parsed.data.make_default) {

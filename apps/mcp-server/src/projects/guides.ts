@@ -92,10 +92,13 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 ## template
 
 - 最初は \`create_presentation_template\` でvisual presetから一件作る。既存templateの別案は\`copy_from_template_id\`で複製し、変更項目だけを部分更新する。
+- visual presetは完成形ではなく出発点として扱う。研究テーマ、作者の好み、避けたい表現を\`design_notes\`へ残し、以後の変更理由をその方針へ揃える。
 - visual presetは \`studio\`、\`paper\`、\`editorial\`、\`neon\`、\`retro-game\`、\`soft-pop\`、\`scientific\`、\`museum\`、\`terminal\`。
 - font presetは \`system-sans\`、\`gothic\`、\`rounded\`、\`mincho\`、\`serif\`、\`monospace\`、\`display\`、\`textbook\`、\`handwritten\`、\`condensed\`。任意font名やURLは入力しない。
 - 密度は \`spacious\`、\`comfortable\`、\`compact\`、動きの傾向は \`calm\`、\`snappy\`、\`dramatic\`。
-- 色、配置、font、密度、animationの調整はupdate_presentation_template_fieldsのupdatesへfield/valueを最大8件入れ、変更項目だけを送る。
+- 色、配置、font、密度、animation、装飾の調整はupdate_presentation_template_fieldsのupdatesへfield/valueを最大8件入れ、変更項目だけを送る。
+- 背景モチーフは \`none\`、\`dots\`、\`grid\`、\`diagonal\`、\`rings\`、\`waves\`。色、濃さ、スケールをそれぞれ\`motif_color\`、\`motif_opacity\`、\`motif_scale\`で調整する。
+- 見出し処理は \`plain\`、\`accent-line\`、\`highlight\`、\`boxed\`、\`outline\`。画像処理は \`natural\`、\`rounded\`、\`framed\`、\`monochrome\`。visual presetを変えずに組み替えられる。
 - 領域配置は単一、左右補足、下段補足に加え、左右均等の \`split\`、上段補足の \`top-band\`、中央集中の \`focus\`を選べる。
 - 基本5色に加えて \`accent_secondary\` と \`border\` を指定できる。値は6桁hexだけを使い、任意CSSやgradientは入力しない。
 
@@ -858,12 +861,19 @@ export function registerResearchGuides(
                 templates: (selected.deck.templates ?? []).map((template) => ({
                   id: template.id,
                   name: template.name,
+                  design_notes: template.design_notes,
                   region_layout: template.region_layout,
                   visual_preset: template.visual_preset,
                   body_font: template.body_font,
                   heading_font: template.heading_font,
                   density: template.density,
-                  motion_style: template.motion_style
+                  motion_style: template.motion_style,
+                  motif: template.motif,
+                  motif_color: template.motif_color,
+                  motif_opacity: template.motif_opacity,
+                  motif_scale: template.motif_scale,
+                  heading_treatment: template.heading_treatment,
+                  image_treatment: template.image_treatment
                 })),
                 narration_defaults: selected.deck.narration_defaults,
                 voicevox: selected.deck.voicevox === null || selected.deck.voicevox === undefined

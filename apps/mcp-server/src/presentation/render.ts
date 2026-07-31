@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@115";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@116";
 
 function escapeHtml(value: string): string {
   return value
@@ -157,6 +157,9 @@ const FONT_CANDIDATES: Record<FontPreset, string[]> = {
 };
 type DensityPreset = "spacious" | "comfortable" | "compact";
 type MotionStyle = "calm" | "snappy" | "dramatic";
+type DesignMotif = "none" | "dots" | "grid" | "diagonal" | "rings" | "waves";
+type HeadingTreatment = "plain" | "accent-line" | "highlight" | "boxed" | "outline";
+type ImageTreatment = "natural" | "rounded" | "framed" | "monochrome";
 
 type TemplateAppearance = {
   visual_preset?: VisualPreset;
@@ -168,6 +171,12 @@ type TemplateAppearance = {
   line_height?: number;
   letter_spacing_em?: number;
   motion_style?: MotionStyle;
+  motif?: DesignMotif;
+  motif_color?: string;
+  motif_opacity?: number;
+  motif_scale?: number;
+  heading_treatment?: HeadingTreatment;
+  image_treatment?: ImageTreatment;
 };
 
 function templateAppearance(template: unknown): Required<TemplateAppearance> {
@@ -181,7 +190,13 @@ function templateAppearance(template: unknown): Required<TemplateAppearance> {
     heading_weight: value.heading_weight ?? 800,
     line_height: value.line_height ?? 1.5,
     letter_spacing_em: value.letter_spacing_em ?? 0,
-    motion_style: value.motion_style ?? "calm"
+    motion_style: value.motion_style ?? "calm",
+    motif: value.motif ?? "none",
+    motif_color: value.motif_color ?? "#9d7bff",
+    motif_opacity: value.motif_opacity ?? 0.1,
+    motif_scale: value.motif_scale ?? 1,
+    heading_treatment: value.heading_treatment ?? "plain",
+    image_treatment: value.image_treatment ?? "natural"
   };
 }
 
@@ -580,6 +595,9 @@ export function renderPresentationHtml(
       --template-spacing: ${template.spacing_scale};
       --template-font-scale: ${template.font_scale};
       --template-sidebar-width: ${template.sidebar_width_percent}%;
+      --motif-color: ${appearance.motif_color};
+      --motif-opacity: ${appearance.motif_opacity};
+      --motif-scale: ${appearance.motif_scale};
       --body-weight: ${appearance.body_weight};
       --heading-weight: ${appearance.heading_weight};
       --body-line-height: ${appearance.line_height};
@@ -660,7 +678,8 @@ export function renderPresentationHtml(
   <aside class="slide-sidebar" data-flow-sidebar data-region="sidebar" data-fit-content data-fit-id="flow:sidebar" data-fit-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
     ${slide.sidebar_markdown === null ? "" : renderTextBlocks(slide.sidebar_markdown)}
   </aside>`;
-      return `<article class="slide tone-${slide.tone}" role="group" aria-roledescription="スライド" aria-label="${index + 1} / ${deck.slides.length}：${escapeHtml(slide.title)}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em" hidden>
+      return `<article class="slide tone-${slide.tone}" role="group" aria-roledescription="スライド" aria-label="${index + 1} / ${deck.slides.length}：${escapeHtml(slide.title)}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-motif="${appearance.motif}" data-heading-treatment="${appearance.heading_treatment}" data-image-treatment="${appearance.image_treatment}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em;--motif-color:${appearance.motif_color};--motif-opacity:${appearance.motif_opacity};--motif-scale:${appearance.motif_scale}" hidden>
+  <div class="theme-motif" aria-hidden="true"></div>
   ${content}
   <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" style="--narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines};${narrationVariables}" aria-live="off">
     <span class="narration-speaker"${narrationSpeaker === "" ? " hidden" : ""}>${escapeHtml(narrationSpeaker)}</span>
@@ -720,6 +739,20 @@ export function renderPresentationHtml(
     .slide > * { position: relative; z-index: 1; }
     .slide[data-user-template="true"] { --accent: var(--template-accent); --accent-secondary: var(--template-accent-secondary); --theme-background: var(--template-background); --theme-surface: var(--template-surface); --theme-foreground: var(--template-foreground); --theme-muted: var(--template-muted); --theme-border: var(--template-border); --slide-base: var(--theme-background); grid-template-columns: minmax(0, 1fr) var(--template-sidebar-width); border-radius: var(--template-radius); }
     .slide[data-user-template="true"] .slide-main { padding: calc(7% * var(--template-spacing)) calc(7% * var(--template-spacing)) calc(4% * var(--template-spacing)); }
+    .theme-motif { position: absolute; z-index: 0; inset: 0; pointer-events: none; opacity: var(--motif-opacity, .1); }
+    .slide > :not(.theme-motif) { position: relative; z-index: 1; }
+    .slide[data-motif="dots"] .theme-motif { background-image: radial-gradient(circle, var(--motif-color) 0 .11cqw, transparent .14cqw); background-size: calc(2.3cqw * var(--motif-scale)) calc(2.3cqw * var(--motif-scale)); }
+    .slide[data-motif="grid"] .theme-motif { background-image: linear-gradient(var(--motif-color) .08cqw, transparent .08cqw), linear-gradient(90deg, var(--motif-color) .08cqw, transparent .08cqw); background-size: calc(3.2cqw * var(--motif-scale)) calc(3.2cqw * var(--motif-scale)); }
+    .slide[data-motif="diagonal"] .theme-motif { background-image: repeating-linear-gradient(135deg, transparent 0 calc(2.1cqw * var(--motif-scale)), var(--motif-color) calc(2.1cqw * var(--motif-scale)) calc(2.25cqw * var(--motif-scale))); }
+    .slide[data-motif="rings"] .theme-motif { background-image: repeating-radial-gradient(circle at 88% 12%, transparent 0 calc(2.4cqw * var(--motif-scale)), var(--motif-color) calc(2.45cqw * var(--motif-scale)) calc(2.58cqw * var(--motif-scale))); }
+    .slide[data-motif="waves"] .theme-motif { background-image: radial-gradient(ellipse at 0 50%, transparent 0 calc(2.3cqw * var(--motif-scale)), var(--motif-color) calc(2.38cqw * var(--motif-scale)) calc(2.52cqw * var(--motif-scale)), transparent calc(2.6cqw * var(--motif-scale))); background-size: calc(6cqw * var(--motif-scale)) calc(5cqw * var(--motif-scale)); }
+    .slide[data-heading-treatment="accent-line"] :is(h2,h3,h4) { padding-inline-start: .42em; border-inline-start: .14em solid var(--accent); }
+    .slide[data-heading-treatment="highlight"] :is(h2,h3,h4) { width: fit-content; background: linear-gradient(transparent 62%, color-mix(in srgb, var(--accent) 45%, transparent) 62%); box-decoration-break: clone; }
+    .slide[data-heading-treatment="boxed"] :is(h2,h3,h4) { width: fit-content; padding: .16em .28em; border: .08em solid var(--accent); }
+    .slide[data-heading-treatment="outline"] :is(h2,h3,h4) { color: var(--theme-background); text-shadow: -.035em -.035em 0 var(--accent), .035em -.035em 0 var(--accent), -.035em .035em 0 var(--accent), .035em .035em 0 var(--accent); }
+    .slide[data-image-treatment="rounded"] :is(uf-image, figure.canvas-block) img { border-radius: 1.4cqw; }
+    .slide[data-image-treatment="framed"] :is(uf-image, figure.canvas-block) img { padding: .55cqw; border: .12cqw solid var(--accent); background: var(--theme-surface); box-shadow: .4cqw .4cqw 0 color-mix(in srgb, var(--accent) 28%, transparent); }
+    .slide[data-image-treatment="monochrome"] :is(uf-image, figure.canvas-block) img { filter: grayscale(1) contrast(1.08); }
     .slide[data-user-template="true"] .slide-sidebar { background: var(--theme-surface); color: var(--theme-muted); }
     .slide[data-density="spacious"] { --density-scale: 1.18; }
     .slide[data-density="compact"] { --density-scale: .82; }
@@ -2306,6 +2339,9 @@ export function renderPresentationHtml(
       currentSlide.dataset.headingFont = String(template.heading_font);
       currentSlide.dataset.density = String(template.density);
       currentSlide.dataset.motionStyle = String(template.motion_style);
+      currentSlide.dataset.motif = String(template.motif || 'none');
+      currentSlide.dataset.headingTreatment = String(template.heading_treatment || 'plain');
+      currentSlide.dataset.imageTreatment = String(template.image_treatment || 'natural');
       currentSlide.dataset.animation = String(template.enter_animation);
       for (const [property, value] of Object.entries({
         '--template-background': template.background,
@@ -2319,6 +2355,9 @@ export function renderPresentationHtml(
         '--template-spacing': template.spacing_scale,
         '--template-font-scale': template.font_scale,
         '--template-sidebar-width': template.sidebar_width_percent + '%',
+        '--motif-color': template.motif_color,
+        '--motif-opacity': template.motif_opacity,
+        '--motif-scale': template.motif_scale,
         '--body-weight': template.body_weight,
         '--heading-weight': template.heading_weight,
         '--body-letter-spacing': template.letter_spacing_em + 'em'
@@ -2401,6 +2440,9 @@ export function renderPresentationHtml(
       currentSlide.dataset.headingFont = String(template.heading_font || 'system-sans');
       currentSlide.dataset.density = String(template.density || 'comfortable');
       currentSlide.dataset.motionStyle = String(template.motion_style || 'calm');
+      currentSlide.dataset.motif = String(template.motif || 'none');
+      currentSlide.dataset.headingTreatment = String(template.heading_treatment || 'plain');
+      currentSlide.dataset.imageTreatment = String(template.image_treatment || 'natural');
       currentSlide.dataset.animation = String(data.enter_animation || template.enter_animation || 'fade');
       for (const [property, value] of Object.entries({
         '--template-background': template.background,
@@ -2414,6 +2456,9 @@ export function renderPresentationHtml(
         '--template-spacing': template.spacing_scale,
         '--template-font-scale': template.font_scale,
         '--template-sidebar-width': template.sidebar_width_percent + '%',
+        '--motif-color': template.motif_color,
+        '--motif-opacity': template.motif_opacity,
+        '--motif-scale': template.motif_scale,
         '--body-weight': template.body_weight,
         '--heading-weight': template.heading_weight,
         '--body-letter-spacing': template.letter_spacing_em + 'em'

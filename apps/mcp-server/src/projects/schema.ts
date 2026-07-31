@@ -38,6 +38,30 @@ export const visualPresetSchema = z.enum([
   "terminal"
 ]);
 
+export const designMotifSchema = z.enum([
+  "none",
+  "dots",
+  "grid",
+  "diagonal",
+  "rings",
+  "waves"
+]);
+
+export const headingTreatmentSchema = z.enum([
+  "plain",
+  "accent-line",
+  "highlight",
+  "boxed",
+  "outline"
+]);
+
+export const imageTreatmentSchema = z.enum([
+  "natural",
+  "rounded",
+  "framed",
+  "monochrome"
+]);
+
 export const fontPresetSchema = z.enum([
   "system-sans",
   "gothic",
@@ -514,6 +538,7 @@ export const slideCompositionSchema = z.discriminatedUnion("mode", [
 export const presentationTemplateSchema = z.object({
   id: templateIdSchema,
   name: z.string().min(1).max(80),
+  design_notes: z.string().max(1_000).optional(),
   region_layout: z.enum([
     "single",
     "sidebar-right",
@@ -549,7 +574,13 @@ export const presentationTemplateSchema = z.object({
     .min(-0.08)
     .max(0.2)
     .multipleOf(0.01)
-    .optional()
+    .optional(),
+  motif: designMotifSchema.optional(),
+  motif_color: hexColorSchema.optional(),
+  motif_opacity: z.number().min(0).max(0.5).multipleOf(0.05).optional(),
+  motif_scale: z.number().min(0.5).max(3).multipleOf(0.1).optional(),
+  heading_treatment: headingTreatmentSchema.optional(),
+  image_treatment: imageTreatmentSchema.optional()
 });
 
 export type PresentationTemplate = z.infer<typeof presentationTemplateSchema>;

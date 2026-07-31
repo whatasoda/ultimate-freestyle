@@ -208,7 +208,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.15.0",
-        renderer_version: "uf-renderer@115",
+        renderer_version: "uf-renderer@116",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -1601,6 +1601,7 @@ describe("MCP contract", () => {
           expected_version: 2,
           template_id: "research-paper",
           name: "研究ノート",
+          design_notes: "観察ノートの紙らしさと、作者の落ち着いた配色を使う。",
           visual_preset: "paper",
           make_default: true
         }
@@ -1633,7 +1634,11 @@ describe("MCP contract", () => {
             { field: "heading_font", value: "mincho" },
             { field: "body_weight", value: 500 },
             { field: "line_height", value: 1.5 },
-            { field: "motion_style", value: "calm" }
+            { field: "motion_style", value: "calm" },
+            { field: "design_notes", value: "紙の観察記録らしさを残す。" },
+            { field: "motif", value: "grid" },
+            { field: "heading_treatment", value: "accent-line" },
+            { field: "image_treatment", value: "framed" }
           ]
         }
       });
@@ -2418,8 +2423,19 @@ describe("MCP contract", () => {
           settings: {
             default_template_id: "paper-variant",
             templates: [
-              expect.objectContaining({ id: "paper-original", visual_preset: "paper" }),
-              expect.objectContaining({ id: "paper-variant", name: "紙面の別案", visual_preset: "paper" })
+              expect.objectContaining({
+                id: "paper-original",
+                visual_preset: "paper",
+                motif: "grid",
+                heading_treatment: "accent-line",
+                image_treatment: "framed"
+              }),
+              expect.objectContaining({
+                id: "paper-variant",
+                name: "紙面の別案",
+                visual_preset: "paper",
+                motif: "grid"
+              })
             ]
           }
         }
