@@ -1,6 +1,8 @@
-export const DASHBOARD_ASSET_VERSION = "165";
+export const DASHBOARD_ASSET_VERSION = "166";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
+  const panelTreatmentLabels = { flat: "素のまま", soft: "やわらかい面", outline: "線で囲む", raised: "浮き上がる", glass: "ガラス" };
   const fragmentIdFromHash = (hash) => {
     const value = hash.startsWith("#") ? hash.slice(1) : hash;
     try { return decodeURIComponent(value); } catch { return value; }
@@ -759,6 +761,35 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
   }
+  const templateRoleStyles = (form, data) => {
+    const editor = form.querySelector("[data-role-style-editor]");
+    if (!(editor instanceof HTMLElement)) return {};
+    let roleStyles = {};
+    try { roleStyles = JSON.parse(editor.dataset.roleStyles || "{}"); } catch {}
+    const role = String(data.get("role_style_role") || "content");
+    if (data.has("role_style_enabled")) {
+      const style = {};
+      for (const field of ["region_layout", "background", "surface", "foreground", "muted", "accent", "motif", "motif_color", "heading_treatment", "panel_treatment"]) {
+        const value = String(data.get("role_style_" + field) || "").trim();
+        if (value) style[field] = value;
+      }
+      const motifOpacity = String(data.get("role_style_motif_opacity") || "").trim();
+      if (motifOpacity !== "" && Number.isFinite(Number(motifOpacity))) style.motif_opacity = Number(motifOpacity);
+      roleStyles[role] = style;
+    } else delete roleStyles[role];
+    editor.dataset.roleStyles = JSON.stringify(roleStyles);
+    const summary = editor.querySelector("[data-role-style-summary]");
+    if (summary instanceof HTMLElement) {
+      summary.replaceChildren();
+      const roles = Object.keys(roleStyles);
+      for (const item of roles.length ? roles : [""]) {
+        const chip = document.createElement("span");
+        chip.textContent = item ? slideRoleLabels[item] || item : "差分なし";
+        summary.append(chip);
+      }
+    }
+    return roleStyles;
+  };
   const syncTemplateDraft = () => {
     if (!(templateEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(templateEditor);
@@ -771,9 +802,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       contrastStatus.textContent = "本文 " + mainContrast.toFixed(1) + ":1 · 補足 " + sidebarContrast.toFixed(1) + ":1" + (readable ? " — 標準文字の目安4.5:1以上です。" : " — 4.5:1未満の組み合わせを見直してください。");
       contrastStatus.dataset.level = readable ? "ok" : "warning";
     }
+    const roleStyles = templateRoleStyles(templateEditor, data);
+    const previewRole = String(data.get("role_style_role") || "content");
+    const roleStyle = roleStyles[previewRole] || {};
+    const roleMainContrast = colorContrast(roleStyle.background || String(data.get("background")), roleStyle.foreground || String(data.get("foreground")));
+    const roleSidebarContrast = colorContrast(roleStyle.surface || String(data.get("surface")), roleStyle.muted || String(data.get("muted")));
+    const roleContrastStatus = templateEditor.querySelector("[data-role-contrast-status]");
+    if (roleContrastStatus instanceof HTMLElement) {
+      const readable = roleMainContrast >= 4.5 && roleSidebarContrast >= 4.5;
+      roleContrastStatus.textContent = "この役割の本文 " + roleMainContrast.toFixed(1) + ":1 · 補足 " + roleSidebarContrast.toFixed(1) + ":1" + (readable ? " — 目安を満たしています。" : " — 4.5:1未満を見直してください。");
+      roleContrastStatus.dataset.level = readable ? "ok" : "warning";
+    }
     slideFrame.contentWindow?.postMessage({
       type: "ultimate-freestyle:preview-template",
       slide_id: templateEditor.dataset.slideId || "",
+      preview_role: previewRole,
       template: {
         region_layout: String(data.get("region_layout") || "sidebar-right"),
         sidebar_width_percent: Number(data.get("sidebar_width_percent")),
@@ -799,6 +842,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         motif_scale: Number(data.get("motif_scale")),
         heading_treatment: String(data.get("heading_treatment") || "plain"),
         image_treatment: String(data.get("image_treatment") || "natural"),
+        panel_treatment: String(data.get("panel_treatment") || "flat"),
+        role_styles: roleStyles,
         body_weight: Number(data.get("body_weight")),
         heading_weight: Number(data.get("heading_weight")),
         line_height: Number(data.get("line_height")),
@@ -808,7 +853,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }, location.origin);
   };
   if (templateEditor instanceof HTMLFormElement) {
-    templateEditor.addEventListener("input", () => {
+    templateEditor.addEventListener("input", (event) => {
+      if (!(event.target instanceof HTMLSelectElement) || event.target.name !== "role_style_role") {
+        templateRoleStyles(templateEditor, new FormData(templateEditor));
+      }
       clearTimeout(draftTemplateTimer);
       draftTemplateTimer = setTimeout(syncTemplateDraft, 120);
       const layoutStatus = document.querySelector("[data-layout-status]");
@@ -817,6 +865,37 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         layoutStatus.dataset.level = "";
       }
     });
+    const roleStyleEditor = templateEditor.querySelector("[data-role-style-editor]");
+    const roleSelect = templateEditor.elements.namedItem("role_style_role");
+    const loadRoleStyle = () => {
+      if (!(roleStyleEditor instanceof HTMLElement) || !(roleSelect instanceof HTMLSelectElement)) return;
+      let roleStyles = {};
+      let base = {};
+      try { roleStyles = JSON.parse(roleStyleEditor.dataset.roleStyles || "{}"); } catch {}
+      try { base = JSON.parse(roleStyleEditor.dataset.roleStyleBase || "{}"); } catch {}
+      const style = roleStyles[roleSelect.value];
+      const enabled = templateEditor.elements.namedItem("role_style_enabled");
+      if (enabled instanceof HTMLInputElement) enabled.checked = Boolean(style);
+      for (const field of ["region_layout", "background", "surface", "foreground", "muted", "accent", "motif", "motif_color", "heading_treatment", "panel_treatment", "motif_opacity"]) {
+        const control = templateEditor.elements.namedItem("role_style_" + field);
+        if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) control.value = style?.[field] ?? "";
+        const picker = templateEditor.elements.namedItem("role_style_" + field + "_picker");
+        if (picker instanceof HTMLInputElement && picker.type === "color") picker.value = style?.[field] || base[field] || "#000000";
+      }
+    };
+    if (roleSelect instanceof HTMLSelectElement) roleSelect.addEventListener("change", loadRoleStyle);
+    for (const picker of templateEditor.querySelectorAll("[data-role-style-color]")) {
+      if (!(picker instanceof HTMLInputElement) || picker.type !== "color") continue;
+      const textField = templateEditor.elements.namedItem("role_style_" + (picker.dataset.roleStyleColor || ""));
+      if (!(textField instanceof HTMLInputElement)) continue;
+      picker.addEventListener("input", () => {
+        textField.value = picker.value;
+        textField.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      textField.addEventListener("input", () => {
+        if (/^#[0-9a-f]{6}$/i.test(textField.value)) picker.value = textField.value;
+      });
+    }
   }
   const syncAppearanceDraft = () => {
     if (!(appearanceEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
@@ -1061,6 +1140,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       motif_scale: numberValue(data, "motif_scale"),
       heading_treatment: String(data.get("heading_treatment") || "plain"),
       image_treatment: String(data.get("image_treatment") || "natural"),
+      panel_treatment: String(data.get("panel_treatment") || "flat"),
+      role_styles: templateRoleStyles(form, data),
       make_default: data.has("make_default")
     });
     if (form.matches("[data-template-create]")) Object.assign(body, {
@@ -1195,18 +1276,21 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const existing = activeFilmstrip.querySelector("[data-filmstrip-role]");
         if (roleField instanceof HTMLSelectElement) {
           const previousRole = activeFilmstrip.dataset.roleLabel || "";
-          const nextRole = roleField.value === "cover" ? "表紙" : "通常";
+          const nextRole = slideRoleLabels[roleField.value] || roleField.value;
           const searchText = activeFilmstrip.dataset.searchText || "";
           activeFilmstrip.dataset.searchText = searchText.replace(" " + previousRole + " ", " " + nextRole + " ");
           activeFilmstrip.dataset.roleLabel = nextRole;
+          setSettingValue("role", nextRole);
         }
-        if (roleField instanceof HTMLSelectElement && roleField.value === "cover" && !(existing instanceof HTMLElement)) {
+        if (roleField instanceof HTMLSelectElement && !(existing instanceof HTMLElement)) {
           const badge = document.createElement("small");
           badge.className = "stage";
           badge.dataset.filmstripRole = "";
-          badge.textContent = "表紙";
+          badge.textContent = slideRoleLabels[roleField.value] || roleField.value;
           activeFilmstrip.querySelector("[data-filmstrip-title]")?.insertAdjacentElement("afterend", badge);
-        } else if (roleField instanceof HTMLSelectElement && roleField.value !== "cover" && existing instanceof HTMLElement) existing.remove();
+        } else if (roleField instanceof HTMLSelectElement && existing instanceof HTMLElement) {
+          existing.textContent = slideRoleLabels[roleField.value] || roleField.value;
+        }
       }
     }
     if (form.matches("[data-typography-editor]")) {
@@ -1249,6 +1333,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       setSettingValue("density", selectedOptionLabel(form, "density"));
       setSettingValue("motion", selectedOptionLabel(form, "motion_style"));
       setSettingValue("motif", selectedOptionLabel(form, "motif"));
+      const role = String(new FormData(form).get("role_style_role") || "content");
+      let roleStyles = {};
+      try { roleStyles = JSON.parse(form.querySelector("[data-role-style-editor]")?.dataset.roleStyles || "{}"); } catch {}
+      const rolePanel = roleStyles[role]?.panel_treatment || String(new FormData(form).get("panel_treatment") || "flat");
+      setSettingValue("panel", panelTreatmentLabels[rolePanel] || rolePanel);
       const impact = form.querySelector("[data-template-impact]");
       if (impact instanceof HTMLElement && result.affected_slides) {
         impact.textContent = "保存すると現在" + result.affected_slides.total + "枚へ反映されます（直接指定 " + result.affected_slides.direct + "枚・既定を継承 " + result.affected_slides.inherited + "枚）。";
@@ -2089,7 +2178,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         syncPicker(form, "[data-tone-pick]", "tonePick", field.value);
       } else if (field.name === "loading_style") {
         syncPicker(form, "[data-loading-style-pick]", "loadingStylePick", field.value);
-      } else if (["motif", "heading_treatment", "image_treatment"].includes(field.name)) {
+      } else if (["motif", "heading_treatment", "image_treatment", "panel_treatment"].includes(field.name)) {
         syncPicker(form, '[data-design-field="' + CSS.escape(field.name) + '"]', "designPick", field.value);
       } else if (field.name === "body_font" || field.name === "heading_font") {
         const body = form.elements.namedItem("body_font");

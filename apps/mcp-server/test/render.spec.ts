@@ -101,7 +101,20 @@ describe("presentation artifact renderer", () => {
               motif_opacity: 0.2,
               motif_scale: 1.4,
               heading_treatment: "outline",
-              image_treatment: "framed"
+              image_treatment: "framed",
+              panel_treatment: "glass",
+              role_styles: {
+                result: {
+                  region_layout: "focus",
+                  background: "#20152f",
+                  accent: "#ff7f50",
+                  motif: "waves",
+                  motif_color: "#ff7f50",
+                  motif_opacity: 0.25,
+                  heading_treatment: "boxed",
+                  panel_treatment: "raised"
+                }
+              }
             }
           ],
           default_template_id: "my-biim",
@@ -114,7 +127,7 @@ describe("presentation artifact renderer", () => {
               reveal_steps: 1,
               tone: "dark",
               template_id: "my-biim",
-              role: "cover",
+              role: "result",
               cover_layout: "poster",
               typography: {
                 preset: "columns",
@@ -191,16 +204,26 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@116");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@117");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");
-    expect(html).toContain('data-motif="rings"');
-    expect(html).toContain('data-heading-treatment="outline"');
+    expect(html).toContain('data-slide-role="result"');
+    expect(html).toContain('data-region-layout="focus"');
+    expect(html).toContain('data-motif="waves"');
+    expect(html).toContain('data-heading-treatment="boxed"');
     expect(html).toContain('data-image-treatment="framed"');
+    expect(html).toContain('data-panel-treatment="raised"');
     expect(html).toContain('class="theme-motif" aria-hidden="true"');
-    expect(html).toContain('--motif-color: #65ccff');
+    expect(html).toContain('--template-background:#20152f');
+    expect(html).toContain('--template-accent:#ff7f50');
+    expect(html).toContain('--motif-color:#ff7f50');
     expect(html).toContain('.slide[data-motif="waves"] .theme-motif');
     expect(html).toContain('.slide[data-heading-treatment="highlight"]');
     expect(html).toContain('.slide[data-image-treatment="monochrome"]');
+    expect(html).toContain('.slide[data-panel-treatment="glass"]');
+    expect(html.indexOf('.slide[data-user-template="true"] .slide-sidebar')).toBeLessThan(
+      html.indexOf('.slide[data-panel-treatment="glass"]')
+    );
+    expect(html).toContain("const templateForPreviewRole =");
     expect(html).toContain("currentSlide.dataset.motif");
     expect(html).toContain("startVoiceDelay");
     expect(html).toContain("読み上げ前の間");
@@ -994,7 +1017,7 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain("data-current-slide-title");
     expect(workspaceHtml).toContain("data-filmstrip-title");
     expect(workspaceHtml).toContain("data-filmstrip-duration");
-    expect(workspaceHtml).toContain('data-role-label="通常"');
+    expect(workspaceHtml).toContain('data-role-label="本文"');
     expect(workspaceHtml).toContain('&quot;template_name&quot;:&quot;');
     expect(workspaceHtml).toContain('data-setting-value="typography"');
     expect(workspaceHtml).toContain("プレビューを広げる");

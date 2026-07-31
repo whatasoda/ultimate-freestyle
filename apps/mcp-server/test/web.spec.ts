@@ -481,8 +481,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=165"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=165"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=166"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=166"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -744,7 +744,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@116"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@117"');
 
     const voicePage = await requestProvider(
       provider,
@@ -914,7 +914,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=165"'
+      'href="/assets/dashboard.css?v=166"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1017,6 +1017,16 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-design-pick="outline"');
     expect(workspaceHtml).toContain('data-design-field="image_treatment"');
     expect(workspaceHtml).toContain('data-design-pick="monochrome"');
+    expect(workspaceHtml).toContain('data-design-field="panel_treatment"');
+    expect(workspaceHtml).toContain('data-design-pick="glass"');
+    expect(workspaceHtml).toContain("役割ごとのデザイン差分");
+    expect(workspaceHtml).toContain('data-role-style-editor');
+    expect(workspaceHtml).toContain('name="role_style_role"');
+    expect(workspaceHtml).toContain('<option value="section"');
+    expect(workspaceHtml).toContain('<option value="comparison"');
+    expect(workspaceHtml).toContain('<option value="result"');
+    expect(workspaceHtml).toContain('<option value="closing"');
+    expect(workspaceHtml).toContain('name="role_style_panel_treatment"');
     expect(workspaceHtml).toContain('name="motif_opacity"');
     expect(workspaceHtml).toContain('name="motif_scale"');
     expect(workspaceHtml).toContain("data-template-delete");
@@ -1033,6 +1043,9 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain('design_notes: String(data.get("design_notes")');
     expect(DASHBOARD_SCRIPT).toContain('motif: String(data.get("motif")');
     expect(DASHBOARD_SCRIPT).toContain('motif_color: String(data.get("motif_color")');
+    expect(DASHBOARD_SCRIPT).toContain("const templateRoleStyles =");
+    expect(DASHBOARD_SCRIPT).toContain("role_styles: templateRoleStyles(form, data)");
+    expect(DASHBOARD_SCRIPT).toContain("slideRoleLabels");
     expect(workspaceHtml).toContain('data-animation-pick="wipe"');
     expect(workspaceHtml).toContain("動きをもう一度見る");
     expect(workspaceHtml).toContain('data-tone-pick="signal"');
@@ -1116,7 +1129,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=165"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=166"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1125,7 +1138,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=165"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=166"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1137,7 +1150,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=165", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=166", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1148,7 +1161,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=165", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=166", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1188,7 +1201,7 @@ describe("Web dashboard", () => {
       ".component-outline-row code { grid-column: 1 / -1;"
     );
     expect(dashboardStyleText).toContain(
-      '[data-appearance-editor]:has(select[name="role"] option[value="content"]:checked)'
+      '[data-appearance-editor]:not(:has(select[name="role"] option[value="cover"]:checked))'
     );
     expect(dashboardStyleText).toContain(
       '.font-pick[data-font-available="false"]'
@@ -2437,7 +2450,18 @@ describe("Web dashboard", () => {
             body_weight: 500,
             heading_weight: 900,
             line_height: 1.6,
-            letter_spacing_em: 0.02
+            letter_spacing_em: 0.02,
+            panel_treatment: "raised",
+            role_styles: {
+              result: {
+                region_layout: "focus",
+                background: "#20152f",
+                accent: "#ff7f50",
+                motif: "waves",
+                heading_treatment: "boxed",
+                panel_treatment: "glass"
+              }
+            }
           })
         }
       ),
@@ -2449,7 +2473,11 @@ describe("Web dashboard", () => {
       template_id: "lab",
       template: {
         name: "読みやすい実験ノート",
-        enter_animation: "slide-left"
+        enter_animation: "slide-left",
+        panel_treatment: "raised",
+        role_styles: {
+          result: { region_layout: "focus", panel_treatment: "glass" }
+        }
       },
       default_template_id: "lab",
       default_template: {
@@ -2669,7 +2697,11 @@ describe("Web dashboard", () => {
       name: "実験ノートの派生",
       visual_preset: "editorial",
       background: "#102030",
-      body_font: "mincho"
+      body_font: "mincho",
+      panel_treatment: "raised",
+      role_styles: {
+        result: { background: "#20152f", panel_treatment: "glass" }
+      }
     });
 
     const typographyUpdate = await requestProvider(

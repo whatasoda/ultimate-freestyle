@@ -99,6 +99,8 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - 色、配置、font、密度、animation、装飾の調整はupdate_presentation_template_fieldsのupdatesへfield/valueを最大8件入れ、変更項目だけを送る。
 - 背景モチーフは \`none\`、\`dots\`、\`grid\`、\`diagonal\`、\`rings\`、\`waves\`。色、濃さ、スケールをそれぞれ\`motif_color\`、\`motif_opacity\`、\`motif_scale\`で調整する。
 - 見出し処理は \`plain\`、\`accent-line\`、\`highlight\`、\`boxed\`、\`outline\`。画像処理は \`natural\`、\`rounded\`、\`framed\`、\`monochrome\`。visual presetを変えずに組み替えられる。
+- カード・補足欄の処理は \`flat\`、\`soft\`、\`outline\`、\`raised\`、\`glass\`。sceneのcard、callout、metric、quote、chart、timelineとflowの補足欄へ一貫して適用する。
+- slideのroleは \`cover\`、\`section\`、\`content\`、\`comparison\`、\`result\`、\`closing\`。role固有の差分は\`update_presentation_template_fields\`へroleを付けて一項目ずつ設定し、nullで基本templateの継承へ戻す。
 - 領域配置は単一、左右補足、下段補足に加え、左右均等の \`split\`、上段補足の \`top-band\`、中央集中の \`focus\`を選べる。
 - 基本5色に加えて \`accent_secondary\` と \`border\` を指定できる。値は6桁hexだけを使い、任意CSSやgradientは入力しない。
 
@@ -873,7 +875,9 @@ export function registerResearchGuides(
                   motif_opacity: template.motif_opacity,
                   motif_scale: template.motif_scale,
                   heading_treatment: template.heading_treatment,
-                  image_treatment: template.image_treatment
+                  image_treatment: template.image_treatment,
+                  panel_treatment: template.panel_treatment,
+                  role_styles: template.role_styles
                 })),
                 narration_defaults: selected.deck.narration_defaults,
                 voicevox: selected.deck.voicevox === null || selected.deck.voicevox === undefined

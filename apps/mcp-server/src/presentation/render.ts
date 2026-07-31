@@ -1,11 +1,12 @@
 import type {
+  PresentationTemplate,
   ProjectRecord,
   SlideBlock,
   SlideSceneNode
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@116";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@117";
 
 function escapeHtml(value: string): string {
   return value
@@ -160,6 +161,8 @@ type MotionStyle = "calm" | "snappy" | "dramatic";
 type DesignMotif = "none" | "dots" | "grid" | "diagonal" | "rings" | "waves";
 type HeadingTreatment = "plain" | "accent-line" | "highlight" | "boxed" | "outline";
 type ImageTreatment = "natural" | "rounded" | "framed" | "monochrome";
+type PanelTreatment = "flat" | "soft" | "outline" | "raised" | "glass";
+type SlideRole = keyof NonNullable<PresentationTemplate["role_styles"]>;
 
 type TemplateAppearance = {
   visual_preset?: VisualPreset;
@@ -177,6 +180,7 @@ type TemplateAppearance = {
   motif_scale?: number;
   heading_treatment?: HeadingTreatment;
   image_treatment?: ImageTreatment;
+  panel_treatment?: PanelTreatment;
 };
 
 function templateAppearance(template: unknown): Required<TemplateAppearance> {
@@ -196,8 +200,18 @@ function templateAppearance(template: unknown): Required<TemplateAppearance> {
     motif_opacity: value.motif_opacity ?? 0.1,
     motif_scale: value.motif_scale ?? 1,
     heading_treatment: value.heading_treatment ?? "plain",
-    image_treatment: value.image_treatment ?? "natural"
+    image_treatment: value.image_treatment ?? "natural",
+    panel_treatment: value.panel_treatment ?? "flat"
   };
+}
+
+function templateForRole(
+  template: PresentationTemplate | null | undefined,
+  role: SlideRole
+): PresentationTemplate | null | undefined {
+  if (template === null || template === undefined) return template;
+  const roleStyle = template.role_styles?.[role];
+  return roleStyle === undefined ? template : { ...template, ...roleStyle };
 }
 
 function narrationAppearance(
@@ -576,7 +590,10 @@ export function renderPresentationHtml(
   const firstSlide = deck.slides[0];
   const firstTemplateId = firstSlide.template_id ?? deck.default_template_id ?? null;
   const preludeHeadingFont = templateAppearance(
-    firstTemplateId === null ? null : templates.get(firstTemplateId)
+    templateForRole(
+      firstTemplateId === null ? null : templates.get(firstTemplateId),
+      firstSlide.role ?? "content"
+    )
   ).heading_font;
   const preludeAccentForeground = readableForeground(deck.accent);
   const templateCss = [...templates.values()]
@@ -624,7 +641,9 @@ export function renderPresentationHtml(
     .map((slide, index) => {
       const templateId = slide.template_id ?? deck.default_template_id ?? null;
       const template = templateId === null ? null : templates.get(templateId);
-      const appearance = templateAppearance(template);
+      const role = slide.role ?? "content";
+      const effectiveTemplate = templateForRole(template, role);
+      const appearance = templateAppearance(effectiveTemplate);
       if (template === null && deck.layout === "minimal") {
         appearance.visual_preset = "paper";
       }
@@ -632,10 +651,10 @@ export function renderPresentationHtml(
         slide.typography,
         appearance.line_height
       );
-      const regionLayout = template?.region_layout ?? "sidebar-right";
+      const regionLayout = effectiveTemplate?.region_layout ?? "sidebar-right";
       const enterAnimation =
-        slide.enter_animation ?? template?.enter_animation ?? "fade";
-      const revealAnimation = template?.reveal_animation ?? "rise";
+        slide.enter_animation ?? effectiveTemplate?.enter_animation ?? "fade";
+      const revealAnimation = effectiveTemplate?.reveal_animation ?? "rise";
       const composition = slide.composition;
       const narrationDisplay = slide.narration?.display ?? "commentary";
       const narrationStyle = narrationAppearance(
@@ -678,7 +697,10 @@ export function renderPresentationHtml(
   <aside class="slide-sidebar" data-flow-sidebar data-region="sidebar" data-fit-content data-fit-id="flow:sidebar" data-fit-region="sidebar"${slide.sidebar_markdown === null ? " hidden" : ""}>
     ${slide.sidebar_markdown === null ? "" : renderTextBlocks(slide.sidebar_markdown)}
   </aside>`;
-      return `<article class="slide tone-${slide.tone}" role="group" aria-roledescription="スライド" aria-label="${index + 1} / ${deck.slides.length}：${escapeHtml(slide.title)}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${slide.role ?? "content"}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-motif="${appearance.motif}" data-heading-treatment="${appearance.heading_treatment}" data-image-treatment="${appearance.image_treatment}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em;--motif-color:${appearance.motif_color};--motif-opacity:${appearance.motif_opacity};--motif-scale:${appearance.motif_scale}" hidden>
+      const roleTemplateVariables = effectiveTemplate === null || effectiveTemplate === undefined
+        ? ""
+        : `--template-background:${effectiveTemplate.background};--template-surface:${effectiveTemplate.surface};--template-foreground:${effectiveTemplate.foreground};--template-muted:${effectiveTemplate.muted};--template-accent:${effectiveTemplate.accent};--template-accent-secondary:${effectiveTemplate.accent_secondary ?? effectiveTemplate.accent};--template-border:${effectiveTemplate.border ?? effectiveTemplate.muted};`;
+      return `<article class="slide tone-${slide.tone}" role="group" aria-roledescription="スライド" aria-label="${index + 1} / ${deck.slides.length}：${escapeHtml(slide.title)}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${role}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-motif="${appearance.motif}" data-heading-treatment="${appearance.heading_treatment}" data-image-treatment="${appearance.image_treatment}" data-panel-treatment="${appearance.panel_treatment}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="${roleTemplateVariables}--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em;--motif-color:${appearance.motif_color};--motif-opacity:${appearance.motif_opacity};--motif-scale:${appearance.motif_scale}" hidden>
   <div class="theme-motif" aria-hidden="true"></div>
   ${content}
   <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" style="--narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines};${narrationVariables}" aria-live="off">
@@ -754,6 +776,12 @@ export function renderPresentationHtml(
     .slide[data-image-treatment="framed"] :is(uf-image, figure.canvas-block) img { padding: .55cqw; border: .12cqw solid var(--accent); background: var(--theme-surface); box-shadow: .4cqw .4cqw 0 color-mix(in srgb, var(--accent) 28%, transparent); }
     .slide[data-image-treatment="monochrome"] :is(uf-image, figure.canvas-block) img { filter: grayscale(1) contrast(1.08); }
     .slide[data-user-template="true"] .slide-sidebar { background: var(--theme-surface); color: var(--theme-muted); }
+    .slide[data-panel-treatment="soft"] :is(uf-card,uf-callout,uf-metric,uf-quote,uf-bar-chart,uf-timeline,.slide-sidebar) { border-color: color-mix(in srgb, var(--theme-border) 58%, transparent); background: color-mix(in srgb, var(--theme-surface) 88%, var(--theme-background)); box-shadow: 0 .55cqw 1.8cqw #0002; backdrop-filter: none; }
+    .slide[data-panel-treatment="outline"] :is(uf-card,uf-callout,uf-metric,uf-quote,uf-bar-chart,uf-timeline,.slide-sidebar) { border-color: var(--accent); background: transparent; box-shadow: none; backdrop-filter: none; }
+    .slide[data-panel-treatment="raised"] :is(uf-card,uf-callout,uf-metric,uf-quote,uf-bar-chart,uf-timeline,.slide-sidebar) { border-color: var(--theme-border); background: var(--theme-surface); box-shadow: .48cqw .48cqw 0 color-mix(in srgb, var(--accent) 34%, transparent); backdrop-filter: none; }
+    .slide[data-panel-treatment="glass"] :is(uf-card,uf-callout,uf-metric,uf-quote,uf-bar-chart,uf-timeline,.slide-sidebar) { border-color: color-mix(in srgb, var(--theme-border) 72%, white); background: color-mix(in srgb, var(--theme-surface) 66%, transparent); box-shadow: 0 .65cqw 2.2cqw #0004; backdrop-filter: blur(18px); }
+    .slide[data-slide-role="section"] .eyebrow, .slide[data-slide-role="result"] .eyebrow, .slide[data-slide-role="closing"] .eyebrow { color: var(--accent); letter-spacing: .16em; }
+    .slide[data-slide-role="result"] .slide-content > :first-child { color: var(--accent); }
     .slide[data-density="spacious"] { --density-scale: 1.18; }
     .slide[data-density="compact"] { --density-scale: .82; }
     .slide[data-motion-style="calm"] { --motion-duration: .48s; --motion-ease: cubic-bezier(.22,.75,.2,1); }
@@ -2329,10 +2357,19 @@ export function renderPresentationHtml(
       if (content instanceof HTMLElement) content.dataset.columns = String(typography.columns);
       scheduleFit();
     };
+    const templateForPreviewRole = (source, role) => {
+      if (!source || typeof source !== 'object') return null;
+      const roleStyles = source.role_styles && typeof source.role_styles === 'object' ? source.role_styles : {};
+      const roleStyle = roleStyles[role] && typeof roleStyles[role] === 'object' ? roleStyles[role] : {};
+      return { ...source, ...roleStyle };
+    };
     const previewTemplate = (data) => {
       const currentSlide = slides[slide];
       if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id || !data.template || typeof data.template !== 'object') return;
-      const template = data.template;
+      const previewRole = String(data.preview_role || currentSlide.dataset.slideRole || 'content');
+      const template = templateForPreviewRole(data.template, previewRole);
+      if (!template) return;
+      currentSlide.dataset.slideRole = previewRole;
       currentSlide.dataset.regionLayout = String(template.region_layout);
       currentSlide.dataset.visualPreset = String(template.visual_preset);
       currentSlide.dataset.bodyFont = String(template.body_font);
@@ -2342,6 +2379,7 @@ export function renderPresentationHtml(
       currentSlide.dataset.motif = String(template.motif || 'none');
       currentSlide.dataset.headingTreatment = String(template.heading_treatment || 'plain');
       currentSlide.dataset.imageTreatment = String(template.image_treatment || 'natural');
+      currentSlide.dataset.panelTreatment = String(template.panel_treatment || 'flat');
       currentSlide.dataset.animation = String(template.enter_animation);
       for (const [property, value] of Object.entries({
         '--template-background': template.background,
@@ -2423,9 +2461,12 @@ export function renderPresentationHtml(
     const previewAppearance = (data) => {
       const currentSlide = slides[slide];
       if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return;
-      const template = data.template;
-      if (!template || typeof template !== 'object') return;
-      currentSlide.dataset.slideRole = String(data.role || 'content');
+      const sourceTemplate = data.template;
+      if (!sourceTemplate || typeof sourceTemplate !== 'object') return;
+      const previewRole = String(data.role || 'content');
+      const template = templateForPreviewRole(sourceTemplate, previewRole);
+      if (!template) return;
+      currentSlide.dataset.slideRole = previewRole;
       currentSlide.dataset.coverLayout = String(data.cover_layout || 'center');
       currentSlide.dataset.tone = String(data.tone || 'dark');
       for (const className of [...currentSlide.classList]) {
@@ -2443,6 +2484,7 @@ export function renderPresentationHtml(
       currentSlide.dataset.motif = String(template.motif || 'none');
       currentSlide.dataset.headingTreatment = String(template.heading_treatment || 'plain');
       currentSlide.dataset.imageTreatment = String(template.image_treatment || 'natural');
+      currentSlide.dataset.panelTreatment = String(template.panel_treatment || 'flat');
       currentSlide.dataset.animation = String(data.enter_animation || template.enter_animation || 'fade');
       for (const [property, value] of Object.entries({
         '--template-background': template.background,

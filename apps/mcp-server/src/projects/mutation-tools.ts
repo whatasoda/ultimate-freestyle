@@ -29,6 +29,9 @@ import {
   narrationAppearanceSchema,
   narrationDisplaySchema,
   narrationSegmentSchema,
+  panelTreatmentSchema,
+  presentationRoleStyleSchema,
+  presentationRoleStylesSchema,
   presentationTemplateSchema,
   presentationAspectRatioSchema,
   projectSlideSchema,
@@ -117,7 +120,8 @@ const templateMutableInput = {
   motif_opacity: presentationTemplateSchema.shape.motif_opacity,
   motif_scale: presentationTemplateSchema.shape.motif_scale,
   heading_treatment: headingTreatmentSchema.optional(),
-  image_treatment: imageTreatmentSchema.optional()
+  image_treatment: imageTreatmentSchema.optional(),
+  panel_treatment: panelTreatmentSchema.optional()
 };
 const templateMutableFieldSchema = z.enum([
   "name",
@@ -150,8 +154,10 @@ const templateMutableFieldSchema = z.enum([
   "motif_opacity",
   "motif_scale",
   "heading_treatment",
-  "image_treatment"
+  "image_treatment",
+  "panel_treatment"
 ]);
+const roleStyleMutableInput = presentationRoleStyleSchema.shape;
 const slideBodyEditSchema = z.object({
   target: z.enum(["content", "sidebar"]),
   operation: z.enum(["replace", "replace_once", "append", "prepend", "clear"]),
@@ -194,7 +200,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.15,
     motif_scale: 1.4,
     heading_treatment: "plain",
-    image_treatment: "rounded"
+    image_treatment: "rounded",
+    panel_treatment: "glass"
   },
   paper: {
     region_layout: "single",
@@ -219,7 +226,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.1,
     motif_scale: 1.1,
     heading_treatment: "accent-line",
-    image_treatment: "framed"
+    image_treatment: "framed",
+    panel_treatment: "outline"
   },
   editorial: {
     region_layout: "sidebar-right",
@@ -244,7 +252,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.1,
     motif_scale: 1.2,
     heading_treatment: "accent-line",
-    image_treatment: "natural"
+    image_treatment: "natural",
+    panel_treatment: "flat"
   },
   neon: {
     region_layout: "sidebar-right",
@@ -269,7 +278,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.15,
     motif_scale: 1.4,
     heading_treatment: "outline",
-    image_treatment: "rounded"
+    image_treatment: "rounded",
+    panel_treatment: "glass"
   },
   "retro-game": {
     region_layout: "sidebar-right",
@@ -294,7 +304,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.15,
     motif_scale: 0.9,
     heading_treatment: "boxed",
-    image_treatment: "framed"
+    image_treatment: "framed",
+    panel_treatment: "raised"
   },
   "soft-pop": {
     region_layout: "sidebar-right",
@@ -319,7 +330,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.15,
     motif_scale: 1.6,
     heading_treatment: "highlight",
-    image_treatment: "rounded"
+    image_treatment: "rounded",
+    panel_treatment: "soft"
   },
   scientific: {
     region_layout: "sidebar-right",
@@ -344,7 +356,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.1,
     motif_scale: 0.9,
     heading_treatment: "accent-line",
-    image_treatment: "framed"
+    image_treatment: "framed",
+    panel_treatment: "outline"
   },
   museum: {
     region_layout: "sidebar-right",
@@ -369,7 +382,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.1,
     motif_scale: 1.8,
     heading_treatment: "plain",
-    image_treatment: "framed"
+    image_treatment: "framed",
+    panel_treatment: "flat"
   },
   terminal: {
     region_layout: "sidebar-right",
@@ -394,7 +408,8 @@ export const TEMPLATE_PRESET_DEFAULTS: Record<
     motif_opacity: 0.15,
     motif_scale: 0.8,
     heading_treatment: "boxed",
-    image_treatment: "monochrome"
+    image_treatment: "monochrome",
+    panel_treatment: "outline"
   }
 };
 
@@ -1158,7 +1173,7 @@ export function registerProjectMutationTools(
     {
       title: "presetまたは既存案から発表テンプレートを作成",
       description:
-        "安全なvisual presetまたは既存templateから新しい案を一件作ります。visual_presetとcopy_from_template_idはどちらか一方だけを指定し、作成後は部分更新toolで必要な項目だけ調整します。",
+        "visual presetまたは既存templateを複製して新しい案を作り、作成後は部分更新します。",
       inputSchema: {
         ...projectIdInput,
         template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -1218,15 +1233,16 @@ export function registerProjectMutationTools(
     {
       title: "発表テンプレートを部分更新",
       description:
-        "指定templateの色、配置、font、密度、動きなど、指定した項目だけを更新します。",
+        "templateの指定項目だけを更新します。role指定時は役割差分を更新し、nullで継承へ戻します。",
       inputSchema: {
         ...projectIdInput,
         template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        role: slideRoleSchema.optional(),
         updates: z
           .array(
             z.object({
               field: templateMutableFieldSchema,
-              value: z.union([z.string().max(1_000), z.number()])
+              value: z.union([z.string().max(1_000), z.number(), z.null()])
             })
           )
           .min(1)
@@ -1240,13 +1256,54 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, template_id, updates }) =>
+    async ({ project_id, expected_version, template_id, role, updates }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
         changedKind: "template_fields_updated",
         changedId: template_id,
         mutate: (document) => {
+          if (role !== undefined) {
+            const template = findTemplate(document, template_id);
+            const roleStyles = { ...(template.role_styles ?? {}) };
+            const roleStyle: Record<string, unknown> = { ...(roleStyles[role] ?? {}) };
+            const changedFields = new Set<string>();
+            for (const update of updates) {
+              if (changedFields.has(update.field)) {
+                throw new ProjectToolError(
+                  "INVALID_FIELDS",
+                  `The ${update.field} field appears more than once.`
+                );
+              }
+              changedFields.add(update.field);
+              if (!(update.field in roleStyleMutableInput)) {
+                throw new ProjectToolError(
+                  "INVALID_FIELDS",
+                  `The ${update.field} field cannot be overridden per role.`
+                );
+              }
+              if (update.value === null) {
+                delete roleStyle[update.field];
+                continue;
+              }
+              const schema = roleStyleMutableInput[
+                update.field as keyof typeof roleStyleMutableInput
+              ];
+              const parsed = schema.safeParse(update.value);
+              if (!parsed.success) {
+                throw new ProjectToolError(
+                  "INVALID_FIELDS",
+                  parsed.error.issues[0]?.message ?? `The ${update.field} field is invalid.`
+                );
+              }
+              roleStyle[update.field] = parsed.data;
+            }
+            if (Object.keys(roleStyle).length === 0) delete roleStyles[role];
+            else roleStyles[role] = presentationRoleStyleSchema.parse(roleStyle);
+            if (Object.keys(roleStyles).length === 0) delete template.role_styles;
+            else template.role_styles = presentationRoleStylesSchema.parse(roleStyles);
+            return;
+          }
           const fields: Record<string, unknown> = {};
           for (const update of updates) {
             if (update.field in fields) {

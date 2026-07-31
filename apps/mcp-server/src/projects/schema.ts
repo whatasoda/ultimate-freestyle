@@ -62,6 +62,14 @@ export const imageTreatmentSchema = z.enum([
   "monochrome"
 ]);
 
+export const panelTreatmentSchema = z.enum([
+  "flat",
+  "soft",
+  "outline",
+  "raised",
+  "glass"
+]);
+
 export const fontPresetSchema = z.enum([
   "system-sans",
   "gothic",
@@ -100,7 +108,24 @@ export const loadingScreenSchema = z.object({
   minimum_duration_ms: z.number().int().min(0).max(5_000)
 });
 
-export const slideRoleSchema = z.enum(["content", "cover"]);
+export const slideRoleSchema = z.enum([
+  "cover",
+  "section",
+  "content",
+  "comparison",
+  "result",
+  "closing"
+]);
+
+export const regionLayoutSchema = z.enum([
+  "single",
+  "sidebar-right",
+  "sidebar-left",
+  "lower-third",
+  "split",
+  "top-band",
+  "focus"
+]);
 
 export const coverLayoutSchema = z.enum([
   "center",
@@ -535,19 +560,36 @@ export const slideCompositionSchema = z.discriminatedUnion("mode", [
   slideSceneCompositionSchema
 ]);
 
+export const presentationRoleStyleSchema = z.object({
+  region_layout: regionLayoutSchema.optional(),
+  background: hexColorSchema.optional(),
+  surface: hexColorSchema.optional(),
+  foreground: hexColorSchema.optional(),
+  muted: hexColorSchema.optional(),
+  accent: hexColorSchema.optional(),
+  accent_secondary: hexColorSchema.optional(),
+  border: hexColorSchema.optional(),
+  motif: designMotifSchema.optional(),
+  motif_color: hexColorSchema.optional(),
+  motif_opacity: z.number().min(0).max(0.5).multipleOf(0.05).optional(),
+  heading_treatment: headingTreatmentSchema.optional(),
+  panel_treatment: panelTreatmentSchema.optional()
+});
+
+export const presentationRoleStylesSchema = z.object({
+  cover: presentationRoleStyleSchema.optional(),
+  section: presentationRoleStyleSchema.optional(),
+  content: presentationRoleStyleSchema.optional(),
+  comparison: presentationRoleStyleSchema.optional(),
+  result: presentationRoleStyleSchema.optional(),
+  closing: presentationRoleStyleSchema.optional()
+});
+
 export const presentationTemplateSchema = z.object({
   id: templateIdSchema,
   name: z.string().min(1).max(80),
   design_notes: z.string().max(1_000).optional(),
-  region_layout: z.enum([
-    "single",
-    "sidebar-right",
-    "sidebar-left",
-    "lower-third",
-    "split",
-    "top-band",
-    "focus"
-  ]),
+  region_layout: regionLayoutSchema,
   sidebar_width_percent: z.number().int().min(20).max(45),
   background: hexColorSchema,
   surface: hexColorSchema,
@@ -580,7 +622,9 @@ export const presentationTemplateSchema = z.object({
   motif_opacity: z.number().min(0).max(0.5).multipleOf(0.05).optional(),
   motif_scale: z.number().min(0.5).max(3).multipleOf(0.1).optional(),
   heading_treatment: headingTreatmentSchema.optional(),
-  image_treatment: imageTreatmentSchema.optional()
+  image_treatment: imageTreatmentSchema.optional(),
+  panel_treatment: panelTreatmentSchema.optional(),
+  role_styles: presentationRoleStylesSchema.optional()
 });
 
 export type PresentationTemplate = z.infer<typeof presentationTemplateSchema>;

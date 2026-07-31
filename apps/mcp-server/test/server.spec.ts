@@ -208,7 +208,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.15.0",
-        renderer_version: "uf-renderer@116",
+        renderer_version: "uf-renderer@117",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -1790,7 +1790,8 @@ describe("MCP contract", () => {
           updates: [
             { field: "region_layout", value: "split" },
             { field: "accent_secondary", value: "#65ccff" },
-            { field: "border", value: "#334155" }
+            { field: "border", value: "#334155" },
+            { field: "panel_treatment", value: "outline" }
           ]
         }
       });
@@ -2012,7 +2013,8 @@ describe("MCP contract", () => {
                   body_weight: 500,
                   region_layout: "split",
                   accent_secondary: "#65ccff",
-                  border: "#334155"
+                  border: "#334155",
+                  panel_treatment: "outline"
                 }
               ],
               voicevox: {
@@ -2080,6 +2082,32 @@ describe("MCP contract", () => {
           voice_profile_id: "guide-voice",
           voice_tuning: { pitchScale: -0.02 },
           audio_src: null
+        }
+      });
+      const roleStyle = await client.callTool({
+        name: "update_presentation_template_fields",
+        arguments: {
+          project_id: projectId,
+          expected_version: 15,
+          template_id: "research-paper",
+          role: "result",
+          updates: [{ field: "panel_treatment", value: "raised" }]
+        }
+      });
+      expect(roleStyle.structuredContent).toMatchObject({ ok: true, version: 16 });
+      const roleStyledDeck = await readJsonResource(
+        client,
+        `research://projects/${projectId}/deck`
+      );
+      expect(roleStyledDeck).toMatchObject({
+        version: 16,
+        deck: {
+          settings: {
+            templates: [{
+              id: "research-paper",
+              role_styles: { result: { panel_treatment: "raised" } }
+            }]
+          }
         }
       });
     } finally {
