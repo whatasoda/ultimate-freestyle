@@ -481,8 +481,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=166"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=166"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=167"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=167"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -744,7 +744,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@117"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@119"');
 
     const voicePage = await requestProvider(
       provider,
@@ -914,7 +914,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=166"'
+      'href="/assets/dashboard.css?v=167"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1027,6 +1027,15 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('<option value="result"');
     expect(workspaceHtml).toContain('<option value="closing"');
     expect(workspaceHtml).toContain('name="role_style_panel_treatment"');
+    expect(workspaceHtml).toContain('name="role_style_visual_preset"');
+    expect(workspaceHtml).toContain('name="role_style_body_font"');
+    expect(workspaceHtml).toContain('name="role_style_density"');
+    expect(workspaceHtml).toContain('name="role_style_spacing_scale"');
+    expect(workspaceHtml).toContain('name="role_style_motion_style"');
+    expect(workspaceHtml).toContain("AIと研究固有デザインを作る");
+    expect(workspaceHtml).toContain("3案を相談する文をコピー");
+    expect(workspaceHtml).toContain("9/10監査を頼む文をコピー");
+    expect(workspaceHtml).toContain("research://guide/presentation-design-workflow");
     expect(workspaceHtml).toContain('name="motif_opacity"');
     expect(workspaceHtml).toContain('name="motif_scale"');
     expect(workspaceHtml).toContain("data-template-delete");
@@ -1044,6 +1053,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain('motif: String(data.get("motif")');
     expect(DASHBOARD_SCRIPT).toContain('motif_color: String(data.get("motif_color")');
     expect(DASHBOARD_SCRIPT).toContain("const templateRoleStyles =");
+    expect(DASHBOARD_SCRIPT).toContain('const roleStyleStringFields = ["region_layout"');
+    expect(DASHBOARD_SCRIPT).toContain('const roleStyleNumberFields = ["sidebar_width_percent"');
     expect(DASHBOARD_SCRIPT).toContain("role_styles: templateRoleStyles(form, data)");
     expect(DASHBOARD_SCRIPT).toContain("slideRoleLabels");
     expect(workspaceHtml).toContain('data-animation-pick="wipe"');
@@ -1129,7 +1140,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=166"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=167"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1138,7 +1149,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=166"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=167"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1150,7 +1161,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=166", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=167", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1161,7 +1172,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=166", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=167", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -2457,8 +2468,14 @@ describe("Web dashboard", () => {
                 region_layout: "focus",
                 background: "#20152f",
                 accent: "#ff7f50",
+                visual_preset: "retro-game",
+                body_font: "monospace",
+                density: "compact",
+                spacing_scale: 0.85,
+                motion_style: "dramatic",
                 motif: "waves",
                 heading_treatment: "boxed",
+                image_treatment: "monochrome",
                 panel_treatment: "glass"
               }
             }
@@ -2476,7 +2493,16 @@ describe("Web dashboard", () => {
         enter_animation: "slide-left",
         panel_treatment: "raised",
         role_styles: {
-          result: { region_layout: "focus", panel_treatment: "glass" }
+          result: {
+            region_layout: "focus",
+            visual_preset: "retro-game",
+            body_font: "monospace",
+            density: "compact",
+            spacing_scale: 0.85,
+            motion_style: "dramatic",
+            image_treatment: "monochrome",
+            panel_treatment: "glass"
+          }
         }
       },
       default_template_id: "lab",
@@ -2700,7 +2726,16 @@ describe("Web dashboard", () => {
       body_font: "mincho",
       panel_treatment: "raised",
       role_styles: {
-        result: { background: "#20152f", panel_treatment: "glass" }
+        result: {
+          background: "#20152f",
+          visual_preset: "retro-game",
+          body_font: "monospace",
+          density: "compact",
+          spacing_scale: 0.85,
+          motion_style: "dramatic",
+          image_treatment: "monochrome",
+          panel_treatment: "glass"
+        }
       }
     });
 

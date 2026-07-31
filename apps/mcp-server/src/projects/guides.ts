@@ -104,6 +104,8 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - 領域配置は単一、左右補足、下段補足に加え、左右均等の \`split\`、上段補足の \`top-band\`、中央集中の \`focus\`を選べる。
 - 基本5色に加えて \`accent_secondary\` と \`border\` を指定できる。値は6桁hexだけを使い、任意CSSやgradientは入力しない。
 
+- role差分では配色・領域・装飾だけでなく、visual preset、font、密度、余白、角丸、文字組み、画像処理、animationまで変更できる。
+
 ## 発表枠・表紙・0ページ目
 
 - \`configure_deck\` で発表全体の \`16:9\`／\`4:3\`と、開始前の0ページ目だけを部分更新する。
@@ -130,6 +132,36 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - 任意の音声URLは入力できない。音声fileの参照は管理された生成処理だけが設定する。
 
 各toolの成功時に返るversionを、次のtoolの\`expected_version\`へ渡す。`;
+
+const PRESENTATION_DESIGN_WORKFLOW_GUIDE = `# 研究固有デザイン制作・評価ガイド
+
+## 制作順序
+
+1. get_project_outline、研究本文、deck resourceを読み、研究の対象、最重要の証拠、作者の好み、避けたい表現を4行以内のdesign briefへまとめる。
+2. briefが空なら見た目を勝手に確定せず、雰囲気、見せたい証拠、避けたい表現のうち最も不足する一問だけを聞く。
+3. 同じ内容で成立する方向を3案出す。各案は名前、研究との接続、配色、font、領域、モチーフ、部品表現、動き、向く証拠を一行ずつ示し、色だけ違う案にしない。
+4. 採用案の意図をtemplateのdesign_notesへ保存し、基本templateを最大8項目ずつ更新する。
+5. 表紙、章扉、本文、比較、結果、結びへroleを割り当て、差が必要なroleだけを部分更新する。最低でも表紙、本文、結果、結びの4役割を確認する。
+6. 一枚固有の構成はflowの組版、scene component、canvas blockで調整する。別templateは研究内で本当に別の表現体系が必要な場合だけ作る。
+7. deck resourceを再読し、Web UIの実rendererと一括品質確認を案内する。研究本文、証拠、読み上げ原稿はデザイン改善のついでに変更しない。
+
+## 見た目の多様性 9/10
+
+- 配色、font、領域・密度、面・画像・見出し処理、動きの5軸すべてに意図がある。
+- 3案が色替えではなく、情報階層と部品構成でも判別できる。
+- 一つのdeckで4役割以上が同じ研究らしさを保ちながら判別できる。
+- flow、scene、canvasの選択が内容量と証拠形式に対応し、16:9または4:3の実枠で見切れない。
+- 任意CSSや未検証HTMLに頼らず、品質診断とコントラストを通せる。
+
+## AI制作 9/10
+
+- design briefと変更理由を保存し、後続Agentが同じ意図を再現できる。
+- resourceで現在値を確認してから、対象とfieldを明示した小粒度toolだけを使う。
+- 提案、適用、再読取、実表示確認の4段階を飛ばさない。
+- role差分とcomponent styleを使い分け、研究全体やscene全体を再送しない。
+- 最後に変更したもの、継承したもの、残る確認事項を利用者へ返す。
+
+9/10は10項目中9項目以上を満たし、コントラスト不足、見切れ、研究内容の無断変更、任意コード利用のいずれもない状態とする。`;
 
 const EDIT_CONTRACT_GUIDE = `# 最自由研究 部分編集契約
 
@@ -222,6 +254,26 @@ export function registerResearchGuides(
           uri: uri.href,
           mimeType: "text/markdown",
           text: PRESENTATION_STYLE_GUIDE
+        }
+      ]
+    })
+  );
+
+  server.registerResource(
+    "presentation-design-workflow-guide",
+    "research://guide/presentation-design-workflow",
+    {
+      title: "研究固有デザイン制作・評価ガイド",
+      description:
+        "AI Agentが研究の意図から3案を比較し、役割差分へ適用して9/10基準で検証する手順です。",
+      mimeType: "text/markdown"
+    },
+    (uri) => ({
+      contents: [
+        {
+          uri: uri.href,
+          mimeType: "text/markdown",
+          text: PRESENTATION_DESIGN_WORKFLOW_GUIDE
         }
       ]
     })
@@ -645,17 +697,45 @@ export function registerResearchGuides(
                     settings,
                     slide_count: slides.length,
                     total_duration_seconds: slides.reduce((sum, slide) => sum + slide.duration_seconds, 0),
-                    slides: slides.map((slide, index) => ({
-                      slide_id: slide.id,
-                      position: index + 1,
-                      title: slide.title,
-                      role: slide.role,
-                      duration_seconds: slide.duration_seconds,
-                      reveal_steps: slide.reveal_steps,
-                      composition_mode: slide.composition?.mode ?? "flow",
-                      narration_segments: slide.narration?.segments.length ?? 0,
-                      uri: `research://projects/${project.project_id}/slides/${slide.id}`
-                    }))
+                    slides: slides.map((slide, index) => {
+                      const templateId = slide.template_id ?? deck.default_template_id ?? null;
+                      const template = (deck.templates ?? []).find((item) => item.id === templateId);
+                      const role = slide.role ?? "content";
+                      const roleStyle = template?.role_styles?.[role];
+                      const effective = template === undefined ? undefined : { ...template, ...roleStyle };
+                      return {
+                        slide_id: slide.id,
+                        position: index + 1,
+                        title: slide.title,
+                        role,
+                        duration_seconds: slide.duration_seconds,
+                        reveal_steps: slide.reveal_steps,
+                        composition_mode: slide.composition?.mode ?? "flow",
+                        narration_segments: slide.narration?.segments.length ?? 0,
+                        design: effective === undefined ? null : {
+                          template_id: template?.id,
+                          template_name: template?.name,
+                          role_override_fields: Object.keys(roleStyle ?? {}),
+                          visual_preset: effective.visual_preset,
+                          region_layout: effective.region_layout,
+                          body_font: effective.body_font,
+                          heading_font: effective.heading_font,
+                          density: effective.density,
+                          motion_style: effective.motion_style,
+                          motif: effective.motif,
+                          heading_treatment: effective.heading_treatment,
+                          image_treatment: effective.image_treatment,
+                          panel_treatment: effective.panel_treatment,
+                          colors: {
+                            background: effective.background,
+                            surface: effective.surface,
+                            foreground: effective.foreground,
+                            accent: effective.accent
+                          }
+                        },
+                        uri: `research://projects/${project.project_id}/slides/${slide.id}`
+                      };
+                    })
                   }
                 };
               })();
@@ -1948,6 +2028,38 @@ export function registerResearchGuides(
   );
 
   server.registerPrompt(
+    "refine_presentation_design",
+    {
+      title: "研究固有の発表デザインを作る",
+      description: "研究の意図から3案を比較し、役割差分へ適用して9/10基準で確認します。",
+      argsSchema: {
+        project_id: z.string().uuid(),
+        mode: z.enum(["propose", "apply", "audit"]),
+        goal: z.string().max(1_000).optional()
+      }
+    },
+    ({ project_id, mode, goal }) => {
+      const modeInstruction = mode === "propose"
+        ? "現在の研究内容は変更せず、色替えではない3方向を比較して、利用者へ採用する一案だけを質問してください。まだ設定は変更しません。"
+        : mode === "apply"
+          ? "利用者が指定した方向をdesign_notes、基本template、必要なrole差分へ小粒度toolで適用してください。各成功versionを次へ渡してください。"
+          : "設定は変更せず、見た目の多様性とAI制作の10項目を根拠付きで採点し、9/10へ届かない最優先の一手だけを示してください。";
+      return {
+        description: "保存済み研究のデザインを提案、適用、または監査します。",
+        messages: [
+          {
+            role: "user",
+            content: {
+              type: "text",
+              text: `get_project_outlineで${project_id}と現在versionを確認し、research://projects/${project_id}/research、research://projects/${project_id}/deck、research://guide/edit-contract、research://guide/presentation-style、research://guide/presentation-design-workflowを読んでください。${modeInstruction} 最低でも表紙、本文、結果、結びのeffective designを比較し、任意CSS、未検証HTML、外部font URLは使わないでください。目的や好み：${goal?.trim() || "保存済みのdesign_notesと研究内容から読み取り、不足する場合だけ一問確認する。"}`
+            }
+          }
+        ]
+      };
+    }
+  );
+
+  server.registerPrompt(
     "compose_presentation",
     {
       title: "発表デッキを構成",
@@ -1961,7 +2073,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、研究本文はresearch://projects/${project_id}/research、発見・限界・ログはそこにあるpage URI、既存の一枚はresearch://projects/${project_id}/slides/{slideId}から必要な範囲だけ読んでください。research://guide/edit-contract、research://guide/presentation-components、research://guide/presentation-styleを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、研究本文はresearch://projects/${project_id}/research、発見・限界・ログはそこにあるpage URI、既存の一枚はresearch://projects/${project_id}/slides/{slideId}から必要な範囲だけ読んでください。research://guide/edit-contract、research://guide/presentation-components、research://guide/presentation-style、research://guide/presentation-design-workflowを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
           }
         }
       ]

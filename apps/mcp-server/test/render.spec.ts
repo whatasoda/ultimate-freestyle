@@ -106,12 +106,29 @@ describe("presentation artifact renderer", () => {
               role_styles: {
                 result: {
                   region_layout: "focus",
+                  sidebar_width_percent: 38,
                   background: "#20152f",
                   accent: "#ff7f50",
+                  corner_radius_px: 4,
+                  spacing_scale: 0.8,
+                  font_scale: 1.1,
+                  enter_animation: "pop",
+                  reveal_animation: "wipe",
+                  visual_preset: "retro-game",
+                  body_font: "monospace",
+                  heading_font: "condensed",
+                  density: "spacious",
+                  motion_style: "dramatic",
+                  body_weight: 600,
+                  heading_weight: 900,
+                  line_height: 1.3,
+                  letter_spacing_em: 0.05,
                   motif: "waves",
                   motif_color: "#ff7f50",
                   motif_opacity: 0.25,
+                  motif_scale: 1.8,
                   heading_treatment: "boxed",
+                  image_treatment: "monochrome",
                   panel_treatment: "raised"
                 }
               }
@@ -204,18 +221,29 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@117");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@119");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");
     expect(html).toContain('data-slide-role="result"');
     expect(html).toContain('data-region-layout="focus"');
     expect(html).toContain('data-motif="waves"');
     expect(html).toContain('data-heading-treatment="boxed"');
-    expect(html).toContain('data-image-treatment="framed"');
+    expect(html).toContain('data-image-treatment="monochrome"');
     expect(html).toContain('data-panel-treatment="raised"');
     expect(html).toContain('class="theme-motif" aria-hidden="true"');
     expect(html).toContain('--template-background:#20152f');
     expect(html).toContain('--template-accent:#ff7f50');
+    expect(html).toContain('--template-radius:0.25cqw');
+    expect(html).toContain('--template-spacing:0.8');
+    expect(html).toContain('--template-font-scale:1.1');
+    expect(html).toContain('--template-sidebar-width:38%');
+    expect(html).toContain('.slide[data-slide-id="result"] { --template-background:#20152f');
+    expect(html).toContain('.slide[data-slide-id="result"] .narration { --narration-text-scale:1.1');
+    expect(html).not.toContain('data-state="inactive" style=');
+    expect(html).not.toContain('class="narration" data-region="narration" style=');
+    expect(html).not.toContain('class="prelude" data-prelude style=');
+    expect(html).not.toContain(' style="');
     expect(html).toContain('--motif-color:#ff7f50');
+    expect(html).toContain('--motif-scale:1.8');
     expect(html).toContain('.slide[data-motif="waves"] .theme-motif');
     expect(html).toContain('.slide[data-heading-treatment="highlight"]');
     expect(html).toContain('.slide[data-image-treatment="monochrome"]');
@@ -253,7 +281,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("prelude.dataset.fitScale = String(scale)");
     expect(html).toContain("ready: preludeStart instanceof HTMLButtonElement && !preludeStart.disabled");
     expect(html).toContain("prelude.dataset.preloadCompleted = String(completed)");
-    expect(html).toContain("--prelude-accent-foreground:#10131a");
+    expect(html).toContain("--prelude-accent-foreground: #10131a");
     expect(html).toContain("const contrast = collectContrast(preludeInner, prelude)");
     expect(html).toContain("schedulePreludeFit();");
     expect(html).toContain("slide_id: '__prelude__'");
@@ -437,11 +465,12 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-region="sidebar"');
     expect(html).toContain('data-reveal-at="1"');
     expect(html).toContain('--template-sidebar-width: 34%');
-    expect(html).toContain('data-visual-preset="neon"');
-    expect(html).toContain('data-body-font="rounded"');
-    expect(html).toContain('data-heading-font="display"');
-    expect(html).toContain('data-density="compact"');
-    expect(html).toContain('data-motion-style="snappy"');
+    expect(html).toContain('data-visual-preset="retro-game"');
+    expect(html).toContain('data-body-font="monospace"');
+    expect(html).toContain('data-heading-font="condensed"');
+    expect(html).toContain('data-density="spacious"');
+    expect(html).toContain('data-motion-style="dramatic"');
+    expect(html).toContain('data-animation="pop"');
     expect(html).toContain('data-placement="overlay-bottom"');
     expect(html).toContain('class="narration-speaker">ずんだもん</span>');
     expect(html).toContain("const player = new Audio(segment.audio_src)");

@@ -6,7 +6,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@117";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@119";
 
 function escapeHtml(value: string): string {
   return value
@@ -637,6 +637,7 @@ export function renderPresentationHtml(
       ];
     })
     .join("\n");
+  const slideVariableCss: string[] = [];
   const slideHtml = deck.slides
     .map((slide, index) => {
       const templateId = slide.template_id ?? deck.default_template_id ?? null;
@@ -699,11 +700,13 @@ export function renderPresentationHtml(
   </aside>`;
       const roleTemplateVariables = effectiveTemplate === null || effectiveTemplate === undefined
         ? ""
-        : `--template-background:${effectiveTemplate.background};--template-surface:${effectiveTemplate.surface};--template-foreground:${effectiveTemplate.foreground};--template-muted:${effectiveTemplate.muted};--template-accent:${effectiveTemplate.accent};--template-accent-secondary:${effectiveTemplate.accent_secondary ?? effectiveTemplate.accent};--template-border:${effectiveTemplate.border ?? effectiveTemplate.muted};`;
-      return `<article class="slide tone-${slide.tone}" role="group" aria-roledescription="スライド" aria-label="${index + 1} / ${deck.slides.length}：${escapeHtml(slide.title)}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${role}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-motif="${appearance.motif}" data-heading-treatment="${appearance.heading_treatment}" data-image-treatment="${appearance.image_treatment}" data-panel-treatment="${appearance.panel_treatment}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" style="${roleTemplateVariables}--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em;--motif-color:${appearance.motif_color};--motif-opacity:${appearance.motif_opacity};--motif-scale:${appearance.motif_scale}" hidden>
+        : `--template-background:${effectiveTemplate.background};--template-surface:${effectiveTemplate.surface};--template-foreground:${effectiveTemplate.foreground};--template-muted:${effectiveTemplate.muted};--template-accent:${effectiveTemplate.accent};--template-accent-secondary:${effectiveTemplate.accent_secondary ?? effectiveTemplate.accent};--template-border:${effectiveTemplate.border ?? effectiveTemplate.muted};--template-radius:${stageLength(effectiveTemplate.corner_radius_px)};--template-spacing:${effectiveTemplate.spacing_scale};--template-font-scale:${effectiveTemplate.font_scale};--template-sidebar-width:${effectiveTemplate.sidebar_width_percent}%;`;
+      slideVariableCss.push(`.slide[data-slide-id="${slide.id}"] { ${roleTemplateVariables}--body-weight:${appearance.body_weight};--heading-weight:${appearance.heading_weight};--body-line-height:${typography.line_height};--body-letter-spacing:${appearance.letter_spacing_em}em;--slide-body-scale:${typography.body_scale};--slide-heading-scale:${typography.heading_scale};--slide-paragraph-spacing:${typography.paragraph_spacing_em}em;--slide-column-gap:${typography.column_gap_em}em;--motif-color:${appearance.motif_color};--motif-opacity:${appearance.motif_opacity};--motif-scale:${appearance.motif_scale}; }
+.slide[data-slide-id="${slide.id}"] .narration { --narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines};${narrationVariables} }`);
+      return `<article class="slide tone-${slide.tone}" role="group" aria-roledescription="スライド" aria-label="${index + 1} / ${deck.slides.length}：${escapeHtml(slide.title)}" data-slide="${index}" data-slide-id="${escapeHtml(slide.id)}" data-slide-role="${role}" data-cover-layout="${slide.cover_layout ?? "center"}" data-template-id="${escapeHtml(templateId ?? `builtin-${deck.layout}`)}" data-user-template="${String(template !== undefined && template !== null)}" data-region-layout="${regionLayout}" data-composition="${composition?.mode ?? "flow"}" data-tone="${slide.tone}" data-visual-preset="${appearance.visual_preset}" data-body-font="${appearance.body_font}" data-heading-font="${appearance.heading_font}" data-density="${appearance.density}" data-motion-style="${appearance.motion_style}" data-motif="${appearance.motif}" data-heading-treatment="${appearance.heading_treatment}" data-image-treatment="${appearance.image_treatment}" data-panel-treatment="${appearance.panel_treatment}" data-text-preset="${typography.preset}" data-text-align="${typography.text_align}" data-vertical-align="${typography.vertical_align}" data-animation="${enterAnimation}" data-state="inactive" hidden>
   <div class="theme-motif" aria-hidden="true"></div>
   ${content}
-  <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" style="--narration-text-scale:${narrationStyle.text_scale};--narration-max-lines:${narrationStyle.max_lines};${narrationVariables}" aria-live="off">
+  <section class="narration" data-region="narration" data-display="${narrationDisplay}" data-placement="${narrationStyle.placement}" data-size="${narrationStyle.size}" data-text-align="${narrationStyle.text_align}" data-speaker-visible="${String(narrationStyle.speaker_visible)}" data-progress-visible="${String(narrationStyle.progress_visible)}" data-fit-content data-fit-id="narration" data-fit-region="narration"${narrationDisplay === "inline" ? " data-fit-scroll=\"true\"" : ""} data-active="${String(initialNarrationSegment !== undefined || narrationDisplay === "inline")}" aria-live="off">
     <span class="narration-speaker"${narrationSpeaker === "" ? " hidden" : ""}>${escapeHtml(narrationSpeaker)}</span>
     <div class="narration-track">${narrationDisplay === "inline" ? inlineNarration : `<p class="narration-text">${escapeHtml(initialNarrationSegment?.text ?? "")}</p>`}</div>
     <span class="narration-inline-progress" aria-hidden="true"></span>
@@ -729,6 +732,7 @@ export function renderPresentationHtml(
   <title>${escapeHtml(project.document.title)}</title>
   <style nonce="saijiyu-static">
     :root { color-scheme: dark; --accent: ${escapeHtml(deck.accent)}; --stage-ratio: 16 / 9; --stage-width: 16; --stage-height: 9; --aspect-font-scale: 1; font-family: Inter, "Noto Sans JP", system-ui, sans-serif; }
+    .prelude { --prelude-accent-foreground: ${preludeAccentForeground}; }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; min-height: 100dvh; overflow: hidden; background: #090d14; color: #f8fafc; }
     button, input { font: inherit; }
@@ -1062,6 +1066,7 @@ export function renderPresentationHtml(
     @keyframes prelude-pulse { from { opacity: .55; scale: .82; } to { opacity: 1; scale: 1.12; } }
     @keyframes prelude-orbit { to { rotate: 1turn; } }
     ${templateCss}
+    ${slideVariableCss.join("\n")}
     ${compositionCss}
     @keyframes slide-fade { from { opacity: 0; } }
     @keyframes slide-rise { from { opacity: 0; translate: 0 3%; } }
@@ -1132,7 +1137,7 @@ export function renderPresentationHtml(
   <main class="app">
     <header><strong>${escapeHtml(deck.short_title)}</strong><span class="meta">v${project.version}</span><span class="time" title="実経過時間 / 現在の区切り目安 / 想定合計時間"><span class="time-part"><span class="time-label">実</span><span id="elapsed">00:00</span></span><span aria-hidden="true">/</span><span class="time-part"><span class="time-label">目安</span><span id="expected">00:00</span></span><span class="time-total"> / 全${formattedTotalDuration}</span></span><span class="pace" id="pace" data-state="remaining">あと --:--</span><button class="timer-toggle" id="timer-toggle" type="button" aria-pressed="true" aria-keyshortcuts="T" title="実経過時間を一時停止・再開（T）">時間計測 ON</button></header>
     <div class="stage-wrap"><div class="stage" role="region" tabindex="0" aria-label="${escapeHtml(project.document.title)}"><p class="sr-only" data-editor-announcer aria-live="polite"></p><p class="sr-only" data-slide-announcer aria-live="polite" aria-atomic="true"></p><p class="sr-only" data-voice-announcer aria-live="polite" aria-atomic="true"></p>
-      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}" aria-labelledby="prelude-title" style="--prelude-accent-foreground:${preludeAccentForeground}"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
+      <section class="prelude" data-prelude data-style="${loadingScreen.style}" data-heading-font="${preludeHeadingFont}" aria-labelledby="prelude-title"${loadingScreen.enabled && (!options.editorFrame || options.editorPrelude) ? "" : " hidden"}>
         <div class="prelude-inner">
           <p class="prelude-kicker">PAGE 0 · PREPARING</p>
           <h1 id="prelude-title">${escapeHtml(project.document.title)}</h1>

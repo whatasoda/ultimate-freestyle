@@ -14,6 +14,7 @@ description: 最自由研究を対話しながら発見・設計・実行・記�
 3. 対象が決まっていれば `researches/<slug>/README.md` と `deck.tsx`
 4. 対話を始めるときは [references/dialogue-flow.md](references/dialogue-flow.md)
 5. 評価するときは [references/evaluation-rubric.md](references/evaluation-rubric.md)
+6. 発表を制作・デザインするときは [references/presentation-production.md](references/presentation-production.md)
 
 対象研究が不明なら、既存候補を確認してから一つだけ質問する。研究を新規作成する前にslugと仮タイトルをユーザーと合意する。
 
@@ -122,6 +123,8 @@ deckを大きく編集する前に、最低限次が説明できる状態にす�
 - `sidebar`：読み上げない補足、作者コメント、追加データ、画像
 
 見栄えのためにデータや体験を捏造しない。結果が未確定なら、完成版スライドではなく調査計画または仮構成として明示する。
+
+productionでは、研究内容から直接一案へ飛ばず、design brief、3方向の比較、採用案の小粒度適用、実rendererでの確認を順に行う。見た目の相談だけなら研究本文と読み上げ原稿を変更しない。Remote MCPが接続されている場合は発表resourceと部分編集toolを使い、接続されていない場合だけリポジトリ内のdeckを直接編集する。
 
 ## セッション終了
 

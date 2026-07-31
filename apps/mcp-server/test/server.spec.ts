@@ -208,7 +208,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.15.0",
-        renderer_version: "uf-renderer@117",
+        renderer_version: "uf-renderer@119",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -248,6 +248,11 @@ describe("MCP contract", () => {
       expect(resources).toContainEqual(
         expect.objectContaining({
           uri: "research://guide/presentation-style"
+        })
+      );
+      expect(resources).toContainEqual(
+        expect.objectContaining({
+          uri: "research://guide/presentation-design-workflow"
         })
       );
       expect(resources).toContainEqual(
@@ -295,7 +300,16 @@ describe("MCP contract", () => {
       expect(styleGuide.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "text/markdown",
-          text: expect.stringContaining("`museum`、`terminal`")
+          text: expect.stringMatching(/`museum`、`terminal`[\s\S]*role差分では配色・領域・装飾だけでなく/)
+        })
+      );
+      const designWorkflow = await client.readResource({
+        uri: "research://guide/presentation-design-workflow"
+      });
+      expect(designWorkflow.contents).toContainEqual(
+        expect.objectContaining({
+          mimeType: "text/markdown",
+          text: expect.stringMatching(/見た目の多様性 9\/10[\s\S]*AI制作 9\/10/)
         })
       );
       const editContract = await client.readResource({
@@ -896,9 +910,22 @@ describe("MCP contract", () => {
         expect.arrayContaining([
           "start_research",
           "review_research",
-          "compose_presentation"
+          "compose_presentation",
+          "refine_presentation_design"
         ])
       );
+      const designPrompt = await client.getPrompt({
+        name: "refine_presentation_design",
+        arguments: {
+          project_id: firstProject.project_id,
+          mode: "propose",
+          goal: "氷の透明感を証拠写真中心で見せたい"
+        }
+      });
+      expect(designPrompt.messages[0]?.content).toMatchObject({
+        type: "text",
+        text: expect.stringMatching(/presentation-design-workflow[\s\S]*3方向[\s\S]*まだ設定は変更しません/)
+      });
       const reviewPrompt = await client.getPrompt({
         name: "review_research",
         arguments: { project_id: firstProject.project_id }
@@ -2034,7 +2061,19 @@ describe("MCP contract", () => {
                 minimum_duration_ms: 800
               }
           },
-          slides: [{ slide_id: "intro", role: "cover", narration_segments: 1 }]
+          slides: [{
+            slide_id: "intro",
+            role: "cover",
+            narration_segments: 1,
+            design: {
+              template_id: "research-paper",
+              role_override_fields: [],
+              visual_preset: "paper",
+              region_layout: "split",
+              heading_font: "mincho",
+              panel_treatment: "outline"
+            }
+          }]
         }
       });
       const detailedSlide = await readJsonResource(
@@ -2090,8 +2129,16 @@ describe("MCP contract", () => {
           project_id: projectId,
           expected_version: 15,
           template_id: "research-paper",
-          role: "result",
-          updates: [{ field: "panel_treatment", value: "raised" }]
+          role: "cover",
+          updates: [
+            { field: "panel_treatment", value: "raised" },
+            { field: "visual_preset", value: "retro-game" },
+            { field: "body_font", value: "monospace" },
+            { field: "density", value: "compact" },
+            { field: "spacing_scale", value: 0.85 },
+            { field: "motion_style", value: "dramatic" },
+            { field: "image_treatment", value: "monochrome" }
+          ]
         }
       });
       expect(roleStyle.structuredContent).toMatchObject({ ok: true, version: 16 });
@@ -2105,9 +2152,39 @@ describe("MCP contract", () => {
           settings: {
             templates: [{
               id: "research-paper",
-              role_styles: { result: { panel_treatment: "raised" } }
+              role_styles: {
+                cover: {
+                  panel_treatment: "raised",
+                  visual_preset: "retro-game",
+                  body_font: "monospace",
+                  density: "compact",
+                  spacing_scale: 0.85,
+                  motion_style: "dramatic",
+                  image_treatment: "monochrome"
+                }
+              }
             }]
-          }
+          },
+          slides: [{
+            role: "cover",
+            design: {
+              role_override_fields: expect.arrayContaining([
+                "visual_preset",
+                "body_font",
+                "density",
+                "spacing_scale",
+                "motion_style",
+                "image_treatment",
+                "panel_treatment"
+              ]),
+              visual_preset: "retro-game",
+              body_font: "monospace",
+              density: "compact",
+              motion_style: "dramatic",
+              image_treatment: "monochrome",
+              panel_treatment: "raised"
+            }
+          }]
         }
       });
     } finally {

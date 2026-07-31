@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "166";
+export const DASHBOARD_ASSET_VERSION = "167";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
@@ -761,6 +761,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
   }
+  const roleStyleStringFields = ["region_layout", "background", "surface", "foreground", "muted", "accent", "accent_secondary", "border", "visual_preset", "body_font", "heading_font", "density", "motion_style", "enter_animation", "reveal_animation", "motif", "motif_color", "heading_treatment", "image_treatment", "panel_treatment"];
+  const roleStyleNumberFields = ["sidebar_width_percent", "corner_radius_px", "spacing_scale", "font_scale", "body_weight", "heading_weight", "line_height", "letter_spacing_em", "motif_opacity", "motif_scale"];
   const templateRoleStyles = (form, data) => {
     const editor = form.querySelector("[data-role-style-editor]");
     if (!(editor instanceof HTMLElement)) return {};
@@ -769,12 +771,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const role = String(data.get("role_style_role") || "content");
     if (data.has("role_style_enabled")) {
       const style = {};
-      for (const field of ["region_layout", "background", "surface", "foreground", "muted", "accent", "motif", "motif_color", "heading_treatment", "panel_treatment"]) {
+      for (const field of roleStyleStringFields) {
         const value = String(data.get("role_style_" + field) || "").trim();
         if (value) style[field] = value;
       }
-      const motifOpacity = String(data.get("role_style_motif_opacity") || "").trim();
-      if (motifOpacity !== "" && Number.isFinite(Number(motifOpacity))) style.motif_opacity = Number(motifOpacity);
+      for (const field of roleStyleNumberFields) {
+        const value = String(data.get("role_style_" + field) || "").trim();
+        if (value !== "" && Number.isFinite(Number(value))) style[field] = Number(value);
+      }
       roleStyles[role] = style;
     } else delete roleStyles[role];
     editor.dataset.roleStyles = JSON.stringify(roleStyles);
@@ -876,7 +880,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const style = roleStyles[roleSelect.value];
       const enabled = templateEditor.elements.namedItem("role_style_enabled");
       if (enabled instanceof HTMLInputElement) enabled.checked = Boolean(style);
-      for (const field of ["region_layout", "background", "surface", "foreground", "muted", "accent", "motif", "motif_color", "heading_treatment", "panel_treatment", "motif_opacity"]) {
+      for (const field of [...roleStyleStringFields, ...roleStyleNumberFields]) {
         const control = templateEditor.elements.namedItem("role_style_" + field);
         if (control instanceof HTMLInputElement || control instanceof HTMLSelectElement) control.value = style?.[field] ?? "";
         const picker = templateEditor.elements.namedItem("role_style_" + field + "_picker");

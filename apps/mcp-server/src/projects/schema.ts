@@ -562,6 +562,7 @@ export const slideCompositionSchema = z.discriminatedUnion("mode", [
 
 export const presentationRoleStyleSchema = z.object({
   region_layout: regionLayoutSchema.optional(),
+  sidebar_width_percent: z.number().int().min(20).max(45).optional(),
   background: hexColorSchema.optional(),
   surface: hexColorSchema.optional(),
   foreground: hexColorSchema.optional(),
@@ -569,10 +570,26 @@ export const presentationRoleStyleSchema = z.object({
   accent: hexColorSchema.optional(),
   accent_secondary: hexColorSchema.optional(),
   border: hexColorSchema.optional(),
+  corner_radius_px: z.number().int().min(0).max(48).optional(),
+  spacing_scale: z.number().min(0.75).max(1.5).multipleOf(0.05).optional(),
+  font_scale: z.number().min(0.75).max(1.3).multipleOf(0.05).optional(),
+  enter_animation: animationSchema.optional(),
+  reveal_animation: animationSchema.optional(),
+  visual_preset: visualPresetSchema.optional(),
+  body_font: fontPresetSchema.optional(),
+  heading_font: fontPresetSchema.optional(),
+  density: densitySchema.optional(),
+  motion_style: motionStyleSchema.optional(),
+  body_weight: z.number().int().min(300).max(900).multipleOf(100).optional(),
+  heading_weight: z.number().int().min(300).max(900).multipleOf(100).optional(),
+  line_height: z.number().min(1).max(2).multipleOf(0.05).optional(),
+  letter_spacing_em: z.number().min(-0.08).max(0.2).multipleOf(0.01).optional(),
   motif: designMotifSchema.optional(),
   motif_color: hexColorSchema.optional(),
   motif_opacity: z.number().min(0).max(0.5).multipleOf(0.05).optional(),
+  motif_scale: z.number().min(0.5).max(3).multipleOf(0.1).optional(),
   heading_treatment: headingTreatmentSchema.optional(),
+  image_treatment: imageTreatmentSchema.optional(),
   panel_treatment: panelTreatmentSchema.optional()
 });
 
