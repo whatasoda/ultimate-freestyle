@@ -208,7 +208,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.15.0",
-        renderer_version: "uf-renderer@119",
+        renderer_version: "uf-renderer@120",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",

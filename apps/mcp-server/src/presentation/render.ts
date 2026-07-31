@@ -6,7 +6,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@119";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@120";
 
 function escapeHtml(value: string): string {
   return value
@@ -2151,7 +2151,7 @@ export function renderPresentationHtml(
     };
     const previewDraft = (data) => {
       const currentSlide = slides[slide];
-      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'flow' || data.slide_id !== DECK.slides[slide].id) return;
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'flow' || data.slide_id !== DECK.slides[slide].id) return false;
       const title = currentSlide.querySelector('[data-flow-title]');
       const content = currentSlide.querySelector('[data-flow-content]');
       const sidebar = currentSlide.querySelector('[data-flow-sidebar]');
@@ -2163,13 +2163,14 @@ export function renderPresentationHtml(
         renderDraftMarkdown(sidebar, markdown);
       }
       scheduleFit();
+      return true;
     };
     const previewCanvasBlock = (data) => {
       const currentSlide = slides[slide];
       const block = data.block;
-      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'canvas' || data.slide_id !== DECK.slides[slide].id || !block || typeof block !== 'object') return;
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'canvas' || data.slide_id !== DECK.slides[slide].id || !block || typeof block !== 'object') return false;
       const target = currentSlide.querySelector('[data-block-id="' + CSS.escape(String(block.id || '')) + '"]');
-      if (!(target instanceof HTMLElement) || target.dataset.blockKind !== block.kind || !block.frame) return;
+      if (!(target instanceof HTMLElement) || target.dataset.blockKind !== block.kind || !block.frame) return false;
       target.style.left = Number(block.frame.x) + '%';
       target.style.top = Number(block.frame.y) + '%';
       target.style.width = Number(block.frame.width) + '%';
@@ -2210,13 +2211,14 @@ export function renderPresentationHtml(
         }
       }
       scheduleFit();
+      return true;
     };
     const previewSceneComponent = (data) => {
       const currentSlide = slides[slide];
       const component = data.component;
-      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'scene' || data.slide_id !== DECK.slides[slide].id || !component || typeof component !== 'object') return;
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'scene' || data.slide_id !== DECK.slides[slide].id || !component || typeof component !== 'object') return false;
       const target = currentSlide.querySelector('[data-node-id="' + String(component.id) + '"]');
-      if (!(target instanceof HTMLElement) || target.dataset.component !== 'uf-' + String(component.kind).replaceAll('_', '-')) return;
+      if (!(target instanceof HTMLElement) || target.dataset.component !== 'uf-' + String(component.kind).replaceAll('_', '-')) return false;
       const componentStyle = component.style && typeof component.style === 'object' ? component.style : {};
       const previewLength = (value) => Number(value || 0) / 16 + 'cqw';
       const verticalAlign = componentStyle.vertical_align === 'center' ? 'center' : componentStyle.vertical_align === 'end' ? 'flex-end' : 'flex-start';
@@ -2344,12 +2346,13 @@ export function renderPresentationHtml(
         }
       }
       scheduleFit();
+      return true;
     };
     const previewTypography = (data) => {
       const currentSlide = slides[slide];
-      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'flow' || data.slide_id !== DECK.slides[slide].id) return;
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition !== 'flow' || data.slide_id !== DECK.slides[slide].id) return false;
       const typography = data.typography;
-      if (!typography || typeof typography !== 'object') return;
+      if (!typography || typeof typography !== 'object') return false;
       currentSlide.dataset.textPreset = String(typography.preset || 'standard');
       currentSlide.dataset.textAlign = String(typography.text_align || 'start');
       currentSlide.dataset.verticalAlign = String(typography.vertical_align || 'start');
@@ -2361,6 +2364,7 @@ export function renderPresentationHtml(
       const content = currentSlide.querySelector('[data-flow-content]');
       if (content instanceof HTMLElement) content.dataset.columns = String(typography.columns);
       scheduleFit();
+      return true;
     };
     const templateForPreviewRole = (source, role) => {
       if (!source || typeof source !== 'object') return null;
@@ -2370,10 +2374,10 @@ export function renderPresentationHtml(
     };
     const previewTemplate = (data) => {
       const currentSlide = slides[slide];
-      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id || !data.template || typeof data.template !== 'object') return;
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id || !data.template || typeof data.template !== 'object') return false;
       const previewRole = String(data.preview_role || currentSlide.dataset.slideRole || 'content');
       const template = templateForPreviewRole(data.template, previewRole);
-      if (!template) return;
+      if (!template) return false;
       currentSlide.dataset.slideRole = previewRole;
       currentSlide.dataset.regionLayout = String(template.region_layout);
       currentSlide.dataset.visualPreset = String(template.visual_preset);
@@ -2386,6 +2390,9 @@ export function renderPresentationHtml(
       currentSlide.dataset.imageTreatment = String(template.image_treatment || 'natural');
       currentSlide.dataset.panelTreatment = String(template.panel_treatment || 'flat');
       currentSlide.dataset.animation = String(template.enter_animation);
+      for (const block of currentSlide.querySelectorAll('[data-flow-content] .reveal-block')) {
+        if (block instanceof HTMLElement) block.dataset.animation = String(template.reveal_animation || 'rise');
+      }
       for (const [property, value] of Object.entries({
         '--template-background': template.background,
         '--template-surface': template.surface,
@@ -2404,18 +2411,22 @@ export function renderPresentationHtml(
         '--body-weight': template.body_weight,
         '--heading-weight': template.heading_weight,
         '--body-letter-spacing': template.letter_spacing_em + 'em'
-      })) currentSlide.style.setProperty(property, String(value));
-      if (template.apply_line_height) currentSlide.style.setProperty('--body-line-height', String(template.line_height));
+      })) {
+        if (value === undefined || value === null || String(value).includes('NaN')) currentSlide.style.removeProperty(property);
+        else currentSlide.style.setProperty(property, String(value));
+      }
+      if (template.apply_line_height && Number.isFinite(Number(template.line_height))) currentSlide.style.setProperty('--body-line-height', String(template.line_height));
       currentSlide.style.animation = 'none';
       currentSlide.getBoundingClientRect();
       currentSlide.style.removeProperty('animation');
       scheduleFit();
+      return true;
     };
     const previewNarrationSettings = (data) => {
       const currentSlide = slides[slide];
-      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id || !data.appearance) return;
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id || !data.appearance) return false;
       const region = currentSlide.querySelector('.narration');
-      if (!(region instanceof HTMLElement)) return;
+      if (!(region instanceof HTMLElement)) return false;
       region.dataset.display = String(data.display);
       region.dataset.placement = String(data.appearance.placement);
       region.dataset.size = String(data.appearance.size);
@@ -2455,22 +2466,24 @@ export function renderPresentationHtml(
       }
       region.dataset.active = String(data.display === 'inline' || Boolean(narration()));
       scheduleFit();
+      return true;
     };
     const previewComposition = (data) => {
       const currentSlide = slides[slide];
-      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition === 'flow' || data.slide_id !== DECK.slides[slide].id) return;
+      if (!(currentSlide instanceof HTMLElement) || currentSlide.dataset.composition === 'flow' || data.slide_id !== DECK.slides[slide].id) return false;
       if (/^#[0-9a-f]{6}$/i.test(String(data.background || ''))) currentSlide.style.setProperty('--canvas-background', String(data.background));
       currentSlide.style.setProperty('--canvas-overflow', data.clip_content ? 'hidden' : 'visible');
       scheduleFit();
+      return true;
     };
     const previewAppearance = (data) => {
       const currentSlide = slides[slide];
-      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return;
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return false;
       const sourceTemplate = data.template;
-      if (!sourceTemplate || typeof sourceTemplate !== 'object') return;
+      if (!sourceTemplate || typeof sourceTemplate !== 'object') return false;
       const previewRole = String(data.role || 'content');
       const template = templateForPreviewRole(sourceTemplate, previewRole);
-      if (!template) return;
+      if (!template) return false;
       currentSlide.dataset.slideRole = previewRole;
       currentSlide.dataset.coverLayout = String(data.cover_layout || 'center');
       currentSlide.dataset.tone = String(data.tone || 'dark');
@@ -2520,12 +2533,13 @@ export function renderPresentationHtml(
       currentSlide.getBoundingClientRect();
       currentSlide.style.removeProperty('animation');
       scheduleFit();
+      return true;
     };
     const previewNarrationSegment = (data) => {
       const currentSlide = slides[slide];
-      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return;
+      if (!(currentSlide instanceof HTMLElement) || data.slide_id !== DECK.slides[slide].id) return false;
       const region = currentSlide.querySelector('.narration');
-      if (!(region instanceof HTMLElement)) return;
+      if (!(region instanceof HTMLElement)) return false;
       if (region.dataset.display === 'inline') {
         let item = region.querySelector('[data-narration-at="' + Number(data.at) + '"]');
         if (!(item instanceof HTMLElement)) {
@@ -2547,6 +2561,7 @@ export function renderPresentationHtml(
         region.dataset.active = String(String(data.text || '').trim() !== '');
       }
       scheduleFit();
+      return true;
     };
     const setPosition = (nextSlide, nextStep, push) => {
       slide = clamp(Number(nextSlide) - 1, 0, slides.length - 1);
@@ -3027,22 +3042,31 @@ export function renderPresentationHtml(
     });
     addEventListener('message', (event) => {
       if (!editorFrame || event.source !== parent || event.origin !== location.origin) return;
+      let previewApplied = false;
       if (event.data?.type === 'ultimate-freestyle:set-position') setPosition(event.data.slide, event.data.step, false);
       else if (event.data?.type === 'ultimate-freestyle:set-editor-selection' && typeof event.data.component_id === 'string') setEditorSelection(event.data.component_id);
       else if (event.data?.type === 'ultimate-freestyle:set-editor-options') {
         editorGridSnap = event.data.grid_snap === true;
         document.body.dataset.editorGrid = String(editorGridSnap);
       }
-      else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewDraft(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-scene-component') previewSceneComponent(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-canvas-block') previewCanvasBlock(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-composition') previewComposition(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewTypography(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-template') previewTemplate(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-appearance') previewAppearance(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-narration-settings') previewNarrationSettings(event.data);
-      else if (event.data?.type === 'ultimate-freestyle:preview-narration-segment') previewNarrationSegment(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-fields') previewApplied = previewDraft(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-scene-component') previewApplied = previewSceneComponent(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-canvas-block') previewApplied = previewCanvasBlock(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-composition') previewApplied = previewComposition(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-typography') previewApplied = previewTypography(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-template') previewApplied = previewTemplate(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-appearance') previewApplied = previewAppearance(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-narration-settings') previewApplied = previewNarrationSettings(event.data);
+      else if (event.data?.type === 'ultimate-freestyle:preview-narration-segment') previewApplied = previewNarrationSegment(event.data);
       else if (event.data?.type === 'ultimate-freestyle:save-status' && typeof event.data.message === 'string') announceEditor(event.data.message);
+      if (previewApplied && Number.isFinite(Number(event.data?.request_id))) {
+        parent.postMessage({
+          type: 'ultimate-freestyle:preview-applied',
+          request_id: Number(event.data.request_id),
+          preview_type: event.data.type,
+          slide_id: DECK.slides[slide]?.id || ''
+        }, location.origin);
+      }
     });
     addEventListener('popstate', restore);
     if ('ResizeObserver' in window) new ResizeObserver(scheduleFit).observe(document.querySelector('.stage'));

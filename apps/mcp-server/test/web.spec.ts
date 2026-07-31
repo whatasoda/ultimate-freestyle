@@ -481,8 +481,8 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=167"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=167"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=168"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=168"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -547,6 +547,10 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("appearanceEditor.dataset.previewTemplates = JSON.stringify(templates)");
     expect(DASHBOARD_SCRIPT).toContain("...template");
     expect(DASHBOARD_SCRIPT).toContain("apply_line_height");
+    expect(DASHBOARD_SCRIPT).toContain("const postPreviewMessage = (message) =>");
+    expect(DASHBOARD_SCRIPT).toContain('data?.type === "ultimate-freestyle:preview-applied"');
+    expect(DASHBOARD_SCRIPT).toContain("中央プレビューへ反映しました。保存すると確定します。");
+    expect(DASHBOARD_SCRIPT).toContain("templateRoleStyles(templateEditor, new FormData(templateEditor), activeRoleStyleRole)");
     expect(DASHBOARD_SCRIPT).toContain('templates[""] = previewTemplate(result.default_template)');
     expect(DASHBOARD_SCRIPT).toContain("activeFilmstrip.dataset.roleLabel = nextRole");
     expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
@@ -744,7 +748,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@119"');
+    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@120"');
 
     const voicePage = await requestProvider(
       provider,
@@ -914,7 +918,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=167"'
+      'href="/assets/dashboard.css?v=168"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1140,7 +1144,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=167"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=168"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1149,7 +1153,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=167"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=168"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1161,7 +1165,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=167", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=168", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1172,7 +1176,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=167", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=168", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);

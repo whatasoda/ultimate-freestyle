@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "167";
+export const DASHBOARD_ASSET_VERSION = "168";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
@@ -654,23 +654,32 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   let draftSceneTimer;
   let draftCompositionTimer;
   let draftCanvasTimer;
+  let previewRequestSequence = 0;
+  let latestPreviewRequestId = 0;
+  const previewDebounceMs = 80;
   let setWorkspaceStep = () => {};
+  const postPreviewMessage = (message) => {
+    if (!(slideFrame instanceof HTMLIFrameElement)) return;
+    const requestId = ++previewRequestSequence;
+    latestPreviewRequestId = requestId;
+    slideFrame.contentWindow?.postMessage({ ...message, request_id: requestId }, location.origin);
+  };
   const syncSlideDraft = () => {
     if (!(slideEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(slideEditor);
     updateRecommendedBodyLimit(currentPreviewTypography);
-    slideFrame.contentWindow?.postMessage({
+    postPreviewMessage({
       type: "ultimate-freestyle:preview-fields",
       slide_id: slideEditor.dataset.slideId || "",
       title: String(data.get("title") || ""),
       content_markdown: String(data.get("content_markdown") || ""),
       sidebar_markdown: String(data.get("sidebar_markdown") || "")
-    }, location.origin);
+    });
   };
   if (slideEditor instanceof HTMLFormElement) {
     slideEditor.addEventListener("input", () => {
       clearTimeout(draftFrameTimer);
-      draftFrameTimer = setTimeout(syncSlideDraft, 120);
+      draftFrameTimer = setTimeout(syncSlideDraft, previewDebounceMs);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = slideEditor.dataset.compositionMode === "flow"
@@ -744,16 +753,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     currentPreviewTypography = typography;
     updateRecommendedBodyLimit(typography);
-    slideFrame.contentWindow?.postMessage({
+    postPreviewMessage({
       type: "ultimate-freestyle:preview-typography",
       slide_id: typographyEditor.dataset.slideId || "",
       typography
-    }, location.origin);
+    });
   };
   if (typographyEditor instanceof HTMLFormElement) {
     typographyEditor.addEventListener("input", () => {
       clearTimeout(draftTypographyTimer);
-      draftTypographyTimer = setTimeout(syncTypographyDraft, 120);
+      draftTypographyTimer = setTimeout(syncTypographyDraft, previewDebounceMs);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = "組版をプレビューへ反映しています…";
@@ -763,12 +772,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   }
   const roleStyleStringFields = ["region_layout", "background", "surface", "foreground", "muted", "accent", "accent_secondary", "border", "visual_preset", "body_font", "heading_font", "density", "motion_style", "enter_animation", "reveal_animation", "motif", "motif_color", "heading_treatment", "image_treatment", "panel_treatment"];
   const roleStyleNumberFields = ["sidebar_width_percent", "corner_radius_px", "spacing_scale", "font_scale", "body_weight", "heading_weight", "line_height", "letter_spacing_em", "motif_opacity", "motif_scale"];
-  const templateRoleStyles = (form, data) => {
+  const templateRoleStyles = (form, data, roleOverride) => {
     const editor = form.querySelector("[data-role-style-editor]");
     if (!(editor instanceof HTMLElement)) return {};
     let roleStyles = {};
     try { roleStyles = JSON.parse(editor.dataset.roleStyles || "{}"); } catch {}
-    const role = String(data.get("role_style_role") || "content");
+    const role = String(roleOverride || data.get("role_style_role") || "content");
     if (data.has("role_style_enabled")) {
       const style = {};
       for (const field of roleStyleStringFields) {
@@ -817,7 +826,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       roleContrastStatus.textContent = "この役割の本文 " + roleMainContrast.toFixed(1) + ":1 · 補足 " + roleSidebarContrast.toFixed(1) + ":1" + (readable ? " — 目安を満たしています。" : " — 4.5:1未満を見直してください。");
       roleContrastStatus.dataset.level = readable ? "ok" : "warning";
     }
-    slideFrame.contentWindow?.postMessage({
+    postPreviewMessage({
       type: "ultimate-freestyle:preview-template",
       slide_id: templateEditor.dataset.slideId || "",
       preview_role: previewRole,
@@ -835,6 +844,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         spacing_scale: Number(data.get("spacing_scale")),
         font_scale: Number(data.get("font_scale")),
         enter_animation: String(data.get("enter_animation") || "fade"),
+        reveal_animation: String(data.get("reveal_animation") || "rise"),
         visual_preset: String(data.get("visual_preset") || "studio"),
         body_font: String(data.get("body_font") || "system-sans"),
         heading_font: String(data.get("heading_font") || "system-sans"),
@@ -854,7 +864,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         letter_spacing_em: Number(data.get("letter_spacing_em")),
         apply_line_height: typographyData?.get("preset") === "standard" && String(typographyData.get("typography_line_height") || "") === ""
       }
-    }, location.origin);
+    });
   };
   if (templateEditor instanceof HTMLFormElement) {
     templateEditor.addEventListener("input", (event) => {
@@ -862,7 +872,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         templateRoleStyles(templateEditor, new FormData(templateEditor));
       }
       clearTimeout(draftTemplateTimer);
-      draftTemplateTimer = setTimeout(syncTemplateDraft, 120);
+      draftTemplateTimer = setTimeout(syncTemplateDraft, previewDebounceMs);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = "テンプレートをプレビューへ反映しています…";
@@ -887,7 +897,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (picker instanceof HTMLInputElement && picker.type === "color") picker.value = style?.[field] || base[field] || "#000000";
       }
     };
-    if (roleSelect instanceof HTMLSelectElement) roleSelect.addEventListener("change", loadRoleStyle);
+    let activeRoleStyleRole = roleSelect instanceof HTMLSelectElement ? roleSelect.value : "content";
+    if (roleSelect instanceof HTMLSelectElement) {
+      roleSelect.addEventListener("change", () => {
+        clearTimeout(draftTemplateTimer);
+        templateRoleStyles(templateEditor, new FormData(templateEditor), activeRoleStyleRole);
+        activeRoleStyleRole = roleSelect.value;
+        loadRoleStyle();
+        draftTemplateTimer = setTimeout(syncTemplateDraft, previewDebounceMs);
+      });
+    }
     for (const picker of templateEditor.querySelectorAll("[data-role-style-color]")) {
       if (!(picker instanceof HTMLInputElement) || picker.type !== "color") continue;
       const textField = templateEditor.elements.namedItem("role_style_" + (picker.dataset.roleStyleColor || ""));
@@ -908,7 +927,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     try { templates = JSON.parse(appearanceEditor.dataset.previewTemplates || "{}"); } catch {}
     const templateId = String(data.get("template_id") || "");
     const template = templates[templateId] || templates[""] || {};
-    slideFrame.contentWindow?.postMessage({
+    postPreviewMessage({
       type: "ultimate-freestyle:preview-appearance",
       slide_id: appearanceEditor.dataset.slideId || "",
       role: String(data.get("role") || "content"),
@@ -916,12 +935,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       tone: String(data.get("tone") || "dark"),
       enter_animation: String(data.get("enter_animation") || template.enter_animation || "fade"),
       template
-    }, location.origin);
+    });
   };
   if (appearanceEditor instanceof HTMLFormElement) {
     appearanceEditor.addEventListener("input", () => {
       clearTimeout(draftAppearanceTimer);
-      draftAppearanceTimer = setTimeout(syncAppearanceDraft, 120);
+      draftAppearanceTimer = setTimeout(syncAppearanceDraft, previewDebounceMs);
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = "スライド外観をプレビューへ反映しています…";
@@ -933,7 +952,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(slideFrame instanceof HTMLIFrameElement)) return;
     if (narrationSettingsEditor instanceof HTMLFormElement) {
       const data = new FormData(narrationSettingsEditor);
-      slideFrame.contentWindow?.postMessage({
+      postPreviewMessage({
         type: "ultimate-freestyle:preview-narration-settings",
         slide_id: narrationSettingsEditor.dataset.slideId || "",
         display: String(data.get("display") || "commentary"),
@@ -952,23 +971,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           accent: String(data.get("appearance_accent") || "") || undefined,
           corner_radius_px: optionalNumberValue(data, "appearance_corner_radius_px")
         }
-      }, location.origin);
+      });
     }
     for (const form of document.querySelectorAll("[data-segment-preview]")) {
       if (!(form instanceof HTMLFormElement)) continue;
       const data = new FormData(form);
-      slideFrame.contentWindow?.postMessage({
+      postPreviewMessage({
         type: "ultimate-freestyle:preview-narration-segment",
         slide_id: form.dataset.slideId || "",
         at: Number(data.has("at") ? data.get("at") : form.dataset.segmentAt || 0),
         text: String(data.get("text") || ""),
         speaker: String(data.get("speaker") || "")
-      }, location.origin);
+      });
     }
   };
   const scheduleNarrationDraft = () => {
     clearTimeout(draftNarrationTimer);
-    draftNarrationTimer = setTimeout(syncNarrationDrafts, 120);
+    draftNarrationTimer = setTimeout(syncNarrationDrafts, previewDebounceMs);
     const layoutStatus = document.querySelector("[data-layout-status]");
     if (layoutStatus instanceof HTMLElement) {
       layoutStatus.textContent = "読み上げ枠をプレビューへ反映しています…";
@@ -1724,26 +1743,26 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(form instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     let assetUrls = {};
     try { assetUrls = JSON.parse(form.closest(".slide-workspace")?.dataset.workspaceAssetUrls || "{}"); } catch {}
-    slideFrame.contentWindow?.postMessage({
+    postPreviewMessage({
       type: "ultimate-freestyle:preview-scene-component",
       slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
       component: sceneComponentFromForm(form),
       asset_urls: assetUrls
-    }, location.origin);
+    });
   };
   const syncCompositionDraft = () => {
     if (!(compositionEditor instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     const data = new FormData(compositionEditor);
-    slideFrame.contentWindow?.postMessage({
+    postPreviewMessage({
       type: "ultimate-freestyle:preview-composition",
       slide_id: compositionEditor.dataset.slideId || "",
       background: String(data.get("composition_background") || ""),
       clip_content: data.has("composition_clip_content")
-    }, location.origin);
+    });
   };
   compositionEditor?.addEventListener("input", () => {
     clearTimeout(draftCompositionTimer);
-    draftCompositionTimer = setTimeout(syncCompositionDraft, 120);
+    draftCompositionTimer = setTimeout(syncCompositionDraft, previewDebounceMs);
     const layoutStatus = document.querySelector("[data-layout-status]");
     if (layoutStatus instanceof HTMLElement) {
       layoutStatus.textContent = "構成全体の背景をプレビューへ反映しています…";
@@ -1754,12 +1773,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!(form instanceof HTMLFormElement) || !(slideFrame instanceof HTMLIFrameElement)) return;
     let assetUrls = {};
     try { assetUrls = JSON.parse(form.closest(".slide-workspace")?.dataset.workspaceAssetUrls || "{}"); } catch {}
-    slideFrame.contentWindow?.postMessage({
+    postPreviewMessage({
       type: "ultimate-freestyle:preview-canvas-block",
       slide_id: slideEditor instanceof HTMLFormElement ? slideEditor.dataset.slideId || "" : "",
       block: sceneComponentFromForm(form),
       asset_urls: assetUrls
-    }, location.origin);
+    });
   };
   for (const form of document.querySelectorAll("[data-scene-component-editor], [data-canvas-block-editor]")) {
     for (const button of form.querySelectorAll("[data-component-order]")) {
@@ -1850,10 +1869,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const canvasEditor = form.matches("[data-canvas-block-editor]");
       if (canvasEditor) {
         clearTimeout(draftCanvasTimer);
-        draftCanvasTimer = setTimeout(() => syncCanvasBlockDraft(form), 120);
+        draftCanvasTimer = setTimeout(() => syncCanvasBlockDraft(form), previewDebounceMs);
       } else {
         clearTimeout(draftSceneTimer);
-        draftSceneTimer = setTimeout(() => syncSceneComponentDraft(form), 120);
+        draftSceneTimer = setTimeout(() => syncSceneComponentDraft(form), previewDebounceMs);
       }
       const layoutStatus = document.querySelector("[data-layout-status]");
       if (layoutStatus instanceof HTMLElement) {
@@ -2926,6 +2945,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     addEventListener("message", (event) => {
       if (event.origin !== location.origin || event.source !== slideFrame.contentWindow) return;
       const data = event.data;
+      if (data?.type === "ultimate-freestyle:preview-applied") {
+        if (Number(data.request_id) !== latestPreviewRequestId) return;
+        if (layoutStatus instanceof HTMLElement) {
+          layoutStatus.textContent = "中央プレビューへ反映しました。保存すると確定します。";
+          layoutStatus.dataset.level = "ok";
+        }
+        return;
+      }
       if (data?.type === "ultimate-freestyle:move-component" && typeof data.component_id === "string" && data.frame && [data.frame.x, data.frame.y, data.frame.width, data.frame.height].every(Number.isFinite)) {
         const forms = data.component_type === "scene"
           ? [...document.querySelectorAll("[data-scene-component-editor]")]
