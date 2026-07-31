@@ -840,8 +840,7 @@ const DASHBOARD_STYLE = String.raw`
       .inspector { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .8rem; align-content: start; align-items: start; }
       .inspector > .slide-creator, .inspector > .mobile-inspector-tabs, .inspector > #inspector-quality { grid-column: 1 / -1; }
       .inspector > #inspector-content, .inspector > #inspector-design { grid-column: span 6; }
-      .inspector > #inspector-narration { grid-column: span 4; }
-      .inspector > #inspector-structure { grid-column: span 8; }
+      .inspector > #inspector-narration, .inspector > #inspector-structure { grid-column: 1 / -1; }
       .filmstrip-search { position: sticky; z-index: 2; top: 0; display: grid; gap: .3rem; padding-bottom: .35rem; background: linear-gradient(var(--bg) 80%, transparent); color: var(--muted); font-size: .72rem; font-weight: 700; }
       .filmstrip-search-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
       .filmstrip-search output { color: #cbd6e4; font-variant-numeric: tabular-nums; }

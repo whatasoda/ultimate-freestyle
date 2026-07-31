@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "173";
+export const DASHBOARD_ASSET_VERSION = "174";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
