@@ -2,7 +2,7 @@
 
 複数の「最自由研究」をこのリポジトリで管理し、それぞれをクリック進行型のWebスライドとして発表するための基盤です。
 
-関連設計資料： [Twitch認証つきRemote MCPの構成・実装計画](docs/remote-mcp-plan.html)
+関連設計資料： [Twitch認証つきRemote MCPの構成・実装計画](docs/remote-mcp-plan.html) · [コード構成と品質境界](docs/code-architecture.md)
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 

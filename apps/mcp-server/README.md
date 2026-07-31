@@ -10,13 +10,14 @@
 bun run dev:mcp
 bun run build:mcp
 bun run test:mcp
+bun run test:mcp:coverage
 bun run test:mcp:render
 bun run types:mcp
 bun run migrate:mcp
 bun run smoke:mcp
 ```
 
-`bun run test:mcp` は生成型の同期、型検査、Workers runtime上のcontract test、deployのdry-run buildを連続実行します。MCP初期化とtool/resourceに加え、fixture化したTwitch APIを使って、Dynamic Client Registration、PKCE、CSRF、Twitch callback、資格判定、MCP token発行、Webログイン、所有研究だけの一覧表示、ログアウトまでをブラウザなしで検証します。
+`bun run test:mcp` は生成型の同期、型検査、Istanbul coverage下限つきWorkers runtime contract test、deployのdry-run buildを連続実行します。coverageだけを確認するときは`bun run test:mcp:coverage`を使います。MCP初期化とtool/resourceに加え、fixture化したTwitch APIを使って、Dynamic Client Registration、PKCE、CSRF、Twitch callback、資格判定、MCP token発行、Webログイン、所有研究だけの一覧表示、ログアウトまでをブラウザなしで検証します。実装の依存方向とcoverage基準は[コード構成と品質境界](../../docs/code-architecture.md)を参照してください。
 
 `bun run test:mcp:render` はローカル待受やCloudflare bindingを使わず、HTML rendererと一枚編集ページの純粋な生成テストだけをNode環境で実行します。制限されたAI実行環境でも、背景、字幕、escape、scene component、構成outlineなどのデザイン変更を素早く検証できます。
 

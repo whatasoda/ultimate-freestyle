@@ -55,24 +55,12 @@ import {
   ReviewServiceError
 } from "../reviews/service";
 import {
-  animationSchema,
-  coverLayoutSchema,
-  loadingScreenSchema,
-  narrationAppearanceSchema,
-  narrationDisplaySchema,
   narrationSegmentSchema,
   presentationTemplateSchema,
-  presentationAspectRatioSchema,
   projectSlideSchema,
-  projectStageSchema,
   RESEARCH_LOG_LIMIT,
   RESEARCH_LOG_PAGE_SIZE,
-  slideRoleSchema,
-  slideBlockSchema,
-  slideSceneNodeSchema,
-  type SlideSceneNode,
-  slideTypographySchema,
-  visualPresetSchema
+  type SlideSceneNode
 } from "../projects/schema";
 import {
   createPresentationPreview,
@@ -97,10 +85,8 @@ import {
   readOwnerVoiceArtifact,
   resolveVoiceArtifacts,
   setupVoicevoxProfile,
-  VoiceGenerationError,
-  voicevoxTuningStatusSchema
+  VoiceGenerationError
 } from "../voicevox/service";
-import { z } from "zod";
 import { DASHBOARD_ASSET_VERSION, dashboardScriptResponse } from "./assets";
 import {
   dashboardPage,
@@ -115,6 +101,41 @@ import {
   userGuidePage,
   voiceFinishPage
 } from "./pages";
+import {
+  canvasBlockActionRequestSchema,
+  canvasBlockCreateRequestSchema,
+  canvasBlockRequestSchema,
+  deckSettingsRequestSchema,
+  draftRestoreRequestSchema,
+  imageAltRequestSchema,
+  narrationSegmentCreateRequestSchema,
+  narrationSegmentDeleteRequestSchema,
+  narrationSegmentRequestSchema,
+  narrationSettingsRequestSchema,
+  previewRequestSchema,
+  projectFieldsRequestSchema,
+  projectListItemRequestSchema,
+  publishRequestSchema,
+  reviewInstructionRequestSchema,
+  sceneComponentActionRequestSchema,
+  sceneComponentCreateRequestSchema,
+  sceneComponentItemActionRequestSchema,
+  sceneComponentRequestSchema,
+  slideActionRequestSchema,
+  slideCompositionCreateRequestSchema,
+  slideCreateRequestSchema,
+  slideFieldsRequestSchema,
+  slideNarrationRequestSchema,
+  slideSplitRequestSchema,
+  slideTypographyRequestSchema,
+  templateCreateRequestSchema,
+  templateDeleteRequestSchema,
+  templateFieldsRequestSchema,
+  voiceJobRequestSchema,
+  voiceProfileTuningRequestSchema,
+  voiceSampleRequestSchema,
+  voiceSetupRequestSchema
+} from "./request-schemas";
 
 const MAX_FORM_BYTES = 16 * 1024;
 const MAX_JSON_BYTES = 128 * 1024;
@@ -128,262 +149,6 @@ const IMAGE_CLIENT_ERROR_CODES = new Set([
   "IMAGE_OUTPUT_TOO_LARGE",
   "IMAGE_EMPTY"
 ]);
-
-const reviewInstructionRequestSchema = z.object({
-  comment_ids: z.array(z.string().uuid()).min(1).max(20)
-});
-
-const projectFieldsRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  title: z.string().min(1).max(120).optional(),
-  stage: projectStageSchema.optional(),
-  summary: z.string().max(2_000).optional(),
-  question: z.string().max(2_000).optional(),
-  hypothesis: z.string().max(4_000).optional(),
-  method: z.string().max(20_000).optional()
-}).strict().refine(
-  (value) => Object.keys(value).some((key) => key !== "expected_version"),
-  { message: "更新する項目を1つ以上指定してください。" }
-);
-const projectListItemRequestSchema = z.discriminatedUnion("action", [
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("add"),
-    list: z.enum(["findings", "limitations"]),
-    value: z.string().trim().min(1).max(4_000)
-  }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("update"),
-    list: z.enum(["findings", "limitations"]),
-    index: z.number().int().nonnegative().max(99),
-    value: z.string().trim().min(1).max(4_000)
-  }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("delete"),
-    list: z.enum(["findings", "limitations"]),
-    index: z.number().int().nonnegative().max(99)
-  })
-]);
-const imageAltRequestSchema = z.object({
-  alt_text: z.string().max(500)
-});
-
-const previewRequestSchema = z.object({
-  expected_version: z.number().int().positive()
-});
-
-const draftRestoreRequestSchema = z.object({
-  expected_version: z.number().int().positive()
-});
-
-const deckSettingsRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  aspect_ratio: presentationAspectRatioSchema,
-  loading_screen: loadingScreenSchema
-});
-
-const publishRequestSchema = z.object({
-  revision_id: z.string().uuid()
-});
-
-const voiceSetupRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  profile_id: z
-    .string()
-    .regex(/^voicevox-style-\d+$/)
-    .default("voicevox-style-3")
-});
-
-const voiceProfileTuningRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  tuning: narrationSegmentSchema.shape.voice_tuning.unwrap()
-});
-
-const voiceSampleRequestSchema = z.object({
-  profile_id: z.string().regex(/^voicevox-style-\d+$/),
-  tuning: voicevoxTuningStatusSchema
-});
-
-const voiceJobRequestSchema = voiceSetupRequestSchema.extend({
-  idempotency_key: z.string().uuid()
-});
-
-const slideFieldsRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  title: z.string().min(1).max(120).optional(),
-  duration_seconds: z.number().int().positive().max(1_200).optional(),
-  tone: z.enum(["dark", "light", "signal", "quiet"]).optional(),
-  template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
-  enter_animation: animationSchema.nullable().optional(),
-  role: slideRoleSchema.optional(),
-  cover_layout: coverLayoutSchema.optional(),
-  composition_background: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
-  composition_clip_content: z.boolean().optional(),
-  content_markdown: z.string().min(1).max(20_000).optional(),
-  sidebar_markdown: z.string().max(10_000).optional()
-}).refine(
-  (request) =>
-    Object.entries(request).some(
-      ([key, value]) => key !== "expected_version" && value !== undefined
-    ),
-  { message: "At least one slide field is required." }
-);
-
-const slideActionRequestSchema = z.discriminatedUnion("action", [
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("duplicate")
-  }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("move"),
-    position: z.number().int().nonnegative().max(99)
-  }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("delete")
-  })
-]);
-const slideCreateRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  title: z.string().min(1).max(120),
-  position: z.number().int().nonnegative().max(99),
-  template: z.enum(["flow", "cover", "canvas", "scene"])
-});
-const slideSplitRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  split_offset: z.number().int().positive().max(19_999),
-  title: z.string().min(1).max(120),
-  duration_seconds: z.number().int().min(2).max(1_200),
-  content_markdown: z.string().min(3).max(20_000),
-  sidebar_markdown: z.string().max(10_000)
-});
-const slideCompositionCreateRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  mode: z.enum(["canvas", "scene"])
-});
-
-const slideTypographyRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  typography: slideTypographySchema
-});
-const sceneComponentRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  component: slideSceneNodeSchema
-});
-const sceneComponentActionRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  action: z.enum(["duplicate", "delete"])
-});
-const sceneComponentItemActionRequestSchema = z.discriminatedUnion("action", [
-  z.object({ expected_version: z.number().int().positive(), action: z.literal("add") }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("delete"),
-    item_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
-  }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("move"),
-    item_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-    position: z.number().int().nonnegative().max(11)
-  })
-]);
-const sceneComponentCreateRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  kind: z.enum(["layer", "stack", "grid", "hero", "markdown", "image", "shape", "card", "metric", "quote", "callout", "bar_chart", "timeline"]),
-  parent_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable(),
-  asset_id: z.string().uuid().nullable().optional()
-});
-const canvasBlockRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  block: slideBlockSchema
-});
-const canvasBlockActionRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  action: z.enum(["duplicate", "delete"])
-});
-const canvasBlockCreateRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  kind: z.enum(["markdown", "image", "shape"]),
-  asset_id: z.string().uuid().nullable().optional()
-});
-
-const templateFieldsRequestSchema = presentationTemplateSchema
-  .omit({ id: true })
-  .extend({
-    expected_version: z.number().int().positive(),
-    make_default: z.boolean().optional()
-  });
-
-const templateCreateRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-  name: z.string().min(1).max(80),
-  design_notes: z.string().max(1_000).optional(),
-  visual_preset: visualPresetSchema,
-  source_template_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable().optional(),
-  make_default: z.boolean()
-});
-const templateDeleteRequestSchema = z.object({
-  expected_version: z.number().int().positive()
-});
-
-const narrationSettingsRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  display: narrationDisplaySchema,
-  speaker: z.string().max(80).nullable(),
-  appearance: narrationAppearanceSchema
-});
-
-const narrationSegmentRequestSchema = z
-  .object({
-    text: narrationSegmentSchema.shape.text,
-    speaker: narrationSegmentSchema.shape.speaker,
-    voice_profile_id: narrationSegmentSchema.shape.voice_profile_id,
-    voice_tuning: narrationSegmentSchema.shape.voice_tuning,
-    voice_cues: narrationSegmentSchema.shape.voice_cues,
-    pause_before_ms: narrationSegmentSchema.shape.pause_before_ms,
-    pause_after_ms: narrationSegmentSchema.shape.pause_after_ms
-  })
-  .required({ speaker: true, voice_profile_id: true, voice_tuning: true })
-  .extend({ expected_version: z.number().int().positive() });
-
-const narrationSegmentCreateRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  at: z.number().int().nonnegative().max(100),
-  text: z.string().trim().min(1).max(2_000)
-});
-
-const narrationSegmentDeleteRequestSchema = z.object({
-  expected_version: z.number().int().positive()
-});
-
-const slideNarrationRequestSchema = z.object({
-  expected_version: z.number().int().positive(),
-  segments: z
-    .array(
-      z.object({
-        at: z.number().int().nonnegative().max(100),
-        text: z.string().trim().min(1).max(2_000)
-      })
-    )
-    .max(101)
-    .superRefine((segments, context) => {
-      const seen = new Set<number>();
-      for (const segment of segments) {
-        if (seen.has(segment.at)) {
-          context.addIssue({
-            code: "custom",
-            message: "Narration steps must be unique."
-          });
-        }
-        seen.add(segment.at);
-      }
-    })
-});
 
 async function recordWebAudit(
   db: D1Database,

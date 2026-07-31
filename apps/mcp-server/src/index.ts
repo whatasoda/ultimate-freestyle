@@ -10,26 +10,16 @@ import {
 import {
   dispatchPendingVoiceOutbox,
   failVoiceGenerationMessage,
-  processVoiceGenerationMessage,
-  type VoiceGenerationMessage
+  processVoiceGenerationMessage
 } from "./voicevox/service";
+import {
+  isVoiceGenerationMessage,
+  type VoiceGenerationMessage
+} from "./voicevox/message";
 import { readBytesCapped } from "./lib/http";
 import { MAX_MCP_REQUEST_BYTES } from "./lib/limits";
 
 export { VoicevoxContainer } from "./voicevox/container";
-
-function isVoiceGenerationMessage(value: unknown): value is VoiceGenerationMessage {
-  if (value === null || typeof value !== "object") return false;
-  const message = value as Record<string, unknown>;
-  return (
-    typeof message.job_id === "string" &&
-    /^[0-9a-f-]{36}$/i.test(message.job_id) &&
-    typeof message.segment_id === "string" &&
-    /^[0-9a-f-]{36}$/i.test(message.segment_id) &&
-    typeof message.fingerprint === "string" &&
-    /^[0-9a-f]{64}$/.test(message.fingerprint)
-  );
-}
 
 function jsonResponse(body: object, init?: ResponseInit): Response {
   const headers = new Headers(init?.headers);

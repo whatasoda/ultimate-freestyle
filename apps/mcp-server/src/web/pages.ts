@@ -1057,27 +1057,6 @@ function slideCreator(options: {
   return `<details class="component-detail"><summary>スライドを追加</summary><form class="editor" data-slide-create data-versioned-form data-method="POST" action="${options.action}" data-version="${options.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>タイトル<input name="title" maxlength="120" required placeholder="この一枚で伝えること"></label><div class="editor-grid"><label>雛形<select name="slide_template"><option value="flow">本文スライド</option><option value="cover">表紙</option><option value="canvas">自由配置</option><option value="scene">リッチ構成</option></select></label><label>挿入位置<select name="position">${positions}</select></label></div><p class="inherit-note">最低限の内容で追加し、次の画面で本文・読み上げ・見た目・表示パーツを調整します。</p><div class="actions"><button type="submit">追加して編集する</button><span class="version" data-version-label>v${options.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
 }
 
-function settingValue(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "未設定（継承）";
-  if (typeof value === "boolean") return value ? "有効" : "無効";
-  if (typeof value === "object") return JSON.stringify(value);
-  return String(value);
-}
-
-function settingTable(entries: Array<[string, unknown]>): string {
-  return `<dl class="setting-table">${entries
-    .map(
-      ([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(settingValue(value))}</dd>`
-    )
-    .join("")}</dl>`;
-}
-
-function componentSettings(node: SlideSceneNode): string {
-  return settingTable(
-    Object.entries(node).map(([key, value]) => [key, value])
-  );
-}
-
 type SceneTextField = {
   name: string;
   label: string;

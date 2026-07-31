@@ -9,7 +9,20 @@ const migrations = await readD1Migrations("./migrations");
 export default defineConfig({
   logLevel: "error",
   test: {
-    setupFiles: ["./test/setup.ts"]
+    setupFiles: ["./test/setup.ts"],
+    coverage: {
+      provider: "istanbul",
+      reportsDirectory: "../../coverage/mcp-server",
+      reporter: ["text", "json-summary"],
+      include: ["src/**/*.ts"],
+      exclude: ["src/worker-configuration.d.ts"],
+      thresholds: {
+        statements: 75,
+        branches: 66,
+        functions: 86,
+        lines: 77
+      }
+    }
   },
   plugins: [
     cloudflareTest({

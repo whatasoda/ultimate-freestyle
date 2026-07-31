@@ -8,7 +8,6 @@ import {
 import { findVoicevoxCatalogProfile } from "@ultimate-freestyle/research-schema/voicevox-catalog";
 import {
   mergeVoicevoxTuning,
-  type VoicevoxTuning,
   type VoicevoxTuningOverride
 } from "@ultimate-freestyle/research-schema/voice";
 import { z } from "zod";
@@ -19,6 +18,9 @@ import {
   invalidateInheritedVoiceAudio,
   invalidateVoiceProfileAudio
 } from "../projects/voice-audio";
+import type { VoiceGenerationMessage } from "./message";
+
+export type { VoiceGenerationMessage } from "./message";
 
 const MAX_JOBS_PER_MONTH = 20;
 const MAX_CHARACTERS_PER_MONTH = 200_000;
@@ -27,12 +29,6 @@ export const MAX_SEGMENTS_PER_JOB = 100;
 export const MAX_SEGMENT_CHARACTERS = 500;
 const MAX_AUDIO_BYTES = 5 * 1024 * 1024;
 const FINGERPRINT_QUERY_BATCH_SIZE = 80;
-
-export type VoiceGenerationMessage = {
-  job_id: string;
-  segment_id: string;
-  fingerprint: string;
-};
 
 export type VoiceSegmentPlan = {
   segmentId: string;
