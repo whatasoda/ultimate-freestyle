@@ -43,3 +43,4 @@
 
 - mainへのpush後にCloudflareの自動デプロイとsmoke testを確認する。
 - 公開済みの固定HTMLは自動で書き換えず、新rendererでpreviewを作り直してから公開する既存フローを維持する。
+- 本番assetのGETは成功する一方でHEADだけ404になる不整合を実環境で発見し、JavaScriptとCSSのHEADもGETと同じstatus、content type、cache policyを返すようにした。

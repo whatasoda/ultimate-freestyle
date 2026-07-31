@@ -4531,11 +4531,17 @@ export async function handleWebRequest(
 ): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
-  if (path === "/assets/dashboard.js" && request.method === "GET") {
-    return dashboardScriptResponse(url.searchParams.get("v") === DASHBOARD_ASSET_VERSION);
+  if (path === "/assets/dashboard.js" && (request.method === "GET" || request.method === "HEAD")) {
+    const response = dashboardScriptResponse(url.searchParams.get("v") === DASHBOARD_ASSET_VERSION);
+    return request.method === "HEAD"
+      ? new Response(null, { status: response.status, headers: response.headers })
+      : response;
   }
-  if (path === "/assets/dashboard.css" && request.method === "GET") {
-    return dashboardStyleResponse(url.searchParams.get("v") === DASHBOARD_ASSET_VERSION);
+  if (path === "/assets/dashboard.css" && (request.method === "GET" || request.method === "HEAD")) {
+    const response = dashboardStyleResponse(url.searchParams.get("v") === DASHBOARD_ASSET_VERSION);
+    return request.method === "HEAD"
+      ? new Response(null, { status: response.status, headers: response.headers })
+      : response;
   }
   if (path === "/" && (request.method === "GET" || request.method === "HEAD")) {
     const session = await readWebSession(request, env.DB);

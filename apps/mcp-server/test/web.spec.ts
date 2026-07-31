@@ -1119,6 +1119,25 @@ describe("Web dashboard", () => {
     expect(versionedDashboardStyle.headers.get("cache-control")).toBe(
       "public, max-age=31536000, immutable"
     );
+    const dashboardScriptHead = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=164", { method: "HEAD" }),
+      authEnv
+    );
+    expect(dashboardScriptHead.status).toBe(200);
+    expect(dashboardScriptHead.headers.get("content-type")).toContain("text/javascript");
+    expect(dashboardScriptHead.headers.get("cache-control")).toBe(
+      "public, max-age=31536000, immutable"
+    );
+    expect(await dashboardScriptHead.text()).toBe("");
+    const dashboardStyleHead = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=164", { method: "HEAD" }),
+      authEnv
+    );
+    expect(dashboardStyleHead.status).toBe(200);
+    expect(dashboardStyleHead.headers.get("content-type")).toContain("text/css");
+    expect(await dashboardStyleHead.text()).toBe("");
     const dashboardStyleText = await versionedDashboardStyle.text();
     expect(dashboardStyleText.length).toBeGreaterThan(30_000);
     expect(dashboardStyleText).toContain(".workspace-head { display: grid;");
