@@ -5,7 +5,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@114";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@115";
 
 function escapeHtml(value: string): string {
   return value
@@ -692,7 +692,7 @@ export function renderPresentationHtml(
     body { margin: 0; min-height: 100vh; min-height: 100dvh; overflow: hidden; background: #090d14; color: #f8fafc; }
     button, input { font: inherit; }
     .sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
-    .app { width: 100%; min-width: 0; height: 100vh; height: 100dvh; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; padding: calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
+    .app { width: 100%; min-width: 0; height: 100vh; height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; gap: 10px; overflow: hidden; padding: calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left)); }
     body[data-editor-frame="true"] .app { grid-template-rows: minmax(0, 1fr); gap: 0; padding: 0; }
     body[data-editor-frame="true"] header, body[data-editor-frame="true"] footer { display: none; }
     body[data-editor-frame="true"] .stage-wrap { grid-row: 1; }

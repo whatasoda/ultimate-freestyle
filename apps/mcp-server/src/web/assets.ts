@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "163";
+export const DASHBOARD_ASSET_VERSION = "164";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const fragmentIdFromHash = (hash) => {
@@ -2379,7 +2379,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const target = inspectorSections.find((details) => details.dataset.inspectorSection === name);
       if (!(target instanceof HTMLDetailsElement)) return;
       syncingInspectorPane = true;
-      for (const details of inspectorSections) details.open = details === target;
+      for (const details of inspectorSections) {
+        const selected = details === target;
+        details.hidden = mobileInspectorMedia.matches && !selected;
+        details.open = selected;
+      }
       syncingInspectorPane = false;
       for (const button of mobileInspectorButtons) {
         if (!(button instanceof HTMLButtonElement)) continue;
@@ -2435,7 +2439,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         return;
       }
       syncingInspectorPane = true;
-      for (const details of inspectorSections) details.open = desktopInspectorOpen.get(details.dataset.inspectorSection || "") ?? details.open;
+      for (const details of inspectorSections) {
+        details.hidden = false;
+        details.open = desktopInspectorOpen.get(details.dataset.inspectorSection || "") ?? details.open;
+      }
       syncingInspectorPane = false;
     });
     const mobileInspectorTabs = mobileInspectorButtons[0]?.closest(".mobile-inspector-tabs");
@@ -4238,6 +4245,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       composer?.removeAttribute("data-active");
       for (const source of reviewPage.querySelectorAll("[data-review-source]")) source.removeAttribute("data-selected");
       if (selectionLabel instanceof HTMLElement) selectionLabel.textContent = "スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。";
+      if (feedback instanceof HTMLElement) {
+        feedback.textContent = "";
+        feedback.classList.remove("warning", "success");
+      }
     };
     const captureSelection = () => {
       const selection = getSelection();
@@ -4274,6 +4285,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         feedback.classList.remove("warning");
       }
       bodyInput?.focus({ preventScroll: true });
+      if (matchMedia("(max-width: 60rem)").matches && composer instanceof HTMLElement) {
+        requestAnimationFrame(() => composer.scrollIntoView({ block: "start", behavior: "smooth" }));
+      }
     };
     reviewPage.addEventListener("mouseup", () => setTimeout(captureSelection));
     reviewPage.addEventListener("keyup", (event) => {
