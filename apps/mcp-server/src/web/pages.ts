@@ -837,7 +837,7 @@ const DASHBOARD_STYLE = String.raw`
       body[data-preview-focus="true"] .filmstrip, body[data-preview-focus="true"] .inspector { display: none; }
       body[data-preview-focus="true"] .workspace-preview { width: min(100%, 96rem); margin: 0 auto; }
       .filmstrip { display: grid; gap: .65rem; align-content: start; max-height: calc(100vh - 10rem); overflow: auto; }
-      .inspector { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .8rem; align-content: start; }
+      .inspector { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: .8rem; align-content: start; align-items: start; }
       .inspector > .slide-creator, .inspector > .mobile-inspector-tabs, .inspector > #inspector-quality { grid-column: 1 / -1; }
       .inspector > #inspector-content, .inspector > #inspector-design { grid-column: span 6; }
       .inspector > #inspector-narration { grid-column: span 4; }
