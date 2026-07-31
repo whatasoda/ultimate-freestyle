@@ -89,6 +89,9 @@ const guideHtml = await guideResponse.text();
 assert.match(guideHtml, /Codexへ接続する/);
 assert.match(guideHtml, /Claude Codeへ接続する/);
 assert.match(guideHtml, /Claudeのカスタムコネクタへ追加する/);
+assert.match(guideHtml, /Claude、Codex、ChatGPTのどれを使う？/);
+assert.match(guideHtml, /ChatGPTのDeveloper modeへ追加する/);
+assert.match(guideHtml, /カスタムRemote MCPは1件まで/);
 assert.match(guideHtml, /https:\/\/saijiyu-kenkyu\.2764\.moe\/mcp/);
 
 const guideHeadResponse = await fetch(new URL("/guide", baseUrl), {
