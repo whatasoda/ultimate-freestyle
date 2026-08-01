@@ -12,7 +12,7 @@ import {
 } from "../assets/service";
 import { readAuthConfig } from "../auth/config";
 import { externalAuthorizationPage, messagePage } from "../auth/pages";
-import { recordAuditEvent } from "../auth/repository";
+import { deleteUserAccount, recordAuditEvent } from "../auth/repository";
 import { secureTokenEqual } from "../auth/security";
 import { storeTwitchState, webTwitchState } from "../auth/twitch-state";
 import { TwitchClient, type Fetcher } from "../auth/twitch";
@@ -31,6 +31,7 @@ import {
   getProject,
   listDashboardProjects,
   listProjectDraftRevisions,
+  deleteProject,
   mutateProject,
   restoreProjectDraftRevision,
   ProjectRepositoryError
@@ -90,6 +91,7 @@ import {
 import { DASHBOARD_ASSET_VERSION, dashboardScriptResponse } from "./assets";
 import {
   dashboardPage,
+  dataHandlingPage,
   dashboardStyleResponse,
   draftRevisionPage,
   landingPage,
@@ -136,6 +138,7 @@ import {
   voiceSampleRequestSchema,
   voiceSetupRequestSchema
 } from "./request-schemas";
+import { drainStorageDeletionOutbox } from "../storage/deletion";
 
 const MAX_FORM_BYTES = 16 * 1024;
 const MAX_JSON_BYTES = 128 * 1024;
@@ -240,8 +243,65 @@ async function handleDashboard(request: Request, env: Env): Promise<Response> {
   return dashboardPage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
-    projects: await listDashboardProjects(env.DB, session.userId)
+    projects: await listDashboardProjects(env.DB, session.userId),
+    projectDeleted:
+      new URL(request.url).searchParams.get("project_deleted") === "1"
   });
+}
+
+async function handleAccountDelete(
+  request: Request,
+  env: Env,
+  revokeUserGrants: (userId: string) => Promise<number>
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) {
+    return redirectPage("/", clearWebSessionCookies());
+  }
+  const form = await readUrlEncodedFormCapped(request, MAX_FORM_BYTES);
+  if (!form.ok) {
+    return messagePage(
+      "アカウントを削除できませんでした",
+      form.reason === "over_cap"
+        ? "リクエストが大きすぎます。"
+        : "リクエストを読み取れませんでした。",
+      form.reason === "over_cap" ? 413 : 400
+    );
+  }
+  const csrfToken = form.value.get("csrf_token");
+  if (
+    typeof csrfToken !== "string" ||
+    !(await secureTokenEqual(csrfToken, session.csrfToken))
+  ) {
+    return messagePage(
+      "アカウントを削除できませんでした",
+      "画面の有効期限が切れました。ページを読み込み直してください。",
+      403
+    );
+  }
+  if (
+    form.value.get("confirmation") !== "DELETE ACCOUNT" ||
+    form.value.get("twitch_login") !== session.twitchLogin
+  ) {
+    return messagePage(
+      "アカウントを削除できませんでした",
+      "Twitchログイン名と DELETE ACCOUNT の両方を正確に入力してください。",
+      422
+    );
+  }
+
+  await revokeUserGrants(session.userId);
+  await deleteUserAccount(env.DB, session.userId);
+  await drainStorageDeletionOutbox(env);
+  return messagePage(
+    "アカウントを削除しました / Account deleted",
+    "Twitch識別情報、全研究、公開URL、MCP接続を削除しました。画像と音声の実体も削除処理へ送られました。",
+    200,
+    clearWebSessionCookies()
+  );
 }
 
 async function handleProjectDetail(
@@ -289,6 +349,85 @@ async function handleProjectDetail(
         }
       : null
   });
+}
+
+async function handleProjectDelete(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await readWebSession(request, env.DB);
+  if (session === null) {
+    return redirectPage("/", clearWebSessionCookies());
+  }
+  const form = await readUrlEncodedFormCapped(request, MAX_FORM_BYTES);
+  if (!form.ok) {
+    return messagePage(
+      "研究を削除できませんでした",
+      form.reason === "over_cap"
+        ? "リクエストが大きすぎます。"
+        : "リクエストを読み取れませんでした。",
+      form.reason === "over_cap" ? 413 : 400
+    );
+  }
+  const csrfToken = form.value.get("csrf_token");
+  const confirmation = form.value.get("confirmation");
+  const expectedVersion = Number(form.value.get("expected_version"));
+  if (
+    typeof csrfToken !== "string" ||
+    !(await secureTokenEqual(csrfToken, session.csrfToken))
+  ) {
+    return messagePage(
+      "研究を削除できませんでした",
+      "画面の有効期限が切れました。ページを読み込み直してください。",
+      403
+    );
+  }
+  if (
+    confirmation !== "DELETE" ||
+    !Number.isSafeInteger(expectedVersion) ||
+    expectedVersion < 1
+  ) {
+    return messagePage(
+      "研究を削除できませんでした",
+      "確認欄へ DELETE と入力し、もう一度操作してください。",
+      422
+    );
+  }
+  try {
+    const deleted = await deleteProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.deleted",
+      outcome: "succeeded",
+      details: {
+        project_id: projectId,
+        queued_object_deletions: deleted.queuedObjectDeletions,
+        source: "web"
+      },
+      createdAt: new Date().toISOString()
+    });
+    await drainStorageDeletionOutbox(env);
+    return redirectPage("/dashboard?project_deleted=1");
+  } catch (error) {
+    if (error instanceof ProjectRepositoryError) {
+      return messagePage(
+        "研究を削除できませんでした",
+        error.code === "PROJECT_VERSION_CONFLICT"
+          ? "別の画面またはAIが研究を更新しました。研究を開き直して、最新の内容を確認してください。"
+          : "研究が見つかりません。すでに削除された可能性があります。",
+        error.code === "PROJECT_VERSION_CONFLICT" ? 409 : 404
+      );
+    }
+    throw error;
+  }
 }
 
 async function handleDraftRevisionPage(
@@ -351,6 +490,7 @@ async function handleDraftRevisionFrame(
       "permissions-policy":
         "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
       "referrer-policy": "no-referrer",
+      "strict-transport-security": "max-age=31536000",
       "x-content-type-options": "nosniff",
       "x-frame-options": "SAMEORIGIN"
     }
@@ -667,6 +807,7 @@ async function handleSlideFrame(
         "default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
       "permissions-policy":
         "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+      "strict-transport-security": "max-age=31536000",
       "referrer-policy": "no-referrer",
       "x-content-type-options": "nosniff",
       "x-frame-options": "SAMEORIGIN"
@@ -4296,10 +4437,47 @@ async function handleLogout(request: Request, env: Env): Promise<Response> {
 export async function handleWebRequest(
   request: Request,
   env: Env,
-  fetcher: Fetcher
+  fetcher: Fetcher,
+  operations?: {
+    revokeUserGrants: (userId: string) => Promise<number>;
+  }
 ): Promise<Response | null> {
   const url = new URL(request.url);
   const path = url.pathname;
+  if (
+    request.method !== "GET" &&
+    request.method !== "HEAD" &&
+    (path.startsWith("/api/") ||
+      path.endsWith("/delete") ||
+      path === "/logout")
+  ) {
+    const session = await readWebSession(request, env.DB);
+    if (session !== null) {
+      const rateLimit = await env.WEB_WRITE_RATE_LIMITER.limit({
+        key: session.userId
+      });
+      if (!rateLimit.success) {
+        return Response.json(
+          {
+            ok: false,
+            error: {
+              code: "WEB_WRITE_RATE_LIMITED",
+              message: "保存操作が集中しています。1分ほど待ってから再開してください。"
+            },
+            request_id: crypto.randomUUID()
+          },
+          {
+            status: 429,
+            headers: {
+              "cache-control": "no-store",
+              "retry-after": "60",
+              "x-content-type-options": "nosniff"
+            }
+          }
+        );
+      }
+    }
+  }
   if (path === "/assets/dashboard.js" && (request.method === "GET" || request.method === "HEAD")) {
     const response = dashboardScriptResponse(url.searchParams.get("v") === DASHBOARD_ASSET_VERSION);
     return request.method === "HEAD"
@@ -4341,11 +4519,27 @@ export async function handleWebRequest(
         })
       : response;
   }
+  if (path === "/data" && (request.method === "GET" || request.method === "HEAD")) {
+    const response = dataHandlingPage();
+    return request.method === "HEAD"
+      ? new Response(null, {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers
+        })
+      : response;
+  }
   if (path === "/login") {
     return handleWebLogin(request, env, fetcher);
   }
   if (path === "/dashboard") {
     return handleDashboard(request, env);
+  }
+  if (path === "/account/delete") {
+    if (operations === undefined) {
+      throw new Error("Account deletion operations are unavailable.");
+    }
+    return handleAccountDelete(request, env, operations.revokeUserGrants);
   }
   const previewPageMatch = path.match(
     new RegExp(`^/preview/${UUID_PATH}$`, "i")
@@ -4462,6 +4656,12 @@ export async function handleWebRequest(
   );
   if (projectMatch?.[1] !== undefined) {
     return handleProjectDetail(request, env, projectMatch[1]);
+  }
+  const projectDeleteMatch = path.match(
+    new RegExp(`^/dashboard/projects/${UUID_PATH}/delete$`, "i")
+  );
+  if (projectDeleteMatch?.[1] !== undefined) {
+    return handleProjectDelete(request, env, projectDeleteMatch[1]);
   }
   const slideFrameMatch = path.match(
     new RegExp(`^/dashboard/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/frame$`)

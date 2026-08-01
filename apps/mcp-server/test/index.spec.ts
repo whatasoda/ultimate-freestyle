@@ -3,9 +3,41 @@ import { createExecutionContext, env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import { handleMcpRequest } from "../src/index";
-import { MAX_MCP_REQUEST_BYTES } from "../src/lib/limits";
+import {
+  MAX_MCP_REQUEST_BYTES,
+  MAX_OAUTH_PROTOCOL_REQUEST_BYTES
+} from "../src/lib/limits";
 
 describe("MCP Worker", () => {
+  it("returns a retryable error before parsing a rate-limited MCP body", async () => {
+    const limitedEnv = {
+      ...env,
+      MCP_RATE_LIMITER: {
+        limit: async () => ({ success: false })
+      }
+    } as Env;
+    const response = await handleMcpRequest(
+      new Request("https://example.com/mcp", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer rate-limited",
+          "content-type": "application/json"
+        },
+        body: "{}"
+      }),
+      limitedEnv,
+      createExecutionContext()
+    );
+    const body = await response.json<{
+      error: { data: { code: string; request_id: string } };
+    }>();
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(body.error.data.code).toBe("MCP_RATE_LIMITED");
+    expect(body.error.data.request_id).toBeTruthy();
+  });
+
   it("passes a bounded MCP request to the Streamable HTTP handler", async () => {
     const response = await handleMcpRequest(
       new Request("https://example.com/mcp", {
@@ -77,6 +109,7 @@ describe("MCP Worker", () => {
       service: string;
       version: string;
       renderer_version: string;
+      mode: string;
       request_id: string;
       eligibility: {
         broadcaster_id: string;
@@ -90,8 +123,9 @@ describe("MCP Worker", () => {
     expect(body).toMatchObject({
       ok: true,
       service: "ultimate-freestyle-mcp",
-      version: "0.15.0",
+      version: "0.16.0",
       renderer_version: "uf-renderer@120",
+      mode: "active",
       eligibility: {
         broadcaster_id: "67879379",
         broadcaster_login: "kashiwo",
@@ -101,6 +135,33 @@ describe("MCP Worker", () => {
     expect(body.request_id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
     );
+  });
+
+  it("rejects an oversized dynamic client registration before OAuth parsing", async () => {
+    let cancelled = false;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(
+          new Uint8Array(MAX_OAUTH_PROTOCOL_REQUEST_BYTES + 1)
+        );
+      },
+      cancel() {
+        cancelled = true;
+      }
+    });
+    const response = await exports.default.fetch("https://example.com/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: stream
+    });
+
+    expect(response.status).toBe(413);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    await expect(response.json()).resolves.toMatchObject({
+      error: "invalid_request",
+      error_description: "The OAuth request exceeds the 16 KiB limit."
+    });
+    expect(cancelled).toBe(true);
   });
 
   it("returns a stable structured error for unknown routes", async () => {

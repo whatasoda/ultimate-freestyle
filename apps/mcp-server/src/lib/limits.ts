@@ -1,1 +1,2 @@
 export const MAX_MCP_REQUEST_BYTES = 256 * 1024;
+export const MAX_OAUTH_PROTOCOL_REQUEST_BYTES = 16 * 1024;

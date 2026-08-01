@@ -55,6 +55,7 @@ assert.equal(health.body.ok, true);
 assert.equal(health.body.service, "ultimate-freestyle-mcp");
 assert.equal(health.body.version, expectedVersion);
 assert.equal(health.body.renderer_version, expectedRendererVersion);
+assert.equal(health.body.mode, "active");
 assert.equal(health.body.eligibility?.broadcaster_id, "67879379");
 
 const landingResponse = await fetch(new URL("/", baseUrl), {
@@ -69,6 +70,10 @@ assert.match(
 assert.match(
   landingResponse.headers.get("content-security-policy") ?? "",
   /default-src 'none'/
+);
+assert.equal(
+  landingResponse.headers.get("strict-transport-security"),
+  "max-age=31536000"
 );
 assert.match(await landingResponse.text(), /Twitchでログイン/);
 
@@ -93,6 +98,21 @@ assert.match(guideHtml, /Claude、Codex、ChatGPTのどれを使う？/);
 assert.match(guideHtml, /ChatGPTのDeveloper modeへ追加する/);
 assert.match(guideHtml, /カスタムRemote MCPは1件まで/);
 assert.match(guideHtml, /https:\/\/saijiyu-kenkyu\.2764\.moe\/mcp/);
+
+const dataResponse = await fetch(new URL("/data", baseUrl), {
+  redirect: "manual",
+  signal: AbortSignal.timeout(15_000)
+});
+assert.equal(dataResponse.status, 200);
+assert.match(
+  dataResponse.headers.get("content-security-policy") ?? "",
+  /default-src 'none'/
+);
+const dataHtml = await dataResponse.text();
+assert.match(dataHtml, /保存するデータと/);
+assert.match(dataHtml, /研究を完全に削除/);
+assert.match(dataHtml, /アカウントと全データを削除/);
+assert.match(dataHtml, /監査記録は180日/);
 
 const guideHeadResponse = await fetch(new URL("/guide", baseUrl), {
   method: "HEAD",

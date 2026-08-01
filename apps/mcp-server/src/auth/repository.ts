@@ -92,3 +92,35 @@ export async function recordAuditEvent(
     )
     .run();
 }
+
+export async function purgeExpiredAuditEvents(
+  db: D1Database,
+  now = new Date(),
+  retentionDays = 180
+): Promise<number> {
+  const cutoff = new Date(
+    now.getTime() - retentionDays * 24 * 60 * 60 * 1_000
+  ).toISOString();
+  const result = await db
+    .prepare("DELETE FROM audit_events WHERE created_at < ?")
+    .bind(cutoff)
+    .run();
+  return result.meta.changes;
+}
+
+export async function deleteUserAccount(
+  db: D1Database,
+  userId: string
+): Promise<void> {
+  const existing = await db
+    .prepare("SELECT id FROM users WHERE id = ?")
+    .bind(userId)
+    .first<{ id: string }>();
+  if (existing === null) {
+    throw new Error("The user account does not exist.");
+  }
+  await db.batch([
+    db.prepare("DELETE FROM audit_events WHERE user_id = ?").bind(userId),
+    db.prepare("DELETE FROM users WHERE id = ?").bind(userId)
+  ]);
+}

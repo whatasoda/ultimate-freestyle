@@ -6,6 +6,9 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { createOAuthProvider } from "../src/auth/oauth";
+import { upsertTwitchUser } from "../src/auth/repository";
+import { createWebSession } from "../src/auth/web-session";
+import { WEB_CSRF_COOKIE } from "../src/auth/security";
 import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { DASHBOARD_SCRIPT } from "../src/web/assets";
@@ -27,6 +30,9 @@ function createAuthEnv(): Env {
     MEDIA_BUCKET: env.MEDIA_BUCKET,
     DB: env.DB,
     VOICE_JOBS_QUEUE: env.VOICE_JOBS_QUEUE,
+    AUTH_RATE_LIMITER: env.AUTH_RATE_LIMITER,
+    MCP_RATE_LIMITER: env.MCP_RATE_LIMITER,
+    WEB_WRITE_RATE_LIMITER: env.WEB_WRITE_RATE_LIMITER,
     VOICEVOX_CONTAINER: env.VOICEVOX_CONTAINER,
     IMAGES: env.IMAGES,
     MCP_AUTH_MODE: "twitch",
@@ -120,8 +126,20 @@ describe("Web dashboard", () => {
     expect(landingHtml).toContain("AIと研究を作る");
     expect(landingHtml).toContain("Remote MCP対応AI");
     expect(landingHtml).toContain("固定プレビューを最後まで見てから");
+    expect(landingHtml).toContain('href="/data"');
     expect(landingHtml).toContain("Webで一枚ずつ確認");
     expect(landingHtml).toContain("確認した版を公開");
+
+    const dataPage = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/data"),
+      authEnv
+    );
+    const dataHtml = await dataPage.text();
+    expect(dataPage.status).toBe(200);
+    expect(dataHtml).toContain("保存するデータと");
+    expect(dataHtml).toContain("監査記録は180日");
+    expect(dataHtml).toContain("公開URLは直ちに無効");
     expect(landingHtml).toContain("限定利用者向けの制作・発表ワークスペース");
     expect(landingHtml).toContain('href="/guide"');
     expect(landingHtml).toContain("下書きは本人だけ。公開は明示操作です");
@@ -461,6 +479,8 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("Claude Web／Desktop");
     expect(dashboardHtml).toContain("Developer modeが表示される場合");
     expect(dashboardHtml).toContain('href="/guide#choose"');
+    expect(dashboardHtml).toContain('action="/account/delete"');
+    expect(dashboardHtml).toContain("DELETE ACCOUNT");
     expect(dashboardHtml).toContain(
       'href="/dashboard/projects/10000000-0000-4000-8000-000000000001"'
     );
@@ -486,8 +506,13 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(
       'action="/api/projects/10000000-0000-4000-8000-000000000001/images"'
     );
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=174"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=174"');
+    expect(detailHtml).toContain(
+      'action="/dashboard/projects/10000000-0000-4000-8000-000000000001/delete"'
+    );
+    expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
+    expect(detailHtml).toContain("公開URLも直ちに無効になります");
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=175"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=175"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -925,7 +950,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=174"'
+      'href="/assets/dashboard.css?v=175"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1151,7 +1176,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=174"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=175"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1160,7 +1185,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=174"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=175"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1172,7 +1197,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=174", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=175", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1183,7 +1208,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=174", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=175", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -3704,4 +3729,59 @@ describe("Web dashboard", () => {
     expect(afterLogout.status).toBe(303);
     expect(afterLogout.headers.get("location")).toBe("/");
   }, 10_000);
+
+  it("deletes the signed-in account and clears its MCP grants", async () => {
+    const authEnv = createAuthEnv();
+    const provider = createOAuthProvider(
+      authEnv,
+      async () => Response.json({ protected: true })
+    );
+    const userId = await upsertTwitchUser(
+      env.DB,
+      {
+        client_id: "twitch-client-id",
+        login: "delete-web-viewer",
+        scopes: ["user:read:follows", "user:read:subscriptions"],
+        user_id: "delete-web-viewer-id",
+        expires_in: 3600
+      },
+      "2026-08-01T00:00:00.000Z"
+    );
+    const session = await createWebSession(env.DB, {
+      userId,
+      now: new Date("2026-08-01T00:00:00.000Z")
+    });
+    const cookie = session.cookies
+      .map((value) => value.split(";", 1)[0])
+      .join("; ");
+    const csrfToken = cookie.match(
+      new RegExp(`(?:^|; )${WEB_CSRF_COOKIE}=([^;]+)`)
+    )?.[1];
+    expect(csrfToken).toBeTruthy();
+    const body = new URLSearchParams({
+      csrf_token: csrfToken ?? "",
+      twitch_login: "delete-web-viewer",
+      confirmation: "DELETE ACCOUNT"
+    });
+
+    const response = await requestProvider(
+      provider,
+      new Request("https://saijiyu-kenkyu.2764.moe/account/delete", {
+        method: "POST",
+        headers: {
+          cookie,
+          "content-type": "application/x-www-form-urlencoded"
+        },
+        body
+      }),
+      authEnv
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("アカウントを削除しました");
+    expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
+    await expect(
+      env.DB.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first()
+    ).resolves.toBeNull();
+  });
 });

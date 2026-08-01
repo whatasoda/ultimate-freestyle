@@ -14,7 +14,7 @@ import { PRESENTATION_RENDERER_VERSION } from "./presentation/render";
 import { registerVoiceTools } from "./voicevox/tools";
 
 export const SERVICE_NAME = "ultimate-freestyle-mcp";
-export const SERVICE_VERSION = "0.15.0";
+export const SERVICE_VERSION = "0.16.0";
 
 export type EligibilityConfig = Pick<
   Env,

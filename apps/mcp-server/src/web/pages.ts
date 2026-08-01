@@ -330,7 +330,10 @@ function headers(setCookies: string[] = []): Headers {
       "base-uri 'none'"
     ].join("; "),
     "content-type": "text/html; charset=utf-8",
+    "permissions-policy":
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "referrer-policy": "no-referrer",
+    "strict-transport-security": "max-age=31536000",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY"
   });
@@ -729,6 +732,13 @@ const DASHBOARD_STYLE = String.raw`
       .loading-style-pick[data-loading-style-pick="research-log"] .loading-wire { background: repeating-linear-gradient(90deg, #d9d2c5 0 1px, #f3efe6 1px 18%); }
       .loading-style-pick[data-loading-style-pick="research-log"] .loading-wire::before { left: 8%; right: 24%; top: 28%; background: #273444; }
       .actions { display: flex; align-items: center; flex-wrap: wrap; gap: .7rem; }
+      .danger-zone { max-width: 44rem; margin-top: 2rem; border: 1px solid #7e3b49; border-radius: .8rem; background: #2a1118; }
+      .danger-zone > summary { padding: .85rem 1rem; color: #ffb8c3; cursor: pointer; font-weight: 800; }
+      .danger-zone > p, .danger-zone > form { margin: 0; padding: 0 1rem 1rem; }
+      .danger-zone form, .danger-zone label { display: grid; gap: .5rem; }
+      .danger-zone form { gap: .85rem; }
+      .danger-zone input { box-sizing: border-box; width: 100%; padding: .7rem; border: 1px solid #7e3b49; border-radius: .5rem; background: #10090c; color: var(--ink); font: inherit; }
+      .danger-zone button.danger { border-color: #b84d5d; background: #7e2635; color: white; }
       button:disabled { cursor: not-allowed; opacity: .55; }
       button[aria-busy="true"] { cursor: wait; }
       .character-count { justify-self: end; margin-top: -.2rem; color: var(--muted); font-size: .7rem; font-variant-numeric: tabular-nums; }
@@ -1408,7 +1418,7 @@ export function landingPage(options: {
   return new Response(
     shell(
       "最自由研究",
-      `<header class="site-header"><a class="brand" href="/">最自由研究</a><nav class="landing-nav" aria-label="案内"><a href="#about">できること</a><a href="#roles">使い分け</a><a class="button ghost" href="/guide">はじめかた</a></nav></header>
+      `<header class="site-header"><a class="brand" href="/">最自由研究</a><nav class="landing-nav" aria-label="案内"><a href="#about">できること</a><a href="#roles">使い分け</a><a href="/data">データの扱い</a><a class="button ghost" href="/guide">はじめかた</a></nav></header>
        <main id="main-content" tabindex="-1"><section class="hero">
          <div class="hero-copy"><p class="eyebrow">Ultimate freestyle research</p>
          <h1>気になったことを、<span class="keep-word">研究にする。</span></h1>
@@ -1449,8 +1459,25 @@ export function userGuidePage(options: {
          <section class="guide-section" id="oauth"><p class="eyebrow">OAuth</p><h2>認証画面で確認すること</h2><ul class="plain-list"><li>接続先が <code>saijiyu-kenkyu.2764.moe</code> であること</li><li>研究の読み取り・編集・公開など、AIクライアントが要求する権限</li><li>ログインするTwitchアカウントがWeb UIと同じであること</li></ul><div class="guide-note"><strong>最後に <code>http://127.0.0.1</code> や <code>http://localhost</code> が開くのは正常です。</strong> CodexやClaude Codeが一時的に待ち受ける、ご自身の端末内だけのOAuth戻り先です。認証完了の表示またはクライアント側の成功を確認するまで、その画面を閉じないでください。</div></section>
          <section class="guide-section" id="first-research"><p class="eyebrow">First research</p><h2>最初の研究を始める</h2><ol class="guide-step-list"><li class="guide-step"><div><h3>AIへ最初の依頼を送る</h3><p>接続したAIとの新しい会話へ、次の文を貼り付けます。一度に結論を作らず、興味から一問ずつ始めます。</p>${commandBox(FIRST_RESEARCH_PROMPT, "最初の依頼文をコピーしました。")}</div></li><li class="guide-step"><div><h3>AIと研究を進める</h3><p>問い、予想、方法、記録を対話し、必要なところで研究を保存するよう頼みます。AIは変更前に対象とversionを確認し、小さな単位で編集します。</p></div></li><li class="guide-step"><div><h3>Web UIで実物を仕上げる</h3><p>「自分の研究」から研究を開き、スライドの実表示、画像、読み上げ、VOICEVOX、品質確認を進めます。最後に固定プレビューを確認してから公開します。</p><div class="actions"><a class="button" href="/login">自分の研究を開く</a></div></div></li></ol><div class="guide-warning guide-note"><strong>公開は自動ではありません。</strong> AIが研究や発表を編集しても下書きのままです。公開版を変える操作はWeb UIで固定プレビューを確認した本人が行います。</div></section>
          <section class="guide-section" id="trouble"><p class="eyebrow">Troubleshooting</p><h2>困ったとき</h2><table class="troubleshooting"><tbody><tr><th>AIに最自由研究のtoolが見えない</th><td>Codexは <code>codex mcp list</code> とセッション内の <code>/mcp</code>、Claude Codeは <code>claude mcp list</code> と <code>/mcp</code> を確認します。登録直後はクライアントを再起動します。</td></tr><tr><th>認証画面が期限切れになった</th><td>古いタブを閉じ、Codexは <code>codex mcp login saijiyu-kenkyu</code>、Claude Codeは <code>/mcp</code> から新しい認証を一度だけ開始します。認証ボタンを連打しません。</td></tr><tr><th>Twitch後に接続へ戻らない</th><td>Codex／Claude Codeを起動した端末とブラウザが同じか確認します。Claude Codeではアドレスバーの完全なcallback URLをクライアントへ貼る復旧手段があります。</td></tr><tr><th>利用条件を満たしていないと表示される</th><td>ログイン中のTwitchアカウント、${escapeHtml(options.broadcasterLogin)}のフォロー状態・期間、現在のサブスク状態を確認します。WebとAI側で別アカウントを使っていないかも確認してください。</td></tr><tr><th>接続し直したい</th><td>Codexは <code>codex mcp logout saijiyu-kenkyu</code> の後にlogin、Claude Codeは <code>/mcp</code> の「Clear authentication」から再認証します。</td></tr><tr><th>編集内容が競合した</th><td>別タブやAIが先に保存しています。画面を再読み込みして現行版を確認し、必要な一項目だけもう一度変更します。過去版は研究詳細の履歴から確認・復元できます。</td></tr></tbody></table></section>
-         <section class="guide-section" id="security"><p class="eyebrow">Safety and privacy</p><h2>接続前に知っておくこと</h2><ul class="plain-list"><li>Twitchのパスワードやaccess tokenをAIの会話へ貼り付けません。</li><li>接続先のAIは、許可した範囲で自分の研究を読み取り・変更できます。tool実行内容を確認してください。</li><li>下書き、画像、生成音声は利用者ごとに分離されます。公開操作後の発表はURLを知る人が閲覧できます。</li><li>任意のHTML、shell、未検証コードをMCPから実行する機能はありません。</li></ul><div class="official-links"><a href="https://learn.chatgpt.com/docs/extend/mcp.md" target="_blank" rel="noopener noreferrer">Codex MCP 公式ガイド</a><a href="https://learn.chatgpt.com/docs/pricing.md" target="_blank" rel="noopener noreferrer">OpenAI 料金</a><a href="https://developers.openai.com/plugins/deploy/connect-chatgpt" target="_blank" rel="noopener noreferrer">ChatGPT Developer mode</a><a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener noreferrer">Claude Code MCP 公式ガイド</a><a href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp" target="_blank" rel="noopener noreferrer">Claude カスタムコネクタ公式ガイド</a><a href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer">Claude 料金</a></div></section>
+         <section class="guide-section" id="security"><p class="eyebrow">Safety and privacy</p><h2>接続前に知っておくこと</h2><ul class="plain-list"><li>Twitchのパスワードやaccess tokenをAIの会話へ貼り付けません。</li><li>接続先のAIは、許可した範囲で自分の研究を読み取り・変更できます。tool実行内容を確認してください。</li><li>下書き、画像、生成音声は利用者ごとに分離されます。公開操作後の発表はURLを知る人が閲覧できます。</li><li>任意のHTML、shell、未検証コードをMCPから実行する機能はありません。</li></ul><div class="actions"><a class="button ghost" href="/data">保存するデータと削除方法を確認</a></div><div class="official-links"><a href="https://learn.chatgpt.com/docs/extend/mcp.md" target="_blank" rel="noopener noreferrer">Codex MCP 公式ガイド</a><a href="https://learn.chatgpt.com/docs/pricing.md" target="_blank" rel="noopener noreferrer">OpenAI 料金</a><a href="https://developers.openai.com/plugins/deploy/connect-chatgpt" target="_blank" rel="noopener noreferrer">ChatGPT Developer mode</a><a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener noreferrer">Claude Code MCP 公式ガイド</a><a href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp" target="_blank" rel="noopener noreferrer">Claude カスタムコネクタ公式ガイド</a><a href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer">Claude 料金</a></div></section>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
+    ),
+    { headers: headers() }
+  );
+}
+
+export function dataHandlingPage(): Response {
+  return new Response(
+    shell(
+      "データの取り扱い — 最自由研究",
+      `<header class="site-header"><a class="brand" href="/">最自由研究</a><nav class="landing-nav" aria-label="案内"><a href="/guide">はじめかた</a><a class="button ghost" href="/login">Twitchでログイン</a></nav></header>
+       <main class="guide-main" id="main-content" tabindex="-1">
+         <section class="guide-hero"><p class="eyebrow">Data handling</p><h1>保存するデータと<br>削除のしかた</h1><p class="lead">限定提供中の最自由研究が、本人確認・制作・公開のために扱う情報を説明します。TwitchのパスワードをこのサービスやAIの会話へ入力する必要はありません。</p><ul class="guide-meta"><li>2026年8月1日現在</li><li>公開は本人の明示操作</li><li>研究・アカウント単位で削除可能</li></ul></section>
+         <section class="guide-section"><h2>保存するもの</h2><ul class="plain-list"><li><strong>Twitch識別情報：</strong>ユーザーID、ログイン名、フォロー期間・サブスク状態を元にした資格判定結果。</li><li><strong>認証情報：</strong>Webセッションは24時間。Remote MCP接続では資格を再確認するため、Twitchが発行したtokenをCloudflare KV内の接続情報として保持します。</li><li><strong>制作データ：</strong>研究本文、版履歴、スライド、レビューコメント、圧縮済みWebP画像、VOICEVOX生成MP3、固定プレビューと公開状態。</li><li><strong>運用記録：</strong>ログイン、資格判定、主要な編集・生成・公開操作の結果。本文やTwitchのパスワードは監査記録へ入れません。</li></ul></section>
+         <section class="guide-section"><h2>公開される範囲</h2><ul class="plain-list"><li>下書き、アップロード画像、生成途中の音声、プレビューは、同じTwitch利用者として認証された本人だけが取得できます。</li><li>「公開する」を実行した固定版だけが、推測しにくい公開URLから認証なしで閲覧できます。</li><li>公開停止または研究削除を行うと、公開URLは直ちに無効になります。</li></ul></section>
+         <section class="guide-section"><h2>保持期間と削除</h2><ul class="plain-list"><li>研究データは本人が削除するまで保持します。下書き履歴は直近10版を残しつつ、最大50版・合計8MiBの範囲で古い版から整理します。</li><li>研究詳細の「研究を完全に削除」で、本文、履歴、画像、音声、プレビュー、公開版をまとめて削除できます。R2の実体は削除待ちへ移され、失敗時も定期的に再試行されます。</li><li>VOICEVOXの調声試聴キャッシュは共有され、最終的に30日で自動削除されます。</li><li>監査記録は180日を超えたものを毎日削除します。期限切れWebセッションとOAuthデータも毎日削除します。</li><li>障害復旧用のCloudflare D1 Time Travelには、削除前の状態が契約プランに応じて最大30日残る場合があります。通常のアプリ操作からは参照できません。</li></ul></section>
+         <section class="guide-section"><h2>利用者ができること</h2><ol class="guide-step-list"><li class="guide-step"><div><h3>公開だけ止める</h3><p>研究詳細の公開欄から「公開を停止」を選びます。下書きは残ります。</p></div></li><li class="guide-step"><div><h3>研究を完全に削除する</h3><p>研究詳細の末尾を開き、確認欄へ <code>DELETE</code> と入力して削除します。この操作は取り消せません。</p></div></li><li class="guide-step"><div><h3>アカウントと全データを削除する</h3><p>「自分の研究」の末尾を開き、Twitchログイン名と <code>DELETE ACCOUNT</code> を入力します。全研究とMCP接続を含む本人データを削除し、ログアウトします。</p></div></li></ol><div class="guide-note"><strong>削除後の復旧について：</strong> 通常の画面からは復旧できません。障害復旧用のD1 Time Travelに残る期間を過ぎると、運営者も復旧できません。公開のIssueやチャットへtoken・パスワードを貼らないでください。</div></section>
+       </main>`
     ),
     { headers: headers() }
   );
@@ -1460,6 +1487,7 @@ export function dashboardPage(options: {
   twitchLogin: string;
   csrfToken: string;
   projects: DashboardProjectSummary[];
+  projectDeleted?: boolean;
 }): Response {
   const cards = options.projects
     .map(
@@ -1533,10 +1561,12 @@ export function dashboardPage(options: {
       "自分の研究 — 最自由研究",
       `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main id="main-content" tabindex="-1">
+         ${options.projectDeleted ? '<p class="panel success" role="status">研究と公開URLを削除しました。画像・音声の実体も削除処理へ送られました。</p>' : ""}
          <div class="section-head"><div><p class="eyebrow">My research</p><h1>自分の研究</h1></div><span class="count">${options.projects.length} / 20 件</span></div>
          ${content}
          ${connectionGuide}
          <p class="hint">研究を開くと、内容確認、文言の微調整、発表プレビュー、公開操作を行えます。大きな構成変更は接続したAIクライアントから進めます。</p>
+         <details class="danger-zone"><summary>アカウントと全データを削除</summary><p>すべての研究、画像、音声、公開URL、Twitch識別情報、Webセッション、MCP接続を削除します。取り消せません。</p><form method="post" action="/account/delete"><input type="hidden" name="csrf_token" value="${escapeHtml(options.csrfToken)}"><label>Twitchログイン名<input name="twitch_login" autocomplete="off" required></label><label>確認のため <code>DELETE ACCOUNT</code> と入力<input name="confirmation" autocomplete="off" pattern="DELETE ACCOUNT" required></label><button class="danger" type="submit">アカウントと全データを削除</button></form></details>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
     { headers: headers() }
@@ -2293,6 +2323,7 @@ export function projectDetailPage(options: {
              ${evaluationPanel}
              ${voicePanel}
              ${publicationPanel}
+             <section class="panel"><details><summary>研究を完全に削除</summary><div class="disclosure-body"><p class="warning">この操作は取り消せません。下書き履歴、画像、生成音声、固定プレビュー、公開中の発表がすべて対象になり、公開URLも直ちに無効になります。</p><form class="editor" method="post" action="/dashboard/projects/${escapeHtml(options.project.project_id)}/delete"><input type="hidden" name="csrf_token" value="${escapeHtml(options.csrfToken)}"><input type="hidden" name="expected_version" value="${options.project.version}"><label>削除の確認<input name="confirmation" required pattern="DELETE" autocomplete="off" placeholder="DELETE"><small class="inherit-note">半角大文字で DELETE と入力してください。</small></label><button class="danger" type="submit">この研究を完全に削除</button></form></div></details></section>
              <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>
            </aside>
          </div>

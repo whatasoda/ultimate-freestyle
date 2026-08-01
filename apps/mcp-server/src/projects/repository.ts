@@ -273,6 +273,50 @@ export async function getProject(
   return row === null ? null : toProject(row);
 }
 
+export async function deleteProject(
+  db: D1Database,
+  options: {
+    ownerUserId: string;
+    projectId: string;
+    expectedVersion: number;
+  }
+): Promise<{ projectId: string; queuedObjectDeletions: number }> {
+  const deleted = await db
+    .prepare(
+      `DELETE FROM research_projects
+       WHERE id = ? AND owner_user_id = ? AND version = ?
+       RETURNING id`
+    )
+    .bind(options.projectId, options.ownerUserId, options.expectedVersion)
+    .first<{ id: string }>();
+  if (deleted === null) {
+    const current = await getProject(db, options.ownerUserId, options.projectId);
+    if (current === null) {
+      throw new ProjectRepositoryError(
+        "PROJECT_NOT_FOUND",
+        "The project does not exist."
+      );
+    }
+    throw new ProjectRepositoryError(
+      "PROJECT_VERSION_CONFLICT",
+      "The project was changed after it was read.",
+      current.version
+    );
+  }
+  const pending = await db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM storage_deletion_outbox
+       WHERE project_id = ?`
+    )
+    .bind(options.projectId)
+    .first<{ count: number }>();
+  return {
+    projectId: deleted.id,
+    queuedObjectDeletions: Number(pending?.count ?? 0)
+  };
+}
+
 export async function createProject(
   db: D1Database,
   options: {

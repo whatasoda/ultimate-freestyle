@@ -8,6 +8,7 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".vinext/**",
+    "**/.wrangler/**",
     "**/dist/**",
     "build/**",
     "apps/mcp-server/src/worker-configuration.d.ts",

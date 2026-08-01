@@ -2,8 +2,10 @@ import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 
 import {
+  deleteUserAccount,
   getEligibilityOverride,
   recordAuditEvent,
+  purgeExpiredAuditEvents,
   upsertTwitchUser
 } from "../src/auth/repository";
 
@@ -84,5 +86,92 @@ describe("auth repository", () => {
     expect(JSON.parse(row?.details_json ?? "{}")).toEqual({
       reason: "subscriber"
     });
+  });
+
+  it("removes audit events older than the retention window", async () => {
+    const userId = await upsertTwitchUser(
+      env.DB,
+      identity,
+      "2026-08-01T00:00:00.000Z"
+    );
+    await Promise.all([
+      recordAuditEvent(env.DB, {
+        userId,
+        eventType: "retention.old",
+        outcome: "succeeded",
+        details: {},
+        createdAt: "2025-12-31T23:59:59.000Z"
+      }),
+      recordAuditEvent(env.DB, {
+        userId,
+        eventType: "retention.current",
+        outcome: "succeeded",
+        details: {},
+        createdAt: "2026-02-03T00:00:00.000Z"
+      })
+    ]);
+
+    await expect(
+      purgeExpiredAuditEvents(
+        env.DB,
+        new Date("2026-08-01T00:00:00.000Z"),
+        180
+      )
+    ).resolves.toBeGreaterThanOrEqual(1);
+    const events = await env.DB.prepare(
+      "SELECT event_type FROM audit_events WHERE event_type LIKE 'retention.%' ORDER BY event_type"
+    ).all<{ event_type: string }>();
+    expect(events.results).toEqual([
+      { event_type: "retention.current" }
+    ]);
+  });
+
+  it("deletes Twitch identity, audit records, and owned projects together", async () => {
+    const now = "2026-08-01T00:00:00.000Z";
+    const userId = await upsertTwitchUser(
+      env.DB,
+      { ...identity, user_id: "delete-account-viewer" },
+      now
+    );
+    await env.DB.prepare(
+      `INSERT INTO research_projects (
+         id, owner_user_id, title, stage, document_json,
+         version, idempotency_key, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+    )
+      .bind(
+        "de1e7e00-0000-4000-8000-000000000001",
+        userId,
+        "削除対象",
+        "planning",
+        "{}",
+        "delete-account-test",
+        now,
+        now
+      )
+      .run();
+    await recordAuditEvent(env.DB, {
+      userId,
+      eventType: "account.delete.test",
+      outcome: "succeeded",
+      details: {},
+      createdAt: now
+    });
+
+    await deleteUserAccount(env.DB, userId);
+
+    await expect(
+      env.DB.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first()
+    ).resolves.toBeNull();
+    await expect(
+      env.DB.prepare("SELECT id FROM research_projects WHERE owner_user_id = ?")
+        .bind(userId)
+        .first()
+    ).resolves.toBeNull();
+    await expect(
+      env.DB.prepare("SELECT id FROM audit_events WHERE user_id = ?")
+        .bind(userId)
+        .first()
+    ).resolves.toBeNull();
   });
 });

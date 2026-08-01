@@ -27,7 +27,10 @@ function pageHeaders(options?: {
       "base-uri 'none'"
     ].join("; "),
     "content-type": "text/html; charset=utf-8",
+    "permissions-policy":
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "referrer-policy": "no-referrer",
+    "strict-transport-security": "max-age=31536000",
     "x-content-type-options": "nosniff",
     "x-frame-options": "DENY"
   });
@@ -162,7 +165,7 @@ export function messagePage(
   title: string,
   message: string,
   status: number,
-  setCookie?: string
+  setCookie?: string | string[]
 ): Response {
   return new Response(
     layout(title, `<h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p>`),

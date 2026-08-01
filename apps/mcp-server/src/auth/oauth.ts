@@ -67,6 +67,21 @@ function getOAuthHelpers(env: Env): OAuthHelpers {
   return helpers as OAuthHelpers;
 }
 
+async function revokeUserGrants(env: Env, userId: string): Promise<number> {
+  const oauth = getOAuthHelpers(env);
+  let cursor: string | undefined;
+  let revoked = 0;
+  do {
+    const page = await oauth.listUserGrants(userId, { limit: 50, cursor });
+    for (const grant of page.items) {
+      await oauth.revokeGrant(grant.id, userId);
+      revoked += 1;
+    }
+    cursor = page.cursor;
+  } while (cursor !== undefined);
+  return revoked;
+}
+
 function validateRequestedScopes(request: AuthRequest): string[] {
   const supportedScopes = new Set<string>(MCP_SCOPES);
   if (
@@ -377,7 +392,9 @@ export function createOAuthProvider(
     async fetch(request: Request, requestEnv: Env): Promise<Response> {
       const path = new URL(request.url).pathname;
       try {
-        const webResponse = await handleWebRequest(request, requestEnv, fetcher);
+        const webResponse = await handleWebRequest(request, requestEnv, fetcher, {
+          revokeUserGrants: (userId) => revokeUserGrants(requestEnv, userId)
+        });
         if (webResponse !== null) {
           return webResponse;
         }
