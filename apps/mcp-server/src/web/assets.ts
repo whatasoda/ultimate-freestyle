@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "176";
+export const DASHBOARD_ASSET_VERSION = "177";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
@@ -4376,6 +4376,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let pendingReviewSelection = null;
     let reviewToolbarRange = null;
     let reviewToolbarFrame = 0;
+    const reloadReviewPage = (nextUrl) => {
+      try {
+        const destination = new URL(typeof nextUrl === "string" ? nextUrl : location.href, location.href);
+        if (destination.origin === location.origin) {
+          history.replaceState(null, "", destination.pathname + destination.search + destination.hash);
+        }
+      } catch {}
+      location.reload();
+    };
     const reviewDraftKey = "ultimate-freestyle:review-draft:" + (reviewPage.dataset.projectId || "") + ":" + (reviewPage.dataset.slideId || "");
     if (bodyInput instanceof HTMLTextAreaElement) {
       try {
@@ -4564,7 +4573,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             feedback.classList.add("success");
           }
           try { sessionStorage.removeItem(reviewDraftKey); } catch {}
-          location.assign(result.next_url || location.href);
+          reloadReviewPage(result.next_url);
         } catch (error) {
           if (feedback instanceof HTMLElement) {
             feedback.textContent = caughtErrorMessage(error, "コメントを保存できませんでした。");
