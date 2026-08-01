@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "175";
+export const DASHBOARD_ASSET_VERSION = "176";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
@@ -4370,6 +4370,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const rangeEnd = composer?.querySelector('input[name="range_end"]');
     const selectedText = composer?.querySelector('input[name="selected_text"]');
     const bodyInput = composer?.querySelector('textarea[name="body"]');
+    const selectionToolbar = reviewPage.querySelector("[data-review-selection-toolbar]");
+    const selectionAction = reviewPage.querySelector("[data-review-selection-action]");
+    const selectionActionLabel = reviewPage.querySelector("[data-review-selection-action-label]");
+    let pendingReviewSelection = null;
+    let reviewToolbarRange = null;
+    let reviewToolbarFrame = 0;
     const reviewDraftKey = "ultimate-freestyle:review-draft:" + (reviewPage.dataset.projectId || "") + ":" + (reviewPage.dataset.slideId || "");
     if (bodyInput instanceof HTMLTextAreaElement) {
       try {
@@ -4386,12 +4392,77 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         } catch {}
       });
     }
+    const clearActiveReviewHighlight = () => {
+      const highlights = globalThis.CSS?.highlights;
+      if (highlights && typeof highlights.delete === "function") highlights.delete("review-selection");
+    };
+    const hideReviewSelectionToolbar = () => {
+      pendingReviewSelection = null;
+      reviewToolbarRange = null;
+      if (selectionToolbar instanceof HTMLElement) selectionToolbar.hidden = true;
+    };
+    const positionReviewSelectionToolbar = () => {
+      if (!(selectionToolbar instanceof HTMLElement) || !(reviewToolbarRange instanceof Range)) return;
+      const rects = reviewToolbarRange.getClientRects();
+      const rect = rects.length > 0 ? rects[0] : reviewToolbarRange.getBoundingClientRect();
+      if (rect.bottom < 0 || rect.top > innerHeight || rect.right < 0 || rect.left > innerWidth) {
+        selectionToolbar.hidden = true;
+        return;
+      }
+      const roomAbove = rect.top >= 58;
+      selectionToolbar.dataset.placement = roomAbove ? "above" : "below";
+      selectionToolbar.style.left = Math.min(innerWidth - 84, Math.max(84, rect.left + rect.width / 2)) + "px";
+      selectionToolbar.style.top = (roomAbove ? rect.top : rect.bottom) + "px";
+      selectionToolbar.hidden = false;
+    };
+    const scheduleReviewToolbarPosition = () => {
+      cancelAnimationFrame(reviewToolbarFrame);
+      reviewToolbarFrame = requestAnimationFrame(positionReviewSelectionToolbar);
+    };
+    const showReviewSelectionToolbar = (range, pending, errorMessage = "") => {
+      if (!(selectionToolbar instanceof HTMLElement) || !(selectionAction instanceof HTMLButtonElement)) return;
+      pendingReviewSelection = pending;
+      reviewToolbarRange = range.cloneRange();
+      selectionAction.disabled = errorMessage.length > 0;
+      if (selectionActionLabel instanceof HTMLElement) {
+        selectionActionLabel.textContent = errorMessage || "コメントを追加";
+      }
+      positionReviewSelectionToolbar();
+    };
+    const applyPendingReviewSelection = () => {
+      if (pendingReviewSelection === null) return;
+      if (!(targetKey instanceof HTMLInputElement) || !(rangeStart instanceof HTMLInputElement) || !(rangeEnd instanceof HTMLInputElement) || !(selectedText instanceof HTMLInputElement)) return;
+      const pending = pendingReviewSelection;
+      targetKey.value = pending.source.dataset.sourceKey || "";
+      rangeStart.value = String(pending.start);
+      rangeEnd.value = String(pending.start + pending.value.length);
+      selectedText.value = pending.value;
+      composer?.setAttribute("data-active", "true");
+      for (const item of reviewPage.querySelectorAll("[data-review-source]")) item.toggleAttribute("data-selected", item === pending.source);
+      if (selectionLabel instanceof HTMLElement) selectionLabel.textContent = (pending.source.dataset.sourceLabel || "文章") + "の「" + pending.value.replace(/\s+/g, " ").slice(0, 160) + (pending.value.length > 160 ? "…" : "") + "」へのコメントです。";
+      if (feedback instanceof HTMLElement) {
+        feedback.textContent = "範囲を指定しました。指摘を書いて追加してください。";
+        feedback.classList.remove("warning", "success");
+      }
+      const HighlightType = globalThis.Highlight;
+      if (globalThis.CSS?.highlights && typeof HighlightType === "function") {
+        globalThis.CSS.highlights.set("review-selection", new HighlightType(pending.range));
+      }
+      hideReviewSelectionToolbar();
+      bodyInput?.focus({ preventScroll: true });
+      if (matchMedia("(max-width: 60rem)").matches && composer instanceof HTMLElement) {
+        requestAnimationFrame(() => composer.scrollIntoView({ block: "start", behavior: "smooth" }));
+      }
+    };
     const resetSelection = () => {
       if (!(targetKey instanceof HTMLInputElement) || !(rangeStart instanceof HTMLInputElement) || !(rangeEnd instanceof HTMLInputElement) || !(selectedText instanceof HTMLInputElement)) return;
       targetKey.value = "slide:whole";
       rangeStart.value = "";
       rangeEnd.value = "";
       selectedText.value = "";
+      hideReviewSelectionToolbar();
+      clearActiveReviewHighlight();
+      getSelection()?.removeAllRanges();
       composer?.removeAttribute("data-active");
       for (const source of reviewPage.querySelectorAll("[data-review-source]")) source.removeAttribute("data-selected");
       if (selectionLabel instanceof HTMLElement) selectionLabel.textContent = "スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。";
@@ -4402,19 +4473,30 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     };
     const captureSelection = () => {
       const selection = getSelection();
-      if (selection === null || selection.rangeCount !== 1 || selection.isCollapsed) return;
+      if (selection === null || selection.rangeCount !== 1 || selection.isCollapsed) {
+        hideReviewSelectionToolbar();
+        return;
+      }
       const range = selection.getRangeAt(0);
       const startElement = range.startContainer instanceof Element ? range.startContainer : range.startContainer.parentElement;
       const endElement = range.endContainer instanceof Element ? range.endContainer : range.endContainer.parentElement;
       const source = startElement?.closest("[data-review-source]");
-      if (!(source instanceof HTMLElement) || source !== endElement?.closest("[data-review-source]")) return;
+      if (!(source instanceof HTMLElement) || source !== endElement?.closest("[data-review-source]")) {
+        hideReviewSelectionToolbar();
+        return;
+      }
       const text = source.querySelector("[data-review-text]");
-      if (!(text instanceof HTMLElement) || !text.contains(range.commonAncestorContainer)) return;
+      if (!(text instanceof HTMLElement) || !text.contains(range.commonAncestorContainer)) {
+        hideReviewSelectionToolbar();
+        return;
+      }
       const prefixRange = document.createRange();
       prefixRange.selectNodeContents(text);
       try { prefixRange.setEnd(range.startContainer, range.startOffset); } catch { return; }
       const value = range.toString();
       if (value.length === 0 || value.length > 2000) {
+        if (value.length > 2000) showReviewSelectionToolbar(range, null, "2000文字以内で選択");
+        else hideReviewSelectionToolbar();
         if (feedback instanceof HTMLElement) {
           feedback.textContent = value.length > 2000 ? "一度に選択できるのは2000文字までです。範囲を分けてください。" : "";
           feedback.classList.toggle("warning", value.length > 2000);
@@ -4422,27 +4504,36 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         return;
       }
       const start = prefixRange.toString().length;
-      if (!(targetKey instanceof HTMLInputElement) || !(rangeStart instanceof HTMLInputElement) || !(rangeEnd instanceof HTMLInputElement) || !(selectedText instanceof HTMLInputElement)) return;
-      targetKey.value = source.dataset.sourceKey || "";
-      rangeStart.value = String(start);
-      rangeEnd.value = String(start + value.length);
-      selectedText.value = value;
-      composer?.setAttribute("data-active", "true");
-      for (const item of reviewPage.querySelectorAll("[data-review-source]")) item.toggleAttribute("data-selected", item === source);
-      if (selectionLabel instanceof HTMLElement) selectionLabel.textContent = (source.dataset.sourceLabel || "文章") + "の「" + value.replace(/\s+/g, " ").slice(0, 160) + (value.length > 160 ? "…" : "") + "」へのコメントです。";
       if (feedback instanceof HTMLElement) {
-        feedback.textContent = "範囲を指定しました。指摘を書いて追加してください。";
-        feedback.classList.remove("warning");
+        feedback.textContent = "選択範囲の近くにある「コメントを追加」を押してください。";
+        feedback.classList.remove("warning", "success");
       }
-      bodyInput?.focus({ preventScroll: true });
-      if (matchMedia("(max-width: 60rem)").matches && composer instanceof HTMLElement) {
-        requestAnimationFrame(() => composer.scrollIntoView({ block: "start", behavior: "smooth" }));
-      }
+      showReviewSelectionToolbar(range, {
+        source,
+        start,
+        value,
+        range: range.cloneRange()
+      });
     };
-    reviewPage.addEventListener("mouseup", () => setTimeout(captureSelection));
+    reviewPage.addEventListener("pointerup", () => setTimeout(captureSelection));
     reviewPage.addEventListener("keyup", (event) => {
       if (event.key === "Shift" || event.key.startsWith("Arrow")) setTimeout(captureSelection);
     });
+    selectionToolbar?.addEventListener("pointerdown", (event) => event.preventDefault());
+    selectionAction?.addEventListener("click", applyPendingReviewSelection);
+    reviewPage.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !selectionToolbar?.hasAttribute("hidden")) {
+        event.preventDefault();
+        hideReviewSelectionToolbar();
+        getSelection()?.removeAllRanges();
+      }
+      if (event.key.toLowerCase() === "m" && event.altKey && (event.ctrlKey || event.metaKey) && pendingReviewSelection !== null) {
+        event.preventDefault();
+        applyPendingReviewSelection();
+      }
+    });
+    addEventListener("resize", scheduleReviewToolbarPosition);
+    document.addEventListener("scroll", scheduleReviewToolbarPosition, { capture: true, passive: true });
     reviewPage.querySelector("[data-review-whole]")?.addEventListener("click", resetSelection);
     if (composer instanceof HTMLFormElement) {
       composer.addEventListener("submit", async (event) => {

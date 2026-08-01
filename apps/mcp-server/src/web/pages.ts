@@ -818,7 +818,15 @@ const DASHBOARD_STYLE = String.raw`
       .review-source[data-kind="narration"] .review-kind { background: #4a3479; color: #e6dbff; }
       .review-source-text { min-width: 0; margin: 0; padding: .2rem 0; color: #e5edf7; font: inherit; font-size: .88rem; line-height: 1.75; overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
       .review-source-text mark { padding: .08rem .12rem; border-radius: .2rem; background: #f4bd6250; color: #fff3d6; }
+      .review-source-text::highlight(review-selection) { background: #91ddff55; color: #fff; text-decoration: underline; text-decoration-color: #91ddff; text-decoration-thickness: .12em; }
       .review-select-hint { margin: 0; color: var(--muted); font-size: .76rem; line-height: 1.6; }
+      .review-selection-toolbar { position: fixed; z-index: 80; left: 50%; top: 0; display: flex; align-items: center; padding: .28rem; border: 1px solid #52647c; border-radius: .65rem; background: #080d15f2; box-shadow: 0 .7rem 2rem #0009; backdrop-filter: blur(12px); transform: translate(-50%, calc(-100% - .65rem)); }
+      .review-selection-toolbar[hidden] { display: none; }
+      .review-selection-toolbar[data-placement="below"] { transform: translate(-50%, .65rem); }
+      .review-selection-toolbar button { display: inline-flex; align-items: center; gap: .42rem; min-height: 2.35rem; padding: .48rem .7rem; border: 0; background: transparent; color: #f2f7fc; white-space: nowrap; }
+      .review-selection-toolbar button:hover { background: #ffffff14; }
+      .review-selection-toolbar button:disabled { color: #ffbdc4; }
+      .review-selection-icon { display: grid; place-items: center; width: 1.35rem; height: 1.35rem; border-radius: .4rem; background: #8062df; color: white; font-size: .9rem; font-weight: 900; }
       .review-composer { display: grid; gap: .65rem; padding: 1rem; border: 1px solid #51637a; border-radius: .85rem; background: #101b29; }
       .review-composer[data-active="true"] { border-color: #91ddff; }
       .review-selection { min-height: 3rem; margin: 0; padding: .65rem; border-radius: .55rem; background: #07101a; color: #c7d3e1; font-size: .78rem; line-height: 1.55; overflow-wrap: anywhere; }
@@ -2655,7 +2663,7 @@ export function slideReviewPage(options: {
            <nav class="review-filmstrip" aria-label="レビューするスライド"><div class="filmstrip-search"><span class="filmstrip-search-head"><span>スライド</span><output>${deck.slides.length}枚</output></span></div><div class="review-filmstrip-list">${filmstrip}</div></nav>
            <div class="review-center">
              <section class="panel review-preview"><div class="workspace-frame" style="--workspace-aspect:${aspect}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(projectId)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=${slide.reveal_steps}" data-slide-frame></iframe></div></section>
-             <section class="panel"><div class="section-head"><div><p class="eyebrow">Flat source</p><h2>画面の文章と音声原稿</h2></div><span class="count">${textSources.length}項目</span></div><p class="review-select-hint">コメントしたい文字を一つの枠内でドラッグ選択してください。Markdown記号を含む保存データをそのまま表示するため、AIが修正する場所と一致します。</p><div class="review-source-list">${sourceCards}</div></section>
+             <section class="panel"><div class="section-head"><div><p class="eyebrow">Flat source</p><h2>画面の文章と音声原稿</h2></div><span class="count">${textSources.length}項目</span></div><p class="review-select-hint">コメントしたい文字を一つの枠内で選び、近くに出る「コメントを追加」を押してください。Markdown記号を含む保存データをそのまま表示するため、AIが修正する場所と一致します。</p><div class="review-source-list">${sourceCards}</div></section>
            </div>
            <aside class="panel review-comments">
              <form class="review-composer" data-review-composer><div><p class="eyebrow">New comment</p><h2>コメントを追加</h2></div><p class="review-selection" data-review-selection>スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。</p><input type="hidden" name="target_key" value="slide:whole"><input type="hidden" name="range_start"><input type="hidden" name="range_end"><input type="hidden" name="selected_text"><label>指摘・修正してほしいこと<textarea name="body" maxlength="4000" required placeholder="例: 結論を先に示し、根拠との関係が一読で分かる表現にしてください。"></textarea></label><div class="actions"><button type="submit">コメントを追加</button><button class="ghost" type="button" data-review-whole>スライド全体に戻す</button></div><p class="feedback" data-review-feedback aria-live="polite"></p></form>
@@ -2663,6 +2671,7 @@ export function slideReviewPage(options: {
              <section class="review-script"><div><h2>AI修正依頼文</h2><p class="review-select-hint">チェックした未解決コメントを最大20件まで、Codex・ChatGPT・Claudeへ安全に渡せる依頼文にします。これは実行コードではありません。</p></div><div class="actions"><button class="ghost" type="button" data-review-script-generate${currentOpenComments.length === 0 ? " disabled" : ""}>選択から生成</button><button type="button" data-review-script-copy${currentOpenComments.length === 0 ? " disabled" : ""}>コピー</button></div><textarea readonly data-review-script-output placeholder="未解決コメントを追加すると、ここにAI修正依頼文が表示されます。">${escapeHtml(initialInstruction)}</textarea><p class="feedback" data-review-script-feedback aria-live="polite">${currentOpenComments.length > 0 ? `${Math.min(currentOpenComments.length, 20)}件を含む依頼文です。${currentOpenComments.length > 20 ? "残りはチェックを切り替えて別の依頼文にしてください。" : ""}` : "未解決コメントを追加すると生成できます。"}</p></section>
            </aside>
          </div>
+         <div class="review-selection-toolbar" data-review-selection-toolbar data-placement="above" role="toolbar" aria-label="選択した文章への操作" hidden><button type="button" data-review-selection-action aria-keyshortcuts="Control+Alt+M Meta+Alt+M"><span class="review-selection-icon" aria-hidden="true">＋</span><span data-review-selection-action-label>コメントを追加</span></button></div>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
     ),
     { headers: headers() }
