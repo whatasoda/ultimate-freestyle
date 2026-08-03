@@ -6,6 +6,7 @@ import {
   projectListItemRequestSchema,
   reviewInstructionRequestSchema,
   sceneComponentCreateRequestSchema,
+  scenePatternCreateRequestSchema,
   slideActionRequestSchema,
   slideFieldsRequestSchema,
   slideNarrationRequestSchema,
@@ -133,6 +134,20 @@ describe("Web request schemas", () => {
       sceneComponentCreateRequestSchema.safeParse({
         expected_version: 1,
         kind: "video",
+        parent_id: null
+      }).success
+    ).toBe(false);
+    expect(
+      scenePatternCreateRequestSchema.safeParse({
+        expected_version: 1,
+        pattern: "pattern-key-metrics",
+        parent_id: null
+      }).success
+    ).toBe(true);
+    expect(
+      scenePatternCreateRequestSchema.safeParse({
+        expected_version: 1,
+        pattern: "pattern-unknown",
         parent_id: null
       }).success
     ).toBe(false);

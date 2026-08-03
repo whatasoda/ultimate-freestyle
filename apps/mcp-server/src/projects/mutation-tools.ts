@@ -56,6 +56,11 @@ import {
   requireSubject,
   toolResult
 } from "./tools";
+import {
+  planScenePatternInsertion,
+  ScenePatternPlanError,
+  scenePatternSchema
+} from "./scene-patterns";
 
 const projectIdInput = {
   project_id: z.string().uuid(),
@@ -642,6 +647,10 @@ const sceneComponentKindSchema = z.enum([
   "callout",
   "bar_chart",
   "timeline"
+]);
+const sceneComponentCreateKindSchema = z.enum([
+  ...sceneComponentKindSchema.options,
+  ...scenePatternSchema.options
 ]);
 
 const sceneComponentContentFieldSchema = z.enum([
@@ -2022,14 +2031,14 @@ export function registerProjectMutationTools(
   server.registerTool(
     "create_slide_component",
     {
-      title: "scene componentを既定値から作成",
+      title: "scene componentを作成",
       description:
-        "kindと配置だけで一件を作成します。文章kindはinitial_text、imageはasset_idを指定し、詳細は部分更新します。",
+        "componentかpattern-*を作ります。imageはasset_id必須です。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        kind: sceneComponentKindSchema,
+        kind: sceneComponentCreateKindSchema,
         parent_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).nullable(),
         order: z.number().int().min(0).max(999).default(0),
         at: z.number().int().nonnegative().max(100).default(0),
@@ -2067,6 +2076,34 @@ export function registerProjectMutationTools(
         changedId: `${slide_id}:${component_id}`,
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
+          const pattern = scenePatternSchema.safeParse(kind);
+          if (pattern.success) {
+            if (slide.composition?.mode !== "scene") {
+              throw new ProjectToolError(
+                "INVALID_COMPOSITION_MODE",
+                "Enable the component scene before creating a component pattern."
+              );
+            }
+            let nodes: SlideSceneNode[];
+            try {
+              nodes = planScenePatternInsertion({
+                existingNodes: slide.composition.nodes,
+                pattern: pattern.data,
+                rootId: component_id,
+                parentId: parent_id,
+                order,
+                frame,
+                at
+              });
+            } catch (error) {
+              if (error instanceof ScenePatternPlanError) {
+                throw new ProjectToolError("INVALID_CHANGE", error.message);
+              }
+              throw error;
+            }
+            for (const node of nodes) upsertSceneComponent(document, slide_id, node);
+            return;
+          }
           if (
             slide.composition?.mode === "scene" &&
             slide.composition.nodes.some((node) => node.id === component_id)
@@ -2076,12 +2113,16 @@ export function registerProjectMutationTools(
               "The slide component already exists."
             );
           }
+          const componentKind = sceneComponentKindSchema.safeParse(kind);
+          if (!componentKind.success) {
+            throw new ProjectToolError("INVALID_CHANGE", "The component kind is invalid.");
+          }
           upsertSceneComponent(
             document,
             slide_id,
             createSceneComponent({
               id: component_id,
-              kind,
+              kind: componentKind.data,
               parentId: parent_id,
               order,
               at,
@@ -2100,7 +2141,7 @@ export function registerProjectMutationTools(
     {
       title: "scene componentの内容を一項目更新",
       description:
-        "本文、数値、表示variant、layout固有値など一項目だけを更新します。短い値はvalue、既存の長文はtext_editで一部置換・追記・前置・消去し、全体を再送しません。配置と共通styleはupdate_slide_componentを使います。",
+        "内容を一項目だけ更新します。短い値はvalue、長文の部分編集はtext_edit、配置と共通styleはupdate_slide_componentを使います。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -2153,7 +2194,7 @@ export function registerProjectMutationTools(
     {
       title: "グラフ・タイムラインの項目を一件編集",
       description:
-        "bar_chartまたはtimelineのitemを追加、部分更新、移動、削除します。after_idがnullなら先頭、未指定なら末尾です。",
+        "bar_chartかtimelineのitemを一件追加、更新、移動、削除します。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -2303,7 +2344,7 @@ export function registerProjectMutationTools(
     {
       title: "scene componentを部分更新",
       description:
-        "既存componentの配置または見た目だけを変更します。本文を送り直す必要はありません。layoutとstyleはどちらか一方だけでも指定できます。",
+        "本文を再送せず、既存componentの配置か見た目を部分更新します。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),

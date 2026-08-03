@@ -54,14 +54,15 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 ## sceneの組み立て
 
 1. \`set_slide_scene\` で一枚をsceneへ切り替える。
-2. \`create_slide_component\` で最初に \`layer\`、\`stack\`、\`grid\` のいずれかをrootとして追加する。
-3. componentを一件ずつ追加し、\`parent_id\` で親layoutを指定する。rootは \`parent_id: null\`。作成後はcomponent resourceを読み、内容を一項目ずつ更新する。
+2. よくある構成は \`create_slide_component\` の \`kind\` に \`pattern-claim-evidence\`、\`pattern-comparison\`、\`pattern-key-metrics\`、\`pattern-timeline\` のいずれかを指定し、編集可能なまとまりから始める。\`component_id\` はまとまりのroot IDになり、子IDもそこから決まる。
+3. 独自構成は \`create_slide_component\` で最初に \`layer\`、\`stack\`、\`grid\` のいずれかをrootとして追加する。以後はcomponentを一件ずつ追加し、\`parent_id\` で親layoutを指定する。rootは \`parent_id: null\`。作成後はcomponent resourceを読み、内容を一項目ずつ更新する。
 4. \`order\` は同じ親の中の順番、\`at\` は表示step、\`animation\` は表示時の動き。
 5. \`stack\` と \`grid\` の子は自動配置されるため \`frame\` を付けない。\`layer\` の子には百分率の \`frame\` が必要。
 6. Web UIの一枚編集画面で実rendererを確認する。
 
 ## component一覧
 
+- まとまり: \`pattern-claim-evidence\`は主張＋根拠、\`pattern-comparison\`は2案比較、\`pattern-key-metrics\`は3数値、\`pattern-timeline\`は経過・手順を、複数の通常componentとして追加する。追加後の変更・移動・削除は一件ずつ行う。
 - 作成: 全13種類を \`create_slide_component\` で安全な既定値から一件ずつ追加する。imageだけはproject内の \`asset_id\` が必要。
 - 内容: \`update_slide_component_content\` で本文、数値、variant、layout固有値のうち一項目だけを更新する。長文は\`text_edit.replace_once\`で現在の短い部分だけを置換する。
 - data item: \`edit_slide_data_item\` でbar chartまたはtimelineの項目を一件ずつ追加、更新、移動、削除する。
@@ -83,7 +84,7 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 
 ## 構成例
 
-rootにcolumn方向のstackを置き、その子にhero、row方向のstackを置く。内側のrow stackへmetricとcardを追加すると、見出し・主要数値・根拠を一枚にまとめられる。棒グラフやtimelineのitemもそれぞれ \`at\` を持つため、クリック進行に同期できる。
+最初は伝えたい意味に近いpatternを追加し、生成されたhero、grid、card、metricなどを個別に書き換える。合わない子は削除し、必要なcomponentを同じ親へ追加できるため、patternは固定テンプレートではなく編集可能な出発点として使う。棒グラフやtimelineのitemもそれぞれ \`at\` を持つため、クリック進行に同期できる。
 
 一度に研究全体やscene全体を送り直さず、\`research://projects/{id}/slides/{slideId}/elements/{elementId}\`で対象一件を読み、成功時に返るversionを次の\`expected_version\`へ渡して一項目ずつ更新する。`;
 
@@ -2073,7 +2074,7 @@ export function registerResearchGuides(
           role: "user",
           content: {
             type: "text",
-            text: `get_project_outlineで${project_id}と現在versionを確認し、研究本文はresearch://projects/${project_id}/research、発見・限界・ログはそこにあるpage URI、既存の一枚はresearch://projects/${project_id}/slides/{slideId}から必要な範囲だけ読んでください。research://guide/edit-contract、research://guide/presentation-components、research://guide/presentation-style、research://guide/presentation-design-workflowを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、layout、text、info、data、mediaの小粒度toolでcomponentを一件ずつ組み立てます。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
+            text: `get_project_outlineで${project_id}と現在versionを確認し、研究本文はresearch://projects/${project_id}/research、発見・限界・ログはそこにあるpage URI、既存の一枚はresearch://projects/${project_id}/slides/{slideId}から必要な範囲だけ読んでください。research://guide/edit-contract、research://guide/presentation-components、research://guide/presentation-style、research://guide/presentation-design-workflowを読み、きっかけ、問いと予想、方法、決定的な記録、予想との差、結論と限界、次の試行の順で、一枚一メッセージかつ合計20分以内のdeckを作ります。configure_deck、create_presentation_template、create_slide、update_slide_fields、set_slide_reveal、set_slide_narrationを順に使い、文章主体のflowはupdate_slide_typographyでarticle、columns、denseから組版を選びます。各成功時のversionを次のexpected_versionへ渡してください。リッチな一枚はset_slide_sceneへ切り替え、意味が合う場合はcreate_slide_componentのpattern-*で編集可能なまとまりを作り、以後はlayout、text、info、data、mediaの小粒度更新でcomponentを一件ずつ調整します。単純な絶対配置だけが必要な場合はcanvasも選べます。content_markdownまたはscene componentは画面で伝える主張と証拠、revealまたはcomponent.atはクリック段階、narrationは全員に順番に聞かせる説明、sidebar_markdownは読み上げない補足です。見た目は安全なpresetから選び、template、読み上げ枠、音声設定の変更ではそれぞれの小粒度toolを使ってください。無音でも要点が伝わり、未取得の証拠は捏造せず未確定と明記してください。最後にWeb UIの一枚編集画面で実rendererと品質診断を確認してから公開するよう案内してください。`
           }
         }
       ]

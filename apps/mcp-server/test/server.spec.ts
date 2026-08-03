@@ -108,6 +108,8 @@ describe("MCP contract", () => {
       const blockTool = tools.find((tool) => tool.name === "edit_slide_block");
       expect(JSON.stringify(blockTool?.inputSchema)).not.toContain('"block"');
       expect(JSON.stringify(blockTool?.inputSchema)).toContain('"text_edit"');
+      const componentCreateTool = tools.find((tool) => tool.name === "create_slide_component");
+      expect(JSON.stringify(componentCreateTool?.inputSchema)).toContain("pattern-claim-evidence");
       expect(JSON.stringify(blockTool?.inputSchema)).not.toContain('"maxLength":20000');
       const revealTool = tools.find((tool) => tool.name === "set_slide_reveal");
       expect(JSON.stringify(revealTool?.inputSchema)).toContain('"text_edit"');
@@ -1454,13 +1456,50 @@ describe("MCP contract", () => {
           style: { background: "#102030", font_scale: 1.25 }
         }
       });
+      const patternComponent = await client.callTool({
+        name: "create_slide_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 19,
+          slide_id: "question",
+          component_id: "research-summary",
+          kind: "pattern-claim-evidence",
+          parent_id: null
+        }
+      });
+      expect(patternComponent.structuredContent).toMatchObject({ ok: true, version: 20 });
+      const patternElements = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/elements/pages/1`
+      );
+      expect(patternElements).toMatchObject({
+        version: 20,
+        total_items: 8,
+        items: expect.arrayContaining([
+          expect.objectContaining({ id: "research-summary", kind: "stack" }),
+          expect.objectContaining({ id: "research-summary-heading", kind: "hero" }),
+          expect.objectContaining({ id: "research-summary-evidence", kind: "card" })
+        ])
+      });
+      const patternEvidence = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/elements/research-summary-evidence`
+      );
+      expect(patternEvidence).toMatchObject({
+        version: 20,
+        element: {
+          id: "research-summary-evidence",
+          kind: "card",
+          parent_id: "research-summary-items"
+        }
+      });
       const revisions = await readJsonResource(
         client,
         `research://projects/${firstProject.project_id}/revisions`
       );
       expect(revisions).toMatchObject({
         ok: true,
-        current_version: 19,
+        current_version: 20,
         retention: {
           maximum_versions: 50,
           guaranteed_recent_versions: 10,
@@ -1471,22 +1510,22 @@ describe("MCP contract", () => {
           current_project_uri: `research://projects/${firstProject.project_id}`
         },
         revisions: expect.arrayContaining([
-          expect.objectContaining({ version: 19, source: "edit" }),
-          expect.objectContaining({ version: 18, source: "edit" })
+          expect.objectContaining({ version: 20, source: "edit" }),
+          expect.objectContaining({ version: 19, source: "edit" })
         ])
       });
       const restoredDraft = await client.callTool({
         name: "restore_draft_revision",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 19,
+          expected_version: 20,
           target_version: 1
         }
       });
       expect(restoredDraft.structuredContent).toMatchObject({
         ok: true,
-        version: 20,
-        current_version: 20,
+        version: 21,
+        current_version: 21,
         restored_from_version: 1
       });
       const editableLogId = "44000000-0000-4000-8000-000000000044";
@@ -1494,7 +1533,7 @@ describe("MCP contract", () => {
         name: "edit_research_log",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 20,
+          expected_version: 21,
           entry: {
             id: editableLogId,
             occurred_at: now,
@@ -1506,19 +1545,19 @@ describe("MCP contract", () => {
       });
       expect(addedLog.structuredContent).toMatchObject({
         ok: true,
-        version: 21
+        version: 22
       });
       const deletedLog = await client.callTool({
         name: "edit_research_log",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 21,
+          expected_version: 22,
           delete_entry_id: editableLogId
         }
       });
       expect(deletedLog.structuredContent).toMatchObject({
         ok: true,
-        version: 22
+        version: 23
       });
       const afterLogDelete = await readJsonResource(
         client,
@@ -1529,7 +1568,7 @@ describe("MCP contract", () => {
         name: "edit_research_log",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 22,
+          expected_version: 23,
           delete_entry_id: editableLogId
         }
       });

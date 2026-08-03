@@ -242,6 +242,8 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .quality-list { color: var(--ink); }
   .component-item legend { color: var(--accent-strong); }
   .component-detail { border-color: var(--line); }
+  .editor .assembly-pattern { border-color: var(--line); background: var(--field); }
+  .editor .assembly-pattern:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
   .voice-segment, .voice-cue { border-color: var(--line); }
   .voice-segment:target { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
   .voice-howto, .quality-status { border-color: var(--line); background: var(--surface-soft); color: var(--ink); }

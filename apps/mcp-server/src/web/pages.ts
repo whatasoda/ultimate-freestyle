@@ -49,6 +49,7 @@ import {
 } from "../reviews/service";
 import type { ReviewComment } from "../reviews/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
+import { SCENE_PATTERN_OPTIONS } from "../projects/scene-patterns";
 import { DASHBOARD_ASSET_VERSION } from "./assets";
 import { DASHBOARD_DESIGN_STYLE } from "./dashboard-design";
 import { renderClientChoiceGuide } from "./client-guide";
@@ -596,6 +597,13 @@ const DASHBOARD_STYLE = String.raw`
       .editor label.wide { grid-column: 1 / -1; }
       .editor input, .editor textarea, .editor select { width: 100%; padding: .72rem; border: 1px solid var(--line); border-radius: .55rem; background: #0a111b; color: var(--ink); font: inherit; line-height: 1.5; }
       .editor textarea { min-height: 7rem; resize: vertical; }
+      .assembly-patterns { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: .55rem; }
+      .editor .assembly-pattern { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .6rem; align-items: start; padding: .7rem; border: 1px solid var(--line); border-radius: .7rem; background: #0a111b; cursor: pointer; }
+      .editor .assembly-pattern:has(input:checked) { border-color: var(--accent); background: #8062df24; box-shadow: 0 0 0 1px var(--accent); }
+      .editor .assembly-pattern input { width: auto; margin-top: .18rem; accent-color: var(--accent); }
+      .assembly-pattern span { display: grid; gap: .2rem; min-width: 0; }
+      .assembly-pattern strong { color: var(--ink); font-size: .84rem; }
+      .assembly-pattern small { color: var(--muted); font-size: .72rem; line-height: 1.5; }
       .markdown-toolbar { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: -.55rem; }
       .markdown-toolbar button { min-height: 2rem; padding: .35rem .55rem; font-size: .75rem; }
       .visual-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.2rem, 1fr)); gap: .45rem; }
@@ -1356,6 +1364,22 @@ function sceneComponentCreator(options: {
     .map((asset) => `<option value="${escapeHtml(asset.asset_id)}">${escapeHtml(asset.alt_text || asset.original_filename)}</option>`)
     .join("");
   return `<details class="component-detail"><summary>リッチ表示パーツを追加</summary><form class="editor" data-scene-component-create data-versioned-form data-method="POST" action="${options.action}" data-version="${options.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>種類<select name="kind"><optgroup label="配置"><option value="layer">重ねる領域</option><option value="stack">縦横に並べる領域</option><option value="grid">格子状に並べる領域</option></optgroup><optgroup label="文章"><option value="hero">大見出し</option><option value="markdown">Markdown本文</option><option value="quote">引用</option></optgroup><optgroup label="情報"><option value="card">カード</option><option value="metric">数値</option><option value="callout">注目情報</option></optgroup><optgroup label="データ"><option value="bar_chart">棒グラフ</option><option value="timeline">時系列</option></optgroup><optgroup label="素材"><option value="shape">図形</option><option value="image"${options.assets.length === 0 ? " disabled" : ""}>画像${options.assets.length === 0 ? "（画像を先に追加）" : ""}</option></optgroup></select></label><label>追加先<select name="parent_id"><option value="">スライド直下（自由配置）</option>${parentOptions}</select></label><label>画像パーツで使用する画像<select name="asset_id"><option value="">選択してください</option>${imageOptions}</select></label></div><p class="inherit-note">配置領域の中へ追加すると自動配置になります。スライド直下へ追加すると、重なりを避ける初期位置を設定します。</p><div class="actions"><button type="submit">リッチ表示パーツを追加</button><span class="version" data-version-label>v${options.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+}
+
+function scenePatternCreator(options: {
+  nodes: SlideSceneNode[];
+  action: string;
+  version: number;
+  csrfToken: string;
+}): string {
+  const containers = options.nodes.filter((node) => ["layer", "stack", "grid"].includes(node.kind));
+  const parentOptions = containers
+    .map((node) => `<option value="${escapeHtml(node.id)}">${escapeHtml(node.id)} · ${node.kind}</option>`)
+    .join("");
+  const patterns = SCENE_PATTERN_OPTIONS.map(
+    (pattern, index) => `<label class="assembly-pattern"><input type="radio" name="pattern" value="${pattern.value}"${index === 0 ? " checked" : ""}><span><strong>${escapeHtml(pattern.label)}</strong><small>${escapeHtml(pattern.description)}</small></span></label>`
+  ).join("");
+  return `<details class="component-detail assembly-detail" open><summary>まとまりから組み立てる</summary><form class="editor" data-scene-pattern-create data-versioned-form data-method="POST" action="${options.action}" data-version="${options.version}" data-csrf="${escapeHtml(options.csrfToken)}"><fieldset><legend>伝え方を選ぶ</legend><div class="assembly-patterns">${patterns}</div></fieldset><label>追加先<select name="parent_id"><option value="">スライド直下（余白つき全面）</option>${parentOptions}</select></label><p class="inherit-note">見出し・配置領域・内容パーツを編集可能なまとまりとして追加します。追加後は、個々のパーツを移動・削除・書き換えできます。</p><div class="actions"><button type="submit">選んだまとまりを追加</button><span class="version" data-version-label>v${options.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
 }
 
 function sceneComponentOutline(nodes: SlideSceneNode[], selectedId: string | null, slidePath: string): string {
@@ -2776,6 +2800,14 @@ export function slideWorkspacePage(options: {
         csrfToken: options.csrfToken
       })
     : "";
+  const scenePatternCreate = slide.composition?.mode === "scene"
+    ? scenePatternCreator({
+        nodes: slide.composition.nodes,
+        action: `${slidePath}/patterns`,
+        version: options.project.version,
+        csrfToken: options.csrfToken
+      })
+    : "";
   const canvasBlockEditors = selectedCanvasBlock === null
     ? ""
     : canvasBlockEditor({
@@ -3260,7 +3292,7 @@ export function slideWorkspacePage(options: {
                <form class="editor" data-narration-settings-editor data-versioned-form action="${slidePath}/narration/settings" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>表示形式<select name="display">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<option value="${value}"${narrationDisplay === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>スライド話者名<input name="speaker" maxlength="80" value="${escapeHtml(slide.narration?.speaker ?? "")}" placeholder="発表全体の既定: ${escapeHtml(deck.narration_defaults?.speaker ?? "なし")}"></label></div>${narrationDisplayPicker}<fieldset><legend>読み上げ枠</legend><div class="editor-grid"><label>配置<select name="placement">${[["bottom", "下部"], ["overlay-bottom", "下部に重ねる"], ["sidebar", "補足欄"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.placement === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>大きさ<select name="size">${[["compact", "小"], ["normal", "標準"], ["large", "大"]].map(([value, label]) => `<option value="${value}"${narrationAppearance.size === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>文字揃え<select name="text_align"><option value="start"${narrationAppearance.text_align === "start" ? " selected" : ""}>左</option><option value="center"${narrationAppearance.text_align === "center" ? " selected" : ""}>中央</option></select></label><label>文字倍率<input name="text_scale" type="number" min="0.75" max="1.5" step="0.05" value="${narrationAppearance.text_scale}"></label><label>最大行数<input name="max_lines" type="number" min="2" max="8" value="${narrationAppearance.max_lines}"></label></div><label class="check-label"><input name="speaker_visible" type="checkbox"${narrationAppearance.speaker_visible ? " checked" : ""}>話者名を表示</label><label class="check-label"><input name="progress_visible" type="checkbox"${narrationAppearance.progress_visible ? " checked" : ""}>読み上げ進捗を表示</label></fieldset><fieldset><legend>読み上げ枠の色</legend>${narrationPalettePicker}<div class="editor-grid">${narrationColorControls}<label>角丸（px）<input name="appearance_corner_radius_px" type="number" min="0" max="64" value="${narrationAppearance.corner_radius_px ?? ""}" placeholder="空欄で表示形式の既定"></label></div><p class="inherit-note">空欄は選択した表示形式とテンプレートの色を使います。</p></fieldset><p class="inherit-note">話者の実効値: ${escapeHtml(effectiveSpeaker ?? "なし")}。この欄で保存するとスライド設定として上書きします。</p><div class="actions"><button type="submit">読み上げ枠を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
                ${narrationSegmentCreator}${narrationSegmentOutline}${voiceSegments}
              </div></details>
-             <details class="inspector-section" id="inspector-structure" data-inspector-section="structure"${flowComposition ? "" : " open"}><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${compositionEditor}${canvasBlockCreator}${sceneComponentCreate}${canvasBlockEditors}${sceneComponentEditors}${componentSearch}${componentOutline}</div></details>
+             <details class="inspector-section" id="inspector-structure" data-inspector-section="structure"${flowComposition ? "" : " open"}><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${compositionEditor}${canvasBlockCreator}${scenePatternCreate}${sceneComponentCreate}${canvasBlockEditors}${sceneComponentEditors}${componentSearch}${componentOutline}</div></details>
              <details class="inspector-section" id="inspector-quality" data-inspector-section="quality" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-base-count="${qualityItems.length}" data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
            </aside>
          </div>

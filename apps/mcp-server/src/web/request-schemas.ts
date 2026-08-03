@@ -16,6 +16,7 @@ import {
   slideTypographySchema,
   visualPresetSchema
 } from "../projects/schema";
+import { scenePatternSchema } from "../projects/scene-patterns";
 import { voicevoxTuningStatusSchema } from "../voicevox/service";
 
 export const reviewInstructionRequestSchema = z.object({
@@ -226,6 +227,15 @@ export const sceneComponentCreateRequestSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
     .nullable(),
   asset_id: z.string().uuid().nullable().optional()
+});
+
+export const scenePatternCreateRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  pattern: scenePatternSchema,
+  parent_id: z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+    .nullable()
 });
 
 export const canvasBlockRequestSchema = z.object({

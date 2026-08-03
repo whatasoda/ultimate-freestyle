@@ -1002,6 +1002,9 @@ describe("presentation artifact renderer", () => {
     expect(workspaceHtml).toContain('data-scene-component-action="duplicate"');
     expect(workspaceHtml).toContain('data-scene-component-action="delete"');
     expect(workspaceHtml).toContain("data-scene-component-create");
+    expect(workspaceHtml).toContain("data-scene-pattern-create");
+    expect(workspaceHtml).toContain("まとまりから組み立てる");
+    expect(workspaceHtml).toContain("pattern-claim-evidence");
     expect(workspaceHtml).toContain("リッチ表示パーツを追加");
     expect(workspaceHtml).toContain('<option value="bar_chart">棒グラフ</option>');
     expect(workspaceHtml).toContain("階層と並び順");

@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "181";
+export const DASHBOARD_ASSET_VERSION = "182";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -1147,6 +1147,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       parent_id: String(data.get("parent_id") || "") || null,
       asset_id: String(data.get("asset_id") || "") || null
     });
+    if (form.matches("[data-scene-pattern-create]")) Object.assign(body, {
+      pattern: String(data.get("pattern") || "pattern-claim-evidence"),
+      parent_id: String(data.get("parent_id") || "") || null
+    });
     if (form.matches("[data-slide-create]")) Object.assign(body, {
       title: String(data.get("title") || ""),
       position: numberValue(data, "position"),
@@ -1488,7 +1492,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           location.href = result.next_url;
           return;
         }
-        if (form.matches("[data-canvas-block-create], [data-scene-component-create]")) {
+        if (form.matches("[data-canvas-block-create], [data-scene-component-create], [data-scene-pattern-create]")) {
           const createdId = String(result.component_id || result.block_id || "");
           if (createdId) navigateToComponent(createdId);
           else location.reload();

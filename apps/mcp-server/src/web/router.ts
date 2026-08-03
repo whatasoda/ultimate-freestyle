@@ -38,6 +38,10 @@ import {
 } from "../projects/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import {
+  planScenePatternInsertion,
+  ScenePatternPlanError
+} from "../projects/scene-patterns";
+import {
   getRenderedQualityReport,
   renderedQualityReportInputSchema,
   saveRenderedQualityReport
@@ -123,6 +127,7 @@ import {
   sceneComponentCreateRequestSchema,
   sceneComponentItemActionRequestSchema,
   sceneComponentRequestSchema,
+  scenePatternCreateRequestSchema,
   slideActionRequestSchema,
   slideCompositionCreateRequestSchema,
   slideCreateRequestSchema,
@@ -2849,6 +2854,75 @@ async function handleSceneComponentCreate(
   }
 }
 
+async function handleScenePatternCreate(
+  request: Request,
+  env: Env,
+  projectId: string,
+  slideId: string
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return new Response(null, { status: 405, headers: { allow: "POST" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse({ ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() }, 403);
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = scenePatternCreateRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "追加するまとまりを確認してください。" }, request_id: crypto.randomUUID() }, 422);
+  }
+  let createdComponentId = "";
+  let createdComponentIds: string[] = [];
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        const slide = document.deck?.slides.find((item) => item.id === slideId);
+        if (slide === undefined) {
+          const error = new Error("The slide does not exist.");
+          Object.assign(error, { code: "SLIDE_NOT_FOUND" });
+          throw error;
+        }
+        if (slide.composition?.mode !== "scene") {
+          const error = new Error("The slide does not use a component scene.");
+          Object.assign(error, { code: "INVALID_COMPOSITION_MODE" });
+          throw error;
+        }
+        let nodes: SlideSceneNode[];
+        try {
+          nodes = planScenePatternInsertion({
+            existingNodes: slide.composition.nodes,
+            pattern: parsed.data.pattern,
+            parentId: parsed.data.parent_id
+          });
+        } catch (error) {
+          if (error instanceof ScenePatternPlanError) {
+            Object.assign(error, { code: "INVALID_FIELDS" });
+          }
+          throw error;
+        }
+        createdComponentId = nodes[0]?.id ?? "";
+        createdComponentIds = nodes.map((node) => node.id);
+        slide.composition.nodes.push(...nodes);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.slide_scene_pattern_created",
+      outcome: "succeeded",
+      details: { project_id: projectId, slide_id: slideId, pattern: parsed.data.pattern, component_id: createdComponentId, component_count: createdComponentIds.length, parent_id: parsed.data.parent_id, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, component_id: createdComponentId, component_ids: createdComponentIds, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "表示パーツのまとまりを追加できませんでした。");
+  }
+}
+
 async function handleSceneComponentItemAction(
   request: Request,
   env: Env,
@@ -4946,6 +5020,17 @@ export async function handleWebRequest(
       env,
       sceneComponentCreateMatch[1],
       sceneComponentCreateMatch[2]
+    );
+  }
+  const scenePatternCreateMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/slides/([a-z0-9][a-z0-9-]{0,63})/patterns$`)
+  );
+  if (scenePatternCreateMatch?.[1] !== undefined && scenePatternCreateMatch[2] !== undefined) {
+    return handleScenePatternCreate(
+      request,
+      env,
+      scenePatternCreateMatch[1],
+      scenePatternCreateMatch[2]
     );
   }
   const sceneComponentMatch = path.match(

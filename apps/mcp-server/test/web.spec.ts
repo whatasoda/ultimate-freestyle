@@ -513,8 +513,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=181"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=181"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=182"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=182"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -966,7 +966,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=181"'
+      'href="/assets/dashboard.css?v=182"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1192,7 +1192,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=181"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=182"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1201,7 +1201,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=181"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=182"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1213,7 +1213,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=181", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=182", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1224,7 +1224,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=181", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=182", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1406,6 +1406,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data.clamps");
     expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain("data-scene-component-create");
+    expect(dashboardScriptText).toContain("data-scene-pattern-create");
     expect(dashboardScriptText).toContain("data-scene-item-action");
     expect(dashboardScriptText).toContain("data-component-order");
     expect(dashboardScriptText).toContain("form.requestSubmit()");
@@ -3384,6 +3385,40 @@ describe("Web dashboard", () => {
     );
     expect(deleteChartItem.status).toBe(200);
     expect(await deleteChartItem.json()).toMatchObject({ ok: true, version: 31, result_item_id: null });
+    const createScenePattern = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/slides/intro/patterns",
+        {
+          method: "POST",
+          headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
+          body: JSON.stringify({ expected_version: 31, pattern: "pattern-key-metrics", parent_id: null })
+        }
+      ),
+      authEnv
+    );
+    expect(createScenePattern.status).toBe(200);
+    expect(await createScenePattern.json()).toMatchObject({
+      ok: true,
+      version: 32,
+      component_id: "group-key-metrics-1",
+      component_ids: expect.arrayContaining([
+        "group-key-metrics-1-heading",
+        "group-key-metrics-1-metric-3"
+      ])
+    });
+    const patternedDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    const patternedNodes = JSON.parse(patternedDocument!.document_json).deck.slides[0].composition.nodes;
+    expect(patternedNodes.find((node: { id: string }) => node.id === "group-key-metrics-1")).toMatchObject({
+      kind: "stack",
+      frame: { x: 5, y: 5, width: 90, height: 90 }
+    });
+    expect(patternedNodes.find((node: { id: string }) => node.id === "group-key-metrics-1-metric-3")).toMatchObject({
+      kind: "metric",
+      parent_id: "group-key-metrics-1-items"
+    });
     const updateComposition = await requestProvider(
       provider,
       new Request(
@@ -3396,7 +3431,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 31,
+            expected_version: 32,
             composition_background: "#223344",
             composition_clip_content: false
           })
@@ -3405,7 +3440,7 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(updateComposition.status).toBe(200);
-    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 32 });
+    expect(await updateComposition.json()).toMatchObject({ ok: true, version: 33 });
     const recoloredDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
@@ -3420,14 +3455,14 @@ describe("Web dashboard", () => {
         {
           method: "POST",
           headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
-          body: JSON.stringify({ expected_version: 32, title: "Webから追加", position: 1, template: "scene" })
+          body: JSON.stringify({ expected_version: 33, title: "Webから追加", position: 1, template: "scene" })
         }
       ),
       authEnv
     );
     expect(createSlide.status).toBe(200);
     const createSlideResult = await createSlide.json() as { slide_id: string; version: number; next_url: string };
-    expect(createSlideResult).toMatchObject({ version: 33 });
+    expect(createSlideResult).toMatchObject({ version: 34 });
     expect(createSlideResult.next_url).toContain(createSlideResult.slide_id);
     const documentWithCreatedSlide = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
@@ -3445,14 +3480,14 @@ describe("Web dashboard", () => {
         {
           method: "POST",
           headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
-          body: JSON.stringify({ expected_version: 33, title: "自由構成へ変換", position: 2, template: "flow" })
+          body: JSON.stringify({ expected_version: 34, title: "自由構成へ変換", position: 2, template: "flow" })
         }
       ),
       authEnv
     );
     expect(createFlowSlide.status).toBe(200);
     const createFlowResult = await createFlowSlide.json() as { slide_id: string; version: number };
-    expect(createFlowResult.version).toBe(34);
+    expect(createFlowResult.version).toBe(35);
     const flowWorkspace = await requestProvider(
       provider,
       new Request(`https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/${createFlowResult.slide_id}`, { headers: { cookie: browserCookies } }),
@@ -3483,13 +3518,13 @@ describe("Web dashboard", () => {
         {
           method: "POST",
           headers: { cookie: browserCookies, "content-type": "application/json", "x-csrf-token": csrfToken ?? "" },
-          body: JSON.stringify({ expected_version: 34, mode: "canvas" })
+          body: JSON.stringify({ expected_version: 35, mode: "canvas" })
         }
       ),
       authEnv
     );
     expect(createComposition.status).toBe(200);
-    expect(await createComposition.json()).toMatchObject({ ok: true, version: 35, mode: "canvas" });
+    expect(await createComposition.json()).toMatchObject({ ok: true, version: 36, mode: "canvas" });
     const documentWithComposition = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
@@ -3515,7 +3550,7 @@ describe("Web dashboard", () => {
     expect(rollbackPublish.status).toBe(200);
     expect(await rollbackPublish.json()).toMatchObject({
       publication: {
-        draft_version: 35,
+        draft_version: 36,
         published: { revision_id: previewResult.revision.revision_id, project_version: 4 },
         events: expect.arrayContaining([
           expect.objectContaining({
@@ -3545,7 +3580,7 @@ describe("Web dashboard", () => {
             "content-type": "application/json",
             "x-csrf-token": csrfToken ?? ""
           },
-          body: JSON.stringify({ expected_version: 35 })
+          body: JSON.stringify({ expected_version: 36 })
         }
       ),
       authEnv
@@ -3554,7 +3589,7 @@ describe("Web dashboard", () => {
     expect(await restoreDraft.json()).toMatchObject({
       ok: true,
       restored_from_version: 4,
-      version: 36
+      version: 37
     });
     const restoredDetail = await requestProvider(
       provider,
@@ -3565,8 +3600,8 @@ describe("Web dashboard", () => {
       authEnv
     );
     const restoredDetailHtml = await restoredDetail.text();
-    expect(restoredDetailHtml).toContain("下書き履歴 · 36件");
-    expect(restoredDetailHtml).toContain("v36");
+    expect(restoredDetailHtml).toContain("下書き履歴 · 37件");
+    expect(restoredDetailHtml).toContain("v37");
     expect(restoredDetailHtml).toContain("復元");
     expect(DASHBOARD_SCRIPT).toContain("data-draft-restore");
     expect(DASHBOARD_SCRIPT).toContain("現在の保存済み下書きも履歴に残ります");
@@ -3583,7 +3618,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 36,
+            expected_version: 37,
             title: "長文を分ける",
             position: 1,
             template: "flow"
@@ -3597,7 +3632,7 @@ describe("Web dashboard", () => {
       slide_id: string;
       version: number;
     };
-    expect(longSlideResult.version).toBe(37);
+    expect(longSlideResult.version).toBe(38);
     const longSlideWorkspace = await requestProvider(
       provider,
       new Request(
@@ -3648,7 +3683,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 37,
+            expected_version: 38,
             split_offset: splitOffset,
             title: "長文を分ける",
             duration_seconds: 60,
@@ -3664,7 +3699,7 @@ describe("Web dashboard", () => {
       version: number;
       next_slide_id: string;
     };
-    expect(splitResult.version).toBe(38);
+    expect(splitResult.version).toBe(39);
     const splitDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{
