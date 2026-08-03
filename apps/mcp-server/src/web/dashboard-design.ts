@@ -109,6 +109,7 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     color: var(--ink);
   }
   input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+  .dashboard-search, .editor label, .upload label, .asset-alt label, .review-composer label { color: var(--ink); }
   .theme-toggle { gap: .45rem; min-height: 2.35rem; padding: .42rem .65rem; font-size: .78rem; }
   .theme-toggle-icon { display: grid; place-items: center; width: 1.15rem; height: 1.15rem; color: var(--accent-strong); font-size: 1rem; }
 
@@ -140,6 +141,11 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .project-status[data-state="attention"] { border-color: var(--warning); background: var(--warning-soft); color: var(--warning); }
   .dashboard-filter button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
   .search-empty { border-color: var(--line-strong); }
+  .danger-zone { border-color: var(--danger); background: var(--danger-soft); }
+  .danger-zone > summary { color: var(--danger); }
+  .danger-zone > p, .danger-zone label { color: var(--ink); }
+  .danger-zone input { border-color: var(--danger); background: var(--field); color: var(--ink); }
+  .danger-zone button.danger { border-color: var(--danger); background: var(--danger); color: #ffffff; }
 
   .journey { border-color: var(--line); background: var(--surface-soft); box-shadow: none; }
   .journey-step { border-color: var(--line); }
