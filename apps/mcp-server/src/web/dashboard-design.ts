@@ -196,7 +196,9 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .content-structure span { background: var(--accent-soft); color: var(--accent-strong); }
 
   .workspace-head { grid-template-columns: minmax(0, 1fr) auto; align-items: end; }
-  .workspace-version { justify-content: flex-end; }
+  .workspace-version { justify-content: flex-end; max-width: 58rem; }
+  .workspace-version > .slide-actions { flex: 1 0 100%; justify-content: flex-end; padding-top: .5rem; border-top: 1px solid var(--line); }
+  .workspace-version > .feedback { flex: 1 0 100%; text-align: right; }
   .slide-workspace { gap: .85rem; }
   .filmstrip { border-right: 1px solid var(--line); padding-right: .75rem; }
   .filmstrip-search { background: linear-gradient(var(--bg) 80%, transparent); }
@@ -302,12 +304,18 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     .review-filmstrip-list { grid-auto-flow: column; grid-auto-columns: minmax(12rem, 14rem); overflow-x: auto; }
   }
 
+  @media (min-width: 72.01rem) {
+    .slide-workspace { grid-template-columns: minmax(13rem, 15rem) minmax(34rem, 1fr); }
+  }
+
   @media (max-width: 48rem) {
     .account { width: 100%; flex-wrap: wrap; }
     .account > span { flex: 1 1 100%; }
     .theme-toggle { margin-right: auto; }
     .workspace-head { grid-template-columns: 1fr; }
     .workspace-version { justify-content: flex-start; }
+    .workspace-version > .slide-actions { justify-content: flex-start; }
+    .workspace-version > .feedback { text-align: left; }
     .card { grid-template-columns: 1fr; gap: .45rem; padding: 1rem .25rem; }
     .card-top, .card h2, .card > .meta, .card > .meta:last-child, .project-statuses, .project-attention { grid-column: 1; grid-row: auto; }
     .card > .meta:last-child { white-space: normal; }
