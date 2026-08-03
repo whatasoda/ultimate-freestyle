@@ -1,6 +1,36 @@
-export const DASHBOARD_ASSET_VERSION = "177";
+export const DASHBOARD_ASSET_VERSION = "178";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
+  const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
+  const storedDashboardTheme = localStorage.getItem(dashboardThemeStorageKey);
+  const dashboardColorScheme = matchMedia("(prefers-color-scheme: dark)");
+  const preferredDashboardTheme = () => storedDashboardTheme === "light" || storedDashboardTheme === "dark"
+    ? storedDashboardTheme
+    : dashboardColorScheme.matches ? "dark" : "light";
+  const applyDashboardTheme = (theme) => {
+    document.documentElement.dataset.theme = theme;
+    for (const button of document.querySelectorAll("[data-dashboard-theme-toggle]")) {
+      if (!(button instanceof HTMLButtonElement)) continue;
+      const dark = theme === "dark";
+      button.setAttribute("aria-pressed", String(dark));
+      button.setAttribute("aria-label", dark ? "ライトモードへ切り替える" : "ダークモードへ切り替える");
+      const label = button.querySelector("[data-dashboard-theme-label]");
+      const icon = button.querySelector("[data-dashboard-theme-icon]");
+      if (label instanceof HTMLElement) label.textContent = dark ? "ライト" : "ダーク";
+      if (icon instanceof HTMLElement) icon.textContent = dark ? "☀" : "☾";
+    }
+  };
+  applyDashboardTheme(preferredDashboardTheme());
+  for (const button of document.querySelectorAll("[data-dashboard-theme-toggle]")) {
+    button.addEventListener("click", () => {
+      const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+      localStorage.setItem(dashboardThemeStorageKey, theme);
+      applyDashboardTheme(theme);
+    });
+  }
+  dashboardColorScheme.addEventListener("change", (event) => {
+    if (localStorage.getItem(dashboardThemeStorageKey) === null) applyDashboardTheme(event.matches ? "dark" : "light");
+  });
   const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
   const panelTreatmentLabels = { flat: "素のまま", soft: "やわらかい面", outline: "線で囲む", raised: "浮き上がる", glass: "ガラス" };
   const fragmentIdFromHash = (hash) => {

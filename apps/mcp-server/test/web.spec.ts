@@ -455,6 +455,8 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("viewer&lt;script&gt;");
     expect(dashboardHtml).not.toContain("viewer<script>");
     expect(dashboardHtml).toContain("1 / 20 件");
+    expect(dashboardHtml).toContain("data-dashboard-theme-toggle");
+    expect(dashboardHtml).toContain("data-dashboard-theme-label>ダーク");
     expect(dashboardHtml).toContain("data-project-search");
     expect(dashboardHtml).toContain('data-project-search-user="viewer&lt;script&gt;"');
     expect(dashboardHtml).toContain("タイトル・制作段階");
@@ -511,8 +513,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=177"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=177"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=178"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=178"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -527,6 +529,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain('const navigationFocusKey = "ultimate-freestyle:navigation-focus"');
     expect(DASHBOARD_SCRIPT).toContain('Math.ceil(details.exceeded_by_bytes / 1024) + " KiB超過"');
     expect(DASHBOARD_SCRIPT).toContain('rememberNavigationFocus("component"');
+    expect(DASHBOARD_SCRIPT).toContain('"ultimate-freestyle:dashboard-theme"');
+    expect(DASHBOARD_SCRIPT).toContain("localStorage.setItem(dashboardThemeStorageKey, theme)");
     expect(DASHBOARD_SCRIPT).toContain('setMobilePane("edit")');
     expect(detailHtml).not.toContain("<style>");
     expect(detail.headers.get("content-security-policy")).toContain(
@@ -859,6 +863,8 @@ describe("Web dashboard", () => {
     expect(emptyReviewHtml).toContain("最初の読み上げ文");
     expect(emptyReviewHtml).toContain('data-kind="narration"');
     expect(emptyReviewHtml).toContain("AI修正依頼文");
+    expect(emptyReviewHtml).toContain('class="review-comments" aria-label="コメントとAI修正依頼文"');
+    expect(emptyReviewHtml).not.toContain('<aside class="panel review-comments">');
     expect(emptyReviewHtml).toContain("これは実行コードではありません");
     expect(emptyReviewHtml).toContain("data-review-selection-toolbar");
     expect(emptyReviewHtml).toContain("data-review-selection-action");
@@ -959,7 +965,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=177"'
+      'href="/assets/dashboard.css?v=178"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1185,7 +1191,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=177"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=178"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1194,7 +1200,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=177"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=178"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1206,7 +1212,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=177", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=178", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1217,7 +1223,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=177", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=178", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1228,6 +1234,9 @@ describe("Web dashboard", () => {
     expect(dashboardStyleText).toContain(".workspace-head { display: grid;");
     expect(dashboardStyleText).toContain("max-width: min(100%, 32ch)");
     expect(dashboardStyleText).toContain("word-break: auto-phrase");
+    expect(dashboardStyleText).toContain('--surface-warm: #fff2e7;');
+    expect(dashboardStyleText).toContain(':root[data-theme="dark"]');
+    expect(dashboardStyleText).toContain('.review-workspace { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);');
     expect(dashboardStyleText).toContain(
       ".step-control [data-grid-snap] { grid-column: 1 / -1; }"
     );
@@ -3757,8 +3766,7 @@ describe("Web dashboard", () => {
       "2026-08-01T00:00:00.000Z"
     );
     const session = await createWebSession(env.DB, {
-      userId,
-      now: new Date("2026-08-01T00:00:00.000Z")
+      userId
     });
     const cookie = session.cookies
       .map((value) => value.split(";", 1)[0])

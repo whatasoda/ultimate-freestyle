@@ -50,6 +50,7 @@ import {
 import type { ReviewComment } from "../reviews/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
 import { DASHBOARD_ASSET_VERSION } from "./assets";
+import { DASHBOARD_DESIGN_STYLE } from "./dashboard-design";
 import { renderClientChoiceGuide } from "./client-guide";
 import {
   MAX_JOB_CHARACTERS,
@@ -1054,7 +1055,7 @@ function shell(title: string, body: string): string {
 }
 
 export function dashboardStyleResponse(versioned = false): Response {
-  return new Response(DASHBOARD_STYLE, {
+  return new Response(`${DASHBOARD_STYLE}\n${DASHBOARD_DESIGN_STYLE}`, {
     headers: {
       "cache-control": versioned
         ? "public, max-age=31536000, immutable"
@@ -1086,6 +1087,7 @@ function accountHeader(twitchLogin: string, csrfToken: string): string {
   return `<header class="site-header">
     <a class="brand" href="/dashboard">最自由研究</a>
     <div class="account"><span><strong>${escapeHtml(twitchLogin)}</strong> でログイン中</span>
+      <button class="ghost theme-toggle" type="button" data-dashboard-theme-toggle aria-pressed="false"><span class="theme-toggle-icon" data-dashboard-theme-icon aria-hidden="true">☾</span><span data-dashboard-theme-label>ダーク</span></button>
       <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="${escapeHtml(csrfToken)}"><button class="ghost" type="submit">ログアウト</button></form>
     </div>
   </header>`;
@@ -2664,12 +2666,12 @@ export function slideReviewPage(options: {
            <div class="review-center">
              <section class="panel review-preview"><div class="workspace-frame" style="--workspace-aspect:${aspect}"><span class="frame-loading" data-frame-loading role="status">プレビューを読み込み中…</span><iframe title="${escapeHtml(slide.title)}の実表示" src="/dashboard/projects/${escapeHtml(projectId)}/slides/${escapeHtml(slide.id)}/frame?slide=${slideIndex + 1}&step=${slide.reveal_steps}" data-slide-frame></iframe></div></section>
              <section class="panel"><div class="section-head"><div><p class="eyebrow">Flat source</p><h2>画面の文章と音声原稿</h2></div><span class="count">${textSources.length}項目</span></div><p class="review-select-hint">コメントしたい文字を一つの枠内で選び、近くに出る「コメントを追加」を押してください。Markdown記号を含む保存データをそのまま表示するため、AIが修正する場所と一致します。</p><div class="review-source-list">${sourceCards}</div></section>
-           </div>
-           <aside class="panel review-comments">
+             <section class="review-comments" aria-label="コメントとAI修正依頼文">
              <form class="review-composer" data-review-composer><div><p class="eyebrow">New comment</p><h2>コメントを追加</h2></div><p class="review-selection" data-review-selection>スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。</p><input type="hidden" name="target_key" value="slide:whole"><input type="hidden" name="range_start"><input type="hidden" name="range_end"><input type="hidden" name="selected_text"><label>指摘・修正してほしいこと<textarea name="body" maxlength="4000" required placeholder="例: 結論を先に示し、根拠との関係が一読で分かる表現にしてください。"></textarea></label><div class="actions"><button type="submit">コメントを追加</button><button class="ghost" type="button" data-review-whole>スライド全体に戻す</button></div><p class="feedback" data-review-feedback aria-live="polite"></p></form>
-             <div class="section-head"><h2>コメント</h2><span class="count">${currentComments.length}件</span></div><div data-review-comment-list>${commentCards}</div>
+             <section class="panel"><div class="section-head"><h2>コメント</h2><span class="count">${currentComments.length}件</span></div><div data-review-comment-list>${commentCards}</div></section>
              <section class="review-script"><div><h2>AI修正依頼文</h2><p class="review-select-hint">チェックした未解決コメントを最大20件まで、Codex・ChatGPT・Claudeへ安全に渡せる依頼文にします。これは実行コードではありません。</p></div><div class="actions"><button class="ghost" type="button" data-review-script-generate${currentOpenComments.length === 0 ? " disabled" : ""}>選択から生成</button><button type="button" data-review-script-copy${currentOpenComments.length === 0 ? " disabled" : ""}>コピー</button></div><textarea readonly data-review-script-output placeholder="未解決コメントを追加すると、ここにAI修正依頼文が表示されます。">${escapeHtml(initialInstruction)}</textarea><p class="feedback" data-review-script-feedback aria-live="polite">${currentOpenComments.length > 0 ? `${Math.min(currentOpenComments.length, 20)}件を含む依頼文です。${currentOpenComments.length > 20 ? "残りはチェックを切り替えて別の依頼文にしてください。" : ""}` : "未解決コメントを追加すると生成できます。"}</p></section>
-           </aside>
+             </section>
+           </div>
          </div>
          <div class="review-selection-toolbar" data-review-selection-toolbar data-placement="above" role="toolbar" aria-label="選択した文章への操作" hidden><button type="button" data-review-selection-action aria-keyshortcuts="Control+Alt+M Meta+Alt+M"><span class="review-selection-icon" aria-hidden="true">＋</span><span data-review-selection-action-label>コメントを追加</span></button></div>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
