@@ -1,7 +1,8 @@
-export const DASHBOARD_ASSET_VERSION = "179";
+export const DASHBOARD_ASSET_VERSION = "180";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
+  const dashboardThemeButtons = [...document.querySelectorAll("[data-dashboard-theme-toggle]")];
   const storedDashboardTheme = localStorage.getItem(dashboardThemeStorageKey);
   const dashboardColorScheme = matchMedia("(prefers-color-scheme: dark)");
   const preferredDashboardTheme = () => storedDashboardTheme === "light" || storedDashboardTheme === "dark"
@@ -9,7 +10,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     : dashboardColorScheme.matches ? "dark" : "light";
   const applyDashboardTheme = (theme) => {
     document.documentElement.dataset.theme = theme;
-    for (const button of document.querySelectorAll("[data-dashboard-theme-toggle]")) {
+    for (const button of dashboardThemeButtons) {
       if (!(button instanceof HTMLButtonElement)) continue;
       const dark = theme === "dark";
       button.setAttribute("aria-pressed", String(dark));
@@ -20,8 +21,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (icon instanceof HTMLElement) icon.textContent = dark ? "☀" : "☾";
     }
   };
-  applyDashboardTheme(preferredDashboardTheme());
-  for (const button of document.querySelectorAll("[data-dashboard-theme-toggle]")) {
+  if (dashboardThemeButtons.length > 0) applyDashboardTheme(preferredDashboardTheme());
+  for (const button of dashboardThemeButtons) {
     button.addEventListener("click", () => {
       const theme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       localStorage.setItem(dashboardThemeStorageKey, theme);
@@ -29,7 +30,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
   dashboardColorScheme.addEventListener("change", (event) => {
-    if (localStorage.getItem(dashboardThemeStorageKey) === null) applyDashboardTheme(event.matches ? "dark" : "light");
+    if (dashboardThemeButtons.length > 0 && localStorage.getItem(dashboardThemeStorageKey) === null) applyDashboardTheme(event.matches ? "dark" : "light");
   });
   const slideRoleLabels = { cover: "表紙", section: "章扉", content: "本文", comparison: "比較", result: "結果", closing: "結び" };
   const panelTreatmentLabels = { flat: "素のまま", soft: "やわらかい面", outline: "線で囲む", raised: "浮き上がる", glass: "ガラス" };
