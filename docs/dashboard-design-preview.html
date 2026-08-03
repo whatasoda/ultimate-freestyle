@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="ja" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="最自由研究の管理画面デザイン刷新案。研究一覧・スライド編集・レビューをライト／ダークで比較する。" />
+    <title>最自由研究 — 管理画面デザイン案</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f8f5;
+        --surface: #ffffff;
+        --surface-soft: #edf6fb;
+        --surface-warm: #fff3e9;
+        --ink: #17283d;
+        --muted: #667587;
+        --line: #d9e1e7;
+        --line-strong: #b9c8d3;
+        --sky: #2389c9;
+        --sky-strong: #126da5;
+        --sky-ink: #ffffff;
+        --apricot: #f3a267;
+        --apricot-soft: #ffe4cf;
+        --success: #24856f;
+        --warning: #a96f12;
+        --danger: #bc4d55;
+        --focus: #167bbb;
+        --shadow: 0 18px 55px rgba(29, 62, 87, 0.12);
+        --radius-sm: 8px;
+        --radius: 12px;
+        --max: 1440px;
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #101820;
+        --surface: #16222d;
+        --surface-soft: #172d3b;
+        --surface-warm: #33271f;
+        --ink: #ecf4f7;
+        --muted: #9eafba;
+        --line: #2e404c;
+        --line-strong: #49616f;
+        --sky: #55b7eb;
+        --sky-strong: #82cdf2;
+        --sky-ink: #092235;
+        --apricot: #f2aa76;
+        --apricot-soft: #493224;
+        --success: #67c7ad;
+        --warning: #efbd62;
+        --danger: #f08d94;
+        --focus: #79c7ef;
+        --shadow: 0 18px 55px rgba(0, 0, 0, 0.3);
+      }
+
+      * { box-sizing: border-box; }
+      html { background: var(--bg); scroll-behavior: smooth; }
+      body { margin: 0; color: var(--ink); background: var(--bg); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif; font-size: 15px; line-height: 1.6; }
+      button, input, textarea, select { color: inherit; font: inherit; }
+      button, a { -webkit-tap-highlight-color: transparent; }
+      button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid color-mix(in srgb, var(--focus) 45%, transparent); outline-offset: 2px; }
+      button { cursor: pointer; }
+      h1, h2, h3, p { margin-top: 0; }
+      h1, h2, h3 { font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif; font-weight: 700; letter-spacing: -0.025em; }
+      small { color: var(--muted); }
+      .preview-page { width: min(calc(100% - 32px), var(--max)); margin: 0 auto; padding: 24px 0 64px; }
+      .decision-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; padding: 12px 0 24px; border-bottom: 1px solid var(--line); }
+      .eyebrow { margin: 0 0 4px; color: var(--sky-strong); font-size: 12px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+      .decision-head h1 { margin-bottom: 6px; font-size: clamp(28px, 4vw, 48px); line-height: 1.12; }
+      .decision-head p:last-child { margin: 0; color: var(--muted); }
+      .decision-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+      .button { min-height: 42px; padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: transparent; color: var(--ink); font-weight: 700; }
+      .button:hover { background: var(--surface-soft); }
+      .button.primary { border-color: var(--sky); background: var(--sky); color: var(--sky-ink); }
+      .button.ghost { border-color: transparent; }
+      .button.danger { color: var(--danger); }
+      .button[aria-pressed="true"] { border-color: var(--sky); background: var(--surface-soft); color: var(--sky-strong); }
+      .theme-button { display: inline-flex; align-items: center; gap: 8px; }
+      .theme-button span:first-child { font-size: 18px; }
+      .tokens { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 20px 0 26px; border-block: 1px solid var(--line); }
+      .token { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: center; padding: 14px 18px; }
+      .token + .token { border-left: 1px solid var(--line); }
+      .token-swatch { width: 24px; height: 24px; border-radius: 50%; }
+      .token-swatch.sky { background: var(--sky); }
+      .token-swatch.apricot { background: var(--apricot); }
+      .token-swatch.surface { border: 1px solid var(--line-strong); background: var(--surface); }
+      .token-swatch.success { background: var(--success); }
+      .token strong, .token small { display: block; }
+      .screen-picker { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+      .screen-picker .button { flex: 1 1 180px; }
+      .mock-browser { overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); }
+      .mock-topbar { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 22px; align-items: center; min-height: 64px; padding: 10px 18px; border-bottom: 1px solid var(--line); }
+      .brand { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 800; }
+      .brand-mark { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; background: var(--apricot-soft); color: var(--sky-strong); }
+      .mock-topbar nav { display: flex; gap: 4px; }
+      .mock-topbar nav button { padding: 8px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-weight: 700; }
+      .mock-topbar nav button[aria-current="page"] { background: var(--surface-soft); color: var(--sky-strong); }
+      .avatar { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface-warm); font-weight: 800; }
+      .mock-screen { display: none; min-height: 680px; }
+      .mock-screen[data-active="true"] { display: block; }
+      .screen-shell { display: grid; grid-template-columns: 208px minmax(0, 1fr); min-height: 680px; }
+      .side-nav { padding: 22px 14px; border-right: 1px solid var(--line); }
+      .side-nav strong { display: block; margin: 0 10px 10px; font-size: 12px; letter-spacing: .08em; color: var(--muted); }
+      .side-nav a { display: flex; align-items: center; gap: 10px; min-height: 42px; margin-bottom: 3px; padding: 8px 10px; border-radius: var(--radius-sm); color: var(--muted); text-decoration: none; font-weight: 700; }
+      .side-nav a[aria-current="page"] { background: var(--surface-soft); color: var(--sky-strong); }
+      .side-nav .nav-icon { width: 22px; text-align: center; }
+      .screen-main { min-width: 0; padding: 28px clamp(20px, 4vw, 48px) 40px; }
+      .page-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+      .page-head h2 { margin-bottom: 4px; font-size: clamp(24px, 3vw, 34px); }
+      .page-head p { margin: 0; color: var(--muted); }
+      .next-action { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px; align-items: center; margin-bottom: 28px; padding: 16px; border-radius: var(--radius); background: var(--surface-warm); }
+      .next-action-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: var(--apricot-soft); color: var(--warning); font-size: 20px; }
+      .next-action strong, .next-action span { display: block; }
+      .next-action span { color: var(--muted); }
+      .section-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding-bottom: 10px; }
+      .section-head h3 { margin: 0; }
+      .quiet-action { padding: 6px 8px; border: 0; background: transparent; color: var(--sky-strong); font-weight: 700; }
+      .research-list { border-top: 1px solid var(--line); }
+      .research-row { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(120px, 180px) auto; gap: 16px; align-items: center; padding: 18px 4px; border-bottom: 1px solid var(--line); }
+      .research-icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: var(--radius-sm); background: var(--surface-soft); color: var(--sky-strong); font-size: 20px; }
+      .research-icon.warm { background: var(--surface-warm); color: var(--warning); }
+      .research-title strong, .research-title span { display: block; }
+      .research-title span { color: var(--muted); font-size: 13px; }
+      .meter { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+      .meter-track { height: 6px; overflow: hidden; border-radius: 999px; background: var(--line); }
+      .meter-track i { display: block; height: 100%; border-radius: inherit; background: var(--sky); }
+      .status { color: var(--success); font-size: 13px; font-weight: 800; white-space: nowrap; }
+      .editor-main { padding: 18px; }
+      .editor-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+      .editor-head h2 { margin: 0; font-size: 24px; }
+      .save-state { color: var(--success); font-size: 13px; font-weight: 800; }
+      .editor-workspace { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 18px; }
+      .filmstrip { display: grid; align-content: start; gap: 8px; }
+      .slide-row { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 8px; padding: 10px 8px; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--muted); }
+      .slide-row[data-current="true"] { border-color: var(--sky); background: var(--surface-soft); color: var(--ink); }
+      .slide-row span { font-size: 12px; }
+      .slide-row strong { font-size: 13px; line-height: 1.4; }
+      .stage { min-width: 0; }
+      .preview-frame { display: grid; place-items: center; aspect-ratio: 16 / 9; overflow: hidden; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: #eaf6fb; color: #173047; }
+      :root[data-theme="dark"] .preview-frame { background: #203845; color: #edf8fb; }
+      .slide-preview { width: 76%; }
+      .slide-preview span { color: #287aa8; font-size: 12px; font-weight: 800; letter-spacing: .1em; }
+      :root[data-theme="dark"] .slide-preview span { color: #89d2f4; }
+      .slide-preview h3 { margin: 8px 0 10px; font-size: clamp(24px, 5vw, 54px); line-height: 1.08; }
+      .slide-preview p { max-width: 48ch; margin: 0; }
+      .editor-dock { margin-top: 16px; border-top: 1px solid var(--line); }
+      .dock-tabs { display: flex; gap: 4px; padding: 10px 0; }
+      .dock-tabs button { padding: 7px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--muted); font-weight: 700; }
+      .dock-tabs button[aria-selected="true"] { background: var(--surface-soft); color: var(--sky-strong); }
+      .dock-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; padding-top: 4px; }
+      .field { display: grid; gap: 5px; }
+      .field label { color: var(--muted); font-size: 13px; font-weight: 700; }
+      .field input, .field textarea, .field select { width: 100%; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--bg); }
+      .field textarea { min-height: 82px; resize: vertical; }
+      .review-main { padding: 18px; }
+      .review-layout { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 18px; }
+      .review-body { min-width: 0; }
+      .source-list { margin-top: 18px; border-top: 1px solid var(--line); }
+      .source-row { display: grid; grid-template-columns: 128px minmax(0, 1fr); gap: 14px; padding: 14px 2px; border-bottom: 1px solid var(--line); }
+      .source-row small { font-weight: 800; }
+      .source-row p { margin: 0; }
+      .source-row mark { padding: 2px 4px; border-radius: 4px; background: var(--apricot-soft); color: var(--ink); }
+      .comment-composer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: end; margin-top: 18px; padding: 14px 0; border-block: 1px solid var(--line); }
+      .comment-composer label { display: grid; gap: 5px; color: var(--muted); font-size: 13px; font-weight: 700; }
+      .comment-composer textarea { width: 100%; min-height: 70px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--bg); resize: vertical; }
+      .comments { margin-top: 22px; }
+      .comment-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; padding: 14px 2px; border-top: 1px solid var(--line); }
+      .comment-row p { margin: 4px 0 0; }
+      .comment-meta { color: var(--muted); font-size: 13px; }
+      .principles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 28px; border-block: 1px solid var(--line); }
+      .principle { padding: 18px; }
+      .principle + .principle { border-left: 1px solid var(--line); }
+      .principle strong { display: block; margin-bottom: 5px; }
+      .principle span { color: var(--muted); font-size: 13px; }
+      [hidden] { display: none !important; }
+
+      @media (max-width: 900px) {
+        .tokens, .principles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .token:nth-child(3), .principle:nth-child(3) { border-left: 0; }
+        .token:nth-child(n+3), .principle:nth-child(n+3) { border-top: 1px solid var(--line); }
+        .screen-shell { grid-template-columns: 1fr; }
+        .side-nav { display: flex; gap: 4px; overflow-x: auto; padding: 10px 14px; border-right: 0; border-bottom: 1px solid var(--line); }
+        .side-nav strong { display: none; }
+        .side-nav a { flex: 0 0 auto; margin: 0; }
+      }
+
+      @media (max-width: 680px) {
+        .preview-page { width: min(calc(100% - 20px), var(--max)); padding-top: 12px; }
+        .decision-head { grid-template-columns: 1fr; align-items: start; }
+        .decision-actions { justify-content: flex-start; }
+        .tokens, .principles { grid-template-columns: 1fr; }
+        .token + .token, .principle + .principle { border-left: 0; border-top: 1px solid var(--line); }
+        .mock-topbar { grid-template-columns: minmax(0, 1fr) auto; }
+        .mock-topbar nav { display: none; }
+        .mock-screen, .screen-shell { min-height: 0; }
+        .screen-main { padding: 22px 16px 30px; }
+        .page-head, .editor-head { align-items: flex-start; flex-direction: column; }
+        .next-action { grid-template-columns: auto minmax(0, 1fr); }
+        .next-action .button { grid-column: 1 / -1; }
+        .research-row { grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; }
+        .research-row .meter { grid-column: 2 / -1; }
+        .editor-main, .review-main { padding: 14px; }
+        .editor-workspace, .review-layout { grid-template-columns: 1fr; }
+        .filmstrip { display: flex; overflow-x: auto; }
+        .slide-row { flex: 0 0 150px; }
+        .dock-fields { grid-template-columns: 1fr; }
+        .source-row { grid-template-columns: 1fr; gap: 4px; }
+        .comment-composer { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="preview-page">
+      <header class="decision-head">
+        <div>
+          <p class="eyebrow">Dashboard design direction · v1</p>
+          <h1>明快な研究室に、少しだけ陽だまりを。</h1>
+          <p>フレッシュ・ラボ 80% ＋ 陽だまりスタジオ 20%。標準密度、空色＋アプリコット。</p>
+        </div>
+        <div class="decision-actions">
+          <button class="button theme-button" type="button" data-theme-toggle aria-pressed="false"><span aria-hidden="true">☾</span><span data-theme-label>ダークで見る</span></button>
+        </div>
+      </header>
+
+      <section class="tokens" aria-label="デザイントークン">
+        <div class="token"><span class="token-swatch sky"></span><div><strong>空色</strong><small>主操作・選択</small></div></div>
+        <div class="token"><span class="token-swatch apricot"></span><div><strong>アプリコット</strong><small>前向きな案内</small></div></div>
+        <div class="token"><span class="token-swatch surface"></span><div><strong>暖かい白／濃紺</strong><small>作業面</small></div></div>
+        <div class="token"><span class="token-swatch success"></span><div><strong>青緑</strong><small>保存・完了</small></div></div>
+      </section>
+
+      <nav class="screen-picker" aria-label="確認する画面">
+        <button class="button" type="button" data-screen-button="projects" aria-pressed="true">研究一覧</button>
+        <button class="button" type="button" data-screen-button="editor" aria-pressed="false">スライド編集</button>
+        <button class="button" type="button" data-screen-button="review" aria-pressed="false">レビュー</button>
+      </nav>
+
+      <section class="mock-browser" aria-label="管理画面モックアップ">
+        <header class="mock-topbar">
+          <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>最自由研究</span></div>
+          <nav aria-label="主要ナビゲーション"><button type="button" aria-current="page">研究</button><button type="button">使い方</button></nav>
+          <button class="avatar" type="button" aria-label="アカウントメニュー">わ</button>
+        </header>
+
+        <section class="mock-screen" data-screen="projects" data-active="true">
+          <div class="screen-shell">
+            <nav class="side-nav" aria-label="研究管理"><strong>WORKSPACE</strong><a href="#" aria-current="page"><span class="nav-icon">⌂</span>研究一覧</a><a href="#"><span class="nav-icon">◫</span>公開管理</a><a href="#"><span class="nav-icon">?</span>使い方</a></nav>
+            <div class="screen-main">
+              <header class="page-head"><div><p class="eyebrow">My research</p><h2>研究を続けよう</h2><p>いま必要な操作から、迷わず再開できます。</p></div><button class="button" type="button">＋ 新しい研究</button></header>
+              <section class="next-action"><span class="next-action-icon" aria-hidden="true">✦</span><div><strong>次は、実験結果を記録しましょう</strong><span>「氷はどこで速く溶ける？」の観察を続けます。</span></div><button class="button primary" type="button">記録を開く</button></section>
+              <div class="section-head"><h3>最近の研究</h3><button class="quiet-action" type="button">すべて見る</button></div>
+              <div class="research-list">
+                <article class="research-row"><span class="research-icon" aria-hidden="true">❄</span><div class="research-title"><strong>氷はどこで速く溶ける？</strong><span>実験中 · 10分前に更新</span></div><div class="meter"><span class="meter-track"><i style="width: 66%"></i></span><small>4 / 6</small></div><button class="button primary" type="button">続ける</button></article>
+                <article class="research-row"><span class="research-icon warm" aria-hidden="true">♧</span><div class="research-title"><strong>ベランダの植物観察</strong><span>問いを整理中 · 昨日更新</span></div><div class="meter"><span class="meter-track"><i style="width: 24%"></i></span><small>1 / 5</small></div><button class="button" type="button">開く</button></article>
+                <article class="research-row"><span class="research-icon" aria-hidden="true">◌</span><div class="research-title"><strong>コップの形と音の違い</strong><span>発表を確認中 · 3日前に更新</span></div><span class="status">公開準備OK</span><button class="button" type="button">確認</button></article>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="mock-screen" data-screen="editor">
+          <div class="editor-main">
+            <header class="editor-head"><div><p class="eyebrow">Slide 2 / 6</p><h2>実験方法</h2></div><div class="decision-actions"><span class="save-state">✓ 保存済み</span><button class="button" type="button">レビュー</button><button class="button primary" type="button">公開を確認</button></div></header>
+            <div class="editor-workspace">
+              <nav class="filmstrip" aria-label="スライド一覧"><div class="slide-row"><span>01</span><strong>氷はどこで速く溶ける？</strong></div><div class="slide-row" data-current="true"><span>02</span><strong>実験方法</strong></div><div class="slide-row"><span>03</span><strong>現在の状態</strong></div><div class="slide-row"><span>04</span><strong>結果</strong></div></nav>
+              <div class="stage">
+                <div class="preview-frame"><div class="slide-preview"><span>02 · METHOD</span><h3>条件をそろえて<br />素材だけを変える</h3><p>同じ大きさの氷を、金属・木・布の上へ同時に置きます。</p></div></div>
+                <section class="editor-dock"><div class="dock-tabs" role="tablist" aria-label="編集項目"><button type="button" role="tab" aria-selected="true">内容</button><button type="button" role="tab" aria-selected="false">デザイン</button><button type="button" role="tab" aria-selected="false">音声</button><button type="button" role="tab" aria-selected="false">構成</button></div><div class="dock-fields"><div class="field"><label for="mock-title">スライドタイトル</label><input id="mock-title" value="実験方法" /></div><div class="field"><label for="mock-role">役割</label><select id="mock-role"><option>本文</option></select></div><div class="field"><label for="mock-content">画面の本文</label><textarea id="mock-content">条件をそろえて、素材だけを変えます。</textarea></div><div class="field"><label for="mock-note">読み上げない補足</label><textarea id="mock-note">日光やエアコンの風が直接当たらない場所で行う。</textarea></div></div></section>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="mock-screen" data-screen="review">
+          <div class="review-main">
+            <header class="editor-head"><div><p class="eyebrow">Slide review · 2 / 6</p><h2>実験方法をレビュー</h2></div><div class="decision-actions"><button class="button" type="button">編集へ戻る</button><button class="button primary" type="button">AI修正依頼を作る</button></div></header>
+            <div class="review-layout">
+              <nav class="filmstrip" aria-label="レビューするスライド"><div class="slide-row"><span>01</span><strong>問い</strong></div><div class="slide-row" data-current="true"><span>02</span><strong>実験方法 · 1件</strong></div><div class="slide-row"><span>03</span><strong>現在の状態</strong></div><div class="slide-row"><span>04</span><strong>結果</strong></div></nav>
+              <div class="review-body">
+                <div class="preview-frame"><div class="slide-preview"><span>02 · METHOD</span><h3>条件をそろえて<br />素材だけを変える</h3><p>同じ大きさの氷を、金属・木・布の上へ同時に置きます。</p></div></div>
+                <section class="source-list" aria-label="画面の文章と音声原稿"><div class="source-row"><small>画面の本文</small><p>同じ大きさの氷を、<mark>金属・木・布の上へ</mark>同時に置きます。</p></div><div class="source-row"><small>音声原稿</small><p>条件をできるだけ同じにして、素材だけを変えます。</p></div></section>
+                <form class="comment-composer"><label for="mock-comment">選択部分へのコメント<textarea id="mock-comment" placeholder="修正してほしいことを入力"></textarea></label><button class="button primary" type="button">コメントを追加</button></form>
+                <section class="comments"><div class="section-head"><h3>コメント</h3><small>1件</small></div><article class="comment-row"><div><span class="comment-meta">画面の本文 · 現在位置</span><p>素材名を箇条書きにして、実験条件を見比べやすくしてください。</p></div><button class="button ghost" type="button">解決済みにする</button></article></section>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+
+      <section class="principles" aria-label="確定したUI原則">
+        <div class="principle"><strong>一領域、一主操作</strong><span>最も必要な操作だけを空色で強調します。</span></div>
+        <div class="principle"><strong>カードを重ねない</strong><span>一覧と設定は余白と区切り線で整理します。</span></div>
+        <div class="principle"><strong>温かさは控えめに</strong><span>アプリコットは案内と達成感に限定します。</span></div>
+        <div class="principle"><strong>テーマ間で同じ構造</strong><span>ライト／ダークで情報階層を変えません。</span></div>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const root = document.documentElement;
+        const themeButton = document.querySelector("[data-theme-toggle]");
+        const themeLabel = document.querySelector("[data-theme-label]");
+        const storageKey = "ultimate-freestyle:dashboard-design-preview-theme";
+        const preferredTheme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        let storedTheme = null;
+        try { storedTheme = localStorage.getItem(storageKey); } catch {}
+
+        const applyTheme = (theme) => {
+          const dark = theme === "dark";
+          root.dataset.theme = dark ? "dark" : "light";
+          themeButton?.setAttribute("aria-pressed", String(dark));
+          if (themeLabel) themeLabel.textContent = dark ? "ライトで見る" : "ダークで見る";
+          const symbol = themeButton?.querySelector("span");
+          if (symbol) symbol.textContent = dark ? "☀" : "☾";
+        };
+
+        applyTheme(storedTheme === "dark" || storedTheme === "light" ? storedTheme : preferredTheme);
+        themeButton?.addEventListener("click", () => {
+          const nextTheme = root.dataset.theme === "dark" ? "light" : "dark";
+          applyTheme(nextTheme);
+          try { localStorage.setItem(storageKey, nextTheme); } catch {}
+        });
+
+        const screenButtons = [...document.querySelectorAll("[data-screen-button]")];
+        const screens = [...document.querySelectorAll("[data-screen]")];
+        for (const button of screenButtons) {
+          button.addEventListener("click", () => {
+            const selected = button.dataset.screenButton;
+            for (const item of screenButtons) item.setAttribute("aria-pressed", String(item === button));
+            for (const screen of screens) screen.dataset.active = String(screen.dataset.screen === selected);
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>
