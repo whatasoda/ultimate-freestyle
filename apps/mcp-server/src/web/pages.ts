@@ -904,6 +904,10 @@ const DASHBOARD_STYLE = String.raw`
       .component-search { display: grid; gap: .35rem; margin-bottom: .65rem; color: var(--muted); font-size: .78rem; }
       .component-search-row { display: flex; gap: .55rem; align-items: center; }
       .component-search-row input { min-width: 0; flex: 1; }
+      .component-search-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin: -.25rem 0 .65rem; }
+      .component-search-actions button { min-height: 1.9rem; padding: .3rem .55rem; font-size: .7rem; }
+      .component-current-path { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin: 0 0 .65rem; color: var(--muted); font-size: .72rem; }
+      .component-current-path code { color: var(--ink); }
       .component-search-row output { min-width: 6.5rem; text-align: end; white-space: nowrap; }
       .segment-outline { display: flex; gap: .4rem; overflow-x: auto; padding: .15rem 0 .5rem; scrollbar-width: thin; }
       .segment-outline a { display: inline-flex; align-items: center; flex: 0 0 auto; min-height: 2.75rem; padding: .45rem .65rem; border: 1px solid var(--line); border-radius: .5rem; color: var(--muted); text-decoration: none; font: 700 .75rem/1 ui-monospace, monospace; }
@@ -1286,8 +1290,18 @@ function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideScene
     .join("");
   const siblings = index.siblingsByParentId.get(node.parent_id) ?? [];
   const siblingIndex = siblings.findIndex((candidate) => candidate.id === node.id);
+  const nodesById = new Map(nodes.map((candidate) => [candidate.id, candidate]));
+  const path = [node.id];
+  const visited = new Set(path);
+  let parentId = node.parent_id;
+  while (parentId !== null && !visited.has(parentId)) {
+    path.unshift(parentId);
+    visited.add(parentId);
+    parentId = nodesById.get(parentId)?.parent_id ?? null;
+  }
+  const currentPath = `<p class="component-current-path"><span>現在地</span><code>${path.map(escapeHtml).join(" › ")}</code></p>`;
   const moveNote = descendants.size > 0 ? ` このまとまりの子孫${descendants.size}件も一緒に移動します。` : "";
-  return `<fieldset><legend>階層と並び順</legend><div class="editor-grid"><label>追加先<select name="parent_id" data-component-parent-select data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value="" data-parent-kind="root"${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。${moveNote}自分自身や子孫は追加先に選べません。</p></fieldset>`;
+  return `<fieldset><legend>階層と並び順</legend>${currentPath}<div class="editor-grid"><label>追加先<select name="parent_id" data-component-parent-select data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value="" data-parent-kind="root"${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。${moveNote}自分自身や子孫は追加先に選べません。</p></fieldset>`;
 }
 
 function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number): string {
@@ -2787,9 +2801,12 @@ export function slideWorkspacePage(options: {
             .join("")}</ul>`
         : `<p class="mode-note">定型レイアウトです。本文、段階表示、補足欄から構成されます。下の選択から自由配置または入れ子のリッチ構成を開始できます。</p>`;
   const componentCount = sceneNodes.length + canvasBlocks.length;
+  const componentTreeActions = sceneNodes.some((node) => node.parent_id !== null)
+    ? '<div class="component-search-actions"><button class="ghost" type="button" data-component-tree-expand-all>すべて展開</button><button class="ghost" type="button" data-component-tree-collapse-all>まとまりを折りたたむ</button></div>'
+    : "";
   const componentSearch = componentCount === 0
     ? ""
-    : `<label class="component-search">構成を絞り込む<span class="component-search-row"><input type="search" data-component-search placeholder="ID・種類・階層" autocomplete="off"><output data-component-search-count aria-live="polite">${componentCount} / ${componentCount}件</output></span></label><p class="filmstrip-empty" data-component-search-empty hidden>一致する表示パーツはありません。</p>`;
+    : `<label class="component-search">構成を絞り込む<span class="component-search-row"><input type="search" data-component-search placeholder="ID・種類・階層" autocomplete="off"><output data-component-search-count aria-live="polite">${componentCount} / ${componentCount}件</output></span></label>${componentTreeActions}<p class="filmstrip-empty" data-component-search-empty hidden>一致する表示パーツはありません。</p>`;
   const modeNote =
     slide.composition?.mode === "scene"
       ? "登録済みの表示パーツで構成されています。AIから一件ずつ構造を編集でき、この画面では内容、並び方、表示STEP、アニメーション、画像、配色、余白、文字倍率を実表示で調整できます。"

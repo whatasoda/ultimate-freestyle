@@ -1038,6 +1038,10 @@ describe("presentation artifact renderer", () => {
     expect(gridWorkspaceHtml).toContain('data-component-tree-item="content-grid"');
     expect(gridWorkspaceHtml).toContain('data-component-tree-toggle="content-grid"');
     expect(gridWorkspaceHtml).toContain('aria-label="content-gridの子孫を折りたたむ"');
+    expect(gridWorkspaceHtml).toContain("すべて展開");
+    expect(gridWorkspaceHtml).toContain("まとまりを折りたたむ");
+    expect(gridWorkspaceHtml).toContain("現在地");
+    expect(gridWorkspaceHtml).toContain("content-grid");
     expect(workspaceHtml).toContain('data-workspace-asset-urls=');
     expect(workspaceHtml).not.toContain(' data-asset-urls=');
     expect(workspaceHtml).toContain("/components/comparison");

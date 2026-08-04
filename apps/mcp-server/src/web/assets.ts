@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "185";
+export const DASHBOARD_ASSET_VERSION = "186";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -2845,17 +2845,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   } catch {}
   const selectedTreeLink = document.querySelector('[data-component-select][aria-current="true"]');
   const selectedTreeItem = selectedTreeLink?.closest("[data-component-tree-item]");
-  const selectedTreeIndex = componentTreeItems.indexOf(selectedTreeItem);
-  if (selectedTreeIndex >= 0) {
-    let ancestorDepth = Number(selectedTreeItem.dataset.componentDepth || "0");
-    for (let index = selectedTreeIndex - 1; index >= 0 && ancestorDepth > 0; index -= 1) {
-      const candidate = componentTreeItems[index];
-      const candidateDepth = Number(candidate.dataset.componentDepth || "0");
-      if (candidateDepth >= ancestorDepth) continue;
-      collapsedComponentIds.delete(candidate.dataset.componentTreeItem || "");
-      ancestorDepth = candidateDepth;
+  const revealSelectedTreePath = () => {
+    const selectedTreeIndex = componentTreeItems.indexOf(selectedTreeItem);
+    if (selectedTreeIndex >= 0) {
+      let ancestorDepth = Number(selectedTreeItem.dataset.componentDepth || "0");
+      for (let index = selectedTreeIndex - 1; index >= 0 && ancestorDepth > 0; index -= 1) {
+        const candidate = componentTreeItems[index];
+        const candidateDepth = Number(candidate.dataset.componentDepth || "0");
+        if (candidateDepth >= ancestorDepth) continue;
+        collapsedComponentIds.delete(candidate.dataset.componentTreeItem || "");
+        ancestorDepth = candidateDepth;
+      }
     }
-  }
+  };
+  const persistComponentTreeCollapse = () => {
+    try { localStorage.setItem(componentTreeStorageKey, JSON.stringify([...collapsedComponentIds])); } catch {}
+  };
+  revealSelectedTreePath();
   const applyComponentTreeCollapse = () => {
     let collapsedDepth = null;
     for (const item of componentTreeItems) {
@@ -2883,11 +2889,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const id = button.dataset.componentTreeToggle || "";
       if (collapsedComponentIds.has(id)) collapsedComponentIds.delete(id);
       else collapsedComponentIds.add(id);
-      try { localStorage.setItem(componentTreeStorageKey, JSON.stringify([...collapsedComponentIds])); } catch {}
+      persistComponentTreeCollapse();
       const search = document.querySelector("[data-component-search]");
       if (!(search instanceof HTMLInputElement) || search.value.trim() === "") applyComponentTreeCollapse();
     });
   }
+  document.querySelector("[data-component-tree-expand-all]")?.addEventListener("click", () => {
+    collapsedComponentIds.clear();
+    persistComponentTreeCollapse();
+    const search = document.querySelector("[data-component-search]");
+    if (search instanceof HTMLInputElement && search.value.trim() !== "") search.dispatchEvent(new Event("input"));
+    else applyComponentTreeCollapse();
+  });
+  document.querySelector("[data-component-tree-collapse-all]")?.addEventListener("click", () => {
+    collapsedComponentIds.clear();
+    for (const button of document.querySelectorAll("[data-component-tree-toggle]")) {
+      if (button instanceof HTMLButtonElement) collapsedComponentIds.add(button.dataset.componentTreeToggle || "");
+    }
+    revealSelectedTreePath();
+    persistComponentTreeCollapse();
+    const search = document.querySelector("[data-component-search]");
+    if (search instanceof HTMLInputElement && search.value.trim() !== "") search.dispatchEvent(new Event("input"));
+    else applyComponentTreeCollapse();
+  });
   applyComponentTreeCollapse();
   const componentSearch = document.querySelector("[data-component-search]");
   const componentSearchCount = document.querySelector("[data-component-search-count]");
