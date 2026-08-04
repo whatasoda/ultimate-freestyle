@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "186";
+export const DASHBOARD_ASSET_VERSION = "187";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -1871,7 +1871,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const parentSelect = form.querySelector("[data-component-parent-select]");
     if (parentSelect instanceof HTMLSelectElement && frameToggle instanceof HTMLInputElement) {
       parentSelect.addEventListener("change", () => {
-        const parentKind = parentSelect.selectedOptions[0]?.dataset.parentKind || "root";
+        const selectedParent = parentSelect.selectedOptions[0];
+        const parentKind = selectedParent?.dataset.parentKind || "root";
+        const currentPath = form.querySelector("[data-component-current-path]");
+        if (currentPath instanceof HTMLElement) {
+          const parentPath = selectedParent?.dataset.parentPath || "";
+          currentPath.textContent = (parentPath ? parentPath + " › " : "") + (currentPath.dataset.componentId || "");
+        }
         if (parentKind === "stack" || parentKind === "grid") frameToggle.checked = false;
         if (parentKind === "layer") frameToggle.checked = true;
         if (parentKind !== "root") frameToggle.dispatchEvent(new Event("input", { bubbles: true }));

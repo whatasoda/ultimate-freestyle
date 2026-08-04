@@ -1284,24 +1284,27 @@ function sceneDescendantIds(nodeId: string, index: SceneHierarchyIndex): Set<str
 
 function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideSceneNode[], index: SceneHierarchyIndex): string {
   const descendants = sceneDescendantIds(node.id, index);
+  const nodesById = new Map(nodes.map((candidate) => [candidate.id, candidate]));
+  const pathTo = (target: SlideSceneNode): string[] => {
+    const result = [target.id];
+    const visited = new Set(result);
+    let parentId = target.parent_id;
+    while (parentId !== null && !visited.has(parentId)) {
+      result.unshift(parentId);
+      visited.add(parentId);
+      parentId = nodesById.get(parentId)?.parent_id ?? null;
+    }
+    return result;
+  };
   const parents = index.containerNodes
     .filter((candidate) => candidate.id !== node.id && !descendants.has(candidate.id))
-    .map((candidate) => `<option value="${escapeHtml(candidate.id)}" data-parent-kind="${candidate.kind}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
+    .map((candidate) => `<option value="${escapeHtml(candidate.id)}" data-parent-kind="${candidate.kind}" data-parent-path="${escapeHtml(pathTo(candidate).join(" › "))}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
     .join("");
   const siblings = index.siblingsByParentId.get(node.parent_id) ?? [];
   const siblingIndex = siblings.findIndex((candidate) => candidate.id === node.id);
-  const nodesById = new Map(nodes.map((candidate) => [candidate.id, candidate]));
-  const path = [node.id];
-  const visited = new Set(path);
-  let parentId = node.parent_id;
-  while (parentId !== null && !visited.has(parentId)) {
-    path.unshift(parentId);
-    visited.add(parentId);
-    parentId = nodesById.get(parentId)?.parent_id ?? null;
-  }
-  const currentPath = `<p class="component-current-path"><span>現在地</span><code>${path.map(escapeHtml).join(" › ")}</code></p>`;
+  const currentPath = `<p class="component-current-path"><span>現在地</span><code data-component-current-path data-component-id="${escapeHtml(node.id)}" aria-live="polite">${pathTo(node).map(escapeHtml).join(" › ")}</code></p>`;
   const moveNote = descendants.size > 0 ? ` このまとまりの子孫${descendants.size}件も一緒に移動します。` : "";
-  return `<fieldset><legend>階層と並び順</legend>${currentPath}<div class="editor-grid"><label>追加先<select name="parent_id" data-component-parent-select data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value="" data-parent-kind="root"${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。${moveNote}自分自身や子孫は追加先に選べません。</p></fieldset>`;
+  return `<fieldset><legend>階層と並び順</legend>${currentPath}<div class="editor-grid"><label>追加先<select name="parent_id" data-component-parent-select data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value="" data-parent-kind="root" data-parent-path=""${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。${moveNote}自分自身や子孫は追加先に選べません。</p></fieldset>`;
 }
 
 function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number): string {

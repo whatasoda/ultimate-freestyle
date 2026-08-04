@@ -1042,6 +1042,8 @@ describe("presentation artifact renderer", () => {
     expect(gridWorkspaceHtml).toContain("まとまりを折りたたむ");
     expect(gridWorkspaceHtml).toContain("現在地");
     expect(gridWorkspaceHtml).toContain("content-grid");
+    expect(gridWorkspaceHtml).toContain('data-component-current-path');
+    expect(gridWorkspaceHtml).toContain('data-parent-path="root"');
     expect(workspaceHtml).toContain('data-workspace-asset-urls=');
     expect(workspaceHtml).not.toContain(' data-asset-urls=');
     expect(workspaceHtml).toContain("/components/comparison");
