@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "187";
+export const DASHBOARD_ASSET_VERSION = "188";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -2851,6 +2851,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   } catch {}
   const selectedTreeLink = document.querySelector('[data-component-select][aria-current="true"]');
   const selectedTreeItem = selectedTreeLink?.closest("[data-component-tree-item]");
+  const componentTreeStatus = document.querySelector("[data-component-tree-status]");
+  const announceComponentTree = (message) => {
+    if (componentTreeStatus instanceof HTMLOutputElement) componentTreeStatus.value = message;
+  };
   const revealSelectedTreePath = () => {
     const selectedTreeIndex = componentTreeItems.indexOf(selectedTreeItem);
     if (selectedTreeIndex >= 0) {
@@ -2898,6 +2902,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       persistComponentTreeCollapse();
       const search = document.querySelector("[data-component-search]");
       if (!(search instanceof HTMLInputElement) || search.value.trim() === "") applyComponentTreeCollapse();
+      announceComponentTree(id + "を" + (collapsedComponentIds.has(id) ? "折りたたみました" : "展開しました"));
     });
   }
   document.querySelector("[data-component-tree-expand-all]")?.addEventListener("click", () => {
@@ -2906,6 +2911,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const search = document.querySelector("[data-component-search]");
     if (search instanceof HTMLInputElement && search.value.trim() !== "") search.dispatchEvent(new Event("input"));
     else applyComponentTreeCollapse();
+    announceComponentTree("すべてのまとまりを展開しました");
   });
   document.querySelector("[data-component-tree-collapse-all]")?.addEventListener("click", () => {
     collapsedComponentIds.clear();
@@ -2917,6 +2923,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const search = document.querySelector("[data-component-search]");
     if (search instanceof HTMLInputElement && search.value.trim() !== "") search.dispatchEvent(new Event("input"));
     else applyComponentTreeCollapse();
+    announceComponentTree(selectedTreeItem instanceof HTMLLIElement ? "選択中のパーツまでの経路を残して折りたたみました" : "すべてのまとまりを折りたたみました");
   });
   applyComponentTreeCollapse();
   const componentSearch = document.querySelector("[data-component-search]");

@@ -513,8 +513,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=187"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=187"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=188"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=188"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -966,7 +966,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=187"'
+      'href="/assets/dashboard.css?v=188"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1192,7 +1192,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=187"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=188"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1201,7 +1201,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=187"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=188"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1213,7 +1213,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=187", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=188", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1224,7 +1224,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=187", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=188", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1445,6 +1445,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("selectedTreeItem");
     expect(dashboardScriptText).toContain("data-component-tree-expand-all");
     expect(dashboardScriptText).toContain("data-component-tree-collapse-all");
+    expect(dashboardScriptText).toContain("data-component-tree-status");
+    expect(dashboardScriptText).toContain("announceComponentTree");
     expect(dashboardScriptText).toContain("revealSelectedTreePath");
     expect(dashboardScriptText).toContain("data-component-current-path");
     expect(dashboardScriptText).toContain("selectedParent?.dataset.parentPath");

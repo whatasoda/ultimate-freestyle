@@ -906,6 +906,7 @@ const DASHBOARD_STYLE = String.raw`
       .component-search-row input { min-width: 0; flex: 1; }
       .component-search-actions { display: flex; flex-wrap: wrap; gap: .35rem; margin: -.25rem 0 .65rem; }
       .component-search-actions button { min-height: 1.9rem; padding: .3rem .55rem; font-size: .7rem; }
+      .component-search-actions output { align-self: center; color: var(--muted); font-size: .7rem; }
       .component-current-path { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; margin: 0 0 .65rem; color: var(--muted); font-size: .72rem; }
       .component-current-path code { color: var(--ink); }
       .component-search-row output { min-width: 6.5rem; text-align: end; white-space: nowrap; }
@@ -1439,7 +1440,7 @@ function sceneComponentOutline(nodes: SlideSceneNode[], selectedId: string | nul
     if (!seen.has(node.id)) ordered.push({ node, depth: 0 });
   }
   const hierarchyIndex = createSceneHierarchyIndex(nodes);
-  return `<ul class="component-outline">${ordered.map(({ node, depth }) => {
+  return `<ul class="component-outline" id="component-outline">${ordered.map(({ node, depth }) => {
     const href = `${slidePath}?component=${encodeURIComponent(node.id)}`;
     const placement = node.frame === null || node.frame === undefined ? "自動配置" : "自由配置";
     const descendants = sceneDescendantIds(node.id, hierarchyIndex).size;
@@ -2797,7 +2798,7 @@ export function slideWorkspacePage(options: {
     slide.composition?.mode === "scene"
       ? sceneComponentOutline(slide.composition.nodes, selectedComponentId, currentSlideDashboardPath)
       : slide.composition?.mode === "canvas"
-        ? `<ul class="component-outline">${slide.composition.blocks
+        ? `<ul class="component-outline" id="component-outline">${slide.composition.blocks
             .map(
               (block) => `<li><a class="component-outline-row" data-component-select="${escapeHtml(block.id)}" href="${escapeHtml(`${currentSlideDashboardPath}?component=${encodeURIComponent(block.id)}`)}"${block.id === selectedComponentId ? ' aria-current="true"' : ""}><code>${escapeHtml(block.kind)}</code><span>${escapeHtml(block.id)}<small>x ${block.frame.x}% · y ${block.frame.y}%</small></span><span class="component-step">STEP ${block.at}</span></a></li>`
             )
@@ -2805,7 +2806,7 @@ export function slideWorkspacePage(options: {
         : `<p class="mode-note">定型レイアウトです。本文、段階表示、補足欄から構成されます。下の選択から自由配置または入れ子のリッチ構成を開始できます。</p>`;
   const componentCount = sceneNodes.length + canvasBlocks.length;
   const componentTreeActions = sceneNodes.some((node) => node.parent_id !== null)
-    ? '<div class="component-search-actions"><button class="ghost" type="button" data-component-tree-expand-all>すべて展開</button><button class="ghost" type="button" data-component-tree-collapse-all>まとまりを折りたたむ</button></div>'
+    ? '<div class="component-search-actions"><button class="ghost" type="button" data-component-tree-expand-all aria-controls="component-outline">すべて展開</button><button class="ghost" type="button" data-component-tree-collapse-all aria-controls="component-outline">まとまりを折りたたむ</button><output data-component-tree-status aria-live="polite"></output></div>'
     : "";
   const componentSearch = componentCount === 0
     ? ""

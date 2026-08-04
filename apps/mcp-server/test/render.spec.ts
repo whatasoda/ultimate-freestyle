@@ -1040,6 +1040,8 @@ describe("presentation artifact renderer", () => {
     expect(gridWorkspaceHtml).toContain('aria-label="content-gridの子孫を折りたたむ"');
     expect(gridWorkspaceHtml).toContain("すべて展開");
     expect(gridWorkspaceHtml).toContain("まとまりを折りたたむ");
+    expect(gridWorkspaceHtml).toContain('aria-controls="component-outline"');
+    expect(gridWorkspaceHtml).toContain('data-component-tree-status');
     expect(gridWorkspaceHtml).toContain("現在地");
     expect(gridWorkspaceHtml).toContain("content-grid");
     expect(gridWorkspaceHtml).toContain('data-component-current-path');
