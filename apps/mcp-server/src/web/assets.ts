@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "183";
+export const DASHBOARD_ASSET_VERSION = "184";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -2835,6 +2835,60 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       focusTarget.focus({ preventScroll: true });
     });
   }
+  const componentTreeItems = [...document.querySelectorAll("[data-component-tree-item]")]
+    .filter((item) => item instanceof HTMLLIElement);
+  const componentTreeStorageKey = "ultimate-freestyle:component-tree:" + location.pathname;
+  const collapsedComponentIds = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(componentTreeStorageKey) || "[]");
+    if (Array.isArray(saved)) for (const id of saved) collapsedComponentIds.add(String(id));
+  } catch {}
+  const selectedTreeLink = document.querySelector('[data-component-select][aria-current="true"]');
+  const selectedTreeItem = selectedTreeLink?.closest("[data-component-tree-item]");
+  const selectedTreeIndex = componentTreeItems.indexOf(selectedTreeItem);
+  if (selectedTreeIndex >= 0) {
+    let ancestorDepth = Number(selectedTreeItem.dataset.componentDepth || "0");
+    for (let index = selectedTreeIndex - 1; index >= 0 && ancestorDepth > 0; index -= 1) {
+      const candidate = componentTreeItems[index];
+      const candidateDepth = Number(candidate.dataset.componentDepth || "0");
+      if (candidateDepth >= ancestorDepth) continue;
+      collapsedComponentIds.delete(candidate.dataset.componentTreeItem || "");
+      ancestorDepth = candidateDepth;
+    }
+  }
+  const applyComponentTreeCollapse = () => {
+    let collapsedDepth = null;
+    for (const item of componentTreeItems) {
+      const depth = Number(item.dataset.componentDepth || "0");
+      if (collapsedDepth !== null && depth > collapsedDepth) {
+        item.hidden = true;
+        continue;
+      }
+      collapsedDepth = null;
+      item.hidden = false;
+      const id = item.dataset.componentTreeItem || "";
+      const button = item.querySelector("[data-component-tree-toggle]");
+      const collapsed = collapsedComponentIds.has(id);
+      if (button instanceof HTMLButtonElement) {
+        button.setAttribute("aria-expanded", String(!collapsed));
+        button.setAttribute("aria-label", id + "の子孫を" + (collapsed ? "展開する" : "折りたたむ"));
+        button.textContent = collapsed ? "▶" : "▼";
+      }
+      if (collapsed) collapsedDepth = depth;
+    }
+  };
+  for (const button of document.querySelectorAll("[data-component-tree-toggle]")) {
+    if (!(button instanceof HTMLButtonElement)) continue;
+    button.addEventListener("click", () => {
+      const id = button.dataset.componentTreeToggle || "";
+      if (collapsedComponentIds.has(id)) collapsedComponentIds.delete(id);
+      else collapsedComponentIds.add(id);
+      try { localStorage.setItem(componentTreeStorageKey, JSON.stringify([...collapsedComponentIds])); } catch {}
+      const search = document.querySelector("[data-component-search]");
+      if (!(search instanceof HTMLInputElement) || search.value.trim() === "") applyComponentTreeCollapse();
+    });
+  }
+  applyComponentTreeCollapse();
   const componentSearch = document.querySelector("[data-component-search]");
   const componentSearchCount = document.querySelector("[data-component-search-count]");
   const componentSearchEmpty = document.querySelector("[data-component-search-empty]");
@@ -2844,9 +2898,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       .filter((row) => row instanceof HTMLLIElement);
     const filterComponents = () => {
       const query = componentSearch.value.trim().toLocaleLowerCase("ja");
+      if (query.length === 0) {
+        applyComponentTreeCollapse();
+        componentSearchCount.value = componentRows.length + " / " + componentRows.length + "件";
+        if (componentSearchEmpty instanceof HTMLElement) componentSearchEmpty.hidden = componentRows.length !== 0;
+        return;
+      }
       let visible = 0;
       for (const row of componentRows) {
-        const matches = query.length === 0 || (row.textContent || "").toLocaleLowerCase("ja").includes(query);
+        const matches = (row.textContent || "").toLocaleLowerCase("ja").includes(query);
         row.hidden = !matches;
         if (matches) visible += 1;
       }

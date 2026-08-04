@@ -67,7 +67,7 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 - 内容: \`update_slide_component_content\` で本文、数値、variant、layout固有値のうち一項目だけを更新する。長文は\`text_edit.replace_once\`で現在の短い部分だけを置換する。
 - data item: \`edit_slide_data_item\` でbar chartまたはtimelineの項目を一件ずつ追加、更新、移動、削除する。
 - 配置・見た目の調整: \`update_slide_component\`。本文を再送せず、\`layout\`で親、順番、step、animation、frameを、\`style\`で指定した見た目だけを部分更新する。
-- 削除: \`delete_slide_component\`。通常は\`include_descendants: false\`の安全な削除を使う。ユーザーがまとまり全体の削除を明示した場合だけ\`include_descendants: true\`にしてrootと全子孫を一括削除する。
+- 複製・削除: \`edit_slide_component_tree\`。\`action: duplicate\`は親参照を付け替えた独立したまとまりとして全子孫を複製し、新しいroot IDと対象件数を返す。\`action: delete\`は通常\`include_descendants: false\`を使い、ユーザーがまとまり全体の削除を明示した場合だけ\`true\`にする。
 
 ## 内容field
 

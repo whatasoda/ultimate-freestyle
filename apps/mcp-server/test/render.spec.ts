@@ -1035,6 +1035,9 @@ describe("presentation artifact renderer", () => {
     expect(gridWorkspaceHtml).toContain("子孫2件も一緒に移動します");
     expect(gridWorkspaceHtml).toContain('data-component-parent-select');
     expect(gridWorkspaceHtml).toContain('data-parent-kind="stack"');
+    expect(gridWorkspaceHtml).toContain('data-component-tree-item="content-grid"');
+    expect(gridWorkspaceHtml).toContain('data-component-tree-toggle="content-grid"');
+    expect(gridWorkspaceHtml).toContain('aria-label="content-gridの子孫を折りたたむ"');
     expect(workspaceHtml).toContain('data-workspace-asset-urls=');
     expect(workspaceHtml).not.toContain(' data-asset-urls=');
     expect(workspaceHtml).toContain("/components/comparison");

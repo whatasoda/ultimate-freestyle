@@ -890,6 +890,10 @@ const DASHBOARD_STYLE = String.raw`
       .step-control output { min-width: 6rem; color: var(--muted); text-align: center; font: 700 .8rem/1 ui-monospace, monospace; }
       .component-outline { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
       .component-outline li { overflow: hidden; border: 1px solid var(--line); border-radius: .55rem; color: #bdc9d8; font-size: .8rem; }
+      .component-outline-item { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: stretch; }
+      .component-tree-toggle, .component-tree-spacer { align-self: center; width: 1.55rem; height: 1.55rem; margin-left: calc(.25rem + var(--component-indent, 0rem)); }
+      .component-tree-toggle { min-height: 0; padding: 0; border: 0; border-radius: .4rem; background: transparent; color: var(--muted); font-size: .75rem; }
+      .component-tree-toggle:hover { background: #8062df24; color: var(--ink); }
       .component-outline-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .55rem; align-items: center; padding: .55rem .55rem .55rem calc(.55rem + var(--component-indent, 0rem)); }
       a.component-outline-row { color: inherit; text-decoration: none; }
       a.component-outline-row:hover, a.component-outline-row[aria-current="true"] { background: #8062df24; color: white; }
@@ -1423,7 +1427,11 @@ function sceneComponentOutline(nodes: SlideSceneNode[], selectedId: string | nul
     const placement = node.frame === null || node.frame === undefined ? "自動配置" : "自由配置";
     const descendants = sceneDescendantIds(node.id, hierarchyIndex).size;
     const groupLabel = descendants > 0 ? ` · 子孫 ${descendants}件` : "";
-    return `<li><a class="component-outline-row" data-component-select="${escapeHtml(node.id)}" data-component-depth="${depth}" data-component-descendant-count="${descendants}" href="${escapeHtml(href)}" style="--component-indent:${Math.min(depth, 8) * 0.5}rem"${node.id === selectedId ? ' aria-current="true"' : ""}><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>階層 ${depth} · ${placement}${groupLabel}</small></span><span class="component-step">STEP ${node.at}</span></a></li>`;
+    const indent = `${Math.min(depth, 8) * 0.5}rem`;
+    const disclosure = descendants > 0
+      ? `<button class="component-tree-toggle" type="button" data-component-tree-toggle="${escapeHtml(node.id)}" aria-expanded="true" aria-label="${escapeHtml(node.id)}の子孫を折りたたむ">▼</button>`
+      : '<span class="component-tree-spacer" aria-hidden="true"></span>';
+    return `<li data-component-tree-item="${escapeHtml(node.id)}" data-component-depth="${depth}"><div class="component-outline-item" style="--component-indent:${indent}">${disclosure}<a class="component-outline-row" data-component-select="${escapeHtml(node.id)}" data-component-depth="${depth}" data-component-descendant-count="${descendants}" href="${escapeHtml(href)}"${node.id === selectedId ? ' aria-current="true"' : ""}><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>階層 ${depth} · ${placement}${groupLabel}</small></span><span class="component-step">STEP ${node.at}</span></a></div></li>`;
   }).join("")}</ul>`;
 }
 

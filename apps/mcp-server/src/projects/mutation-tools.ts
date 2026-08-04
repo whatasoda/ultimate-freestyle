@@ -63,6 +63,7 @@ import {
 } from "./scene-patterns";
 import {
   deleteSceneSubtree,
+  duplicateSceneSubtree,
   sceneFrameForParent,
   SceneTreeOperationError
 } from "./scene-tree";
@@ -80,6 +81,12 @@ const mutationOutput = {
   error: z
     .object({ code: z.string(), message: z.string() })
     .nullable()
+};
+
+const componentTreeOutput = {
+  ...mutationOutput,
+  result_component_id: z.string().nullable(),
+  affected_component_count: z.number().int().nonnegative().nullable()
 };
 
 const narrationVoiceCueInputSchema = z.object({
@@ -429,6 +436,7 @@ type MutationContext = {
   changedKind: string;
   changedId?: string | null;
   mutate: (document: ProjectDocument) => void;
+  successDetails?: () => Record<string, unknown>;
 };
 
 async function executeMutation(
@@ -456,7 +464,7 @@ async function executeMutation(
       },
       createdAt: new Date().toISOString()
     });
-    return mutationSuccess(requestId, project);
+    return mutationSuccess(requestId, project, context.successDetails?.());
   } catch (error) {
     const normalized = normalizeProjectToolError(error);
     return toolResult(
@@ -474,14 +482,16 @@ async function executeMutation(
 
 function mutationSuccess(
   requestId: string,
-  project: ProjectRecord
+  project: ProjectRecord,
+  details: Record<string, unknown> = {}
 ) {
   return toolResult({
     ok: true,
     request_id: requestId,
     version: project.version,
     current_version: null,
-    error: null
+    error: null,
+    ...details
   });
 }
 
@@ -2146,7 +2156,7 @@ export function registerProjectMutationTools(
     {
       title: "scene componentの内容を一項目更新",
       description:
-        "内容を一項目だけ更新します。短い値はvalue、長文の部分編集はtext_edit、配置と共通styleはupdate_slide_componentを使います。",
+        "一項目を更新します。長文はtext_edit、配置とstyleはupdate_slide_componentを使います。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
@@ -2417,18 +2427,19 @@ export function registerProjectMutationTools(
   );
 
   server.registerTool(
-    "delete_slide_component",
+    "edit_slide_component_tree",
     {
-      title: "scene componentを削除",
+      title: "sceneのまとまりを複製・削除",
       description:
-        "一件を削除します。子も含める場合だけinclude_descendantsをtrueにします。",
+        "一件を複製または削除します。複製は子孫を含みます。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
         component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        action: z.enum(["duplicate", "delete"]),
         include_descendants: z.boolean().default(false)
       },
-      outputSchema: mutationOutput,
+      outputSchema: componentTreeOutput,
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
@@ -2436,11 +2447,15 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, component_id, include_descendants }) =>
-      executeMutation(db, getAuthProps, {
+    async ({ project_id, expected_version, slide_id, component_id, action, include_descendants }) => {
+      let resultComponentId: string | null = null;
+      let affectedComponentCount: number | null = null;
+      return executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
-        changedKind: "slide_component_deleted",
+        changedKind: action === "duplicate"
+          ? "slide_component_duplicated"
+          : "slide_component_deleted",
         changedId: `${slide_id}:${component_id}`,
         mutate: (document) => {
           const slide = findSlide(document, slide_id);
@@ -2450,6 +2465,29 @@ export function registerProjectMutationTools(
               "This slide does not use a component scene."
             );
           }
+          if (action === "duplicate") {
+            try {
+              const duplicated = duplicateSceneSubtree(
+                slide.composition.nodes,
+                component_id
+              );
+              slide.composition.nodes = duplicated.nodes;
+              resultComponentId = duplicated.rootCopyId;
+              affectedComponentCount = duplicated.copiedIds.length;
+            } catch (error) {
+              if (error instanceof SceneTreeOperationError) {
+                throw new ProjectToolError(
+                  error.message.includes("does not exist")
+                    ? "COMPONENT_NOT_FOUND"
+                    : "INVALID_CHANGE",
+                  error.message
+                );
+              }
+              throw error;
+            }
+            recalculateSlideRevealSteps(slide);
+            return;
+          }
           if (!slide.composition.nodes.some((node) => node.id === component_id)) {
             throw new ProjectToolError(
               "COMPONENT_NOT_FOUND",
@@ -2458,10 +2496,12 @@ export function registerProjectMutationTools(
           }
           if (include_descendants) {
             try {
-              slide.composition.nodes = deleteSceneSubtree(
+              const deleted = deleteSceneSubtree(
                 slide.composition.nodes,
                 component_id
-              ).nodes;
+              );
+              slide.composition.nodes = deleted.nodes;
+              affectedComponentCount = deleted.deletedIds.length;
             } catch (error) {
               if (error instanceof SceneTreeOperationError) {
                 throw new ProjectToolError("INVALID_CHANGE", error.message);
@@ -2480,9 +2520,15 @@ export function registerProjectMutationTools(
           slide.composition.nodes = slide.composition.nodes.filter(
             (node) => node.id !== component_id
           );
+          affectedComponentCount = 1;
           recalculateSlideRevealSteps(slide);
-        }
-      })
+        },
+        successDetails: () => ({
+          result_component_id: resultComponentId,
+          affected_component_count: affectedComponentCount
+        })
+      });
+    }
   );
 
   server.registerTool(
