@@ -66,6 +66,7 @@ import {
   ReviewServiceError
 } from "../reviews/service";
 import {
+  compositionRevealPositions,
   narrationSegmentSchema,
   presentationTemplateSchema,
   projectSlideSchema,
@@ -3101,9 +3102,7 @@ async function handleSceneComponentAction(
           const deleted = deleteSceneSubtree(slide.composition.nodes, componentId);
           slide.composition.nodes = deleted.nodes;
           affectedComponentCount = deleted.deletedIds.length;
-          return;
-        }
-        if (parsed.data.action === "delete") {
+        } else if (parsed.data.action === "delete") {
           if (slide.composition.nodes.some((node) => node.parent_id === componentId)) {
             const error = new Error("The component still has children.");
             Object.assign(error, { code: "COMPONENT_HAS_CHILDREN" });
@@ -3111,12 +3110,18 @@ async function handleSceneComponentAction(
           }
           slide.composition.nodes.splice(index, 1);
           affectedComponentCount = 1;
-          return;
+        } else {
+          const duplicated = duplicateSceneSubtree(slide.composition.nodes, componentId);
+          slide.composition.nodes = duplicated.nodes;
+          resultComponentId = duplicated.rootCopyId;
+          affectedComponentCount = duplicated.copiedIds.length;
         }
-        const duplicated = duplicateSceneSubtree(slide.composition.nodes, componentId);
-        slide.composition.nodes = duplicated.nodes;
-        resultComponentId = duplicated.rootCopyId;
-        affectedComponentCount = duplicated.copiedIds.length;
+        slide.reveal_steps = Math.max(
+          ...slide.reveal_blocks.map((block) => block.at),
+          ...(slide.narration?.segments.map((segment) => segment.at) ?? []),
+          ...compositionRevealPositions(slide.composition),
+          0
+        );
       }
     });
     await recordWebAudit(env.DB, {

@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "184";
+export const DASHBOARD_ASSET_VERSION = "185";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -2904,14 +2904,28 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (componentSearchEmpty instanceof HTMLElement) componentSearchEmpty.hidden = componentRows.length !== 0;
         return;
       }
-      let visible = 0;
-      for (const row of componentRows) {
-        const matches = (row.textContent || "").toLocaleLowerCase("ja").includes(query);
-        row.hidden = !matches;
-        if (matches) visible += 1;
+      const matchingRows = componentRows.filter((row) =>
+        (row.textContent || "").toLocaleLowerCase("ja").includes(query)
+      );
+      const contextualRows = new Set(matchingRows);
+      for (const row of matchingRows) {
+        const treeItem = row.closest("[data-component-tree-item]");
+        const treeIndex = componentTreeItems.indexOf(treeItem);
+        if (treeIndex < 0) continue;
+        let ancestorDepth = Number(treeItem.dataset.componentDepth || "0");
+        for (let index = treeIndex - 1; index >= 0 && ancestorDepth > 0; index -= 1) {
+          const candidate = componentTreeItems[index];
+          const candidateDepth = Number(candidate.dataset.componentDepth || "0");
+          if (candidateDepth >= ancestorDepth) continue;
+          contextualRows.add(candidate);
+          ancestorDepth = candidateDepth;
+        }
       }
-      componentSearchCount.value = visible + " / " + componentRows.length + "件";
-      if (componentSearchEmpty instanceof HTMLElement) componentSearchEmpty.hidden = visible !== 0;
+      for (const row of componentRows) {
+        row.hidden = !contextualRows.has(row);
+      }
+      componentSearchCount.value = matchingRows.length + " / " + componentRows.length + "件";
+      if (componentSearchEmpty instanceof HTMLElement) componentSearchEmpty.hidden = matchingRows.length !== 0;
     };
     componentSearch.addEventListener("input", filterComponents);
     filterComponents();

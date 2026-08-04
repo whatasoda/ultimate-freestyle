@@ -513,8 +513,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=184"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=184"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=185"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=185"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -966,7 +966,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=184"'
+      'href="/assets/dashboard.css?v=185"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1192,7 +1192,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=184"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=185"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1201,7 +1201,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=184"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=185"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1213,7 +1213,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=184", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=185", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1224,7 +1224,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=184", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=185", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1443,7 +1443,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("ultimate-freestyle:component-tree:");
     expect(dashboardScriptText).toContain("applyComponentTreeCollapse");
     expect(dashboardScriptText).toContain("selectedTreeItem");
-    expect(dashboardScriptText).toContain('row.hidden = !matches');
+    expect(dashboardScriptText).toContain('row.hidden = !contextualRows.has(row)');
+    expect(dashboardScriptText).toContain("matchingRows");
     expect(dashboardScriptText).toContain('sessionStorage.removeItem(form.dataset.draftKey)');
     expect(dashboardScriptText).toContain('Number(link.dataset.narrationSelect) !== deletedAt');
     expect(dashboardScriptText).toContain("data-narration-search");
@@ -3326,9 +3327,21 @@ describe("Web dashboard", () => {
     const duplicatedSceneDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
-    const duplicatedNodes = JSON.parse(duplicatedSceneDocument!.document_json).deck.slides[0].composition.nodes;
+    const duplicatedProjectDocument = JSON.parse(duplicatedSceneDocument!.document_json);
+    const duplicatedSlide = duplicatedProjectDocument.deck.slides[0];
+    const duplicatedNodes = duplicatedSlide.composition.nodes;
     expect(duplicatedNodes.find((node: { id: string }) => node.id === "stack-1-copy")).toMatchObject({ kind: "stack", parent_id: null });
     expect(duplicatedNodes.find((node: { id: string }) => node.id === "markdown-1-copy")).toMatchObject({ kind: "markdown", parent_id: "stack-1-copy" });
+    duplicatedSlide.reveal_blocks = [];
+    for (const segment of duplicatedSlide.narration?.segments ?? []) segment.at = 0;
+    for (const node of duplicatedNodes) {
+      node.at = node.id === "stack-1-copy" || node.parent_id === "stack-1-copy" ? 5 : 0;
+      for (const item of node.items ?? []) item.at = 0;
+    }
+    duplicatedSlide.reveal_steps = 5;
+    await env.DB.prepare(
+      "UPDATE research_projects SET document_json = ? WHERE id = ?"
+    ).bind(JSON.stringify(duplicatedProjectDocument), "10000000-0000-4000-8000-000000000001").run();
     const deleteSceneTree = await requestProvider(
       provider,
       new Request(
@@ -3348,6 +3361,10 @@ describe("Web dashboard", () => {
       result_component_id: null,
       affected_component_count: 2
     });
+    const afterTreeDeleteDocument = await env.DB.prepare(
+      "SELECT document_json FROM research_projects WHERE id = ?"
+    ).bind("10000000-0000-4000-8000-000000000001").first<{ document_json: string }>();
+    expect(JSON.parse(afterTreeDeleteDocument!.document_json).deck.slides[0].reveal_steps).toBe(0);
     const moveSceneChild = await requestProvider(
       provider,
       new Request(
