@@ -61,6 +61,11 @@ import {
   ScenePatternPlanError,
   scenePatternSchema
 } from "./scene-patterns";
+import {
+  deleteSceneSubtree,
+  sceneFrameForParent,
+  SceneTreeOperationError
+} from "./scene-tree";
 
 const projectIdInput = {
   project_id: z.string().uuid(),
@@ -2381,15 +2386,26 @@ export function registerProjectMutationTools(
             );
           }
           const component = findSceneComponent(document, slide_id, component_id);
-          if (layout?.parent_id !== undefined) component.parent_id = layout.parent_id;
+          const slide = findSlide(document, slide_id);
+          if (layout !== undefined) {
+            const targetParentId = layout.parent_id !== undefined
+              ? layout.parent_id
+              : component.parent_id;
+            const targetParent = targetParentId === null || slide.composition?.mode !== "scene"
+              ? undefined
+              : slide.composition.nodes.find((node) => node.id === targetParentId);
+            component.parent_id = targetParentId;
+            component.frame = sceneFrameForParent(
+              layout.frame !== undefined ? layout.frame : component.frame,
+              targetParent?.kind ?? null
+            );
+          }
           if (layout?.order !== undefined) component.order = layout.order;
           if (layout?.at !== undefined) component.at = layout.at;
           if (layout?.animation !== undefined) component.animation = layout.animation;
-          if (layout?.frame !== undefined) component.frame = layout.frame;
           if (style !== undefined) {
             component.style = replace_style ? style : { ...component.style, ...style };
           }
-          const slide = findSlide(document, slide_id);
           if (slide.composition?.mode === "scene") {
             slide.composition.nodes.sort(
               (left, right) => left.order - right.order || left.id.localeCompare(right.id)
@@ -2405,11 +2421,12 @@ export function registerProjectMutationTools(
     {
       title: "scene componentを削除",
       description:
-        "子を持たないcomponentを一件削除します。子がある場合は先に子を削除または移動してください。",
+        "一件を削除します。子も含める場合だけinclude_descendantsをtrueにします。",
       inputSchema: {
         ...projectIdInput,
         slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
-        component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
+        component_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+        include_descendants: z.boolean().default(false)
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -2419,7 +2436,7 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, slide_id, component_id }) =>
+    async ({ project_id, expected_version, slide_id, component_id, include_descendants }) =>
       executeMutation(db, getAuthProps, {
         projectId: project_id,
         expectedVersion: expected_version,
@@ -2438,6 +2455,21 @@ export function registerProjectMutationTools(
               "COMPONENT_NOT_FOUND",
               "The slide component does not exist."
             );
+          }
+          if (include_descendants) {
+            try {
+              slide.composition.nodes = deleteSceneSubtree(
+                slide.composition.nodes,
+                component_id
+              ).nodes;
+            } catch (error) {
+              if (error instanceof SceneTreeOperationError) {
+                throw new ProjectToolError("INVALID_CHANGE", error.message);
+              }
+              throw error;
+            }
+            recalculateSlideRevealSteps(slide);
+            return;
           }
           if (slide.composition.nodes.some((node) => node.parent_id === component_id)) {
             throw new ProjectToolError(

@@ -181,7 +181,7 @@ export const sceneComponentRequestSchema = z.object({
 
 export const sceneComponentActionRequestSchema = z.object({
   expected_version: z.number().int().positive(),
-  action: z.enum(["duplicate", "delete"])
+  action: z.enum(["duplicate", "delete", "delete_tree"])
 });
 
 export const sceneComponentItemActionRequestSchema = z.discriminatedUnion(

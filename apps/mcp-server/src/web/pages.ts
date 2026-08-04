@@ -604,6 +604,8 @@ const DASHBOARD_STYLE = String.raw`
       .assembly-pattern span { display: grid; gap: .2rem; min-width: 0; }
       .assembly-pattern strong { color: var(--ink); font-size: .84rem; }
       .assembly-pattern small { color: var(--muted); font-size: .72rem; line-height: 1.5; }
+      .operation-summary { display: flex; flex-wrap: wrap; gap: .35rem .65rem; align-items: baseline; margin: 0; padding: .65rem .75rem; border-left: 3px solid var(--accent); background: #0c1724; color: var(--muted); font-size: .8rem; }
+      .operation-summary strong { color: var(--ink); }
       .markdown-toolbar { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: -.55rem; }
       .markdown-toolbar button { min-height: 2rem; padding: .35rem .55rem; font-size: .75rem; }
       .visual-picker { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.2rem, 1fr)); gap: .45rem; }
@@ -1260,22 +1262,28 @@ function createSceneHierarchyIndex(nodes: SlideSceneNode[]): SceneHierarchyIndex
   };
 }
 
-function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideSceneNode[], index: SceneHierarchyIndex): string {
+function sceneDescendantIds(nodeId: string, index: SceneHierarchyIndex): Set<string> {
   const descendants = new Set<string>();
-  const pending = [...(index.childrenByParentId.get(node.id) ?? [])];
+  const pending = [...(index.childrenByParentId.get(nodeId) ?? [])];
   while (pending.length > 0) {
     const child = pending.pop();
     if (child === undefined || descendants.has(child.id)) continue;
     descendants.add(child.id);
     pending.push(...(index.childrenByParentId.get(child.id) ?? []));
   }
+  return descendants;
+}
+
+function sceneComponentHierarchyControls(node: SlideSceneNode, nodes: SlideSceneNode[], index: SceneHierarchyIndex): string {
+  const descendants = sceneDescendantIds(node.id, index);
   const parents = index.containerNodes
     .filter((candidate) => candidate.id !== node.id && !descendants.has(candidate.id))
-    .map((candidate) => `<option value="${escapeHtml(candidate.id)}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
+    .map((candidate) => `<option value="${escapeHtml(candidate.id)}" data-parent-kind="${candidate.kind}"${candidate.id === node.parent_id ? " selected" : ""}>${escapeHtml(candidate.id)} · ${candidate.kind}</option>`)
     .join("");
   const siblings = index.siblingsByParentId.get(node.parent_id) ?? [];
   const siblingIndex = siblings.findIndex((candidate) => candidate.id === node.id);
-  return `<fieldset><legend>階層と並び順</legend><div class="editor-grid"><label>追加先<select name="parent_id" data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value=""${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。自分自身や子孫は追加先に選べません。</p></fieldset>`;
+  const moveNote = descendants.size > 0 ? ` このまとまりの子孫${descendants.size}件も一緒に移動します。` : "";
+  return `<fieldset><legend>階層と並び順</legend><div class="editor-grid"><label>追加先<select name="parent_id" data-component-parent-select data-component-field data-component-path="parent_id" data-component-number="false" data-nullable="true"><option value="" data-parent-kind="root"${node.parent_id === null ? " selected" : ""}>スライド直下</option>${parents}</select></label><label>並び位置<input name="order" data-component-field data-component-path="order" data-component-number="true" data-nullable="false" type="number" min="0" max="${Math.max(0, nodes.length - 1)}" value="${node.order}"></label></div><div class="actions"><button class="ghost" type="button" data-component-order="${siblingIndex - 1}"${siblingIndex <= 0 ? " disabled" : ""}>↑ 前へ</button><button class="ghost" type="button" data-component-order="${siblingIndex + 1}"${siblingIndex === -1 || siblingIndex >= siblings.length - 1 ? " disabled" : ""}>↓ 後へ</button></div><p class="inherit-note">0が先頭です。追加先を変えると、その領域の指定位置へ移動します。${moveNote}自分自身や子孫は追加先に選べません。</p></fieldset>`;
 }
 
 function sceneComponentAppearanceControls(node: SlideSceneNode, maxStep: number): string {
@@ -1409,10 +1417,13 @@ function sceneComponentOutline(nodes: SlideSceneNode[], selectedId: string | nul
   for (const node of nodes) {
     if (!seen.has(node.id)) ordered.push({ node, depth: 0 });
   }
+  const hierarchyIndex = createSceneHierarchyIndex(nodes);
   return `<ul class="component-outline">${ordered.map(({ node, depth }) => {
     const href = `${slidePath}?component=${encodeURIComponent(node.id)}`;
     const placement = node.frame === null || node.frame === undefined ? "自動配置" : "自由配置";
-    return `<li><a class="component-outline-row" data-component-select="${escapeHtml(node.id)}" data-component-depth="${depth}" href="${escapeHtml(href)}" style="--component-indent:${Math.min(depth, 8) * 0.5}rem"${node.id === selectedId ? ' aria-current="true"' : ""}><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>階層 ${depth} · ${placement}</small></span><span class="component-step">STEP ${node.at}</span></a></li>`;
+    const descendants = sceneDescendantIds(node.id, hierarchyIndex).size;
+    const groupLabel = descendants > 0 ? ` · 子孫 ${descendants}件` : "";
+    return `<li><a class="component-outline-row" data-component-select="${escapeHtml(node.id)}" data-component-depth="${depth}" data-component-descendant-count="${descendants}" href="${escapeHtml(href)}" style="--component-indent:${Math.min(depth, 8) * 0.5}rem"${node.id === selectedId ? ' aria-current="true"' : ""}><code>uf-${escapeHtml(node.kind.replaceAll("_", "-"))}</code><span>${escapeHtml(node.id)}<small>階層 ${depth} · ${placement}${groupLabel}</small></span><span class="component-step">STEP ${node.at}</span></a></li>`;
   }).join("")}</ul>`;
 }
 
@@ -2784,11 +2795,13 @@ export function slideWorkspacePage(options: {
     : [selectedSceneNode]
         .map((node) => {
           const fields = sceneTextFields(node);
+          const descendantCount = sceneDescendantIds(node.id, sceneHierarchyIndex).size;
+          const affectedCount = descendantCount + 1;
           const hierarchyControls = sceneComponentHierarchyControls(node, sceneNodes, sceneHierarchyIndex);
           const controls = sceneComponentContentControls(node, slide.reveal_steps);
           const kindControls = sceneComponentKindControls(node, options.assets ?? []);
           const appearanceControls = sceneComponentAppearanceControls(node, slide.reveal_steps);
-          return `<details class="component-detail" open><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${hierarchyControls}${controls}${kindControls}${appearanceControls}<div class="actions"><button type="submit">この表示パーツを保存</button><button class="ghost" type="button" data-scene-component-action="duplicate" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">複製</button><button class="ghost danger" type="button" data-scene-component-action="delete" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+          return `<details class="component-detail" open><summary>${escapeHtml(node.id)} · uf-${escapeHtml(node.kind.replaceAll("_", "-"))} の${fields.length > 0 ? "内容と見た目" : "見た目"}</summary><form class="editor" data-scene-component-editor data-component-id="${escapeHtml(node.id)}" data-versioned-form action="${slidePath}/components/${escapeHtml(node.id)}" data-version="${options.project.version}" data-component="${escapeHtml(JSON.stringify(node))}" data-csrf="${escapeHtml(options.csrfToken)}">${hierarchyControls}${controls}${kindControls}${appearanceControls}${descendantCount > 0 ? `<p class="operation-summary"><strong>まとまりとして操作</strong><span>このパーツと子孫 ${descendantCount}件を一緒に扱います。</span></p>` : ""}<div class="actions"><button type="submit">この表示パーツを保存</button><button class="ghost" type="button" data-scene-component-action="duplicate" data-affected-count="${affectedCount}" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">${descendantCount > 0 ? `まとまりを複製（${affectedCount}パーツ）` : "複製"}</button><button class="ghost danger" type="button" data-scene-component-action="${descendantCount > 0 ? "delete_tree" : "delete"}" data-affected-count="${affectedCount}" data-action-url="${slidePath}/components/${escapeHtml(node.id)}/actions">${descendantCount > 0 ? `まとまりごと削除（${affectedCount}パーツ）` : "削除"}</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
         })
         .join("");
   const sceneComponentCreate = slide.composition?.mode === "scene"

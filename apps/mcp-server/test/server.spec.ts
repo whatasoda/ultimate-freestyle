@@ -293,7 +293,7 @@ describe("MCP contract", () => {
       expect(componentGuide.contents).toContainEqual(
         expect.objectContaining({
           mimeType: "text/markdown",
-          text: expect.stringContaining("子を移動または削除してから親を削除する")
+          text: expect.stringContaining("明示した場合だけ`include_descendants: true`")
         })
       );
       const styleGuide = await client.readResource({
@@ -1493,13 +1493,41 @@ describe("MCP contract", () => {
           parent_id: "research-summary-items"
         }
       });
+      const deletedPattern = await client.callTool({
+        name: "delete_slide_component",
+        arguments: {
+          project_id: firstProject.project_id,
+          expected_version: 20,
+          slide_id: "question",
+          component_id: "research-summary",
+          include_descendants: true
+        }
+      });
+      expect(deletedPattern.structuredContent).toMatchObject({
+        ok: true,
+        version: 21
+      });
+      const elementsAfterPatternDelete = await readJsonResource(
+        client,
+        `research://projects/${firstProject.project_id}/slides/question/elements/pages/1`
+      ) as { items: unknown[] };
+      expect(elementsAfterPatternDelete).toMatchObject({
+        version: 21,
+        total_items: 3
+      });
+      expect(elementsAfterPatternDelete.items).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: "research-summary" }),
+          expect.objectContaining({ id: "research-summary-evidence" })
+        ])
+      );
       const revisions = await readJsonResource(
         client,
         `research://projects/${firstProject.project_id}/revisions`
       );
       expect(revisions).toMatchObject({
         ok: true,
-        current_version: 20,
+        current_version: 21,
         retention: {
           maximum_versions: 50,
           guaranteed_recent_versions: 10,
@@ -1510,22 +1538,22 @@ describe("MCP contract", () => {
           current_project_uri: `research://projects/${firstProject.project_id}`
         },
         revisions: expect.arrayContaining([
-          expect.objectContaining({ version: 20, source: "edit" }),
-          expect.objectContaining({ version: 19, source: "edit" })
+          expect.objectContaining({ version: 21, source: "edit" }),
+          expect.objectContaining({ version: 20, source: "edit" })
         ])
       });
       const restoredDraft = await client.callTool({
         name: "restore_draft_revision",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 20,
+          expected_version: 21,
           target_version: 1
         }
       });
       expect(restoredDraft.structuredContent).toMatchObject({
         ok: true,
-        version: 21,
-        current_version: 21,
+        version: 22,
+        current_version: 22,
         restored_from_version: 1
       });
       const editableLogId = "44000000-0000-4000-8000-000000000044";
@@ -1533,7 +1561,7 @@ describe("MCP contract", () => {
         name: "edit_research_log",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 21,
+          expected_version: 22,
           entry: {
             id: editableLogId,
             occurred_at: now,
@@ -1545,19 +1573,19 @@ describe("MCP contract", () => {
       });
       expect(addedLog.structuredContent).toMatchObject({
         ok: true,
-        version: 22
+        version: 23
       });
       const deletedLog = await client.callTool({
         name: "edit_research_log",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 22,
+          expected_version: 23,
           delete_entry_id: editableLogId
         }
       });
       expect(deletedLog.structuredContent).toMatchObject({
         ok: true,
-        version: 23
+        version: 24
       });
       const afterLogDelete = await readJsonResource(
         client,
@@ -1568,7 +1596,7 @@ describe("MCP contract", () => {
         name: "edit_research_log",
         arguments: {
           project_id: firstProject.project_id,
-          expected_version: 23,
+          expected_version: 24,
           delete_entry_id: editableLogId
         }
       });

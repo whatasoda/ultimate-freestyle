@@ -1027,6 +1027,14 @@ describe("presentation artifact renderer", () => {
     expect(imageWorkspaceHtml).toContain("パーツ固有の配置");
     expect(imageWorkspaceHtml).toContain('data-component-path="fit"');
     expect(gridWorkspaceHtml).toContain('data-component-path="columns"');
+    expect(gridWorkspaceHtml).toContain('data-scene-component-action="delete_tree"');
+    expect(gridWorkspaceHtml).toContain("まとまりを複製");
+    expect(gridWorkspaceHtml).toContain("まとまりごと削除");
+    expect(gridWorkspaceHtml).toContain("まとまりとして操作");
+    expect(gridWorkspaceHtml).toContain("子孫 2件");
+    expect(gridWorkspaceHtml).toContain("子孫2件も一緒に移動します");
+    expect(gridWorkspaceHtml).toContain('data-component-parent-select');
+    expect(gridWorkspaceHtml).toContain('data-parent-kind="stack"');
     expect(workspaceHtml).toContain('data-workspace-asset-urls=');
     expect(workspaceHtml).not.toContain(' data-asset-urls=');
     expect(workspaceHtml).toContain("/components/comparison");

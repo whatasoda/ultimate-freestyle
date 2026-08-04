@@ -5,6 +5,7 @@ import {
   projectFieldsRequestSchema,
   projectListItemRequestSchema,
   reviewInstructionRequestSchema,
+  sceneComponentActionRequestSchema,
   sceneComponentCreateRequestSchema,
   scenePatternCreateRequestSchema,
   slideActionRequestSchema,
@@ -149,6 +150,18 @@ describe("Web request schemas", () => {
         expected_version: 1,
         pattern: "pattern-unknown",
         parent_id: null
+      }).success
+    ).toBe(false);
+    expect(
+      sceneComponentActionRequestSchema.safeParse({
+        expected_version: 1,
+        action: "delete_tree"
+      }).success
+    ).toBe(true);
+    expect(
+      sceneComponentActionRequestSchema.safeParse({
+        expected_version: 1,
+        action: "delete_all"
       }).success
     ).toBe(false);
     expect(

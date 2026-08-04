@@ -62,12 +62,12 @@ const PRESENTATION_COMPONENT_GUIDE = `# 発表scene componentガイド
 
 ## component一覧
 
-- まとまり: \`pattern-claim-evidence\`は主張＋根拠、\`pattern-comparison\`は2案比較、\`pattern-key-metrics\`は3数値、\`pattern-timeline\`は経過・手順を、複数の通常componentとして追加する。追加後の変更・移動・削除は一件ずつ行う。
+- まとまり: \`pattern-claim-evidence\`は主張＋根拠、\`pattern-comparison\`は2案比較、\`pattern-key-metrics\`は3数値、\`pattern-timeline\`は経過・手順を、複数の通常componentとして追加する。追加後はrootの移動で子孫も一緒に移り、内容と見た目は一件ずつ変更する。
 - 作成: 全13種類を \`create_slide_component\` で安全な既定値から一件ずつ追加する。imageだけはproject内の \`asset_id\` が必要。
 - 内容: \`update_slide_component_content\` で本文、数値、variant、layout固有値のうち一項目だけを更新する。長文は\`text_edit.replace_once\`で現在の短い部分だけを置換する。
 - data item: \`edit_slide_data_item\` でbar chartまたはtimelineの項目を一件ずつ追加、更新、移動、削除する。
 - 配置・見た目の調整: \`update_slide_component\`。本文を再送せず、\`layout\`で親、順番、step、animation、frameを、\`style\`で指定した見た目だけを部分更新する。
-- 削除: \`delete_slide_component\`。子があるcomponentは削除できないため、子を移動または削除してから親を削除する。
+- 削除: \`delete_slide_component\`。通常は\`include_descendants: false\`の安全な削除を使う。ユーザーがまとまり全体の削除を明示した場合だけ\`include_descendants: true\`にしてrootと全子孫を一括削除する。
 
 ## 内容field
 

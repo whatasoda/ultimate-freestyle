@@ -230,6 +230,7 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   }
   .animation-symbol { background: var(--surface-soft); color: var(--accent-strong); }
   .mode-note, .voice-composed { border-color: var(--accent); background: var(--surface-soft); color: var(--ink); }
+  .operation-summary { border-color: var(--accent); background: var(--surface-soft); color: var(--muted); }
   .setting-chip { border-color: var(--line); background: var(--surface-subtle); color: var(--ink); }
   .component-outline li { border-color: var(--line); color: var(--ink); }
   a.component-outline-row:hover, a.component-outline-row[aria-current="true"] { background: var(--accent-soft); color: var(--ink); }

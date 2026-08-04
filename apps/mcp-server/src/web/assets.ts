@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "182";
+export const DASHBOARD_ASSET_VERSION = "183";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -1707,9 +1707,13 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const feedback = form?.querySelector("[data-form-feedback]");
       if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) return;
       const action = button.dataset.sceneComponentAction;
-      if (action === "delete" && !confirm("この表示パーツを削除しますか？子パーツがある場合は先に移動または削除が必要です。")) return;
+      const affectedCount = Number(button.dataset.affectedCount || "1");
+      if (action === "delete" && !confirm("この表示パーツを削除しますか？")) return;
+      if (action === "delete_tree" && !confirm("このまとまり " + affectedCount + "パーツをすべて削除しますか？この操作は元に戻せません。")) return;
       setButtonBusy(button, true);
-      feedback.textContent = action === "duplicate" ? "表示パーツを複製しています…" : "表示パーツを削除しています…";
+      feedback.textContent = action === "duplicate"
+        ? affectedCount > 1 ? affectedCount + "パーツのまとまりを複製しています…" : "表示パーツを複製しています…"
+        : affectedCount + "パーツを削除しています…";
       feedback.classList.remove("success", "warning");
       try {
         const response = await fetch(button.dataset.actionUrl || "", {
@@ -1720,7 +1724,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const result = await response.json();
         if (!response.ok) throw new Error(apiErrorMessage(result, "表示パーツを操作できませんでした。"));
         form.dataset.dirty = "false";
-        feedback.textContent = action === "duplicate" ? "複製しました。画面を更新します…" : "削除しました。画面を更新します…";
+        const resultCount = Number(result.affected_component_count || affectedCount);
+        feedback.textContent = action === "duplicate"
+          ? resultCount + "パーツを複製しました。画面を更新します…"
+          : resultCount + "パーツを削除しました。画面を更新します…";
         feedback.classList.add("success");
         if (action === "duplicate" && result.result_component_id) navigateToComponent(String(result.result_component_id));
         else {
@@ -1861,6 +1868,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       validateFrame();
     };
     frameToggle?.addEventListener("input", syncFrameControls);
+    const parentSelect = form.querySelector("[data-component-parent-select]");
+    if (parentSelect instanceof HTMLSelectElement && frameToggle instanceof HTMLInputElement) {
+      parentSelect.addEventListener("change", () => {
+        const parentKind = parentSelect.selectedOptions[0]?.dataset.parentKind || "root";
+        if (parentKind === "stack" || parentKind === "grid") frameToggle.checked = false;
+        if (parentKind === "layer") frameToggle.checked = true;
+        if (parentKind !== "root") frameToggle.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+    }
     for (const preset of form.querySelectorAll("[data-component-frame-preset]")) {
       if (!(preset instanceof HTMLButtonElement) || !(frameToggle instanceof HTMLInputElement)) continue;
       preset.addEventListener("click", () => {

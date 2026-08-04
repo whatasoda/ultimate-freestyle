@@ -42,6 +42,12 @@ import {
   ScenePatternPlanError
 } from "../projects/scene-patterns";
 import {
+  deleteSceneSubtree,
+  duplicateSceneSubtree,
+  sceneFrameForParent,
+  SceneTreeOperationError
+} from "../projects/scene-tree";
+import {
   getRenderedQualityReport,
   renderedQualityReportInputSchema,
   saveRenderedQualityReport
@@ -2498,6 +2504,7 @@ async function handleSceneComponentUpdate(
           throw error;
         }
         const previousParentId = existing.parent_id;
+        let targetParent: SlideSceneNode | undefined;
         if (component.parent_id !== null) {
           const parent = slide.composition.nodes.find((node) => node.id === component.parent_id);
           if (parent === undefined || !["layer", "stack", "grid"].includes(parent.kind)) {
@@ -2505,6 +2512,7 @@ async function handleSceneComponentUpdate(
             Object.assign(error, { code: "INVALID_FIELDS" });
             throw error;
           }
+          targetParent = parent;
           const visited = new Set<string>();
           let ancestor: SlideSceneNode | undefined = parent;
           while (ancestor !== undefined) {
@@ -2631,7 +2639,7 @@ async function handleSceneComponentUpdate(
             throw error;
           }
         }
-        existing.frame = component.frame;
+        existing.frame = sceneFrameForParent(component.frame, targetParent?.kind ?? null);
         existing.at = component.at;
         existing.animation = component.animation;
         existing.style = component.style;
@@ -3064,6 +3072,7 @@ async function handleSceneComponentAction(
     return jsonResponse({ ok: false, error: { code: "INVALID_FIELDS", message: "表示パーツの操作内容を確認してください。" }, request_id: crypto.randomUUID() }, 422);
   }
   let resultComponentId: string | null = null;
+  let affectedComponentCount = 0;
   try {
     const project = await mutateProject(env.DB, {
       ownerUserId: session.userId,
@@ -3088,6 +3097,12 @@ async function handleSceneComponentAction(
           Object.assign(error, { code: "COMPONENT_NOT_FOUND" });
           throw error;
         }
+        if (parsed.data.action === "delete_tree") {
+          const deleted = deleteSceneSubtree(slide.composition.nodes, componentId);
+          slide.composition.nodes = deleted.nodes;
+          affectedComponentCount = deleted.deletedIds.length;
+          return;
+        }
         if (parsed.data.action === "delete") {
           if (slide.composition.nodes.some((node) => node.parent_id === componentId)) {
             const error = new Error("The component still has children.");
@@ -3095,33 +3110,31 @@ async function handleSceneComponentAction(
             throw error;
           }
           slide.composition.nodes.splice(index, 1);
+          affectedComponentCount = 1;
           return;
         }
-        const used = new Set(slide.composition.nodes.map((node) => node.id));
-        const base = `${component.id.slice(0, 48)}-copy`;
-        let candidate = base;
-        for (let suffix = 2; used.has(candidate); suffix += 1) candidate = `${base.slice(0, 58)}-${suffix}`;
-        const copy = structuredClone(component);
-        copy.id = candidate;
-        const siblings = slide.composition.nodes.filter((node) => node.parent_id === component.parent_id);
-        copy.order = Math.min(999, Math.max(-1, ...siblings.map((node) => node.order)) + 1);
-        if (copy.frame) {
-          copy.frame.x = Math.min(100 - copy.frame.width, copy.frame.x + 3);
-          copy.frame.y = Math.min(100 - copy.frame.height, copy.frame.y + 3);
-        }
-        slide.composition.nodes.splice(index + 1, 0, copy);
-        resultComponentId = candidate;
+        const duplicated = duplicateSceneSubtree(slide.composition.nodes, componentId);
+        slide.composition.nodes = duplicated.nodes;
+        resultComponentId = duplicated.rootCopyId;
+        affectedComponentCount = duplicated.copiedIds.length;
       }
     });
     await recordWebAudit(env.DB, {
       userId: session.userId,
-      eventType: `project.slide_component_${parsed.data.action}d`,
+      eventType: parsed.data.action === "duplicate"
+        ? "project.slide_component_duplicated"
+        : parsed.data.action === "delete_tree"
+          ? "project.slide_component_tree_deleted"
+          : "project.slide_component_deleted",
       outcome: "succeeded",
-      details: { project_id: projectId, slide_id: slideId, component_id: componentId, result_component_id: resultComponentId, version: project.version },
+      details: { project_id: projectId, slide_id: slideId, component_id: componentId, result_component_id: resultComponentId, affected_component_count: affectedComponentCount, version: project.version },
       createdAt: new Date().toISOString()
     });
-    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, component_id: componentId, result_component_id: resultComponentId, action: parsed.data.action, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+    return jsonResponse({ ok: true, project_id: projectId, slide_id: slideId, component_id: componentId, result_component_id: resultComponentId, affected_component_count: affectedComponentCount, action: parsed.data.action, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
   } catch (error) {
+    if (error instanceof SceneTreeOperationError) {
+      Object.assign(error, { code: error.message.includes("does not exist") ? "COMPONENT_NOT_FOUND" : "INVALID_FIELDS" });
+    }
     return projectMutationErrorResponse(error, "表示パーツを操作できませんでした。");
   }
 }
