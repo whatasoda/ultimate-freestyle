@@ -59,14 +59,17 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   }
   a.button:not(.ghost):hover { background: var(--accent); color: var(--on-accent); }
 
-  /* 編集の明示保存。領域の末尾に一つ。確定ではないので塗らない。 */
-  button[type="submit"]:not([data-op]):not(.danger):not(.ghost) {
+  /* 編集。値が変わり版が上がる。明示保存も構造操作もプリセット適用も同じ意味なので
+     同じ形にし、明示保存は「領域の末尾に一つ」という配置の規則で区別する。 */
+  [data-op="edit"],
+  button[type="submit"]:not([data-op]):not(.danger) {
     border-color: var(--accent);
     background: transparent;
     color: var(--accent-strong);
     font-weight: 800;
   }
-  button[type="submit"]:not([data-op]):not(.danger):not(.ghost):hover { background: var(--accent-soft); }
+  [data-op="edit"]:hover,
+  button[type="submit"]:not([data-op]):not(.danger):hover { background: var(--accent-soft); }
 
   /* 実行。押すと待ち時間が生まれる。確認とも保存とも区別する。 */
   [data-op="run"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); font-weight: 800; }
@@ -92,6 +95,23 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   /* 公開停止は外向きの状態を戻す確定。破棄ではないが、公開と逆向きだと読めるようにする。 */
   [data-op="commit"].danger { border-color: var(--failure); background: transparent; color: var(--failure); }
   [data-op="commit"].danger:hover { background: var(--failure); color: var(--on-failure); }
+
+  /* 確定のゲート。可逆な操作と同じ面に置くと、押した結果が外へ出ることが読めない。 */
+  .commit-zone {
+    display: grid;
+    gap: .7rem;
+    margin-top: 1.35rem;
+    padding: 1rem;
+    border: 1px solid var(--accent);
+    border-radius: .8rem;
+    background: var(--surface-accent);
+  }
+  .commit-zone-label {
+    margin: 0;
+    color: var(--accent-strong);
+    font-size: .78rem;
+    font-weight: 850;
+  }
 
   :where(a, button, input, textarea, select, summary):focus-visible { outline-color: var(--accent); }
   input, textarea, select, .editor input, .editor textarea, .editor select,
@@ -136,7 +156,7 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .project-status[data-state="ready"] { border-color: var(--line-strong); background: var(--sunken); color: var(--muted); }
       .project-status[data-kind="publication"][data-state="ready"] { border-color: var(--achieved); background: var(--achieved-surface); color: var(--achieved); }
   .project-status[data-state="attention"] { border-color: var(--caution); background: var(--caution-surface); color: var(--caution); }
-  .dashboard-filter button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+  .dashboard-filter button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-strong); }
   .search-empty { border-color: var(--line-strong); }
   .danger-zone { border-color: var(--failure); background: var(--failure-surface); }
   .danger-zone > summary { color: var(--failure); }
@@ -220,9 +240,8 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .ratio-option:has(input:checked), .cover-pick[aria-pressed="true"], .narration-display-pick[aria-pressed="true"],
   .narration-color-pick[aria-pressed="true"], .region-pick[aria-pressed="true"], .animation-pick[aria-pressed="true"],
   .tone-pick[aria-pressed="true"], .loading-style-pick[aria-pressed="true"] {
-    border-color: var(--accent);
     background: var(--accent-soft);
-    color: var(--ink);
+    color: var(--accent-strong);
     box-shadow: none;
   }
   .animation-symbol { background: var(--surface-accent); color: var(--accent-strong); }
@@ -257,7 +276,7 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .voice-stat.pending strong { color: var(--caution); }
   .job-card[data-state="completed"] { border-color: var(--line-strong); }
   .job-card[data-state="failed"], .job-card[data-state="partially_failed"] { border-color: var(--failure); }
-  .voice-filter :is(button,.button)[aria-current="page"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+  .voice-filter :is(button,.button)[aria-current="page"] { background: var(--accent-soft); color: var(--accent-strong); }
   .voice-review-body p, .voice-next ol { color: var(--ink); }
   .voice-status { background: var(--sunken); color: var(--muted); }
   .voice-status.ready, .voice-status.completed { background: var(--sunken); color: var(--muted); }
@@ -317,7 +336,7 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     .card-top, .card h2, .card > .meta, .card > .meta:last-child, .project-statuses, .project-attention { grid-column: 1; grid-row: auto; }
     .card > .meta:last-child { white-space: normal; }
     .mobile-workspace-tabs, .mobile-inspector-tabs { border-color: var(--line); background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: var(--shadow); }
-    .mobile-workspace-tabs button[aria-selected="true"], .mobile-inspector-tabs button[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent-strong); }
+    .mobile-workspace-tabs button[aria-selected="true"], .mobile-inspector-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-strong); }
     .tab-badge { background: var(--caution-surface); color: var(--caution); }
   }
 `;

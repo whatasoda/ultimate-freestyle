@@ -1559,7 +1559,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       notice.append(document.createTextNode("更新前の未保存入力を復元しました。"));
       const discard = document.createElement("button");
       discard.type = "button";
-      discard.className = "ghost";
+      discard.className = "danger";
       discard.textContent = "復元内容を破棄";
       discard.addEventListener("click", () => { removeDraft(); location.reload(); });
       notice.append(discard);
@@ -1576,7 +1576,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       actions.className = "draft-recovery-actions";
       const apply = document.createElement("button");
       apply.type = "button";
-      apply.className = "ghost";
+      apply.dataset.op = "edit";
       apply.textContent = "現在版へ入力を適用";
       apply.addEventListener("click", () => {
         applyDraftFields(conflictedDraft.fields);
@@ -1592,7 +1592,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
       const copy = document.createElement("button");
       copy.type = "button";
-      copy.className = "ghost";
+      copy.className = "";
       copy.textContent = "退避内容をコピー";
       copy.addEventListener("click", async () => {
         const copyText = conflictedDraft.fields.map((field) =>
@@ -1607,7 +1607,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
       const discard = document.createElement("button");
       discard.type = "button";
-      discard.className = "ghost";
+      discard.className = "danger";
       discard.textContent = "退避内容を破棄";
       discard.addEventListener("click", () => {
         removeDraft();
@@ -3067,7 +3067,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           : null;
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "ghost";
+        button.dataset.op = "move";
         button.dataset.diagnosticFix = "true";
         button.textContent = "修正欄へ";
         button.addEventListener("click", () => {
@@ -3087,7 +3087,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         if (preferredField instanceof HTMLInputElement && /^#[0-9a-f]{6}$/i.test(String(item.suggested_foreground || ""))) {
           const suggestion = document.createElement("button");
           suggestion.type = "button";
-          suggestion.className = "ghost";
+          suggestion.dataset.op = "edit";
           suggestion.textContent = "推奨色を入力";
           suggestion.addEventListener("click", () => {
             setMobilePane("edit");

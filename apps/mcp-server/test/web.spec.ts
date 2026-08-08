@@ -3573,7 +3573,7 @@ describe("Web dashboard", () => {
     expect(flowWorkspaceHtml).toContain('data-composition-mode="flow"');
     expect(flowWorkspaceHtml).toContain('data-inspector-section="content" open');
     expect(flowWorkspaceHtml).toContain('class="mobile-inspector-tabs" role="tablist" aria-label="編集項目" hidden');
-    expect(flowWorkspaceHtml).toContain('class="ghost" id="inspector-tab-content" type="button" role="tab"');
+    expect(flowWorkspaceHtml).toContain('id="inspector-tab-content" type="button" role="tab"');
     expect(DASHBOARD_SCRIPT).toContain('mobileInspectorTabs.hidden = false');
     expect(flowWorkspaceHtml).toContain('data-inspector-pane="quality" aria-controls="inspector-quality"');
     expect(flowWorkspaceHtml).toContain('id="inspector-tab-content"');
