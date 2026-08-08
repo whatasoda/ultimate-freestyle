@@ -27,6 +27,7 @@
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "test": "bun run build && node --test tests/*.test.mjs && bun run test:mcp",
     "dev:mcp": "bun run --cwd apps/mcp-server dev",
+    "preview:dashboard": "bun run --cwd apps/mcp-server preview:dashboard",
     "build:mcp": "bun run --cwd apps/mcp-server build",
     "migrate:mcp": "bun run --cwd apps/mcp-server migrate",
     "deploy:mcp": "bun run --cwd apps/mcp-server deploy",
