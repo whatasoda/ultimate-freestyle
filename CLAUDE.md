@@ -1,72 +1,92 @@
 # Claude Code instructions
 
-このリポジトリは、カシヲ氏の「最自由研究」に複数の研究を提出するための制作・発表基盤です。返答、文書、コードコメントは原則として日本語を使ってください。
+このリポジトリは、カシヲ氏の「最自由研究」を制作・発表するためのworkspaceです。返答、設計文書、コードコメントは原則として日本語を使ってください。
 
-Cloudflare Remote MCPの実装では、先に `AGENTS.md` と `docs/remote-mcp-plan.html` を読む。現行形式の外部利用者はいないため、MCP移行ではGitHub Pagesとの後方互換層を作らず、このリポジトリを直接Cloudflare構成へ整理する。
+まず `AGENTS.md` を読む。リポジトリ共通の方針、移行状態、MCP実装ルールはそちらを正本とし、このファイルには重複させない。ここにはClaudeで作業するときの読み順、面ごとの担当、skillの選び方だけを置く。
 
-## 作業を始める前に
+## 2つの面
 
-1. `docs/最自由研究2026.md` を読み、提出条件を確認する。
-2. `docs/設計.md` を読み、研究の分離と発表UIの責務を確認する。
-3. 対象研究の `researches/<slug>/README.md` を読み、研究内容と進捗を把握する。
-4. `git status --short` を確認し、ユーザーの既存変更を保持する。
+このリポジトリには性質の違う2つのアプリがある。どちらを触るかを最初に決める。
 
-研究テーマ、問い、方法、記録、発表構成、評価をユーザーと対話して作る依頼では、`.claude/skills/research-companion/SKILL.md` を使う。正本である `.agents/skills/research-companion/SKILL.md` と、必要な参照ファイルを完全に読む。
+| 面 | 場所 | 状態 |
+|---|---|---|
+| Remote MCP・制御画面・発表renderer | `apps/mcp-server/` | 現行。研究データはD1、素材はR2 |
+| 旧発表アプリ（Next.js） | リポジトリ直下の `app/`、`components/`、`researches/` | 移行途中。共有schemaとrendererを抽出したら `apps/presentation/` へ移す |
 
-公開素材のURLへドメイン名を直接埋め込まない。研究データでは `/researches/<slug>/...` の同一host相対URLを使い、Cloudflare WorkerとR2の公開経路へ解決する。
+新しい機能は `apps/mcp-server/` 側へ作る。旧発表アプリは既存研究を壊さない範囲の修正に留める。
+
+## 正本と履歴
+
+読む順は目的で決める。全部を先に読まない。
+
+| 知りたいこと | 正本 |
+|---|---|
+| 提出条件 | `docs/最自由研究2026.md` |
+| 現行システムの仕様（URL、公開方式、スライド構成、レビュー、音声） | `docs/設計.md` |
+| Cloudflare構成と移行段階 | `docs/remote-mcp-plan.html` |
+| 実装の置き場所、依存方向、テスト責任 | `docs/code-architecture.md` |
+| 制御画面の役割分解（面の型、操作の意味、状態の系統） | `docs/dashboard-roles.md` |
+| 制御画面のデザイン決定 | `docs/dashboard-design-system.md` |
+| 個別の判断とその理由 | `docs/decisions/` |
+| 発表デザインとAI制作の合格基準 | `docs/design-production-rubric.md` |
+
+`docs/ux-improvement-log-*.md` と `docs/implementation-log-*.md` は**履歴であって正本ではない**。決定の背景を追うときだけ読み、現在の仕様として引用しない。矛盾したら上表の正本を優先する。
+
+## skill
+
+| 状況 | skill |
+|---|---|
+| 研究テーマ、問い、方法、記録、発表構成、評価をユーザーと対話して作る | `research-companion` |
+| 制御画面のデザインを定義・適用・点検する | `dashboard-design` |
+
+どちらも `.agents/skills/<name>/SKILL.md` が正本。`.claude/` 側はポインタなので、正本と参照ファイルを最初から最後まで読んでから作業する。
 
 ## コマンド
 
-このプロジェクトではBunを使う。package.jsonのscriptを実行するときは、必ず `bun run <script>` を使う。
+package.jsonのscriptは必ず `bun run <script>` で実行する。`bun test`、`bun build`、`bun deploy` はbun組み込みコマンドであり、scriptを実行しない。
+
+全体・旧発表アプリ:
 
 - 開発: `bun run dev`
 - ローカルVOICEVOX音声で開発: `bun run dev:voicevox`（先に生成が必要）
-- ビルド: `bun run build`
 - 検証: `bun run test`
 - lint: `bun run lint`
-- VOICEVOX話者一覧: `bun run voicevox:list`（ENGINE起動中のみ）
 - VOICEVOX MP3一括生成: `bun run voicevox:generate -- <slug>`（ENGINEとffmpegが必要）
 
-`bun test`、`bun build`、`bun deploy` はpackage.jsonのscript実行には使わない。
+`apps/mcp-server/`:
 
-## 変更方針
+- 開発: `bun run dev:mcp`
+- 検証: `bun run test:mcp`（型生成確認、TypeScript、coverage付きWorkersテスト、dry-run deploy）
+- 制御画面の実表示プレビュー生成: `bun run preview:dashboard`
+- 本番デプロイ: `bun run deploy:mcp`
 
-- 研究固有の内容は `researches/<slug>/` に置く。
-- 研究固有の画像・動画・音声は `public/researches/<slug>/` に置く。
+その他のscriptは `AGENTS.md` を見る。
+
+## 制御画面を実表示で確認する
+
+制御画面はTwitch OAuthの内側にあるが、`bun run preview:dashboard` が固定データから全ページのHTMLを `work/dashboard-preview/` へ生成する。ログインもD1もR2も不要で、CSSとJSは配信されるものと同一。`agent-browser` で開いて確認する。
+
+サーバへ送る操作とスライド編集画面の中央プレビューiframeは動かない。それらの確認には `bun run dev:mcp` と実ログインが要る。
+
+## 旧発表アプリを触るとき
+
+`researches/<slug>/deck.tsx` を編集する場合だけ適用する。現行の制御画面から作る研究データには当てはまらない。
+
+- 研究固有の内容は `researches/<slug>/`、素材は `public/researches/<slug>/` に置く。研究を追加したら `researches/registry.ts` に登録する。
 - 共通の発表操作、タイマー、進捗、読み上げは `components/presentation/` に置く。
-- 研究を追加したら `researches/registry.ts` に登録する。
-- 発表物間のナビゲーションは追加しない。各研究は `/present/<slug>` から直接開く。
-- 1つの研究内でタイトルから結論まで完結させる。
-- 発表時間は20分以内。設定した想定時間の合計も必ず確認する。
-- アニメーションは発表内容を補助する範囲に留め、`prefers-reduced-motion` を壊さない。
-- 本番操作を妨げるフォーム、モーダル、通常のサイトヘッダーは発表画面に追加しない。
-- 発表内容は16:9の `.stage` 内に限定し、タイマー・進捗・音声・操作ボタンは枠外へ置く。スライド内の寸法にはコンテナ単位（`cqw`、`cqh`）を使い、画面全体の `vw`、`vh` に依存させない。
-- レイアウトは `cinematic`、`biim`、`minimal` の3種類を維持する。研究データやスライド部品をレイアウト固有に分岐させず、`data-layout` 配下の共通CSSと補助クロームで表現する。
-- 新しい依存関係は、CSSと既存コードでは実現できない場合にだけ追加する。
-
-## スライド実装ルール
-
-- `durationSeconds` は実際に読み上げて見積もる。
-- `<Reveal at={n}>` の最大値と `revealSteps` を一致させる。
-- `narration.segments[].at` も対応する `<Reveal at={n}>` と一致させる。
+- `<Reveal at={n}>` の最大値、`revealSteps`、`narration.segments[].at` を一致させる。
 - 読み上げ原稿をスライド本文へコピーしない。表示と音声は必ず同じ `narration.segments[].text` を参照する。
-- BIIM右欄の読み上げない補足はスライドの `sidebar` に置く。`narration` へ混ぜず、作者コメント・追加データ・画像等の任意要素を許可する。
-- `speaker` は実際に話者名を見せたい場合だけ指定する。「ナレーション」のような汎用ラベルは表示しない。
-- 原稿表示は、ストーリーなら `dialogue`、テンポ重視なら `commentary`、全原稿を読ませるなら `inline` を選ぶ。
-- 1スライド1メッセージを基本とし、配信画面の縮小表示でも読める文字量にする。
-- 引用・素材の出典は、スライド内または研究READMEに必ず残す。
-- 音声ファイルを追加する場合は各segmentの `audioSrc` を使い、ファイルがなくても発表が止まらない構成にする。
-- ローカルVOICEVOX生成ファイルは `public/.voicevox-preview/researches/<slug>/audio/<slide-id>-<at>.mp3` に置かれ、コミットしない。通常開発はブラウザ読み上げを使う。
-- GitHub ActionsのVOICEVOX生成は試聴artifact専用とする。本番用VOICEVOX MP3は将来Cloudflare ContainerからR2へ保存する。`public/researches/<slug>/audio/` へ生成MP3をコミットせず、Git LFSも使わない。
-- ページ・段階の移動後は対応するsegmentを自動再生し、音声終了時だけ自動送りする。個別の再読み上げ操作は追加しない。
-- 読み上げ時間と再生位置は下部のインジケーターへ反映する。音声ファイルがない場合もブラウザ読み上げの推定値を表示する。
-- 音量は `ultimate-freestyle:narration-volume` として `localStorage` に保存する。進行位置は保存せず、`?slide=<1始まり>&step=<0始まり>` とHistory APIで管理する。
-- カシヲ氏本人の協力が必要な研究は、公式FAQに従い事前連絡が必要であることを研究READMEへ明記する。
+- `durationSeconds` は実際に読み上げて見積もる。発表時間は20分以内に収め、合計を必ず確認する。
+- 発表内容は16:9の `.stage` 内に限定し、タイマー・進捗・音声・操作ボタンは枠外へ置く。スライド内の寸法にはコンテナ単位（`cqw`、`cqh`）を使い、`vw`・`vh` に依存させない。
+- レイアウトは `cinematic`、`biim`、`minimal` の3種類を維持する。研究データやスライド部品をレイアウト固有に分岐させず、`data-layout` 配下の共通CSSで表現する。
+- 発表物間のナビゲーションは追加しない。各研究は `/present/<slug>` から直接開く。
+- 本番操作を妨げるフォーム、モーダル、通常のサイトヘッダーを発表画面へ追加しない。
+- ローカルVOICEVOX生成ファイルは `public/.voicevox-preview/` に置かれ、コミットしない。生成MP3を `public/researches/<slug>/audio/` へコミットせず、Git LFSも使わない。
 
-## 完了条件
+## 共通の制約
 
-- `bun run test` が成功する。
-- クリックとキーボードの両方で最初から最後まで進行できる。
-- 予定時間・実時間・進捗表示が内容を隠さない。
-- 1280×720相当で文字や操作部品が画面外へ出ない。
-- 音声なしでも研究内容が完全に伝わる。
+- 公開素材のURLへドメイン名を直接埋め込まない。`/researches/<slug>/...` の同一host相対URLを使う。
+- 新しい依存関係は、CSSと既存コードでは実現できない場合にだけ追加する。
+- `prefers-reduced-motion` を壊さない。
+- 音声なしでも研究内容が完全に伝わる状態を保つ。
+- 作業前に `git status --short` を確認し、ユーザーの既存変更を保持する。

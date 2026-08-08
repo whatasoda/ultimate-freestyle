@@ -11,6 +11,7 @@ export default defineConfig([
     "**/.wrangler/**",
     "**/dist/**",
     "build/**",
+    "work/**",
     "apps/mcp-server/src/worker-configuration.d.ts",
     "next-env.d.ts"
   ])

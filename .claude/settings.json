@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run test)",
+      "Bash(bun run test:mcp)",
+      "Bash(bun run test:mcp:coverage)",
+      "Bash(bun run test:mcp:render)",
+      "Bash(bun run lint)",
+      "Bash(bun run build)",
+      "Bash(bun run build:mcp)",
+      "Bash(bun run preview:dashboard)",
+      "Bash(bun run --cwd apps/mcp-server typecheck)",
+      "Bash(agent-browser:*)",
+      "Bash(rg:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
+    ],
+    "ask": [
+      "Bash(bun run deploy:mcp)",
+      "Bash(bun run migrate:mcp)",
+      "Bash(bun run smoke:mcp)",
+      "Bash(wrangler deploy:*)",
+      "Bash(wrangler d1:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
