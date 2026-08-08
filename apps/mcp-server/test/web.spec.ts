@@ -513,12 +513,12 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=188"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=188"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=189"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=189"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
-    expect(detailHtml).toContain('<main id="main-content" tabindex="-1">');
+    expect(detailHtml).toContain('<main data-surface="overview" id="main-content" tabindex="-1">');
     expect(detailHtml).toContain('class="project-section-nav" aria-label="この研究の編集項目"');
     expect(detailHtml).toContain('<a href="#publication">プレビューと公開</a>');
     expect(detailHtml).toContain('id="voice-finishing" tabindex="-1"');
@@ -966,7 +966,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=188"'
+      'href="/assets/dashboard.css?v=189"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1192,7 +1192,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=188"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=189"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1201,7 +1201,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=188"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=189"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1213,7 +1213,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=188", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=189", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1224,7 +1224,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=188", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=189", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1235,18 +1235,18 @@ describe("Web dashboard", () => {
     expect(dashboardStyleText).toContain(".workspace-head { display: grid;");
     expect(dashboardStyleText).toContain("max-width: min(100%, 32ch)");
     expect(dashboardStyleText).toContain("word-break: auto-phrase");
-    expect(dashboardStyleText).toContain('--surface-warm: #fff2e7;');
-    expect(dashboardStyleText).toContain(':root:has(.account)[data-theme="dark"]');
-    expect(dashboardStyleText).toContain('body:has(.account) main:not(.workspace-main):not(.voice-main)');
+    expect(dashboardStyleText).toContain('--surface-warm: #fff3e8;');
+    expect(dashboardStyleText).toContain(':root[data-theme="dark"]');
+    expect(dashboardStyleText).toContain('main[data-surface="overview"]');
     expect(dashboardStyleText).toContain('.review-workspace { grid-template-columns: minmax(11rem, 14rem) minmax(0, 1fr);');
     expect(dashboardStyleText).toContain('.workspace-version > .slide-actions { flex: 1 0 100%;');
     expect(dashboardStyleText).toContain(
       ".step-control [data-grid-snap] { grid-column: 1 / -1; }"
     );
     expect(dashboardStyleText).toContain('[id^="research-item-"]');
-    expect(dashboardStyleText).toContain(".project-section-nav a:focus-visible { background: #ffffff12; color: var(--ink); }");
+    expect(dashboardStyleText).toContain(".project-section-nav a:focus-visible { background: var(--surface-accent); color: var(--ink); }");
     expect(dashboardStyleText).not.toContain("var(--text)");
-    expect(dashboardStyleText).toContain("--bg: #090f18");
+    expect(dashboardStyleText).toContain("--bg: #f6f7f5");
     expect(dashboardStyleText).toContain("background: linear-gradient(var(--bg) 80%, transparent)");
     const definedDashboardTokens = new Set(
       [...dashboardStyleText.matchAll(/--([\w-]+)\s*:/g)].map((match) => match[1])
@@ -1276,7 +1276,7 @@ describe("Web dashboard", () => {
     );
     expect(dashboardStyleText).toContain(".voice-filter { position: sticky;");
     expect(dashboardStyleText).toContain(".project-section-nav, .voice-filter {");
-    expect(dashboardStyleText).toContain(".voice-status.ready, .voice-status.completed { background: var(--success-soft);");
+    expect(dashboardStyleText).toContain(".voice-status.ready, .voice-status.completed { background: var(--sunken);");
     expect(dashboardStyleText).toContain(".quality-sweep-results, .preflight-list, .revision-slide-list {");
     expect(dashboardStyleText).toContain(".narration-color-pick[aria-pressed=\"true\"]");
     expect(dashboardStyleText).toContain(
