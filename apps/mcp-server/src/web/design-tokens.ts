@@ -32,6 +32,7 @@ const LIGHT: TokenMap = {
   "achieved-surface": "#dcf1e9",
   "achieved-line": "#3f9a7d",
 
+  "shadow-color": "#29455b",
   shadow: "0 .8rem 2.2rem #29455b12",
   "shadow-floating": "0 1rem 3rem #17283d26"
 };
@@ -68,6 +69,7 @@ const DARK: TokenMap = {
   "achieved-surface": "#12332b",
   "achieved-line": "#346e5d",
 
+  "shadow-color": "#000000",
   shadow: "0 .8rem 2.2rem #00000024",
   "shadow-floating": "0 1rem 3rem #00000066"
 };
