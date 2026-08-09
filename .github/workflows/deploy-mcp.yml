@@ -49,8 +49,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # image-sizeは上流に修正版が無く（2.0.2が最新かつ対象）、旧発表アプリのvinext経由の
+      # devDependencyとしてのみ存在する。Worker成果物には含まれないため本番へは到達しない。
+      # 修正版が出るか、旧発表アプリをapps/presentationへ移した時点でこの除外を削除する。
       - name: Audit dependencies
-        run: bun audit
+        run: bun audit --ignore=GHSA-w3rx-r6r6-pgpr --ignore=GHSA-5p2g-fcmc-qvqq
 
       - name: Validate Remote MCP
         run: bun run test:mcp
