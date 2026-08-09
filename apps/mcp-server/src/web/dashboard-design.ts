@@ -21,6 +21,128 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     main[data-surface="workspace"] { --surface-width: min(98vw, 112rem); }
   }
 
+  /* 作業面は対象一覧・実表示・編集を同時に見せる面である。編集を下段の帯として
+     積むと、実表示との重なりが無くなり保存前ライブプレビューの結果が見えない。
+     ページ全体を1画面へ収め、3領域をそれぞれ独立してスクロールさせる。 */
+  body:has(main[data-surface="workspace"]) {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  body:has(main[data-surface="workspace"]) > .site-header { flex: 0 0 auto; }
+  main[data-surface="workspace"] {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    padding-block: .55rem .5rem;
+  }
+  main[data-surface="workspace"] .workspace-head {
+    gap: .4rem 1rem;
+    /* 2列目を縮められるようにしないと、版と操作の実幅が1列目を0へ潰す。 */
+    grid-template-columns: minmax(7rem, 1fr) minmax(0, auto);
+  }
+  main[data-surface="workspace"] .workspace-head h1 { font-size: clamp(1.3rem, 2.2vw, 1.9rem); }
+  .workspace-head-links { margin: .2rem 0 0; font-size: .8rem; }
+  main[data-surface="workspace"] > .slide-workspace {
+    flex: 1;
+    min-height: 0;
+    /* align-items: start だと子が行をはみ出して自然な高さで描かれ、
+       ドックの上へ重なる。行で高さを配分するため stretch に戻す。 */
+    align-items: stretch;
+    margin-bottom: 0;
+  }
+
+  /* 16:9の実表示は高さで決まる。ドックを下段へ置くと高さを奪い、横は余る。
+     広い画面ではドックを右へ置き、余っている幅の側から取る。 */
+  @media (min-width: 48.01rem) {
+    main[data-surface="workspace"] > .slide-workspace {
+      grid-template-columns: minmax(9rem, 13rem) minmax(0, 1fr) minmax(15rem, 23rem);
+      grid-template-rows: minmax(0, 1fr);
+    }
+    main[data-surface="workspace"] > .slide-workspace > .inspector {
+      grid-column: 3;
+      grid-row: 1;
+      /* 右ドックは1列。12列のままだとチップや使い方が1/12幅へ潰れる。 */
+      grid-template-columns: minmax(0, 1fr);
+    }
+    main[data-surface="workspace"] > .slide-workspace > .inspector > * { grid-column: 1 / -1; }
+    /* プレビューを広げる間は一覧とドックを畳む。 */
+    body[data-preview-focus="true"] main[data-surface="workspace"] > .slide-workspace {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    body[data-preview-focus="true"] main[data-surface="workspace"] > .slide-workspace > .inspector { grid-column: 1; }
+  }
+  .slide-workspace > .filmstrip { min-height: 0; overflow: auto; }
+  .slide-workspace > .workspace-preview {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: auto;
+  }
+  /* 枠は幅ではなく残りの高さから決める。width:100%のままだと縦が足りない画面で
+     max-heightに切られ、選んだ比率が崩れる。 */
+  /* 幅からアスペクト比で高さを決め、残り高さでmax-heightを掛ける。高さ起点にすると
+     幅の制約が勝った瞬間に比率が崩れる。 */
+  .slide-workspace > .workspace-preview { container-type: size; }
+  .slide-workspace > .workspace-preview > .workspace-frame {
+    flex: 0 0 auto;
+    /* 幅を確定させたままmax-heightを掛けると比率が切られ、高さ起点にすると幅の
+       制約で切られる。残り高さから幅を先に決めれば、どちらでも比率が保たれる。 */
+    width: min(100%, calc((100cqh - 7.5rem) * var(--workspace-aspect-num, 1.7778)));
+    min-height: 0;
+    max-height: none;
+    margin-inline: auto;
+  }
+
+  /* 見出し帯は1行に収める。操作を独立した段へ落とすと作業面の高さを削る。 */
+  main[data-surface="workspace"] .workspace-version > .slide-actions {
+    flex: 0 0 auto;
+    padding-top: 0;
+    border-top: 0;
+  }
+  /* 折り返させると幅が狭い画面で見出し帯が数百px膨らみ、作業面の高さを食う。
+     横スクロールへ逃がして高さを固定する。 */
+  main[data-surface="workspace"] .workspace-version {
+    flex-wrap: nowrap;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: .2rem;
+    scrollbar-width: thin;
+  }
+  main[data-surface="workspace"] .workspace-version > .feedback { flex: 0 0 auto; }
+  main[data-surface="workspace"] .workspace-version :is(a, button) { white-space: nowrap; }
+
+  /* 編集ドック。高さを画面の4割で止め、一度に一つの節だけを見せる。
+     全設定を積み上げると、実表示が画面外へ押し出される。 */
+  .slide-workspace > .inspector {
+    max-height: none;
+    overflow: auto;
+    padding: .7rem .8rem 1rem;
+    border-top: 1px solid var(--line-strong);
+    border-radius: .8rem .8rem 0 0;
+    background: var(--panel);
+    box-shadow: var(--shadow-floating);
+    scrollbar-gutter: stable;
+  }
+  .inspector-tabs {
+    position: sticky;
+    z-index: 2;
+    top: -.7rem;
+    display: flex;
+    gap: .3rem;
+    margin: -.7rem -.8rem .55rem;
+    padding: .55rem .8rem;
+    overflow-x: auto;
+    border-bottom: 1px solid var(--line);
+    background: var(--panel);
+    scrollbar-width: thin;
+  }
+  .inspector-tabs button { flex: 0 0 auto; min-height: 2.5rem; padding: .4rem .7rem; font-size: .76rem; }
+  .inspector-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-strong); }
+
   .site-header { padding-block: 1rem; border-bottom: 1px solid var(--line); }
   .brand { color: var(--ink); font-family: ui-rounded, "Hiragino Maru Gothic ProN", "BIZ UDPGothic", sans-serif; }
   h1, h2, h3, summary, .button, button { text-wrap: balance; }
@@ -321,7 +443,6 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   }
 
   @media (min-width: 72.01rem) {
-    .slide-workspace { grid-template-columns: minmax(13rem, 15rem) minmax(34rem, 1fr); }
   }
 
   @media (max-width: 48rem) {
@@ -335,8 +456,8 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     .card { grid-template-columns: 1fr; gap: .45rem; padding: 1rem .25rem; }
     .card-top, .card h2, .card > .meta, .card > .meta:last-child, .project-statuses, .project-attention { grid-column: 1; grid-row: auto; }
     .card > .meta:last-child { white-space: normal; }
-    .mobile-workspace-tabs, .mobile-inspector-tabs { border-color: var(--line); background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: var(--shadow); }
-    .mobile-workspace-tabs button[aria-selected="true"], .mobile-inspector-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-strong); }
+    .mobile-workspace-tabs, .inspector-tabs { border-color: var(--line); background: color-mix(in srgb, var(--panel) 94%, transparent); box-shadow: var(--shadow); }
+    .mobile-workspace-tabs button[aria-selected="true"], .inspector-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-strong); }
     .tab-badge { background: var(--caution-surface); color: var(--caution); }
   }
 `;

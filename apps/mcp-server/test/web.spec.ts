@@ -513,8 +513,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=189"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=189"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=190"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=190"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -966,7 +966,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=189"'
+      'href="/assets/dashboard.css?v=190"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1192,7 +1192,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=189"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=190"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1201,7 +1201,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=189"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=190"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1213,7 +1213,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=189", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=190", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1224,7 +1224,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=189", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=190", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1259,6 +1259,7 @@ describe("Web dashboard", () => {
       "palette-accent",
       "revision-aspect",
       "workspace-aspect",
+      "workspace-aspect-num",
       "component-indent"
     ]);
     const undefinedDashboardTokens = [
@@ -3572,7 +3573,7 @@ describe("Web dashboard", () => {
     const flowWorkspaceHtml = await flowWorkspace.text();
     expect(flowWorkspaceHtml).toContain('data-composition-mode="flow"');
     expect(flowWorkspaceHtml).toContain('data-inspector-section="content" open');
-    expect(flowWorkspaceHtml).toContain('class="mobile-inspector-tabs" role="tablist" aria-label="編集項目" hidden');
+    expect(flowWorkspaceHtml).toContain('class="inspector-tabs" role="tablist" aria-label="編集項目" hidden');
     expect(flowWorkspaceHtml).toContain('id="inspector-tab-content" type="button" role="tab"');
     expect(DASHBOARD_SCRIPT).toContain('mobileInspectorTabs.hidden = false');
     expect(flowWorkspaceHtml).toContain('data-inspector-pane="quality" aria-controls="inspector-quality"');
@@ -3580,7 +3581,7 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain('const mobileInspectorMedia = matchMedia("(max-width: 48rem)")');
     expect(DASHBOARD_SCRIPT).toContain('selectInspectorPane(next.dataset.inspectorPane');
     expect(DASHBOARD_SCRIPT).toContain('panel.setAttribute("aria-labelledby", button.id)');
-    expect(DASHBOARD_SCRIPT).toContain('details.hidden = mobileInspectorMedia.matches && !selected');
+    expect(DASHBOARD_SCRIPT).toContain('details.hidden = inspectorDockAlways && !selected');
     expect(DASHBOARD_SCRIPT).toContain('details.hidden = false');
     expect(DASHBOARD_SCRIPT).toContain('document.addEventListener("visibilitychange"');
     expect(DASHBOARD_SCRIPT).toContain('void pollJob(activePollUrl)');

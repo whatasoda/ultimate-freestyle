@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "189";
+export const DASHBOARD_ASSET_VERSION = "190";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -2557,6 +2557,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
 
   const mobileInspectorButtons = [...document.querySelectorAll("[data-inspector-pane]")];
   const mobileInspectorMedia = matchMedia("(max-width: 48rem)");
+  const inspectorDockAlways = true;
   if (mobileInspectorButtons.length > 0 && inspectorSections.length > 0) {
     const syncMobileInspectorSemantics = () => {
       for (const button of mobileInspectorButtons) {
@@ -2564,7 +2565,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const panelId = button.getAttribute("aria-controls");
         const panel = panelId ? document.getElementById(panelId) : null;
         if (!(panel instanceof HTMLElement)) continue;
-        if (mobileInspectorMedia.matches) {
+        if (inspectorDockAlways) {
           panel.setAttribute("role", "tabpanel");
           panel.setAttribute("aria-labelledby", button.id);
         } else {
@@ -2580,7 +2581,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       syncingInspectorPane = true;
       for (const details of inspectorSections) {
         const selected = details === target;
-        details.hidden = mobileInspectorMedia.matches && !selected;
+        details.hidden = inspectorDockAlways && !selected;
         details.open = selected;
       }
       syncingInspectorPane = false;
@@ -2591,7 +2592,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         button.tabIndex = selected ? 0 : -1;
       }
       if (userInitiated) {
-        setMobilePane("edit");
+        if (mobilePaneMedia.matches) setMobilePane("edit");
         try { localStorage.setItem(activeInspectorKey, name); } catch {}
       }
       if (focus) requestAnimationFrame(() => {
@@ -2607,7 +2608,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     if (!inspectorSections.some((details) => details.dataset.inspectorSection === preferredInspector)) {
       preferredInspector = inspectorSections.find((details) => details.open)?.dataset.inspectorSection || "content";
     }
-    if (mobileInspectorMedia.matches) selectInspectorPane(preferredInspector);
+    selectInspectorPane(preferredInspector);
     for (const [index, button] of mobileInspectorButtons.entries()) {
       if (!(button instanceof HTMLButtonElement)) continue;
       button.addEventListener("click", () => selectInspectorPane(button.dataset.inspectorPane || "content", true, true));
@@ -2644,7 +2645,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
       syncingInspectorPane = false;
     });
-    const mobileInspectorTabs = mobileInspectorButtons[0]?.closest(".mobile-inspector-tabs");
+    const mobileInspectorTabs = mobileInspectorButtons[0]?.closest(".inspector-tabs");
     if (mobileInspectorTabs instanceof HTMLElement) mobileInspectorTabs.hidden = false;
     syncMobileInspectorSemantics();
   }
