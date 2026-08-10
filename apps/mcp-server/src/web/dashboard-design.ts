@@ -64,10 +64,13 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     main[data-surface="workspace"] > .slide-workspace > .inspector {
       grid-column: 3;
       grid-row: 1;
-      /* 右ドックは1列。12列のままだとチップや使い方が1/12幅へ潰れる。 */
-      grid-template-columns: minmax(0, 1fr);
+      /* 12列のgridのままだとチップが1/12幅へ潰れ、開いたdetailsの行も確保されず
+         後続要素へ重なる。1列に積むだけなのでflexにする。 */
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
     }
-    main[data-surface="workspace"] > .slide-workspace > .inspector > * { grid-column: 1 / -1; }
+    main[data-surface="workspace"] > .slide-workspace > .inspector > * { flex: 0 0 auto; }
     /* プレビューを広げる間は一覧とドックを畳む。 */
     body[data-preview-focus="true"] main[data-surface="workspace"] > .slide-workspace {
       grid-template-columns: minmax(0, 1fr);
@@ -132,20 +135,32 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     z-index: 2;
     top: -.7rem;
     display: flex;
+    flex-wrap: wrap;
     gap: .3rem;
     margin: -.7rem -.8rem .55rem;
     padding: .55rem .8rem;
-    overflow-x: auto;
     border-bottom: 1px solid var(--line);
     background: var(--panel);
-    scrollbar-width: thin;
   }
-  .inspector-tabs button { flex: 0 0 auto; min-height: 2.5rem; padding: .4rem .7rem; font-size: .76rem; }
+  .inspector-tabs button { flex: 0 0 auto; min-height: 2.4rem; padding: .38rem .6rem; font-size: .76rem; white-space: nowrap; }
   .inspector-tabs button[aria-selected="true"] { background: var(--accent-soft); color: var(--accent-strong); }
 
   .site-header { padding-block: 1rem; border-bottom: 1px solid var(--line); }
   .brand { color: var(--ink); font-family: ui-rounded, "Hiragino Maru Gothic ProN", "BIZ UDPGothic", sans-serif; }
   h1, h2, h3, summary, .button, button { text-wrap: balance; }
+  /* 日本語ラベルは既定だと語の途中で折れる。文節境界で折り、短い操作名は折らない。 */
+  :is(.button, button, summary, .setting-chip, .project-status, .filmstrip-link, label) {
+    word-break: auto-phrase;
+    line-break: strict;
+  }
+  :is(.dashboard-filter, .voice-filter, .step-control, .slide-actions, .inspector-tabs) :is(button, .button) {
+    white-space: nowrap;
+  }
+  /* 操作のラベルは縮めない。行が足りないときは説明文の側を折る。
+     操作を縮めると2〜3文字ずつの折り返しになり、何の操作か読めなくなる。 */
+  :is(.section-head, .workspace-head, .voice-hero, .landing-cta) > :is(a, button, .actions) { flex-shrink: 0; }
+  :is(.section-head, .workspace-head, .voice-hero, .landing-cta) > :not(a):not(button):not(.actions) { min-width: 0; }
+  .actions > :is(a, button) { flex-shrink: 0; }
   h1, h2, h3 { font-family: ui-rounded, "Hiragino Maru Gothic ProN", "BIZ UDPGothic", sans-serif; }
   .eyebrow { color: var(--accent-strong); }
   .lead, .panel p, .panel li, .back, .meta, .hint { color: var(--muted); }
