@@ -17,6 +17,27 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   main[data-surface="review"]     { --surface-width: min(94vw, 88rem); --surface-pad-top: 1rem; --surface-rhythm: 1.25rem; }
   main[data-surface="monitor"]    { --surface-width: min(94vw, 84rem); --surface-pad-top: 1rem; --surface-rhythm: 1.25rem; }
 
+  /* 見出し群は一つのまとまりであって節ではない。節と節の間隔を内側へ適用すると、
+     戻る・段階・題名・概要・節ナビの4つの隙間だけで120px消える。 */
+  main[data-surface] > :is(.back, .card-top, .eyebrow, .detail-title, .lead)
+    + :is(.card-top, .eyebrow, .detail-title, .lead, .project-section-nav, .actions) {
+    margin-top: .3rem;
+  }
+  /* 道具の画面は読み物ではない。上余白を読み幅の基準から詰める。 */
+  main[data-surface="select"], main[data-surface="overview"] { --surface-pad-top: clamp(1rem, 2vw, 1.5rem); }
+  main[data-surface="overview"] .detail-title { font-size: clamp(1.6rem, 3vw, 2.4rem); }
+  /* 見出しと概要は開示面の寸法のまま道具の画面でも使われていた。読ませる面と
+     見て決める面では、題名と説明に割ける高さが違う。 */
+  main:is([data-surface="select"], [data-surface="overview"], [data-surface="monitor"], [data-surface="review"]) h1 {
+    font-size: clamp(1.5rem, 2.6vw, 2.1rem);
+  }
+  main:is([data-surface="select"], [data-surface="overview"], [data-surface="monitor"], [data-surface="review"]) .lead {
+    margin-top: .35rem;
+    font-size: .95rem;
+    line-height: 1.65;
+  }
+  body:has(.account) .site-header { padding-block: .65rem; }
+
   @media (min-width: 72.01rem) {
     main[data-surface="workspace"] { --surface-width: min(98vw, 112rem); }
   }
