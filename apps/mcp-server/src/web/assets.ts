@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "192";
+export const DASHBOARD_ASSET_VERSION = "193";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -4601,6 +4601,33 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
       positionReviewSelectionToolbar();
     };
+    const floatComposerMedia = matchMedia("(min-width: 60.01rem)");
+    let composerAnchorRect = null;
+    const positionReviewComposer = (rect) => {
+      if (!(composer instanceof HTMLElement)) return;
+      if (rect) composerAnchorRect = rect;
+      const anchor = composerAnchorRect;
+      if (!anchor || composer.dataset.floating !== "true") return;
+      const box = composer.getBoundingClientRect();
+      const gap = 10;
+      const below = anchor.bottom + gap;
+      const top = below + box.height > innerHeight - 12
+        ? Math.max(12, anchor.top - gap - box.height)
+        : below;
+      const left = Math.min(
+        innerWidth - box.width - 12,
+        Math.max(12, anchor.left + anchor.width / 2 - box.width / 2)
+      );
+      composer.style.top = top + "px";
+      composer.style.left = left + "px";
+    };
+    const unfloatReviewComposer = () => {
+      if (!(composer instanceof HTMLElement)) return;
+      composer.removeAttribute("data-floating");
+      composer.style.top = "";
+      composer.style.left = "";
+      composerAnchorRect = null;
+    };
     const applyPendingReviewSelection = () => {
       if (pendingReviewSelection === null) return;
       if (!(targetKey instanceof HTMLInputElement) || !(rangeStart instanceof HTMLInputElement) || !(rangeEnd instanceof HTMLInputElement) || !(selectedText instanceof HTMLInputElement)) return;
@@ -4620,9 +4647,14 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (globalThis.CSS?.highlights && typeof HighlightType === "function") {
         globalThis.CSS.highlights.set("review-selection", new HighlightType(pending.range));
       }
+      const anchorRect = pending.range.getBoundingClientRect();
       hideReviewSelectionToolbar();
+      if (composer instanceof HTMLElement && floatComposerMedia.matches) {
+        composer.dataset.floating = "true";
+        positionReviewComposer(anchorRect);
+      }
       bodyInput?.focus({ preventScroll: true });
-      if (matchMedia("(max-width: 60rem)").matches && composer instanceof HTMLElement) {
+      if (!floatComposerMedia.matches && composer instanceof HTMLElement) {
         requestAnimationFrame(() => composer.scrollIntoView({ block: "start", behavior: "smooth" }));
       }
     };
@@ -4636,6 +4668,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       clearActiveReviewHighlight();
       getSelection()?.removeAllRanges();
       composer?.removeAttribute("data-active");
+      unfloatReviewComposer();
       for (const source of reviewPage.querySelectorAll("[data-review-source]")) source.removeAttribute("data-selected");
       if (selectionLabel instanceof HTMLElement) selectionLabel.textContent = "スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。";
       if (feedback instanceof HTMLElement) {
@@ -4707,6 +4740,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     addEventListener("resize", scheduleReviewToolbarPosition);
     document.addEventListener("scroll", scheduleReviewToolbarPosition, { capture: true, passive: true });
     reviewPage.querySelector("[data-review-whole]")?.addEventListener("click", resetSelection);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && composer instanceof HTMLElement && composer.dataset.floating === "true") resetSelection();
+    });
+    addEventListener("resize", () => positionReviewComposer());
+    floatComposerMedia.addEventListener("change", () => { if (!floatComposerMedia.matches) unfloatReviewComposer(); });
     if (composer instanceof HTMLFormElement) {
       composer.addEventListener("submit", async (event) => {
         event.preventDefault();

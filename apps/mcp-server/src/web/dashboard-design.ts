@@ -65,7 +65,23 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     grid-template-columns: minmax(7rem, 1fr) minmax(0, auto);
   }
   main[data-surface="workspace"] .workspace-head h1 { font-size: clamp(1.3rem, 2.2vw, 1.9rem); }
-  .workspace-head-links { margin: .2rem 0 0; font-size: .8rem; }
+  /* 作業面の見出しは、段階・題名・レビューへの導線が3行に積まれて85pxあった。
+     どれも短いので1行へ並べ、足りなければ折り返す。 */
+  main[data-surface="workspace"] .workspace-head > div:first-child {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: .1rem .6rem;
+  }
+  main[data-surface="workspace"] .workspace-head .eyebrow { margin: 0; }
+  main[data-surface="workspace"] .workspace-head h1 { margin: 0; }
+  .workspace-head-links { margin: 0; font-size: .8rem; }
+  /* 戻る導線は独立した帯にせず見出しの段へ寄せる。 */
+  main[data-surface="workspace"] > .back {
+    align-self: start;
+    margin-bottom: -1.15rem;
+    font-size: .8rem;
+  }
   main[data-surface="workspace"] > .slide-workspace {
     flex: 1;
     min-height: 0;
@@ -461,6 +477,23 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .review-source-text, .review-card p { color: var(--ink); }
   .review-source-text mark { background: var(--caution-surface); color: var(--ink); }
   .review-composer { border-color: var(--accent); background: var(--surface-accent); }
+  /* 指摘は選んだ場所で書く。入力欄がページ下方にあると、広い画面では画面外のまま
+     有効になり、どこへ書けばよいか分からない。 */
+  .review-composer[data-floating="true"] {
+    position: fixed;
+    z-index: 40;
+    width: min(30rem, calc(100vw - 1.5rem));
+    max-height: min(26rem, calc(100dvh - 2rem));
+    overflow: auto;
+    border-color: var(--accent);
+    border-radius: .8rem;
+    background: var(--panel);
+    box-shadow: var(--shadow-floating);
+  }
+  .review-composer[data-floating="true"] textarea { min-height: 5.5rem; }
+  /* 浮いている間は見出しが冗長。選択箇所と入力欄だけを見せる。 */
+  .review-composer[data-floating="true"] > div:first-child { display: none; }
+  .review-composer[data-floating="true"] .review-selection { margin-top: 0; }
   .review-selection { background: var(--field); color: var(--muted); }
   .review-card { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; }
   .review-card:first-child { border-top: 0; }
