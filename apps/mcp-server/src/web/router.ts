@@ -1346,7 +1346,7 @@ async function handleRenderedQualityReportSave(
       project_id: projectId,
       version: report.project_version,
       status: report.status,
-      issue_count: report.issue_count
+      measured_slides: report.measurements.length
     },
     createdAt: report.created_at
   });
@@ -1356,7 +1356,7 @@ async function handleRenderedQualityReportSave(
     project_version: report.project_version,
     renderer_version: report.renderer_version,
     status: report.status,
-    issue_count: report.issue_count,
+    measured_slides: report.measurements.length,
     saved_at: report.created_at,
     error: null,
     request_id: crypto.randomUUID()

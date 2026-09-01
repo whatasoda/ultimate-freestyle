@@ -22,7 +22,6 @@ import {
 } from "../publications/service";
 import { getVoiceProjectStatus } from "../voicevox/service";
 import { getProject } from "./repository";
-import { staticSlideQuality } from "./quality";
 import { getRenderedQualityReport } from "./quality-reports";
 import { listReviewComments } from "../reviews/repository";
 import { reviewCommentWithAnchor } from "../reviews/service";
@@ -567,9 +566,9 @@ export function registerResearchGuides(
       list: undefined
     }),
     {
-      title: "研究発表の品質事前検査",
+      title: "研究発表の実表示測定値",
       description:
-        "文章量、表、タイトル、読み上げ時間の静的警告と、実rendererで確認するWeb導線を取得します。",
+        "実rendererで測った縮小率、コントラスト比、文字サイズ、はみ出し、省略行数、重なり率を取得します。閾値判定は行いません。",
       mimeType: "application/json"
     },
     async (uri, variables) => {
@@ -581,15 +580,11 @@ export function registerResearchGuides(
       const renderedReport = project === null || "error" in auth
         ? null
         : await getRenderedQualityReport(db, auth.ownerUserId, project.project_id);
-      const deck = project?.document.deck ?? null;
-      const slides = deck?.slides.map((slide, index) => ({
-        slide_id: slide.id,
-        slide_number: index + 1,
-        title: slide.title,
-        warnings: staticSlideQuality(slide, deck.aspect_ratio ?? "16:9", deck.voicevox),
-        web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${project?.project_id}/slides/${slide.id}`
-      })) ?? [];
-      const warningCount = slides.reduce((sum, slide) => sum + slide.warnings.length, 0);
+      const current = project !== null &&
+        renderedReport !== null &&
+        renderedReport.project_version === project.version &&
+        renderedReport.renderer_version === PRESENTATION_RENDERER_VERSION &&
+        renderedReport.status === "completed";
       const body = "error" in auth
         ? { ok: false, error: { code: auth.error } }
         : project === null
@@ -599,34 +594,25 @@ export function registerResearchGuides(
               project_id: project.project_id,
               version: project.version,
               renderer_version: PRESENTATION_RENDERER_VERSION,
-              static_checks: {
-                status: warningCount > 0 ? "needs_changes" : "ready_for_render_review",
-                warning_count: warningCount,
-                slides
+              measured: renderedReport !== null,
+              current,
+              measurement: renderedReport,
+              fields: {
+                min_fit_scale: "自動縮小の下限。1.0が縮小なし",
+                overflow_count: "発表枠からはみ出した要素の数",
+                max_overflow_px: "はみ出し量の最大値",
+                min_contrast_ratio: "文字と背景のコントラスト比の下限",
+                min_contrast_required: "その箇所のWCAG基準値。下回るかは用途で判断する",
+                contrast_manual_review_count: "背景画像などで自動判定できず目視が要る箇所の数",
+                hidden_line_count: "読み上げ枠で省略された行数",
+                min_font_size_px: "実表示の最小文字サイズ",
+                min_font_size_recommended_px: "その箇所の推奨値",
+                max_overlap_ratio: "表示パーツ同士の重なり率の最大値",
+                fallback_font_count: "指定fontを使えず代替表示になった箇所の数"
               },
-              rendered_checks: {
-                required: true,
-                available_in_mcp: renderedReport !== null,
-                current: renderedReport !== null &&
-                  renderedReport.project_version === project.version &&
-                  renderedReport.renderer_version === PRESENTATION_RENDERER_VERSION &&
-                  renderedReport.status === "completed",
-                checks: ["見切れ", "自動縮小率", "文字コントラスト", "読み上げ文の省略", "実文字サイズ", "表示パーツの重なり"],
-                reason: "DOMの実寸、font、画像、アニメーションを含む検査は保存データだけでは確定できません。",
-                latest_report: renderedReport,
-                web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${project.project_id}`,
-                requires_session: true
-              },
-              next_action: warningCount > 0
-                ? "fix_static_warnings"
-                : renderedReport === null ||
-                    renderedReport.project_version !== project.version ||
-                    renderedReport.renderer_version !== PRESENTATION_RENDERER_VERSION ||
-                    renderedReport.status !== "completed"
-                  ? "run_rendered_quality_sweep"
-                  : renderedReport.issue_count > 0
-                    ? "fix_rendered_warnings"
-                    : "quality_review_complete"
+              note: "この測定値に合否はない。表紙の大きな文字と本文では基準が違うため、直すかどうかは研究の意図と合わせて判断する。保存データからは確定できないDOM実寸・font・画像・アニメーションの結果である。",
+              web_url: `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${project.project_id}`,
+              requires_session: true
             };
       return {
         contents: [{
@@ -744,20 +730,16 @@ export function registerResearchGuides(
             renderedReport.renderer_version !== PRESENTATION_RENDERER_VERSION ||
             renderedReport.status !== "completed"
           ? "stale"
-          : renderedReport.issue_count > 0
-            ? "issues"
-            : "clean";
+          : "measured";
       const qualityAdvisories = qualityState === "missing"
-        ? ["実rendererによる一括品質確認がまだありません。"]
+        ? ["実rendererでの測定がまだありません。research://projects/{id}/quality に数値が入ります。"]
         : qualityState === "stale"
-          ? ["最新の研究版とrendererで一括品質確認をやり直してください。"]
-          : qualityState === "issues"
-            ? [`実表示の確認事項が${renderedReport?.issue_count ?? 0}件あります。`]
-            : [];
+          ? ["最新の研究版とrendererで測定をやり直してください。"]
+          : [];
       const nextAction = contentBlocked
         ? "fix_blockers"
-        : qualityState !== "clean"
-          ? "review_quality"
+        : qualityState !== "measured"
+          ? "measure_rendered_output"
         : !previewCurrent
           ? "create_preview"
           : latest?.reviewed_at === null

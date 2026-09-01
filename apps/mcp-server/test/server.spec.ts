@@ -651,17 +651,12 @@ describe("MCP contract", () => {
         ok: true,
         project_id: firstProject.project_id,
         version: 2,
-        static_checks: {
-          status: "ready_for_render_review",
-          warning_count: 0
-        },
-        rendered_checks: {
-          required: true,
-          available_in_mcp: false,
-          requires_session: true
-        },
-        next_action: "run_rendered_quality_sweep"
+        measured: false,
+        current: false,
+        requires_session: true
       });
+      expect(JSON.stringify(qualityResource)).not.toContain("next_action");
+      expect(JSON.stringify(qualityResource)).not.toContain("static_checks");
       await saveRenderedQualityReport(
         env.DB,
         subjectId,
@@ -672,8 +667,22 @@ describe("MCP contract", () => {
           status: "completed",
           completed_checkpoints: 1,
           total_checkpoints: 1,
-          issue_count: 0,
-          results: []
+          measurements: [{
+            slide_id: "intro",
+            steps: 1,
+            min_fit_scale: 0.82,
+            min_fit_scale_step: 0,
+            overflow_count: 0,
+            max_overflow_px: 0,
+            min_contrast_ratio: 7.1,
+            min_contrast_required: 4.5,
+            contrast_manual_review_count: 0,
+            hidden_line_count: 0,
+            min_font_size_px: 32,
+            min_font_size_recommended_px: 24,
+            max_overlap_ratio: 0,
+            fallback_font_count: 0
+          }]
         },
         "2026-07-30T08:00:00.000Z"
       );
@@ -682,16 +691,13 @@ describe("MCP contract", () => {
         `research://projects/${firstProject.project_id}/quality`
       );
       expect(checkedQualityResource).toMatchObject({
-        rendered_checks: {
-          available_in_mcp: true,
-          current: true,
-          latest_report: {
-            project_version: 2,
-            status: "completed",
-            issue_count: 0
-          }
-        },
-        next_action: "quality_review_complete"
+        measured: true,
+        current: true,
+        measurement: {
+          project_version: 2,
+          status: "completed",
+          measurements: [{ slide_id: "intro", min_fit_scale: 0.82, min_contrast_ratio: 7.1 }]
+        }
       });
       const publicationResource = await readJsonResource(
         client,
@@ -730,7 +736,7 @@ describe("MCP contract", () => {
           ]),
           quality: {
             uri: `research://projects/${firstProject.project_id}/quality`,
-            state: "clean",
+            state: "measured",
             advisories: []
           }
         },
@@ -1805,7 +1811,7 @@ describe("MCP contract", () => {
           quality: {
             uri: `research://projects/${projectId}/quality`,
             state: "missing",
-            advisories: ["実rendererによる一括品質確認がまだありません。"]
+            advisories: ["実rendererでの測定がまだありません。research://projects/{id}/quality に数値が入ります。"]
           },
           can_publish: false
         }

@@ -1,4 +1,5 @@
 import type { SlideTypography } from "./schema";
+import type { ProjectRecord } from "./schema";
 
 export type ResolvedSlideTypography = {
   preset: SlideTypography["preset"];
@@ -80,4 +81,26 @@ export function resolveSlideTypography(
     ...(preset === "standard" ? { line_height: inheritedLineHeight } : {}),
     ...value
   };
+}
+
+type FlowSlide = NonNullable<ProjectRecord["document"]["deck"]>["slides"][number];
+
+export function recommendedFlowBodyLimit(
+  slide: FlowSlide,
+  aspectRatio: "16:9" | "4:3"
+): number {
+  const typography = resolveSlideTypography(slide.typography);
+  const presetFactor = {
+    statement: 0.55,
+    standard: 1,
+    article: 1.45,
+    columns: 1.5,
+    dense: 1.75
+  }[typography.preset];
+  const base = aspectRatio === "4:3" ? 460 : 600;
+  const sidebarFactor = slide.sidebar_markdown?.trim() ? 0.78 : 1;
+  const scaleFactor = Math.pow(1 / typography.body_scale, 1.6);
+  const lineHeightFactor = 1.5 / typography.line_height;
+  const columnFactor = 1 + (typography.columns - 1) * 0.08;
+  return Math.round(Math.min(1_600, Math.max(180, base * sidebarFactor * presetFactor * scaleFactor * lineHeightFactor * columnFactor)) / 10) * 10;
 }

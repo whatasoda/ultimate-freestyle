@@ -17,21 +17,14 @@ import {
   type VoicevoxTuning
 } from "@ultimate-freestyle/research-schema/voice";
 import {
-  MAX_PRESENTATION_ASSETS,
-  MAX_PRESENTATION_ASSET_BYTES,
   MAX_PRESENTATION_DURATION_SECONDS,
   type PublicationStatus
 } from "../publications/service";
 import {
-  listPresentationAssetIds,
   PRESENTATION_RENDERER_VERSION
 } from "../presentation/render";
 import { VOICEVOX_CATALOG } from "@ultimate-freestyle/research-schema/voicevox-catalog";
-import { resolveSlideTypography } from "../projects/typography";
-import {
-  recommendedFlowBodyLimit,
-  staticSlideQuality
-} from "../projects/quality";
+import { recommendedFlowBodyLimit, resolveSlideTypography } from "../projects/typography";
 import type { RenderedQualityReport } from "../projects/quality-reports";
 import { flattenSlideReviewSources } from "../reviews/flatten";
 import {
@@ -1491,14 +1484,12 @@ export function dashboardPage(options: {
         const qualityCurrent = project.quality_project_version === project.version &&
           project.quality_renderer_version === PRESENTATION_RENDERER_VERSION &&
           project.quality_status === "completed";
-        const qualityState = qualityCurrent && project.quality_issue_count === 0 ? "ready" : "attention";
+        const qualityState = qualityCurrent ? "ready" : "attention";
         const qualityLabel = project.quality_project_version === null
-          ? "実表示 未確認"
+          ? "実表示 未測定"
           : !qualityCurrent
-            ? "実表示 要再確認"
-            : project.quality_issue_count === 0
-              ? "実表示 確認済み"
-              : `実表示 要確認 ${project.quality_issue_count}件`;
+            ? "実表示 要再測定"
+            : "実表示 測定済み";
         const attentionReasons = !project.has_presentation
           ? ["発表を構成"]
           : [
@@ -1592,12 +1583,7 @@ export function projectDetailPage(options: {
           const voiceLabel = narration.length === 0
             ? "原稿なし"
             : `音声 ${readyVoice}/${narration.length}`;
-          const qualityWarnings = staticSlideQuality(
-            slide,
-            deck?.aspect_ratio ?? "16:9",
-            deck?.voicevox
-          );
-          return `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${SLIDE_ROLE_LABELS[slide.role ?? "content"]} · ${escapeHtml(slideCompositionLabel(slide))}</small>${qualityWarnings.length ? `<small class="slide-quality-warning">要確認 ${qualityWarnings.length}</small>` : ""}</strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階<small class="stage">${voiceLabel}</small></span></a>`;
+          return `<a class="slide-row" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slide.id)}"><span>${index + 1}</span><strong>${escapeHtml(slide.title)}<small class="stage">${SLIDE_ROLE_LABELS[slide.role ?? "content"]} · ${escapeHtml(slideCompositionLabel(slide))}</small></strong><span>${slide.duration_seconds}秒 · ${slide.reveal_steps + 1}段階<small class="stage">${voiceLabel}</small></span></a>`;
         })
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
@@ -1619,15 +1605,6 @@ export function projectDetailPage(options: {
   const assetTotalSize = assetTotalBytes < 1024 * 1024
     ? `${Math.ceil(assetTotalBytes / 1024)} KiB`
     : `${(assetTotalBytes / 1024 / 1024).toFixed(1)} MiB`;
-  const referencedAssetIds = listPresentationAssetIds(options.project);
-  const referencedAssets = referencedAssetIds
-    .map((assetId) => options.assets.find((asset) => asset.asset_id === assetId))
-    .filter((asset): asset is ProjectAsset => asset !== undefined);
-  const referencedAssetBytes = referencedAssets.reduce((total, asset) => total + asset.byte_size, 0);
-  const referencedAssetsValid =
-    referencedAssets.length === referencedAssetIds.length &&
-    referencedAssetIds.length <= MAX_PRESENTATION_ASSETS &&
-    referencedAssetBytes <= MAX_PRESENTATION_ASSET_BYTES;
   const narrationSegments = slides.flatMap(
     (slide) => slide.narration?.segments ?? []
   );
@@ -1674,59 +1651,8 @@ export function projectDetailPage(options: {
     (total, slide) => total + slide.duration_seconds,
     0
   );
-  const longestSlide = slides.reduce<(typeof slides)[number] | undefined>(
-    (longest, slide) =>
-      longest === undefined || slide.duration_seconds > longest.duration_seconds
-        ? slide
-        : longest,
-    undefined
-  );
   const durationWithinLimit =
     totalDurationSeconds > 0 && totalDurationSeconds <= MAX_PRESENTATION_DURATION_SECONDS;
-  const coverSlideCount = slides.filter((slide) => slide.role === "cover").length;
-  const narratedSlideCount = slides.filter(
-    (slide) => (slide.narration?.segments.length ?? 0) > 0
-  ).length;
-  const slidesWithMissingAlt = slides.filter((slide) => {
-    if (slide.composition?.mode === "canvas") {
-      return slide.composition.blocks.some(
-        (block) => block.kind === "image" && block.alt_text.trim() === ""
-      );
-    }
-    if (slide.composition?.mode === "scene") {
-      return slide.composition.nodes.some(
-        (node) => node.kind === "image" && node.alt_text.trim() === ""
-      );
-    }
-    return false;
-  }).length;
-  const assetsWithMissingAlt = options.assets.filter(
-    (asset) => asset.alt_text.trim() === ""
-  ).length;
-  const firstSlideWithMissingAlt = slides.find((slide) => {
-    if (slide.composition?.mode === "canvas") {
-      return slide.composition.blocks.some(
-        (block) => block.kind === "image" && block.alt_text.trim() === ""
-      );
-    }
-    if (slide.composition?.mode === "scene") {
-      return slide.composition.nodes.some(
-        (node) => node.kind === "image" && node.alt_text.trim() === ""
-      );
-    }
-    return false;
-  });
-  const firstSlideWithoutNarration = slides.find(
-    (slide) => (slide.narration?.segments.length ?? 0) === 0
-  );
-  const slidesWithStaticQualityWarnings = slides.filter(
-    (slide) => staticSlideQuality(
-      slide,
-      deck?.aspect_ratio ?? "16:9",
-      deck?.voicevox
-    ).length > 0
-  );
-  const firstSlideWithStaticQualityWarning = slidesWithStaticQualityWarnings[0];
   const firstSlidePath = slides[0] === undefined
     ? "#presentation-structure"
     : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(slides[0].id)}`;
@@ -1738,19 +1664,15 @@ export function projectDetailPage(options: {
     ? "missing"
     : !renderedQualityCurrent
       ? "stale"
-      : options.renderedQualityReport.issue_count > 0
-        ? "issues"
-        : "clean";
+      : "measured";
   const renderedQualityLabel = renderedQualityState === "missing"
-    ? "未実行"
+    ? "未測定"
     : renderedQualityState === "stale"
-      ? "要再確認"
-      : renderedQualityState === "issues"
-        ? `要確認 ${options.renderedQualityReport?.issue_count ?? 0}件`
-        : "確認済み";
+      ? "要再測定"
+      : "測定済み";
   const journeySteps = [
     { label: "発表構成", detail: `${slides.length}枚`, complete: slidesReady },
-    { label: "実表示", detail: renderedQualityLabel, complete: renderedQualityState === "clean" },
+    { label: "実表示", detail: renderedQualityLabel, complete: renderedQualityState === "measured" },
     ...(voiceConfigured
       ? [{
           label: "VOICEVOX",
@@ -1784,13 +1706,11 @@ export function projectDetailPage(options: {
             description: `現在は${formatDuration(totalDurationSeconds)}です。スライドの構成または想定秒数を見直してください。`,
             action: `<a class="button" href="${firstSlidePath}">スライドを見直す</a>`
           }
-      : renderedQualityState !== "clean"
+      : renderedQualityState !== "measured"
         ? {
-            title: renderedQualityState === "issues" ? "実表示の確認事項を直す" : "全スライドの実表示を確認する",
-            description: renderedQualityState === "issues"
-              ? `${options.renderedQualityReport?.issue_count ?? 0}件の確認事項があります。対象の一枚を直してから一括チェックをやり直します。`
-              : "実際のフォント・画像・アニメーションを含め、全STEPの見切れや重なりを一括確認します。",
-            action: `<a class="button" href="#rendered-quality">実表示チェックへ</a>`
+            title: "全スライドの実表示を測定する",
+            description: "実際のフォント・画像・アニメーションを含めて全STEPを描画し、縮小率・コントラスト・文字サイズを測ります。数値は接続中のAIから読めます。",
+            action: `<a class="button" href="#rendered-quality">実表示の測定へ</a>`
           }
       : voiceIncomplete && !previewCurrent
         ? {
@@ -1833,123 +1753,14 @@ export function projectDetailPage(options: {
     : !previewRendererCurrent
       ? "表示エンジンが更新されたため、新しいプレビューの確認が必要です。"
       : "公開中の版は、下書きを編集しても自動では変わりません。";
-  const preflightItems = [
-    {
-      complete: coverSlideCount > 0,
-      recommended: true,
-      label: "表紙スライド",
-      detail: coverSlideCount > 0 ? `${coverSlideCount}枚を表紙として設定済みです。` : "任意ですが、発表の題名と作者を伝えやすくなります。",
-      href: firstSlidePath
-    },
-    {
-      complete: slidesWithMissingAlt + assetsWithMissingAlt === 0,
-      recommended: true,
-      label: "画像の説明",
-      detail: slidesWithMissingAlt + assetsWithMissingAlt === 0
-        ? "説明が必要な画像に未入力はありません。"
-        : `${slidesWithMissingAlt}枚のスライドと${assetsWithMissingAlt}件の素材に未入力があります。`,
-      href: assetsWithMissingAlt > 0
-        ? "#research-images"
-        : firstSlideWithMissingAlt === undefined
-          ? "#research-images"
-          : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithMissingAlt.id)}`
-    },
-    {
-      complete: slides.length > 0 && narratedSlideCount === slides.length,
-      recommended: true,
-      label: "表示・読み上げ文",
-      detail: slides.length === 0
-        ? "スライドを作ると確認できます。"
-        : narratedSlideCount === slides.length
-          ? `全${slides.length}枚に読み上げ文があります。`
-          : `${narratedSlideCount}/${slides.length}枚に設定済みです。音声を使わない構成なら省略できます。`,
-      href: firstSlideWithoutNarration === undefined
-        ? `/dashboard/projects/${escapeHtml(options.project.project_id)}/voice`
-        : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithoutNarration.id)}`
-    },
-    {
-      complete: slides.length > 0 && slidesWithStaticQualityWarnings.length === 0,
-      recommended: true,
-      label: "文字量と表示枠",
-      detail: slides.length === 0
-        ? "スライドを作ると確認できます。"
-        : slidesWithStaticQualityWarnings.length === 0
-          ? `全${slides.length}枚で文章量の事前警告はありません。`
-          : `${slidesWithStaticQualityWarnings.length}/${slides.length}枚で文章量、表、読み上げ枠の確認をおすすめします。`,
-      href: firstSlideWithStaticQualityWarning === undefined
-          ? firstSlidePath
-          : `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(firstSlideWithStaticQualityWarning.id)}`
-    },
-    {
-      complete: referencedAssetsValid,
-      recommended: false,
-      label: "公開版の画像容量",
-      detail: referencedAssets.length !== referencedAssetIds.length
-        ? `${referencedAssetIds.length - referencedAssets.length}件の参照画像が見つかりません。`
-        : referencedAssetsValid
-          ? `${referencedAssetIds.length}件 · ${(referencedAssetBytes / 1024 / 1024).toFixed(1)}MiBで上限内です。`
-          : `${referencedAssetIds.length}/${MAX_PRESENTATION_ASSETS}件 · ${(referencedAssetBytes / 1024 / 1024).toFixed(1)}/30MiBです。使用画像を減らしてください。`,
-      href: "#research-images"
-    },
-    {
-      complete: durationWithinLimit,
-      recommended: false,
-      label: "想定発表時間",
-      detail: totalDurationSeconds === 0
-        ? "各スライドの想定秒数を確認してください。"
-        : durationWithinLimit
-          ? `${formatDuration(totalDurationSeconds)}です。20分以内に収まっています。`
-          : `現在${formatDuration(totalDurationSeconds)}で、20分以内を${formatDuration(totalDurationSeconds - MAX_PRESENTATION_DURATION_SECONDS)}超えています。`,
-      href: totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS && longestSlide !== undefined
-        ? `/dashboard/projects/${escapeHtml(options.project.project_id)}/slides/${escapeHtml(longestSlide.id)}`
-        : firstSlidePath
-    },
-    {
-      complete: !voiceIncomplete || previewCurrent,
-      recommended: false,
-      label: "固定版のVOICEVOX音声",
-      detail: previewCurrent
-        ? "現在の固定プレビューに必要な音声を保存済みです。"
-        : !voiceConfigured
-        ? "VOICEVOX未設定のため、固定プレビューではブラウザ音声を使います。"
-        : voiceIncomplete
-          ? `${readyVoiceSegments}/${narrationSegments.length}区間まで生成済みです。設定した声で全区間を生成してください。`
-          : `全${narrationSegments.length}区間を設定した声で生成済みです。`,
-      href: `/dashboard/projects/${escapeHtml(options.project.project_id)}/voice`
-    },
-    {
-      complete: renderedQualityState === "clean",
-      recommended: true,
-      label: "実表示の一括チェック",
-      detail: renderedQualityState === "clean"
-        ? "現在の下書きと表示エンジンで確認事項はありません。"
-        : renderedQualityState === "issues"
-          ? `${options.renderedQualityReport?.issue_count ?? 0}件の確認事項があります。修正後に再実行してください。`
-          : renderedQualityState === "stale"
-            ? "下書きまたは表示エンジンが変わったため再実行してください。"
-            : "実際のフォント・画像・全STEPをまだ一括確認していません。",
-      href: "#rendered-quality"
-    },
-    {
-      complete: previewReviewed,
-      recommended: false,
-      label: "固定プレビュー",
-      detail: previewReviewed ? "現在の版を最後まで確認済みです。" : previewCurrent ? "固定プレビューを最後まで操作し、確認済みにしてください。" : "現在の下書きから作り、最後まで操作して確認してください。",
-      href: "#publication"
-    }
-  ];
-  const corePreflightItems = preflightItems.filter((item) => !item.recommended);
-  const recommendedPreflightItems = preflightItems.filter((item) => item.recommended);
-  const preflightChecklist = `<details${previewCurrent ? "" : " open"}><summary>公開前チェック · 基本 ${corePreflightItems.filter((item) => item.complete).length}/${corePreflightItems.length} · おすすめ ${recommendedPreflightItems.filter((item) => item.complete).length}/${recommendedPreflightItems.length}</summary><ul class="preflight-list">${preflightItems.map((item) => `<li class="preflight-item" data-state="${item.complete ? "complete" : item.recommended ? "recommendation" : "attention"}"><span><strong>${escapeHtml(item.label)}${item.recommended ? " · おすすめ" : ""}</strong><small>${escapeHtml(item.detail)}</small></span>${item.complete ? "" : `<a class="preflight-action" href="${item.href}">${item.recommended ? "確認へ" : "修正へ"} →</a>`}</li>`).join("")}</ul></details>`;
   const publicMetaEditor = `<details class="component-detail"><summary>公開ページの題名と説明文</summary><div class="disclosure-body"><form class="editor" data-project-editor action="${projectFieldsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>題名<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label><label>説明文<textarea name="summary" maxlength="2000" placeholder="公開ページをSNSなどで共有したときに表示される説明です。">${escapeHtml(document.summary)}</textarea></label><div class="actions"><button type="submit">保存</button><span class="version" data-editor-version>v${options.project.version}</span></div><p class="feedback" data-editor-feedback aria-live="polite"></p></form></div></details>`;
   const publicationPanel = `<section class="panel publish-state" id="publication" tabindex="-1" data-publication>
     <h2>プレビューと公開</h2>
     <p class="feedback warning" data-publication-dirty aria-live="polite" hidden></p>
     ${publicMetaEditor}
-    ${preflightChecklist}
     <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
     <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
-    <div class="status-row"><span>実表示チェック</span><strong data-rendered-quality-state>${escapeHtml(renderedQualityLabel)}</strong></div>
+    <div class="status-row"><span>実表示の測定</span><strong data-rendered-quality-state>${escapeHtml(renderedQualityLabel)}</strong></div>
     <div class="status-row"><span>最新プレビュー</span><strong data-preview-status>${preview === null ? "未作成" : `v${preview.project_version} · ${escapeHtml(preview.renderer_version)}${previewCurrent ? "" : " · 要再生成"}`}</strong></div>
     <div class="status-row"><span>プレビュー確認</span><strong data-preview-review-status>${previewReviewed ? "確認済み" : previewCurrent ? "終了画面の到達待ち" : "対象なし"}</strong></div>
     <div class="status-row"><span>公開中</span><strong data-published-status>${published === null ? "未公開" : `v${published.project_version} · ${escapeHtml(published.renderer_version)}`}</strong></div>
@@ -2014,23 +1825,35 @@ export function projectDetailPage(options: {
   ];
   const qualitySweepStepCount = qualitySweepSlides.reduce((total, slide) => total + slide.max_step + 1, 0);
   const savedRenderedQualityItems = renderedQualityCurrent
-    ? (options.renderedQualityReport?.results ?? [])
-        .filter((result) => result.warning)
-        .map((result) => {
-          const slide = qualitySweepSlides.find((item) => item.id === result.slide_id);
-          const label = result.slide_id === "__prelude__"
+    ? (options.renderedQualityReport?.measurements ?? [])
+        .map((measurement) => {
+          const slide = qualitySweepSlides.find((item) => item.id === measurement.slide_id);
+          const label = measurement.slide_id === "__prelude__"
             ? "0ページ目"
             : slide === undefined
-              ? result.slide_id
+              ? measurement.slide_id
               : `${slide.number}. ${slide.title}`;
           const href = slide?.href ?? "#rendered-quality";
-          return `<li data-saved-quality-result><a href="${escapeHtml(href)}">${escapeHtml(label)}</a> — ${escapeHtml(result.message)}</li>`;
+          const numbers = [
+            `最小縮小率 ${measurement.min_fit_scale.toFixed(2)}`,
+            measurement.min_contrast_ratio === null
+              ? ""
+              : `最小コントラスト ${measurement.min_contrast_ratio.toFixed(2)}:1（目安 ${(measurement.min_contrast_required ?? 0).toFixed(1)}）`,
+            measurement.min_font_size_px === null
+              ? ""
+              : `最小文字 ${measurement.min_font_size_px.toFixed(1)}px（目安 ${(measurement.min_font_size_recommended_px ?? 0).toFixed(1)}px）`,
+            measurement.overflow_count > 0 ? `はみ出し ${measurement.overflow_count}件` : "",
+            measurement.hidden_line_count > 0 ? `省略 ${measurement.hidden_line_count}行` : "",
+            measurement.max_overlap_ratio > 0 ? `重なり最大 ${measurement.max_overlap_ratio.toFixed(2)}` : "",
+            measurement.fallback_font_count > 0 ? `代替フォント ${measurement.fallback_font_count}件` : ""
+          ].filter(Boolean).join(" · ");
+          return `<li data-saved-quality-result><a href="${escapeHtml(href)}">${escapeHtml(label)}</a> — ${escapeHtml(numbers)}</li>`;
         })
         .join("")
     : "";
   const qualitySweepPanel = qualitySweepSlides.length === 0
     ? ""
-    : `<details class="panel panel-disclosure" id="rendered-quality"${renderedQualityState === "clean" ? "" : " open"}><summary>0ページ目と全スライドの実表示を一括確認 · ${escapeHtml(renderedQualityLabel)}</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で${loadingScreen.enabled ? "0ページ目と" : ""}全${slides.length}枚・${qualitySweepStepCount}段階を順番に描画し、見切れ、70%未満の自動縮小、文字コントラスト、読み上げ文の省略、文字サイズ、重なり、代替フォントを探します。完了結果は同じ研究へ接続したAIからも確認できます。</p><div class="quality-sweep-head"><button type="button" data-op="run" data-quality-sweep data-project-id="${escapeHtml(options.project.project_id)}" data-project-version="${options.project.version}" data-renderer-version="${escapeHtml(PRESENTATION_RENDERER_VERSION)}" data-report-url="/api/projects/${escapeHtml(options.project.project_id)}/quality-report" data-csrf="${escapeHtml(options.csrfToken)}" data-prelude-minimum-ms="${loadingScreen.minimum_duration_ms}" data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`/dashboard/projects/${options.project.project_id}/slides/${slides[0]?.id}/frame?slide=1&step=0`)}">${renderedQualityState === "missing" ? "一括チェックを開始" : "一括チェックをやり直す"}</button><button type="button" data-op="run" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">${escapeHtml(renderedQualityLabel)}</span></div><ol class="quality-sweep-results" data-quality-sweep-results>${savedRenderedQualityItems}</ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="0ページ目と全スライドの表示確認"></iframe></div></div></details>`;
+    : `<details class="panel panel-disclosure" id="rendered-quality"${renderedQualityState === "measured" ? "" : " open"}><summary>0ページ目と全スライドの実表示を測定 · ${escapeHtml(renderedQualityLabel)}</summary><div class="disclosure-body quality-sweep"><p class="prose">現在の${escapeHtml(deck?.aspect_ratio ?? "16:9")}の発表枠で${loadingScreen.enabled ? "0ページ目と" : ""}全${slides.length}枚・${qualitySweepStepCount}段階を順番に描画し、自動縮小率、コントラスト比、文字サイズ、はみ出し、省略行数、重なり率を測ります。合否は付けません。数値は同じ研究へ接続したAIが読み、直すかどうかは研究の意図と合わせて判断します。</p><div class="quality-sweep-head"><button type="button" data-op="run" data-quality-sweep data-project-id="${escapeHtml(options.project.project_id)}" data-project-version="${options.project.version}" data-renderer-version="${escapeHtml(PRESENTATION_RENDERER_VERSION)}" data-report-url="/api/projects/${escapeHtml(options.project.project_id)}/quality-report" data-csrf="${escapeHtml(options.csrfToken)}" data-prelude-minimum-ms="${loadingScreen.minimum_duration_ms}" data-slides="${escapeHtml(JSON.stringify(qualitySweepSlides))}" data-frame-url="${escapeHtml(`/dashboard/projects/${options.project.project_id}/slides/${slides[0]?.id}/frame?slide=1&step=0`)}">${renderedQualityState === "missing" ? "測定を開始" : "測定をやり直す"}</button><button type="button" data-op="run" data-quality-sweep-cancel hidden>中断</button><progress data-quality-sweep-progress max="${qualitySweepStepCount}" value="0" hidden>0 / ${qualitySweepStepCount}</progress><span class="feedback" data-quality-sweep-status aria-live="polite">${escapeHtml(renderedQualityLabel)}</span></div><ol class="quality-sweep-results" data-quality-sweep-results>${savedRenderedQualityItems}</ol><div class="quality-sweep-preview" data-quality-sweep-preview style="--quality-sweep-aspect:${(deck?.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9"}" hidden><iframe data-quality-sweep-frame title="0ページ目と全スライドの表示確認"></iframe></div></div></details>`;
 
   return new Response(
     shell(
@@ -2889,55 +2712,9 @@ export function slideWorkspacePage(options: {
   const narrationSegmentCreator = availableNarrationSteps.length
     ? `<details class="component-detail"><summary>読み上げ区間を追加</summary><form class="editor" data-narration-segment-create data-segment-preview data-versioned-form data-method="POST" action="${slidePath}/narration/segments" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-effective-tuning="${escapeHtml(JSON.stringify(defaultNarrationTuning))}" data-profile-catalogs="${escapeHtml(JSON.stringify(profileCatalogIds))}" data-step-duration="${slide.duration_seconds / (slide.reveal_steps + 1)}" data-csrf="${escapeHtml(options.csrfToken)}"><label>表示する段階<select name="at">${availableNarrationSteps.map((step) => `<option value="${step}">STEP ${step}</option>`).join("")}</select><small class="inherit-note">選ぶと左の実表示も同じSTEPへ移動します。</small></label><label>表示・読み上げ文<textarea name="text" maxlength="2000" required placeholder="この段階で読み上げる文"></textarea></label><span class="voice-timing" data-segment-duration data-state="ok">概算 1.5秒 / STEP目安 ${(slide.duration_seconds / (slide.reveal_steps + 1)).toFixed(1)}秒</span><div class="actions"><button type="button" data-op="run" data-segment-speech-preview aria-pressed="false" disabled>ブラウザで仮試聴</button>${profileCatalogIds[""] ? `<button type="button" data-op="run" data-segment-voicevox-sample="${voicevoxSampleUrl}" aria-pressed="false">既定の声をVOICEVOXで試聴</button>` : ""}<button type="submit">区間を追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`
     : `<p class="inherit-note">STEP 0〜${slide.reveal_steps}にはすべて読み上げ区間があります。</p>`;
-  const missingAlt =
-    slide.composition?.mode === "canvas"
-      ? slide.composition.blocks.filter(
-          (block) => block.kind === "image" && block.alt_text.trim() === ""
-        ).length
-      : slide.composition?.mode === "scene"
-        ? slide.composition.nodes.filter(
-            (node) => node.kind === "image" && node.alt_text.trim() === ""
-          ).length
-        : 0;
-  const missingAudio =
-    slide.narration?.segments.filter((segment) => segment.audio_src === null).length ?? 0;
-  const markdownBlocks = slide.content_markdown
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter(Boolean);
-  const headingCount = markdownBlocks.filter((block) => /^#{1,6}\s/m.test(block)).length;
-  const paragraphCount = markdownBlocks.filter((block) => !/^(?:#{1,6}\s|[-*+]\s)/m.test(block)).length;
-  const needsReadingLayout =
-    slide.content_markdown.length > 550 ||
-    (headingCount >= 2 && paragraphCount >= 3);
   const compositionMode = slide.composition?.mode ?? "flow";
   const flowComposition = compositionMode === "flow";
   const contentSectionTitle = flowComposition ? "内容" : "基本情報と代替テキスト";
-  const qualityItems = [...new Set([
-    ...(missingAlt > 0 ? [`説明のない画像が${missingAlt}件あります。`] : []),
-    ...(missingAudio > 0
-      ? [`${missingAudio}区間はVOICEVOX音声が未生成です。編集画面ではブラウザ音声で仮試聴できます。`]
-      : []),
-    ...(slide.composition?.clip_content
-      ? ["枠外を隠す設定です。実表示の見切れ診断を確認してください。"]
-      : []),
-    ...(mainContrast !== null && mainContrast < 4.5
-      ? [`本文と背景のコントラストが${mainContrast.toFixed(1)}:1です。標準文字は4.5:1以上を目安にしてください。`]
-      : []),
-    ...(sidebarContrast !== null && sidebarContrast < 4.5
-      ? [`補助文字と補足面のコントラストが${sidebarContrast.toFixed(1)}:1です。標準文字は4.5:1以上を目安にしてください。`]
-      : []),
-    ...(slide.composition === null || slide.composition === undefined
-      ? needsReadingLayout && ["statement", "standard"].includes(typography.preset)
-        ? ["文章量が多いため、「読み物」または「2段組み」の組版プリセットも確認してください。"]
-        : typography.columns === 3 && (deck.aspect_ratio ?? "16:9") === "4:3"
-          ? ["4:3で3段組みを使っています。1段あたりの行長と見切れ診断を確認してください。"]
-          : typography.columns > 1 && headingCount === 0 && slide.content_markdown.length > 320
-            ? ["段組みの文章に見出しがありません。段の切り替わりを追いやすいよう、小見出しの追加を検討してください。"]
-          : []
-      : []),
-    ...staticSlideQuality(slide, deck.aspect_ratio ?? "16:9", deck.voicevox)
-  ])];
   const workspaceTotalDurationSeconds = deck.slides.reduce(
     (total, item) => total + item.duration_seconds,
     0
@@ -2978,7 +2755,7 @@ export function slideWorkspacePage(options: {
              <p class="quality-status" data-layout-status role="status" aria-live="polite">実表示の文字収まりを確認しています…</p>
            </section>
            <aside class="inspector" id="workspace-edit-pane">${workspaceSlideCreator}
-             <div class="inspector-tabs" role="tablist" aria-label="編集項目" hidden><button id="inspector-tab-content" type="button" role="tab" data-inspector-pane="content" aria-controls="inspector-content">内容</button><button id="inspector-tab-design" type="button" role="tab" data-inspector-pane="design" aria-controls="inspector-design">デザイン</button><button id="inspector-tab-narration" type="button" role="tab" data-inspector-pane="narration" aria-controls="inspector-narration">読み上げ</button><button id="inspector-tab-structure" type="button" role="tab" data-inspector-pane="structure" aria-controls="inspector-structure">構造</button><button id="inspector-tab-quality" type="button" role="tab" data-inspector-pane="quality" aria-controls="inspector-quality">品質確認</button></div>
+             <div class="inspector-tabs" role="tablist" aria-label="編集項目" hidden><button id="inspector-tab-content" type="button" role="tab" data-inspector-pane="content" aria-controls="inspector-content">内容</button><button id="inspector-tab-design" type="button" role="tab" data-inspector-pane="design" aria-controls="inspector-design">デザイン</button><button id="inspector-tab-narration" type="button" role="tab" data-inspector-pane="narration" aria-controls="inspector-narration">読み上げ</button><button id="inspector-tab-structure" type="button" role="tab" data-inspector-pane="structure" aria-controls="inspector-structure">構造</button></div>
                           <details class="inspector-section" id="inspector-content" data-inspector-section="content"${flowComposition ? " open" : ""}><summary>${contentSectionTitle}</summary><div class="inspector-body">
                <form class="editor" data-slide-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-composition-mode="${compositionMode}" data-max-step="${slide.reveal_steps}" data-step-count="${slide.reveal_steps + 1}" data-csrf="${escapeHtml(options.csrfToken)}">
                  ${flowComposition ? "" : '<p class="mode-note">このスライドで見える文章・画像・図形は「構造」の表示パーツです。ここでは一覧・検索・構成変換に使う代替テキストと基本情報だけを編集します。</p>'}
@@ -3003,7 +2780,6 @@ export function slideWorkspacePage(options: {
                ${narrationSegmentCreator}${narrationSegmentOutline}${voiceSegments}
              </div></details>
              <details class="inspector-section" id="inspector-structure" data-inspector-section="structure"${flowComposition ? "" : " open"}><summary>構造 · ${escapeHtml(slideCompositionLabel(slide))}</summary><div class="inspector-body"><p class="mode-note">${escapeHtml(modeNote)}</p>${compositionEditor}${canvasBlockCreator}${scenePatternCreate}${sceneComponentCreate}${canvasBlockEditors}${sceneComponentEditors}${componentSearch}${componentOutline}</div></details>
-             <details class="inspector-section" id="inspector-quality" data-inspector-section="quality" open><summary>品質確認</summary><div class="inspector-body"><p class="quality-status" data-quality-summary data-base-count="${qualityItems.length}" data-level="${qualityItems.length ? "warning" : "ok"}">${qualityItems.length ? `${qualityItems.length}件の確認事項があります。` : "保存データ上の確認事項はありません。"}</p><ul class="quality-list" data-quality-list>${qualityItems.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul></div></details>
            ${effectiveSummary}
              <details class="workspace-guide"><summary>この編集画面の使い方</summary><div class="workspace-guide-body"><p><strong>1 · スライドを選ぶ</strong>左の一覧で一枚を選びます。検索するとタイトル・構成・音声状態で絞れます。</p><p><strong>2 · 実表示で確認</strong>中央は公開時と同じrendererです。段階ボタンでSTEPごとの見え方を確認します。</p><p><strong>3 · 項目ごとに保存</strong>プレビュー下の編集ドックで、内容、デザイン、読み上げ、構造を編集します。変更した欄の保存ボタンを押します。</p><p><strong>4 · 品質を解消</strong>見切れや文字サイズは品質確認に出ます。研究詳細で全スライド確認後、previewを作成します。</p></div></details>
            </aside>

@@ -37,7 +37,6 @@ export type DashboardProjectSummary = ProjectSummary & {
   quality_project_version: number | null;
   quality_renderer_version: string | null;
   quality_status: "completed" | "cancelled" | null;
-  quality_issue_count: number | null;
 };
 
 export class ProjectRepositoryError extends Error {
@@ -174,8 +173,7 @@ export async function listDashboardProjects(
               published.renderer_version AS published_renderer_version,
               quality.project_version AS quality_project_version,
               quality.renderer_version AS quality_renderer_version,
-              quality.status AS quality_status,
-              quality.issue_count AS quality_issue_count
+              quality.status AS quality_status
        FROM research_projects AS projects
        LEFT JOIN project_publications AS publications
          ON publications.project_id = projects.id AND publications.owner_user_id = projects.owner_user_id
@@ -205,8 +203,7 @@ export async function listDashboardProjects(
       quality_project_version: number | null;
       quality_renderer_version: string | null;
       quality_status: "completed" | "cancelled" | null;
-      quality_issue_count: number | null;
-    }>();
+        }>();
 
   return result.results.map((row) => ({
     project_id: row.id,
@@ -226,7 +223,6 @@ export async function listDashboardProjects(
     quality_project_version: row.quality_project_version,
     quality_renderer_version: row.quality_renderer_version,
     quality_status: row.quality_status,
-    quality_issue_count: row.quality_issue_count,
     created_at: row.created_at,
     updated_at: row.updated_at
   }));

@@ -445,8 +445,8 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("data-dashboard-theme-label>ダーク");
     expect(dashboardHtml).toContain("発表 1枚 · 0分30秒");
     expect(dashboardHtml).toContain("プレビュー未作成");
-    expect(dashboardHtml).toContain("実表示 未確認");
-    expect(dashboardHtml).toContain("次に：実表示 未確認 · プレビュー未作成");
+    expect(dashboardHtml).toContain("実表示 未測定");
+    expect(dashboardHtml).toContain("次に：実表示 未測定 · プレビュー未作成");
     expect(dashboardHtml).toContain("音声 1/1 完成");
     expect(dashboardHtml).not.toContain("data-project-search");
     expect(dashboardHtml).not.toContain("data-project-filter");
@@ -511,19 +511,17 @@ describe("Web dashboard", () => {
     expect(detail.headers.get("content-security-policy")).toContain(
       "style-src 'self' 'unsafe-inline'"
     );
-    expect(DASHBOARD_SCRIPT).toContain("背景模様・透明度を含む概算のため目視確認");
     expect(DASHBOARD_SCRIPT).toContain("指定フォントがこの端末になく");
-    expect(DASHBOARD_SCRIPT).toContain("指定フォントの代替表示");
-    expect(DASHBOARD_SCRIPT).toContain('target.elements.namedItem(preferredPath)');
+    expect(DASHBOARD_SCRIPT).toContain("代替フォントで表示されています");
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
     expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
-    expect(detailHtml).toContain("0ページ目と全スライドの実表示を一括確認");
+    expect(detailHtml).toContain("0ページ目と全スライドの実表示を測定");
     expect(detailHtml).toContain('id="rendered-quality" open');
-    expect(detailHtml).toContain('data-rendered-quality-state>未実行');
-    expect(detailHtml).toContain("実表示の一括チェック · おすすめ");
+    expect(detailHtml).toContain('data-rendered-quality-state>未測定');
+    expect(detailHtml).toContain("合否は付けません");
     expect(detailHtml).toContain('&quot;id&quot;:&quot;__prelude__&quot;');
     expect(detailHtml).toContain("data-quality-sweep");
     expect(detailHtml).toContain('data-report-url="/api/projects/10000000-0000-4000-8000-000000000001/quality-report"');
@@ -535,10 +533,8 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("Number(data.step) !== sweepStep");
     expect(DASHBOARD_SCRIPT).toContain('slide.id === "__prelude__" && data.ready !== true');
     expect(DASHBOARD_SCRIPT).toContain("qualitySweepButton.dataset.preludeMinimumMs");
-    expect(DASHBOARD_SCRIPT).toContain('sharedState.textContent = sweepIssueCount');
+    expect(DASHBOARD_SCRIPT).toContain('sharedState.textContent = "測定済み"');
     expect(detailHtml).toContain('data-prelude-minimum-ms="500"');
-    expect(DASHBOARD_SCRIPT).toContain("推奨色を入力");
-    expect(DASHBOARD_SCRIPT).toContain('item.id === "flow:sidebar" ? "muted" : "foreground"');
     expect(detailHtml).toContain("data-quality-sweep-cancel");
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:set-position");
     expect(detailHtml).toContain("data-copy-public");
@@ -562,27 +558,15 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("templateRoleStyles(templateEditor, new FormData(templateEditor), activeRoleStyleRole)");
     expect(DASHBOARD_SCRIPT).toContain('templates[""] = previewTemplate(result.default_template)');
     expect(DASHBOARD_SCRIPT).toContain("activeFilmstrip.dataset.roleLabel = nextRole");
-    expect(DASHBOARD_SCRIPT).toContain('button.textContent = "修正欄へ"');
     expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
     expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:preview-review");
     expect(DASHBOARD_SCRIPT).toContain("recordCompletedPreview");
-    expect(detailHtml).toContain("公開前チェック ·");
-    expect(detailHtml).toContain("基本 2/4 · おすすめ 3/5");
-    expect(detailHtml).toContain("固定版のVOICEVOX音声");
+    expect(detailHtml).not.toContain("公開前チェック");
+    expect(detailHtml).not.toContain("文字量と表示枠");
     expect(detailHtml).toContain('data-can-preview="false"');
-    expect(detailHtml).toContain("公開版の画像容量");
-    expect(detailHtml).toContain("表紙スライド · おすすめ");
-    expect(detailHtml).toContain("文字量と表示枠 · おすすめ");
-    expect(detailHtml).toContain('data-state="recommendation"');
-    expect(detailHtml).toContain("表紙スライド");
-    expect(detailHtml).toContain("画像の説明");
-    expect(detailHtml).toContain("表示・読み上げ文");
     expect(detailHtml).toContain("音声 0/1");
-    expect(detailHtml).toContain("想定発表時間");
     expect(detailHtml).toContain('<dt>想定時間</dt><dd data-state="ok">0分30秒</dd>');
-    expect(detailHtml).toContain("固定プレビュー");
-    expect(detailHtml).toContain("修正へ →");
     expect(detailHtml).not.toContain('href="#basic-information"');
     expect(detailHtml).toContain('id="research-images"');
     expect(detailHtml).toContain('id="presentation-structure"');
@@ -641,11 +625,21 @@ describe("Web dashboard", () => {
             status: "completed",
             completed_checkpoints: 2,
             total_checkpoints: 2,
-            issue_count: 1,
-            results: [{
+            measurements: [{
               slide_id: "intro",
-              message: "STEP 1: 小さすぎる文字1か所",
-              warning: true
+              steps: 2,
+              min_fit_scale: 0.68,
+              min_fit_scale_step: 1,
+              overflow_count: 0,
+              max_overflow_px: 0,
+              min_contrast_ratio: 3.9,
+              min_contrast_required: 4.5,
+              contrast_manual_review_count: 0,
+              hidden_line_count: 0,
+              min_font_size_px: 17.4,
+              min_font_size_recommended_px: 24,
+              max_overlap_ratio: 0,
+              fallback_font_count: 0
             }]
           })
         }
@@ -657,13 +651,12 @@ describe("Web dashboard", () => {
       ok: true,
       project_version: 1,
       status: "completed",
-      issue_count: 1
+      measured_slides: 1
     });
     expect(await env.DB.prepare(
-      "SELECT issue_count, results_json FROM project_quality_reports WHERE project_id = ?"
+      "SELECT results_json FROM project_quality_reports WHERE project_id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first()).toMatchObject({
-      issue_count: 1,
-      results_json: expect.stringContaining("小さすぎる文字")
+      results_json: expect.stringContaining('"min_fit_scale":0.68')
     });
     const dashboardWithSavedQuality = await requestProvider(
       provider,
@@ -672,7 +665,7 @@ describe("Web dashboard", () => {
       }),
       authEnv
     );
-    expect(await dashboardWithSavedQuality.text()).toContain("実表示 要確認 1件");
+    expect(await dashboardWithSavedQuality.text()).toContain("実表示 測定済み");
     const detailWithSavedQuality = await requestProvider(
       provider,
       new Request(
@@ -682,10 +675,12 @@ describe("Web dashboard", () => {
       authEnv
     );
     const detailWithSavedQualityHtml = await detailWithSavedQuality.text();
-    expect(detailWithSavedQualityHtml).toContain("0ページ目と全スライドの実表示を一括確認 · 要確認 1件");
-    expect(detailWithSavedQualityHtml).toContain('data-rendered-quality-state>要確認 1件');
+    expect(detailWithSavedQualityHtml).toContain("0ページ目と全スライドの実表示を測定 · 測定済み");
+    expect(detailWithSavedQualityHtml).toContain('data-rendered-quality-state>測定済み');
     expect(detailWithSavedQualityHtml).toContain('data-saved-quality-result');
-    expect(detailWithSavedQualityHtml).toContain("STEP 1: 小さすぎる文字1か所");
+    expect(detailWithSavedQualityHtml).toContain("最小縮小率 0.68");
+    expect(detailWithSavedQualityHtml).toContain("最小コントラスト 3.90:1（目安 4.5）");
+    expect(detailWithSavedQualityHtml).toContain("最小文字 17.4px（目安 24.0px）");
     expect(detailWithSavedQualityHtml).toContain(
       'href="/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro">1. はじめに</a>'
     );
@@ -1045,11 +1040,10 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("声を変える位置を追加");
     expect(workspaceHtml).toContain("読み上げ前後の余白");
     expect(workspaceHtml).toContain("はじめての読み上げ設定");
-    expect(workspaceHtml).toContain("VOICEVOX音声が未生成");
     expect(workspaceHtml).toContain("ずんだもん・ノーマル");
     expect(workspaceHtml).toContain("data-component-select");
     expect(workspaceHtml).toContain("data-layout-status");
-    expect(workspaceHtml).toContain('data-base-count="');
+    expect(workspaceHtml).not.toContain("data-inspector-pane=\"quality\"");
 
     const frameUrl = `${workspaceUrl}/frame?slide=1&step=0`;
     const frame = await requestProvider(
@@ -1206,11 +1200,11 @@ describe("Web dashboard", () => {
     const dashboardScriptText = await dashboardScript.text();
     expect(() => new Function(dashboardScriptText)).not.toThrow();
     expect(dashboardScriptText).toContain("queueMicrotask(syncFramePosition)");
-    expect(dashboardScriptText).toContain("qualitySummary.dataset.baseCount");
+    expect(dashboardScriptText).not.toContain("qualitySummary");
     expect(dashboardScriptText).toContain("Array.isArray(data.fits)");
-    expect(dashboardScriptText).toContain("70%未満まで縮小");
-    expect(dashboardScriptText).toContain("小さすぎる文字");
-    expect(dashboardScriptText).toContain("表示パーツの重なり");
+    expect(dashboardScriptText).toContain("最小縮小率 ");
+    expect(dashboardScriptText).toContain("最小文字 ");
+    expect(dashboardScriptText).toContain("最小コントラスト ");
     expect(dashboardScriptText).toContain("ultimate-freestyle:save-component");
     expect(dashboardScriptText).toContain("未保存の変更はありません");
     expect(dashboardScriptText).toContain("syncPageVersion(result.version)");
@@ -1237,7 +1231,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('response.headers.get("x-voicevox-cache")');
     expect(dashboardScriptText).toContain('persistQualitySweep("completed")');
     expect(dashboardScriptText).toContain('void saveQualitySweep("completed")');
-    expect(dashboardScriptText).toContain("前回の確認結果：");
+    expect(dashboardScriptText).toContain("段階まで測定しました");
     expect(dashboardScriptText).toContain("updateImagePreview");
     expect(dashboardScriptText).toContain("URL.revokeObjectURL");
     expect(dashboardScriptText).toContain("画像の解像度を確認しています");
@@ -1295,7 +1289,6 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("data-narration-color-preview");
     expect(dashboardScriptText).toContain("data-narration-color-pick");
     expect(dashboardScriptText).toContain("data-narration-color-reset");
-    expect(dashboardScriptText).toContain('item.id === "narration" ? "appearance_foreground"');
     expect(dashboardScriptText).toContain("読み上げ枠をプレビューへ反映しています");
     expect(dashboardScriptText).toContain("説明を保存しています");
     expect(dashboardScriptText).toContain("SpeechSynthesisUtterance");
@@ -1316,7 +1309,7 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("form.dataset.component = JSON.stringify");
     expect(dashboardScriptText).toContain("data-slide-create");
     expect(dashboardScriptText).toContain("data-composition-create");
-    expect(dashboardScriptText).toContain("読み上げ文の省略");
+    expect(dashboardScriptText).toContain("行が省略されています");
     expect(dashboardScriptText).toContain("data.clamps");
     expect(dashboardScriptText).toContain("data-scene-component-action");
     expect(dashboardScriptText).toContain('action === "delete_tree"');
@@ -1752,8 +1745,7 @@ describe("Web dashboard", () => {
             status: "completed",
             completed_checkpoints: 2,
             total_checkpoints: 2,
-            issue_count: 0,
-            results: []
+            measurements: []
           })
         }
       ),
@@ -3222,7 +3214,7 @@ describe("Web dashboard", () => {
     expect(flowWorkspaceHtml).toContain('class="inspector-tabs" role="tablist" aria-label="編集項目" hidden');
     expect(flowWorkspaceHtml).toContain('id="inspector-tab-content" type="button" role="tab"');
     expect(DASHBOARD_SCRIPT).toContain('mobileInspectorTabs.hidden = false');
-    expect(flowWorkspaceHtml).toContain('data-inspector-pane="quality" aria-controls="inspector-quality"');
+    expect(flowWorkspaceHtml).not.toContain('data-inspector-pane="quality"');
     expect(flowWorkspaceHtml).toContain('id="inspector-tab-content"');
     expect(DASHBOARD_SCRIPT).toContain('const mobileInspectorMedia = matchMedia("(max-width: 48rem)")');
     expect(DASHBOARD_SCRIPT).toContain('selectInspectorPane(next.dataset.inspectorPane');

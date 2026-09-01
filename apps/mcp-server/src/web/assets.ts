@@ -275,36 +275,74 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     let sweepIndex = 0;
     let sweepStep = 0;
     let sweepRunning = false;
-    let sweepIssueCount = 0;
     let completedCheckpoints = 0;
-    let currentSlideFindings = [];
-    let sweepResults = [];
+    let currentSlideSteps = [];
+    let sweepMeasurements = [];
+    let sweepUnmeasuredCount = 0;
     let sweepTimer;
     let sweepFrameMode = "unloaded";
     const totalCheckpoints = slides.reduce((total, slide) => total + Number(slide.max_step || 0) + 1, 0);
     const presentationSlideCount = slides.filter((slide) => slide.id !== "__prelude__").length;
     const includesPrelude = slides.some((slide) => slide.id === "__prelude__");
     const sweepStorageKey = "ultimate-freestyle:quality-sweep:" + (qualitySweepButton.dataset.projectId || "") + ":v" + (qualitySweepButton.dataset.projectVersion || "");
-    const renderSweepResult = (result) => {
-      if (!(qualitySweepResults instanceof HTMLOListElement)) return;
-      const item = document.createElement("li");
-      if (!result.warning) item.classList.add("success");
-      if (result.href) {
-        const link = document.createElement("a");
-        link.href = result.href;
-        link.textContent = result.label;
-        item.append(link, document.createTextNode(" — " + result.message));
-      } else item.textContent = result.message;
-      qualitySweepResults.append(item);
+    const foldSlideSteps = (slideId, steps) => {
+      const numbers = (list, pick) => list.flatMap((step) => step[pick] ?? []).filter((value) => Number.isFinite(value));
+      const fitScales = numbers(steps, "fit_scales");
+      const contrastPairs = steps.flatMap((step) => step.contrasts ?? []);
+      const fontSizes = steps.flatMap((step) => step.font_sizes ?? []);
+      const worstContrast = contrastPairs.length
+        ? contrastPairs.reduce((worst, item) => (item.ratio < worst.ratio ? item : worst))
+        : null;
+      const worstFont = fontSizes.length
+        ? fontSizes.reduce((worst, item) => (item.font_size_px < worst.font_size_px ? item : worst))
+        : null;
+      const minFitScale = fitScales.length ? Math.min(...fitScales) : 1;
+      const minFitScaleStep = steps.find((step) => (step.fit_scales ?? []).some((value) => value === minFitScale));
+      return {
+        slide_id: String(slideId).slice(0, 64),
+        steps: steps.length,
+        min_fit_scale: Number(minFitScale.toFixed(3)),
+        min_fit_scale_step: minFitScaleStep ? minFitScaleStep.step : 0,
+        overflow_count: steps.reduce((total, step) => total + (step.overflow_count ?? 0), 0),
+        max_overflow_px: Number(Math.max(0, ...steps.map((step) => step.max_overflow_px ?? 0)).toFixed(1)),
+        min_contrast_ratio: worstContrast ? Number(worstContrast.ratio.toFixed(2)) : null,
+        min_contrast_required: worstContrast ? Number(worstContrast.required.toFixed(2)) : null,
+        contrast_manual_review_count: steps.reduce((total, step) => total + (step.contrast_manual_review_count ?? 0), 0),
+        hidden_line_count: steps.reduce((total, step) => total + (step.hidden_line_count ?? 0), 0),
+        min_font_size_px: worstFont ? Number(worstFont.font_size_px.toFixed(1)) : null,
+        min_font_size_recommended_px: worstFont ? Number(worstFont.recommended_px.toFixed(1)) : null,
+        max_overlap_ratio: Number(Math.max(0, ...steps.map((step) => step.max_overlap_ratio ?? 0)).toFixed(3)),
+        fallback_font_count: steps.reduce((total, step) => total + (step.fallback_font_count ?? 0), 0)
+      };
     };
-    const appendSweepResult = (slide, message, warning = true) => {
-      const result = { slide_id: slide?.id || "__all__", href: slide?.href || "", label: slide?.href ? slide.number + ". " + slide.title : "", message, warning };
-      sweepResults.push(result);
-      renderSweepResult(result);
+    const renderSweepResult = (measurement) => {
+      if (!(qualitySweepResults instanceof HTMLOListElement)) return;
+      const slide = slides.find((item) => item.id === measurement.slide_id);
+      const numbers = [
+        "最小縮小率 " + measurement.min_fit_scale.toFixed(2),
+        measurement.min_contrast_ratio === null
+          ? ""
+          : "最小コントラスト " + measurement.min_contrast_ratio.toFixed(2) + ":1（目安 " + (measurement.min_contrast_required ?? 0).toFixed(1) + "）",
+        measurement.min_font_size_px === null
+          ? ""
+          : "最小文字 " + measurement.min_font_size_px.toFixed(1) + "px（目安 " + (measurement.min_font_size_recommended_px ?? 0).toFixed(1) + "px）",
+        measurement.overflow_count ? "はみ出し " + measurement.overflow_count + "件（最大 " + Math.round(measurement.max_overflow_px) + "px）" : "",
+        measurement.hidden_line_count ? "省略 " + measurement.hidden_line_count + "行" : "",
+        measurement.max_overlap_ratio ? "重なり最大 " + measurement.max_overlap_ratio.toFixed(2) : "",
+        measurement.fallback_font_count ? "代替フォント " + measurement.fallback_font_count + "件" : ""
+      ].filter(Boolean).join(" · ");
+      const item = document.createElement("li");
+      if (slide?.href) {
+        const link = document.createElement("a");
+        link.href = slide.href;
+        link.textContent = slide.number + ". " + slide.title;
+        item.append(link, document.createTextNode(" — " + numbers));
+      } else item.textContent = measurement.slide_id + " — " + numbers;
+      qualitySweepResults.append(item);
     };
     const persistQualitySweep = (state) => {
       try {
-        sessionStorage.setItem(sweepStorageKey, JSON.stringify({ state, completed_checkpoints: completedCheckpoints, total_checkpoints: totalCheckpoints, issue_count: sweepIssueCount, results: sweepResults }));
+        sessionStorage.setItem(sweepStorageKey, JSON.stringify({ state, completed_checkpoints: completedCheckpoints, total_checkpoints: totalCheckpoints, measurements: sweepMeasurements }));
       } catch {}
     };
     const saveQualitySweep = async (state) => {
@@ -321,15 +359,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
             status: state,
             completed_checkpoints: completedCheckpoints,
             total_checkpoints: totalCheckpoints,
-            issue_count: sweepIssueCount,
-            results: sweepResults
-              .filter((result) => result.warning && result.slide_id)
-              .slice(0, 60)
-              .map((result) => ({
-                slide_id: String(result.slide_id).slice(0, 64),
-                message: String(result.message).slice(0, 300),
-                warning: true
-              }))
+            measurements: sweepMeasurements.slice(0, 101)
           })
         });
         if (!response.ok && qualitySweepStatus instanceof HTMLElement) {
@@ -337,9 +367,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           qualitySweepStatus.classList.add("warning");
         } else if (response.ok) {
           const sharedState = document.querySelector("[data-rendered-quality-state]");
-          if (sharedState instanceof HTMLElement) {
-            sharedState.textContent = sweepIssueCount ? "要確認 " + sweepIssueCount + "件" : "確認済み";
-          }
+          if (sharedState instanceof HTMLElement) sharedState.textContent = "測定済み";
         }
       } catch {
         if (qualitySweepStatus instanceof HTMLElement) {
@@ -352,16 +380,15 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       sweepRunning = false;
       clearTimeout(sweepTimer);
       setButtonBusy(qualitySweepButton, false);
-      qualitySweepButton.textContent = "もう一度チェック";
+      qualitySweepButton.textContent = "もう一度測定";
       if (qualitySweepCancel instanceof HTMLButtonElement) qualitySweepCancel.hidden = true;
       if (qualitySweepStatus instanceof HTMLElement) {
-        qualitySweepStatus.textContent = sweepIssueCount
-          ? sweepIssueCount + "項目に確認事項があります。"
-          : (includesPrelude ? "0ページ目と" : "") + "全" + presentationSlideCount + "枚・" + totalCheckpoints + "段階が発表枠内に収まっています。";
-        qualitySweepStatus.classList.toggle("warning", sweepIssueCount > 0);
-        qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0);
+        qualitySweepStatus.textContent = (includesPrelude ? "0ページ目と" : "") + "全" + presentationSlideCount + "枚・" + totalCheckpoints + "段階を測定しました。"
+          + (sweepUnmeasuredCount ? sweepUnmeasuredCount + "段階は描画結果を取得できませんでした。" : "")
+          + "数値は接続中のAIから読めます。";
+        qualitySweepStatus.classList.remove("warning", "success");
+        qualitySweepStatus.classList.toggle("warning", sweepUnmeasuredCount > 0);
       }
-      if (sweepIssueCount === 0) appendSweepResult(null, "全段階で見切れ、過剰な自動縮小、配色の確認事項は見つかりませんでした。", false);
       persistQualitySweep("completed");
       void saveQualitySweep("completed");
     };
@@ -399,15 +426,16 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (sweepStep < Number(slide?.max_step || 0)) {
         sweepStep += 1;
       } else {
-        if (currentSlideFindings.length) {
-          sweepIssueCount += 1;
-          appendSweepResult(slide, [...new Set(currentSlideFindings)].join(" / ") + "。個別画面で配色・組版・文章量を調整してください。");
+        if (slide && currentSlideSteps.length) {
+          const measurement = foldSlideSteps(slide.id, currentSlideSteps);
+          sweepMeasurements.push(measurement);
+          renderSweepResult(measurement);
         }
-        currentSlideFindings = [];
+        currentSlideSteps = [];
         sweepIndex += 1;
         sweepStep = 0;
       }
-      if (qualitySweepStatus instanceof HTMLElement) qualitySweepStatus.textContent = completedCheckpoints + " / " + totalCheckpoints + "段階を確認";
+      if (qualitySweepStatus instanceof HTMLElement) qualitySweepStatus.textContent = completedCheckpoints + " / " + totalCheckpoints + "段階を測定";
       if (sweepIndex >= slides.length) finishQualitySweep();
       else {
         persistQualitySweep("partial");
@@ -422,7 +450,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         : 5000;
       sweepTimer = setTimeout(() => {
         if (!sweepRunning) return;
-        currentSlideFindings.push("STEP " + sweepStep + ": 描画結果を取得できませんでした");
+        sweepUnmeasuredCount += 1;
         advanceQualitySweep();
       }, timeout);
     };
@@ -433,37 +461,26 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       if (!data || data.type !== "ultimate-freestyle:render-diagnostics" || data.slide_id !== slide?.id || Number(data.step) !== sweepStep) return;
       if (slide.id === "__prelude__" && data.ready !== true) return;
       clearTimeout(sweepTimer);
-      const overflows = Array.isArray(data.overflows) ? data.overflows : [];
-      const compressed = Array.isArray(data.fits)
-        ? data.fits.filter((item) => Number.isFinite(item?.fit_scale) && item.fit_scale < 0.7)
-        : [];
-      const contrasts = Array.isArray(data.contrasts)
-        ? data.contrasts.filter((item) => Number.isFinite(item?.ratio) && Number.isFinite(item?.required) && (item.ratio < item.required || item.manual_review === true))
-        : [];
-      const clamps = Array.isArray(data.clamps)
-        ? data.clamps.filter((item) => Number.isFinite(item?.hidden_lines) && item.hidden_lines > 0)
-        : [];
-      const readability = Array.isArray(data.readability)
-        ? data.readability.filter((item) => Number.isFinite(item?.font_size_px) && Number.isFinite(item?.recommended_px) && item.font_size_px < item.recommended_px)
-        : [];
-      const occlusions = Array.isArray(data.occlusions)
-        ? data.occlusions.filter((item) => typeof item?.id === "string" && typeof item?.other_id === "string" && Number.isFinite(item?.overlap_ratio) && item.overlap_ratio >= 0.2)
-        : [];
-      const fonts = Array.isArray(data.fonts)
-        ? data.fonts.filter((item) => typeof item?.role === "string" && typeof item?.preset === "string" && Array.isArray(item?.candidates))
-        : [];
-      if (overflows.length || compressed.length || contrasts.length || clamps.length || readability.length || occlusions.length || fonts.length) {
-        const details = [
-          overflows.length ? "見切れ" + overflows.length + "か所" : "",
-          compressed.length ? "70%未満の縮小" + compressed.length + "か所" : "",
-          contrasts.length ? "配色の目視確認" + contrasts.length + "か所" : "",
-          clamps.length ? "読み上げ文の省略" + clamps.length + "か所" : "",
-          readability.length ? "小さすぎる文字" + readability.length + "か所" : "",
-          occlusions.length ? "表示パーツの重なり" + occlusions.length + "組" : "",
-          fonts.length ? "指定フォントの代替表示" + fonts.length + "件" : ""
-        ].filter(Boolean).join("、");
-        currentSlideFindings.push("STEP " + sweepStep + ": " + details);
-      }
+      const list = (value) => (Array.isArray(value) ? value : []);
+      const overflows = list(data.overflows);
+      const fits = list(data.fits).filter((item) => Number.isFinite(item?.fit_scale));
+      const contrasts = list(data.contrasts).filter((item) => Number.isFinite(item?.ratio) && Number.isFinite(item?.required));
+      const clamps = list(data.clamps).filter((item) => Number.isFinite(item?.hidden_lines));
+      const readability = list(data.readability).filter((item) => Number.isFinite(item?.font_size_px) && Number.isFinite(item?.recommended_px));
+      const occlusions = list(data.occlusions).filter((item) => Number.isFinite(item?.overlap_ratio));
+      const fonts = list(data.fonts).filter((item) => typeof item?.role === "string");
+      currentSlideSteps.push({
+        step: sweepStep,
+        fit_scales: fits.map((item) => item.fit_scale),
+        overflow_count: overflows.length,
+        max_overflow_px: Math.max(0, ...overflows.map((item) => Math.max(Number(item?.overflow_x) || 0, Number(item?.overflow_y) || 0))),
+        contrasts: contrasts.map((item) => ({ ratio: item.ratio, required: item.required })),
+        contrast_manual_review_count: contrasts.filter((item) => item.manual_review === true).length,
+        hidden_line_count: clamps.reduce((total, item) => total + item.hidden_lines, 0),
+        font_sizes: readability.map((item) => ({ font_size_px: item.font_size_px, recommended_px: item.recommended_px })),
+        max_overlap_ratio: Math.max(0, ...occlusions.map((item) => item.overlap_ratio)),
+        fallback_font_count: fonts.length
+      });
       advanceQualitySweep();
     });
     qualitySweepButton.addEventListener("click", () => {
@@ -471,12 +488,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       sweepRunning = true;
       sweepIndex = 0;
       sweepStep = 0;
-      sweepIssueCount = 0;
       completedCheckpoints = 0;
-      currentSlideFindings = [];
-      sweepResults = [];
+      currentSlideSteps = [];
+      sweepMeasurements = [];
+      sweepUnmeasuredCount = 0;
       setButtonBusy(qualitySweepButton, true);
-      qualitySweepButton.textContent = "確認中…";
+      qualitySweepButton.textContent = "測定中…";
       if (qualitySweepCancel instanceof HTMLButtonElement) qualitySweepCancel.hidden = false;
       if (qualitySweepResults instanceof HTMLOListElement) qualitySweepResults.replaceChildren();
       if (qualitySweepProgress instanceof HTMLProgressElement) {
@@ -500,7 +517,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         sweepFrameMode = "unloaded";
         qualitySweepCancel.hidden = true;
         setButtonBusy(qualitySweepButton, false);
-        qualitySweepButton.textContent = "最初からチェック";
+        qualitySweepButton.textContent = "最初から測定";
         if (qualitySweepStatus instanceof HTMLElement) {
           qualitySweepStatus.textContent = completedCheckpoints + " / " + totalCheckpoints + "段階で中断しました。途中結果は下に残しています。";
           qualitySweepStatus.classList.remove("success", "warning");
@@ -511,23 +528,22 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     }
     try {
       const saved = JSON.parse(sessionStorage.getItem(sweepStorageKey) || "null");
-      if (saved && saved.total_checkpoints === totalCheckpoints && Array.isArray(saved.results)) {
+      if (saved && saved.total_checkpoints === totalCheckpoints && Array.isArray(saved.measurements)) {
         if (qualitySweepResults instanceof HTMLOListElement) qualitySweepResults.replaceChildren();
-        sweepResults = saved.results.filter((result) => result && typeof result.message === "string" && typeof result.href === "string" && typeof result.label === "string" && typeof result.warning === "boolean");
-        sweepResults.forEach(renderSweepResult);
+        sweepMeasurements = saved.measurements.filter((item) => item && typeof item.slide_id === "string" && Number.isFinite(item.min_fit_scale));
+        sweepMeasurements.forEach(renderSweepResult);
         completedCheckpoints = Math.min(Math.max(Number(saved.completed_checkpoints) || 0, 0), totalCheckpoints);
-        sweepIssueCount = Math.max(Number(saved.issue_count) || 0, 0);
         if (qualitySweepProgress instanceof HTMLProgressElement) {
           qualitySweepProgress.hidden = false;
           qualitySweepProgress.value = completedCheckpoints;
         }
-        qualitySweepButton.textContent = "もう一度チェック";
+        qualitySweepButton.textContent = "もう一度測定";
         if (qualitySweepStatus instanceof HTMLElement) {
           qualitySweepStatus.textContent = saved.state === "completed"
-            ? "前回の確認結果：" + (sweepIssueCount ? sweepIssueCount + "項目に確認事項があります。" : "確認事項はありません。")
-            : "前回は" + completedCheckpoints + " / " + totalCheckpoints + "段階まで確認しました。最初から再実行できます。";
-          qualitySweepStatus.classList.toggle("warning", sweepIssueCount > 0 || saved.state !== "completed");
-          qualitySweepStatus.classList.toggle("success", sweepIssueCount === 0 && saved.state === "completed");
+            ? "前回は全" + totalCheckpoints + "段階を測定しました。"
+            : "前回は" + completedCheckpoints + " / " + totalCheckpoints + "段階まで測定しました。最初から再実行できます。";
+          qualitySweepStatus.classList.remove("success", "warning");
+          qualitySweepStatus.classList.toggle("warning", saved.state !== "completed");
         }
       }
     } catch {}
@@ -2928,81 +2944,6 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       }
     });
     const layoutStatus = document.querySelector("[data-layout-status]");
-    const qualitySummary = document.querySelector("[data-quality-summary]");
-    const qualityList = document.querySelector("[data-quality-list]");
-    const diagnosticTarget = (id, preferredPath = "") => {
-      let sectionName = "structure";
-      let target = null;
-      let componentId = "";
-      if (id.startsWith("node:")) {
-        componentId = id.slice(5);
-        target = [...document.querySelectorAll("[data-scene-component-editor]")].find((form) => form instanceof HTMLFormElement && form.dataset.componentId === componentId) || null;
-      } else if (id.startsWith("block:")) {
-        componentId = id.slice(6);
-        target = [...document.querySelectorAll("[data-canvas-block-editor]")].find((form) => {
-          if (!(form instanceof HTMLFormElement)) return false;
-          try { return JSON.parse(form.dataset.component || "{}").id === componentId; } catch { return false; }
-        }) || null;
-      } else if (id === "flow:main" || id === "flow:sidebar") {
-        sectionName = preferredPath ? "design" : "content";
-        target = preferredPath ? document.querySelector("[data-template-editor]") : document.querySelector("[data-slide-editor]");
-      } else if (id === "narration") {
-        sectionName = "narration";
-        target = document.querySelector("[data-narration-settings-editor]");
-      }
-      const section = document.querySelector('[data-inspector-section="' + sectionName + '"]');
-      return { section, target: target || section, componentId, mounted: target instanceof HTMLFormElement };
-    };
-    const appendDiagnostic = (item, message, preferredPath = "") => {
-      if (!(qualityList instanceof HTMLElement)) return;
-      const row = document.createElement("li");
-      row.dataset.layoutWarning = "true";
-      row.append(document.createTextNode(message));
-      const { section, target, componentId, mounted } = diagnosticTarget(item.id, preferredPath);
-      if (section instanceof HTMLDetailsElement && target instanceof HTMLElement) {
-        const fallbackFieldName = item.id === "narration" ? "appearance_foreground" : item.id === "flow:sidebar" ? "muted" : "foreground";
-        const preferredField = preferredPath
-          ? target.querySelector('[data-component-path="' + preferredPath + '"]') || (target instanceof HTMLFormElement ? target.elements.namedItem(preferredPath) || target.elements.namedItem(fallbackFieldName) : null)
-          : null;
-        const button = document.createElement("button");
-        button.type = "button";
-        button.dataset.op = "move";
-        button.dataset.diagnosticFix = "true";
-        button.textContent = "修正欄へ";
-        button.addEventListener("click", () => {
-          if (componentId && !mounted) {
-            navigateToComponent(componentId);
-            return;
-          }
-          setMobilePane("edit");
-          section.open = true;
-          const componentDetail = target.closest("details.component-detail");
-          if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
-          target.scrollIntoView({ block: "center", behavior: "smooth" });
-          const field = preferredField || target.querySelector("textarea, input, select");
-          if (field instanceof HTMLElement) field.focus({ preventScroll: true });
-        });
-        row.append(button);
-        if (preferredField instanceof HTMLInputElement && /^#[0-9a-f]{6}$/i.test(String(item.suggested_foreground || ""))) {
-          const suggestion = document.createElement("button");
-          suggestion.type = "button";
-          suggestion.dataset.op = "edit";
-          suggestion.textContent = "推奨色を入力";
-          suggestion.addEventListener("click", () => {
-            setMobilePane("edit");
-            section.open = true;
-            const componentDetail = target.closest("details.component-detail");
-            if (componentDetail instanceof HTMLDetailsElement) componentDetail.open = true;
-            preferredField.value = item.suggested_foreground;
-            preferredField.dispatchEvent(new Event("input", { bubbles: true }));
-            preferredField.scrollIntoView({ block: "center", behavior: "smooth" });
-            preferredField.focus();
-          });
-          row.append(suggestion);
-        }
-      }
-      qualityList.append(row);
-    };
     addEventListener("message", (event) => {
       if (event.origin !== location.origin || event.source !== slideFrame.contentWindow) return;
       const data = event.data;
@@ -3094,69 +3035,23 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         : [];
       if (layoutStatus instanceof HTMLElement) {
         layoutStatus.textContent = overflows.length
-          ? overflows.length + "か所で文字が収まりません。品質確認から対象を確認してください。"
+          ? overflows.length + "か所で文字が枠を超えています（最大 " + Math.ceil(Math.max(0, ...overflows.map((item) => Math.max(item.overflow_x || 0, item.overflow_y || 0)))) + "px）。"
           : compressed.length
-            ? compressed.length + "か所の文字を70%未満まで縮小しています。組版か文章量を見直してください。"
+            ? "最小縮小率 " + Math.min(...compressed.map((item) => item.fit_scale)).toFixed(2) + "（" + compressed.length + "か所）。"
           : contrasts.length
             ? contrasts.some((item) => item.ratio < item.required)
-              ? contrasts.length + "か所で文字と背景のコントラストを確認してください。"
-              : contrasts.length + "か所は背景模様・透明度を含むため、実際の読みやすさを目視確認してください。"
+              ? "最小コントラスト " + Math.min(...contrasts.map((item) => item.ratio)).toFixed(1) + ":1（目安 " + Math.max(...contrasts.map((item) => item.required)).toFixed(1) + "）。"
+              : contrasts.length + "か所は背景模様・透明度を含むため自動判定できません。"
           : clamps.length
-            ? "読み上げ枠で文章の一部が省略されています。枠の大きさ・文字倍率・最大行数を見直してください。"
+            ? "読み上げ枠で約" + clamps.reduce((total, item) => total + item.hidden_lines, 0) + "行が省略されています。"
           : readability.length
-            ? readability.length + "か所で文字が小さすぎます。自動縮小、文字倍率、枠の大きさを見直してください。"
+            ? "最小文字 " + Math.min(...readability.map((item) => item.font_size_px)).toFixed(1) + "px（目安 " + Math.max(...readability.map((item) => item.recommended_px)).toFixed(0) + "px）。"
           : occlusions.length
-            ? occlusions.length + "組の文字表示が重なっています。読み上げ枠または自由配置の位置と大きさを確認してください。"
+            ? occlusions.length + "組が最大" + Math.round(Math.max(...occlusions.map((item) => item.overlap_ratio)) * 100) + "%重なっています。"
           : fonts.length
-            ? fonts.length + "件の指定フォントがこの端末になく、代替フォントで表示されています。フォント設定または実際の改行を確認してください。"
+            ? fonts.length + "件の指定フォントがこの端末になく、代替フォントで表示されています。"
           : "このSTEPの文字は" + (slideFrame.dataset.aspectRatio || "16:9") + "の枠内に収まっています。";
         layoutStatus.dataset.level = overflows.length || compressed.length || contrasts.length || clamps.length || readability.length || occlusions.length || fonts.length ? "warning" : "ok";
-      }
-      if (qualityList instanceof HTMLElement) {
-        qualityList.querySelectorAll("[data-layout-warning]").forEach((item) => item.remove());
-        for (const item of overflows) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」が横" + Math.ceil(item.overflow_x) + "px・縦" + Math.ceil(item.overflow_y) + "px超過しています。");
-        }
-        for (const item of compressed) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」を" + Math.round(item.fit_scale * 100) + "%まで自動縮小しています。");
-        }
-        for (const item of contrasts) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」の文字コントラストは" + item.ratio.toFixed(1) + ":1" + (item.manual_review ? "です。背景模様・透明度を含む概算のため目視確認が必要です" : (item.estimated ? "（背景模様・透明度を含む概算）です" : "です")) + "（目安" + item.required.toFixed(1) + ":1以上）。", "style.foreground");
-        }
-        for (const item of clamps) {
-          appendDiagnostic(item, "読み上げ枠で約" + item.hidden_lines + "行が省略されています。最大行数、文字倍率、枠の大きさを調整してください。");
-        }
-        for (const item of readability) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」の最小文字が基準幅換算" + item.font_size_px.toFixed(1) + "pxです（目安" + item.recommended_px.toFixed(0) + "px以上）。");
-        }
-        for (const item of occlusions) {
-          appendDiagnostic(item, item.region + "「" + item.id + "」と" + item.other_region + "「" + item.other_id + "」が" + Math.round(item.overlap_ratio * 100) + "%重なっています。");
-        }
-        for (const item of fonts) {
-          appendDiagnostic(item, item.role + "の「" + item.preset + "」はこの端末で候補フォント（" + item.candidates.join("、") + "）を確認できず、代替表示です。", item.field);
-        }
-      }
-      if (qualitySummary instanceof HTMLElement) {
-        const baseCount = Number(qualitySummary.dataset.baseCount || 0);
-        const total = baseCount + overflows.length + compressed.length + contrasts.length + clamps.length + readability.length + occlusions.length + fonts.length;
-        qualitySummary.dataset.level = total ? "warning" : "ok";
-        qualitySummary.textContent = overflows.length
-          ? total + "件の確認事項があります（うち見切れ" + overflows.length + "件）。"
-          : compressed.length
-            ? total + "件の確認事項があります（うち過剰な自動縮小" + compressed.length + "件）。"
-          : contrasts.length
-            ? total + "件の確認事項があります（うち配色の確認" + contrasts.length + "件）。"
-          : clamps.length
-            ? total + "件の確認事項があります（うち読み上げ文の省略" + clamps.length + "件）。"
-          : readability.length
-            ? total + "件の確認事項があります（うち小さすぎる文字" + readability.length + "件）。"
-          : occlusions.length
-            ? total + "件の確認事項があります（うち表示パーツの重なり" + occlusions.length + "件）。"
-          : fonts.length
-            ? total + "件の確認事項があります（うち指定フォントの代替表示" + fonts.length + "件）。"
-          : baseCount
-            ? baseCount + "件の確認事項があります。"
-            : "保存データ上の確認事項はありません。";
       }
     });
     try {
