@@ -154,14 +154,13 @@ describe("VOICEVOX generation", () => {
       ).bind(userId, "voice-unconfigured-user", "voice-unconfigured", now, now),
       env.DB.prepare(
         `INSERT INTO research_projects (
-           id, owner_user_id, title, stage, document_json, version,
+           id, owner_user_id, title, document_json, version,
            idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
       ).bind(
         projectId,
         userId,
         document.title,
-        document.stage,
         JSON.stringify(document),
         "voice-unconfigured-test",
         now,
@@ -246,14 +245,13 @@ describe("VOICEVOX generation", () => {
       ).bind(userId, "voice-test-user", "voice-test", now, now),
       env.DB.prepare(
         `INSERT INTO research_projects (
-           id, owner_user_id, title, stage, document_json, version,
+           id, owner_user_id, title, document_json, version,
            idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
       ).bind(
         projectId,
         userId,
         document.title,
-        document.stage,
         JSON.stringify(document),
         "voice-generation-test",
         now,

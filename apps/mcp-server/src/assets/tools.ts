@@ -120,7 +120,7 @@ export function registerAssetTools(
     {
       title: "研究画像を削除",
       description:
-        "自分が所有する未使用画像をprivate storageとmetadataから削除します。現在版または保持中の下書き履歴で参照中ならASSET_IN_USEを返し、存在しない画像の再削除は成功として扱います。",
+        "自分が所有する未使用画像をprivate storageとmetadataから削除します。現在版のスライドで参照中ならASSET_IN_USEを返し、存在しない画像の再削除は成功として扱います。",
       inputSchema: { asset_id: z.string().uuid() },
       outputSchema: {
         ok: z.boolean(),

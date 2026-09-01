@@ -1,22 +1,13 @@
 import { escapeHtml } from "../auth/pages";
 import { PROJECT_IMAGE_LIMIT, type ProjectAsset } from "../assets/schema";
 import {
-  RESEARCH_LOG_PAGE_SIZE,
   type ProjectRecord,
-  type ProjectSummary,
   type SlideBlock,
   type SlideSceneNode
 } from "../projects/schema";
-import type {
-  DashboardProjectSummary,
-  ProjectDraftRevision,
-  ProjectDraftRevisionSummary
-} from "../projects/repository";
+import type { DashboardProjectSummary } from "../projects/repository";
 import {
   MAX_PROJECT_DOCUMENT_BYTES,
-  PROJECT_DRAFT_REVISION_BYTE_BUDGET,
-  PROJECT_DRAFT_REVISION_LIMIT,
-  PROJECT_DRAFT_REVISION_MINIMUM,
   projectDocumentBytes
 } from "../projects/repository";
 import {
@@ -59,73 +50,6 @@ import {
   MAX_SEGMENT_CHARACTERS,
   selectVoiceGenerationBatch
 } from "../voicevox/service";
-
-const STAGE_LABELS: Record<ProjectSummary["stage"], string> = {
-  discovery: "発見",
-  design: "設計",
-  fieldwork: "調査・実験",
-  story: "構成",
-  production: "制作",
-  review: "見直し"
-};
-
-type PresentationSlide = NonNullable<ProjectRecord["document"]["deck"]>["slides"][number];
-
-function slideDifferenceLabels(
-  previous: PresentationSlide,
-  selected: PresentationSlide
-): string[] {
-  const labels: string[] = [];
-  if (previous.title !== selected.title) labels.push("題名");
-  if (
-    previous.content_markdown !== selected.content_markdown ||
-    previous.sidebar_markdown !== selected.sidebar_markdown ||
-    JSON.stringify(previous.reveal_blocks) !== JSON.stringify(selected.reveal_blocks)
-  ) labels.push("画面の文章");
-  if (JSON.stringify(previous.composition ?? null) !== JSON.stringify(selected.composition ?? null)) labels.push("表示パーツ・画像");
-  if (
-    previous.duration_seconds !== selected.duration_seconds ||
-    previous.reveal_steps !== selected.reveal_steps
-  ) labels.push("時間・STEP");
-  const narrationContent = (slide: PresentationSlide) => ({
-    display: slide.narration?.display ?? null,
-    speaker: slide.narration?.speaker ?? null,
-    appearance: slide.narration?.appearance ?? null,
-    segments: slide.narration?.segments.map((segment) => ({
-      at: segment.at,
-      text: segment.text,
-      speaker: segment.speaker ?? null
-    })) ?? []
-  });
-  const narrationVoice = (slide: PresentationSlide) => slide.narration?.segments.map((segment) => ({
-    at: segment.at,
-    profile: segment.voice_profile_id ?? null,
-    tuning: segment.voice_tuning ?? null
-  })) ?? [];
-  const narrationAudio = (slide: PresentationSlide) => slide.narration?.segments.map((segment) => ({
-    at: segment.at,
-    audio: segment.audio_src ?? null
-  })) ?? [];
-  if (JSON.stringify(narrationContent(previous)) !== JSON.stringify(narrationContent(selected))) labels.push("読み上げ文・枠");
-  if (JSON.stringify(narrationVoice(previous)) !== JSON.stringify(narrationVoice(selected))) labels.push("声・トーン");
-  if (JSON.stringify(narrationAudio(previous)) !== JSON.stringify(narrationAudio(selected))) labels.push("生成音声");
-  if (JSON.stringify({
-    tone: previous.tone,
-    role: previous.role,
-    cover_layout: previous.cover_layout,
-    template_id: previous.template_id,
-    enter_animation: previous.enter_animation,
-    typography: previous.typography
-  }) !== JSON.stringify({
-    tone: selected.tone,
-    role: selected.role,
-    cover_layout: selected.cover_layout,
-    template_id: selected.template_id,
-    enter_animation: selected.enter_animation,
-    typography: selected.typography
-  })) labels.push("見た目・組版");
-  return labels;
-}
 
 function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 60)}分${String(seconds % 60).padStart(2, "0")}秒`;
@@ -385,15 +309,6 @@ const DASHBOARD_STYLE = String.raw`
       #journey, #basic-information, #presentation-screen, #rendered-quality, #presentation-structure, #research-images, #research-log, #research-list-findings, #research-list-limitations, [id^="research-item-"], #voice-finishing, #publication { scroll-margin-top: 5rem; }
       .section-head h1 { font-size: clamp(2rem, 5vw, 3.6rem); }
       .count { color: var(--muted); }
-      .dashboard-tools { display: flex; align-items: end; justify-content: space-between; gap: 1rem; margin: 0 0 1rem; }
-      .dashboard-search { display: grid; gap: .35rem; width: min(100%, 28rem); color: var(--accent-strong); font-size: .86rem; }
-      .dashboard-search input { width: 100%; min-height: 2.8rem; padding: .7rem .85rem; border: 1px solid var(--line); border-radius: .7rem; background: var(--accent-soft); color: var(--ink); font: inherit; }
-      .dashboard-filter { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .4rem; }
-      .dashboard-filter button { min-height: 2.35rem; padding: .45rem .65rem; font-size: .78rem; }
-      .dashboard-filter button[aria-pressed="true"] { border-color: var(--accent-strong); background: var(--accent-strong); color: white; }
-      .dashboard-sort { display: flex; align-items: center; gap: .35rem; color: var(--muted); font-size: .78rem; }
-      .dashboard-sort select { min-height: 2.35rem; padding: .4rem .55rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--accent-soft); color: var(--ink); font: inherit; }
-      .search-empty { margin: 1rem 0; padding: 1rem; border: 1px dashed var(--accent-strong); border-radius: .8rem; color: var(--muted); text-align: center; }
       .connection-guide { margin-top: 1.25rem; border: 1px solid var(--accent-strong); border-radius: 1rem; background: var(--accent-soft); }
       .connection-guide > summary { padding: 1rem 1.2rem; cursor: pointer; font-weight: 820; }
       .connection-guide[open] > summary { border-bottom: 1px solid var(--line); }
@@ -778,10 +693,6 @@ const DASHBOARD_STYLE = String.raw`
       .publication-history .status-row { align-items: center; padding: .55rem .65rem; border: 1px solid var(--line); border-radius: .55rem; }
       .publication-history .status-row span, .publication-history .status-row small { display: grid; gap: .12rem; }
       .publication-history .actions { display: flex; align-items: center; gap: .4rem; }
-      .draft-history { display: grid; gap: .45rem; margin-top: .65rem; }
-      .draft-revision { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .6rem; align-items: center; padding: .65rem; border: 1px solid var(--line); border-radius: .6rem; background: var(--accent-soft); }
-      .draft-revision p, .draft-revision small { margin: 0; }
-      .draft-revision small { color: var(--muted); }
       .revision-preview { width: 100%; aspect-ratio: var(--revision-aspect, 16 / 9); border: 1px solid var(--accent-strong); border-radius: .8rem; background: var(--accent-soft); }
       .revision-slide-list { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
       .revision-slide-list li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; gap: .6rem; padding: .65rem; border: 1px solid var(--line); border-radius: .6rem; color: var(--accent-strong); }
@@ -1093,18 +1004,6 @@ export function dashboardStyleResponse(versioned = false): Response {
 function formatDate(iso: string): string {
   const [date] = iso.split("T");
   return date?.replaceAll("-", "/") ?? iso;
-}
-
-function safeResearchSourceUrl(value: string | null): { href: string; hostname: string } | null {
-  if (value === null) return null;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" || url.protocol === "http:"
-      ? { href: url.href, hostname: url.hostname }
-      : null;
-  } catch {
-    return null;
-  }
 }
 
 function accountHeader(twitchLogin: string, csrfToken: string): string {
@@ -1503,8 +1402,8 @@ export function landingPage(options: {
          <p class="hint">限定公開中です。Twitchで${escapeHtml(options.broadcasterLogin)}を${options.minFollowDays}日以上フォローしている方、または現在サブスク中の方が利用できます。</p></div>
          <ol class="landing-flow" aria-label="利用の流れ"><li><span><strong>AIと研究を作る</strong><small>CodexやClaudeなど、Remote MCP対応AIと問い・実験・構成を対話します。</small></span></li><li><span><strong>Webで一枚ずつ確認</strong><small>文言、組版、画像、VOICEVOX音声、見切れを実表示で仕上げます。</small></span></li><li><span><strong>確認した版を公開</strong><small>固定プレビューを最後まで見てから、自分で公開版を切り替えます。</small></span></li></ol>
        </section>
-       <section class="landing-section" id="about"><div class="landing-section-head"><p class="eyebrow">One workspace</p><h2>調べる途中も、発表する瞬間も</h2><p>研究データを版付きで保存し、対話による大きな編集と、画面を見ながらの細かな仕上げを同じ研究へ反映します。一般的なWebサイト作成サービスではなく、最自由研究の制作過程と発表に焦点を絞っています。</p></div><div class="product-grid"><article class="product-card"><h3>研究を育てる</h3><p>興味の発見、問い・仮説、実験や観察、発見・限界、研究ログをAIと一項目ずつ整理します。</p></article><article class="product-card"><h3>Webスライドを作る</h3><p>16:9／4:3、複数の構成・組版・配色、自由配置、段階表示、画像、読み上げ枠に対応します。</p></article><article class="product-card"><h3>声と表示を確認する</h3><p>ブラウザ音声で仮試聴し、VOICEVOX音声を生成。見切れなどを実rendererで検査してから公開します。</p></article></div></section>
-       <section class="landing-section" id="roles"><div class="landing-section-head"><p class="eyebrow">Two surfaces</p><h2>AIとWeb UIには、得意な仕事があります</h2></div><div class="role-table"><article><h3>Claude・Codex・ChatGPTで進めること</h3><ul><li>テーマを一緒に探す</li><li>問い、方法、記録、発見を整理する</li><li>発表の流れや各スライドを構成する</li><li>対象を読んで小さな単位で修正する</li></ul></article><article><h3>ブラウザで進めること</h3><ul><li>Twitchで本人確認する</li><li>画像を追加し、実際の表示を確認する</li><li>文言、見た目、VOICEVOXを仕上げる</li><li>固定プレビューを確認し、公開する</li></ul></article></div></section>
+       <section class="landing-section" id="about"><div class="landing-section-head"><p class="eyebrow">One workspace</p><h2>調べる途中も、発表する瞬間も</h2><p>研究データを版付きで保存し、対話による大きな編集と、画面を見ながらの細かな仕上げを同じ研究へ反映します。一般的なWebサイト作成サービスではなく、最自由研究の制作過程と発表に焦点を絞っています。</p></div><div class="product-grid"><article class="product-card"><h3>研究を育てる</h3><p>興味の発見から問い・実験・結論まで、AIと対話しながら発表の形へ組み立てます。</p></article><article class="product-card"><h3>Webスライドを作る</h3><p>16:9／4:3、複数の構成・組版・配色、自由配置、段階表示、画像、読み上げ枠に対応します。</p></article><article class="product-card"><h3>声と表示を確認する</h3><p>ブラウザ音声で仮試聴し、VOICEVOX音声を生成。見切れなどを実rendererで検査してから公開します。</p></article></div></section>
+       <section class="landing-section" id="roles"><div class="landing-section-head"><p class="eyebrow">Two surfaces</p><h2>AIとWeb UIには、得意な仕事があります</h2></div><div class="role-table"><article><h3>Claude・Codex・ChatGPTで進めること</h3><ul><li>テーマを一緒に探す</li><li>問い、方法、記録、発見を整理する</li><li>発表の流れや各スライドを構成する</li><li>対象を読んで小さな単位で修正する</li></ul><p class="inherit-note">研究の中身はAIとの対話で育て、決まったものをスライドと読み上げ原稿として保存します。</p></article><article><h3>ブラウザで進めること</h3><ul><li>Twitchで本人確認する</li><li>画像を追加し、実際の表示を確認する</li><li>文言、見た目、VOICEVOXを仕上げる</li><li>固定プレビューを確認し、公開する</li></ul></article></div></section>
        <section class="landing-section"><div class="landing-section-head"><p class="eyebrow">Your control</p><h2>下書きは本人だけ。公開は明示操作です</h2><p>AIとの接続にもWeb UIにも同じTwitchアカウントを使います。研究、画像、生成音声は所有者ごとに分離され、固定プレビューを確認して公開操作をするまで発表は一般公開されません。TwitchのパスワードをAIへ渡す必要はありません。</p></div></section>
        <section class="landing-cta"><div><h2>初回設定は5〜10分ほど</h2><p>Claude、Codex、ChatGPTの選び方から、環境ごとの接続手順まで案内します。</p></div><a class="button" href="/guide">はじめかたを見る</a></section>
        </main>`
@@ -1533,7 +1432,7 @@ export function userGuidePage(options: {
          <section class="guide-section" id="claude-web"><p class="eyebrow">Claude Web / Desktop</p><h2>Claudeのカスタムコネクタへ追加する</h2><ol class="guide-step-list"><li class="guide-step"><div><h3>コネクタ設定を開く</h3><p>Claudeの「Customize（カスタマイズ）」→「Connectors（コネクタ）」→「＋」→「Add custom connector」を開きます。Team／Enterpriseでは管理者がOrganization settingsから先に追加する場合があります。</p></div></li><li class="guide-step"><div><h3>MCP URLを登録する</h3><p>名前を「最自由研究」、Remote MCP server URLを次の値にします。Client IDやSecretは入力せず追加します。</p>${endpointBox}</div></li><li class="guide-step"><div><h3>接続して会話で有効にする</h3><p>追加したコネクタの「Connect」からTwitch認証を完了します。新しい会話では入力欄左下の「＋」→「Connectors」から最自由研究を有効にします。</p></div></li></ol></section>
          <section class="guide-section" id="chatgpt"><p class="eyebrow">ChatGPT</p><h2>ChatGPTのDeveloper modeへ追加する</h2><div class="guide-note"><strong>最初に表示を確認：</strong> ChatGPTの「Settings」→「Security and login」に「Developer mode」が表示される場合だけ、この経路を選びます。利用可否はアカウントとworkspace policyに依存するため、料金プラン名だけでは保証できません。</div><ol class="guide-step-list"><li class="guide-step"><div><h3>Developer modeを有効にする</h3><p>「Settings」→「Security and login」を開き、「Developer mode」をオンにします。</p></div></li><li class="guide-step"><div><h3>PluginsへMCP URLを登録する</h3><p><a href="https://chatgpt.com/plugins" target="_blank" rel="noopener noreferrer">ChatGPT Plugins</a>の「＋」から名前と説明を入力し、公開HTTPS endpointとして次のURLを登録します。</p>${endpointBox}</div></li><li class="guide-step"><div><h3>新しい会話で有効にする</h3><p>新しい会話の「＋」から「More」を開き、登録した最自由研究を選びます。要求されたら同じTwitchアカウントで接続を許可します。</p></div></li></ol><div class="guide-warning guide-note"><strong>Developer modeが見つからない場合：</strong> 先に課金して解決するとは限りません。同じOpenAIアカウントで利用できるCodex、またはClaude Freeのカスタムコネクタを選んでください。</div></section>
          <section class="guide-section" id="oauth"><p class="eyebrow">OAuth</p><h2>認証画面で確認すること</h2><ul class="plain-list"><li>接続先が <code>saijiyu-kenkyu.2764.moe</code> であること</li><li>研究の読み取り・編集・公開など、AIクライアントが要求する権限</li><li>ログインするTwitchアカウントがWeb UIと同じであること</li></ul><div class="guide-note"><strong>最後に <code>http://127.0.0.1</code> や <code>http://localhost</code> が開くのは正常です。</strong> CodexやClaude Codeが一時的に待ち受ける、ご自身の端末内だけのOAuth戻り先です。認証完了の表示またはクライアント側の成功を確認するまで、その画面を閉じないでください。</div></section>
-         <section class="guide-section" id="first-research"><p class="eyebrow">First research</p><h2>最初の研究を始める</h2><ol class="guide-step-list"><li class="guide-step"><div><h3>AIへ最初の依頼を送る</h3><p>接続したAIとの新しい会話へ、次の文を貼り付けます。一度に結論を作らず、興味から一問ずつ始めます。</p>${commandBox(FIRST_RESEARCH_PROMPT, "最初の依頼文をコピーしました。")}</div></li><li class="guide-step"><div><h3>AIと研究を進める</h3><p>問い、予想、方法、記録を対話し、必要なところで研究を保存するよう頼みます。AIは変更前に対象とversionを確認し、小さな単位で編集します。</p></div></li><li class="guide-step"><div><h3>Web UIで実物を仕上げる</h3><p>「自分の研究」から研究を開き、スライドの実表示、画像、読み上げ、VOICEVOX、品質確認を進めます。最後に固定プレビューを確認してから公開します。</p><div class="actions"><a class="button" href="/login">自分の研究を開く</a></div></div></li></ol><div class="guide-warning guide-note"><strong>公開は自動ではありません。</strong> AIが研究や発表を編集しても下書きのままです。公開版を変える操作はWeb UIで固定プレビューを確認した本人が行います。</div></section>
+         <section class="guide-section" id="first-research"><p class="eyebrow">First research</p><h2>最初の研究を始める</h2><ol class="guide-step-list"><li class="guide-step"><div><h3>AIへ最初の依頼を送る</h3><p>接続したAIとの新しい会話へ、次の文を貼り付けます。一度に結論を作らず、興味から一問ずつ始めます。</p>${commandBox(FIRST_RESEARCH_PROMPT, "最初の依頼文をコピーしました。")}</div></li><li class="guide-step"><div><h3>AIと研究を進める</h3><p>問い、予想、方法、結果を対話し、まとまったところで発表スライドと読み上げ原稿にするよう頼みます。AIは変更前に対象とversionを確認し、小さな単位で編集します。</p></div></li><li class="guide-step"><div><h3>Web UIで実物を仕上げる</h3><p>「自分の研究」から研究を開き、スライドの実表示、画像、読み上げ、VOICEVOX、品質確認を進めます。最後に固定プレビューを確認してから公開します。</p><div class="actions"><a class="button" href="/login">自分の研究を開く</a></div></div></li></ol><div class="guide-warning guide-note"><strong>公開は自動ではありません。</strong> AIが研究や発表を編集しても下書きのままです。公開版を変える操作はWeb UIで固定プレビューを確認した本人が行います。</div></section>
          <section class="guide-section" id="trouble"><p class="eyebrow">Troubleshooting</p><h2>困ったとき</h2><table class="troubleshooting"><tbody><tr><th>AIに最自由研究のtoolが見えない</th><td>Codexは <code>codex mcp list</code> とセッション内の <code>/mcp</code>、Claude Codeは <code>claude mcp list</code> と <code>/mcp</code> を確認します。登録直後はクライアントを再起動します。</td></tr><tr><th>認証画面が期限切れになった</th><td>古いタブを閉じ、Codexは <code>codex mcp login saijiyu-kenkyu</code>、Claude Codeは <code>/mcp</code> から新しい認証を一度だけ開始します。認証ボタンを連打しません。</td></tr><tr><th>Twitch後に接続へ戻らない</th><td>Codex／Claude Codeを起動した端末とブラウザが同じか確認します。Claude Codeではアドレスバーの完全なcallback URLをクライアントへ貼る復旧手段があります。</td></tr><tr><th>利用条件を満たしていないと表示される</th><td>ログイン中のTwitchアカウント、${escapeHtml(options.broadcasterLogin)}のフォロー状態・期間、現在のサブスク状態を確認します。WebとAI側で別アカウントを使っていないかも確認してください。</td></tr><tr><th>接続し直したい</th><td>Codexは <code>codex mcp logout saijiyu-kenkyu</code> の後にlogin、Claude Codeは <code>/mcp</code> の「Clear authentication」から再認証します。</td></tr><tr><th>編集内容が競合した</th><td>別タブやAIが先に保存しています。画面を再読み込みして現行版を確認し、必要な一項目だけもう一度変更します。過去版は研究詳細の履歴から確認・復元できます。</td></tr></tbody></table></section>
          <section class="guide-section" id="security"><p class="eyebrow">Safety and privacy</p><h2>接続前に知っておくこと</h2><ul class="plain-list"><li>Twitchのパスワードやaccess tokenをAIの会話へ貼り付けません。</li><li>接続先のAIは、許可した範囲で自分の研究を読み取り・変更できます。tool実行内容を確認してください。</li><li>下書き、画像、生成音声は利用者ごとに分離されます。公開操作後の発表はURLを知る人が閲覧できます。</li><li>任意のHTML、shell、未検証コードをMCPから実行する機能はありません。</li></ul><div class="actions"><a class="button ghost" href="/data">保存するデータと削除方法を確認</a></div><div class="official-links"><a href="https://learn.chatgpt.com/docs/extend/mcp.md" target="_blank" rel="noopener noreferrer">Codex MCP 公式ガイド</a><a href="https://learn.chatgpt.com/docs/pricing.md" target="_blank" rel="noopener noreferrer">OpenAI 料金</a><a href="https://developers.openai.com/plugins/deploy/connect-chatgpt" target="_blank" rel="noopener noreferrer">ChatGPT Developer mode</a><a href="https://code.claude.com/docs/en/mcp" target="_blank" rel="noopener noreferrer">Claude Code MCP 公式ガイド</a><a href="https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp" target="_blank" rel="noopener noreferrer">Claude カスタムコネクタ公式ガイド</a><a href="https://claude.com/pricing" target="_blank" rel="noopener noreferrer">Claude 料金</a></div></section>
        </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
@@ -1551,7 +1450,7 @@ export function dataHandlingPage(): Response {
          <section class="guide-hero"><p class="eyebrow">Data handling</p><h1>保存するデータと<br>削除のしかた</h1><p class="lead">限定提供中の最自由研究が、本人確認・制作・公開のために扱う情報を説明します。TwitchのパスワードをこのサービスやAIの会話へ入力する必要はありません。</p><ul class="guide-meta"><li>2026年8月1日現在</li><li>公開は本人の明示操作</li><li>研究・アカウント単位で削除可能</li></ul></section>
          <section class="guide-section"><h2>保存するもの</h2><ul class="plain-list"><li><strong>Twitch識別情報：</strong>ユーザーID、ログイン名、フォロー期間・サブスク状態を元にした資格判定結果。</li><li><strong>認証情報：</strong>Webセッションは24時間。Remote MCP接続では資格を再確認するため、Twitchが発行したtokenをCloudflare KV内の接続情報として保持します。</li><li><strong>制作データ：</strong>研究本文、版履歴、スライド、レビューコメント、圧縮済みWebP画像、VOICEVOX生成MP3、固定プレビューと公開状態。</li><li><strong>運用記録：</strong>ログイン、資格判定、主要な編集・生成・公開操作の結果。本文やTwitchのパスワードは監査記録へ入れません。</li></ul></section>
          <section class="guide-section"><h2>公開される範囲</h2><ul class="plain-list"><li>下書き、アップロード画像、生成途中の音声、プレビューは、同じTwitch利用者として認証された本人だけが取得できます。</li><li>「公開する」を実行した固定版だけが、推測しにくい公開URLから認証なしで閲覧できます。</li><li>公開停止または研究削除を行うと、公開URLは直ちに無効になります。</li></ul></section>
-         <section class="guide-section"><h2>保持期間と削除</h2><ul class="plain-list"><li>研究データは本人が削除するまで保持します。下書き履歴は直近10版を残しつつ、最大50版・合計8MiBの範囲で古い版から整理します。</li><li>研究詳細の「研究を完全に削除」で、本文、履歴、画像、音声、プレビュー、公開版をまとめて削除できます。R2の実体は削除待ちへ移され、失敗時も定期的に再試行されます。</li><li>VOICEVOXの調声試聴キャッシュは共有され、最終的に30日で自動削除されます。</li><li>監査記録は180日を超えたものを毎日削除します。期限切れWebセッションとOAuthデータも毎日削除します。</li><li>障害復旧用のCloudflare D1 Time Travelには、削除前の状態が契約プランに応じて最大30日残る場合があります。通常のアプリ操作からは参照できません。</li></ul></section>
+         <section class="guide-section"><h2>保持期間と削除</h2><ul class="plain-list"><li>研究データは本人が削除するまで保持します。</li><li>研究詳細の「研究を完全に削除」で、本文、画像、音声、プレビュー、公開版をまとめて削除できます。R2の実体は削除待ちへ移され、失敗時も定期的に再試行されます。</li><li>VOICEVOXの調声試聴キャッシュは共有され、最終的に30日で自動削除されます。</li><li>監査記録は180日を超えたものを毎日削除します。期限切れWebセッションとOAuthデータも毎日削除します。</li><li>障害復旧用のCloudflare D1 Time Travelには、削除前の状態が契約プランに応じて最大30日残る場合があります。通常のアプリ操作からは参照できません。</li></ul></section>
          <section class="guide-section"><h2>利用者ができること</h2><ol class="guide-step-list"><li class="guide-step"><div><h3>公開だけ止める</h3><p>研究詳細の公開欄から「公開を停止」を選びます。下書きは残ります。</p></div></li><li class="guide-step"><div><h3>研究を完全に削除する</h3><p>研究詳細の末尾を開き、確認欄へ <code>DELETE</code> と入力して削除します。この操作は取り消せません。</p></div></li><li class="guide-step"><div><h3>アカウントと全データを削除する</h3><p>「自分の研究」の末尾を開き、Twitchログイン名と <code>DELETE ACCOUNT</code> を入力します。全研究とMCP接続を含む本人データを削除し、ログアウトします。</p></div></li></ol><div class="guide-note"><strong>削除後の復旧について：</strong> 通常の画面からは復旧できません。障害復旧用のD1 Time Travelに残る期間を過ぎると、運営者も復旧できません。公開のIssueやチャットへtoken・パスワードを貼らないでください。</div></section>
        </main>`
     ),
@@ -1588,7 +1487,6 @@ export function dashboardPage(options: {
                     ? "プレビュー後に内容変更"
                 : "プレビュー未作成";
         const publicationState = publishedCurrent ? "ready" : "attention";
-        const cardState = !project.has_presentation ? "missing" : publishedCurrent ? "published" : "attention";
         const incompleteVoice = project.voice_segment_count > 0 && project.voice_ready_count < project.voice_segment_count;
         const qualityCurrent = project.quality_project_version === project.version &&
           project.quality_renderer_version === PRESENTATION_RENDERER_VERSION &&
@@ -1614,9 +1512,8 @@ export function dashboardPage(options: {
             ? `音声 ${project.voice_ready_count}/${project.voice_segment_count} 完成`
             : `音声 ${project.voice_ready_count}/${project.voice_segment_count}`;
         const voiceState = project.voice_segment_count > 0 && project.voice_ready_count === project.voice_segment_count ? "ready" : "attention";
-        const searchText = `${project.title} ${STAGE_LABELS[project.stage]} ${voiceLabel} ${qualityLabel} ${publicationLabel} ${attentionReasons.join(" ")}`.toLocaleLowerCase("ja");
-        return `<a class="card-link" data-project-card data-presentation="${project.has_presentation ? "ready" : "missing"}" data-project-state="${cardState}" data-needs-attention="${String(attentionReasons.length > 0)}" data-title="${escapeHtml(project.title)}" data-updated="${escapeHtml(project.updated_at)}" data-duration="${project.total_duration_seconds}" data-search-text="${escapeHtml(searchText)}" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
-        <div class="card-top"><span class="stage">${STAGE_LABELS[project.stage]}</span><span class="version">v${project.version}</span></div>
+        return `<a class="card-link" href="/dashboard/projects/${escapeHtml(project.project_id)}"><article class="card" data-project-id="${escapeHtml(project.project_id)}">
+        <div class="card-top"><span class="version">v${project.version}</span></div>
         <h2>${escapeHtml(project.title)}</h2>
         <p class="meta">${project.has_presentation ? `発表 ${project.slide_count}枚 · ${formatDuration(project.total_duration_seconds)}` : "発表は未構成"}</p>
         ${project.has_presentation ? `<div class="project-statuses"><span class="project-status" data-kind="voice" data-state="${voiceState}">${voiceLabel}</span><span class="project-status" data-kind="quality" data-state="${qualityState}">${qualityLabel}</span><span class="project-status" data-kind="publication" data-state="${publicationState}">${publicationLabel}</span></div>` : ""}
@@ -1628,7 +1525,7 @@ export function dashboardPage(options: {
     .join("");
   const content =
     cards.length > 0
-      ? `<div class="dashboard-tools"><label class="dashboard-search">研究を絞り込む<input type="search" data-project-search data-project-search-user="${escapeHtml(options.twitchLogin)}" placeholder="タイトル・制作段階・音声・公開状態" autocomplete="off"></label><div class="dashboard-filter" role="group" aria-label="研究一覧の表示設定"><button type="button" data-project-filter="all" aria-pressed="true">すべて</button><button type="button" data-project-filter="ready" aria-pressed="false">発表あり</button><button type="button" data-project-filter="published" aria-pressed="false">公開中</button><button type="button" data-project-filter="attention" aria-pressed="false">要仕上げ</button><button type="button" data-project-filter="missing" aria-pressed="false">未構成</button><label class="dashboard-sort">並び順<select data-project-sort><option value="updated">更新が新しい順</option><option value="title">題名順</option><option value="duration">発表時間が長い順</option></select></label><span class="count" data-project-count>${options.projects.length}件を表示</span></div></div><div class="grid" data-project-grid>${cards}</div><p class="search-empty" data-project-search-empty hidden>一致する研究がありません。Escキーで検索語を消すか、絞り込みを変えてください。</p>`
+      ? `<div class="grid" data-project-grid>${cards}</div>`
       : `<section class="empty"><p class="eyebrow">Ready for your first research</p><h2>Web UIの準備はできました</h2><p>まだ研究がありません。次はCodexまたはClaudeへMCPを接続し、下の文から最初の対話を始めます。</p><div class="copy-box"><code>${escapeHtml(FIRST_RESEARCH_PROMPT)}</code><div class="actions"><button type="button" data-op="ask" data-copy-text="${escapeHtml(FIRST_RESEARCH_PROMPT)}">AIに頼む文をコピー</button><a class="button ghost" href="/guide#choose">接続手順を開く</a><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></section>`;
   const connectionGuide = `<details class="connection-guide"${options.projects.length === 0 ? " open" : ""}><summary>AIクライアントとの接続・再接続</summary><div class="connection-body"><p>この画面のTwitchログインと、AIクライアントからのMCP接続許可は別々です。初回だけ、利用するAI側でも同じTwitchアカウントによる認証を完了してください。</p><ol class="setup-steps"><li><strong>Codex</strong><br><code>codex mcp add</code> と <code>codex mcp login</code> を使います。</li><li><strong>Claude Code</strong><br><code>claude mcp add</code> の後、<code>/mcp</code> から認証します。</li><li><strong>Claude Web／Desktop</strong><br>カスタムコネクタへMCP URLを追加します。</li><li><strong>ChatGPT</strong><br>Developer modeが表示される場合、PluginsへMCP URLを追加します。</li></ol><div class="endpoint-box"><code>${MCP_ENDPOINT}</code><button type="button" data-copy-text="${MCP_ENDPOINT}" data-copy-success="MCP URLをコピーしました。">MCP URLをコピー</button><a class="button ghost" href="/guide#choose">AIを選ぶ・接続手順</a><span class="feedback" data-copy-feedback aria-live="polite"></span></div><p class="inherit-note">TwitchのパスワードやtokenをAIへ貼る必要はありません。認証後に127.0.0.1またはlocalhostが開く場合は、AIクライアントへ戻るための正常な画面です。</p></div></details>`;
 
@@ -1649,113 +1546,13 @@ export function dashboardPage(options: {
   );
 }
 
-export function draftRevisionPage(options: {
-  twitchLogin: string;
-  csrfToken: string;
-  current: ProjectRecord;
-  revision: ProjectDraftRevision;
-}): Response {
-  const selected = options.revision.document;
-  const currentSlides = options.current.document.deck?.slides ?? [];
-  const selectedSlides = selected.deck?.slides ?? [];
-  const currentById = new Map(currentSlides.map((slide) => [slide.id, slide]));
-  const selectedById = new Map(selectedSlides.map((slide) => [slide.id, slide]));
-  const currentIndexById = new Map(currentSlides.map((slide, index) => [slide.id, index]));
-  const added = selectedSlides.filter((slide) => !currentById.has(slide.id)).length;
-  const removed = currentSlides.filter((slide) => !selectedById.has(slide.id)).length;
-  const changed = selectedSlides.filter((slide) => {
-    const currentSlide = currentById.get(slide.id);
-    return currentSlide !== undefined && JSON.stringify(currentSlide) !== JSON.stringify(slide);
-  }).length;
-  const reordered = selectedSlides.filter(
-    (slide, index) => currentIndexById.has(slide.id) && currentIndexById.get(slide.id) !== index
-  ).length;
-  const selectedDuration = selectedSlides.reduce((total, slide) => total + slide.duration_seconds, 0);
-  const currentDuration = currentSlides.reduce((total, slide) => total + slide.duration_seconds, 0);
-  const researchFields = [
-    ["title", "研究名"],
-    ["stage", "制作段階"],
-    ["summary", "概要"],
-    ["question", "問い"],
-    ["hypothesis", "仮説"],
-    ["method", "方法"],
-    ["findings", "わかったこと"],
-    ["limitations", "制約・限界"],
-    ["logs", "研究ログ"]
-  ] as const;
-  const researchChanges = researchFields.filter(
-    ([field]) => JSON.stringify(selected[field]) !== JSON.stringify(options.current.document[field])
-  );
-  const deckFields = [
-    ["short_title", "発表名"],
-    ["description", "発表説明"],
-    ["author", "作者"],
-    ["year", "年"],
-    ["accent", "アクセント色"],
-    ["layout", "基本レイアウト"],
-    ["aspect_ratio", "画面比率"],
-    ["loading_screen", "0ページ目"],
-    ["templates", "テンプレート"],
-    ["default_template_id", "既定テンプレート"],
-    ["narration_defaults", "読み上げ枠の既定"],
-    ["voicevox", "VOICEVOX設定"]
-  ] as const;
-  const deckChanges = deckFields.filter(
-    ([field]) => JSON.stringify(selected.deck?.[field] ?? null) !== JSON.stringify(options.current.document.deck?.[field] ?? null)
-  );
-  const sourceLabel = { created: "作成", edit: "編集", restore: "復元" }[options.revision.source];
-  const isCurrent = options.revision.version === options.current.version;
-  const frameUrl = `/dashboard/projects/${escapeHtml(options.current.project_id)}/revisions/${options.revision.version}/frame?slide=0&amp;step=0`;
-  const slideList = selectedSlides.length === 0
-    ? '<p class="prose">この版には発表スライドがありません。</p>'
-    : `<ol class="revision-slide-list">${selectedSlides.map((slide, index) => {
-        const prior = currentById.get(slide.id);
-        const moved = currentIndexById.get(slide.id) !== index;
-        const differences = prior === undefined ? [] : slideDifferenceLabels(prior, slide);
-        const state = prior === undefined ? "この版だけ" : [...differences, ...(moved ? ["順番"] : [])].join("・") || "同じ";
-        return `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(slide.title)}</strong><span>${state}</span></li>`;
-      }).join("")}</ol>`;
-  const currentOnlySlides = currentSlides.filter((slide) => !selectedById.has(slide.id));
-  const currentOnlyList = currentOnlySlides.length === 0
-    ? ""
-    : `<section class="panel"><h2>復元すると外れるスライド</h2><p class="inherit-note">現在版だけにあるため、この版を復元すると次のスライドは発表から外れます。現在版そのものは履歴に残ります。</p><ol class="revision-slide-list">${currentOnlySlides.map((slide) => {
-        const index = currentIndexById.get(slide.id) ?? 0;
-        return `<li><span>${String(index + 1).padStart(2, "0")}</span><strong>${escapeHtml(slide.title)}</strong><span>現在版だけ</span></li>`;
-      }).join("")}</ol></section>`;
-  return new Response(
-    shell(
-      `v${options.revision.version}を確認 — ${selected.title}`,
-      `${accountHeader(options.twitchLogin, options.csrfToken)}
-       <main data-surface="overview" id="main-content" tabindex="-1"><a class="back" href="/dashboard/projects/${escapeHtml(options.current.project_id)}">← 研究詳細へ戻る</a>
-         <div class="section-head"><div><p class="eyebrow">Draft revision</p><h1>v${options.revision.version}を復元前に確認</h1></div><span class="stage">${sourceLabel}</span></div>
-         <div class="detail-grid"><div class="detail-column">
-           <section class="panel"><h2>${escapeHtml(selected.title)}</h2><p class="meta">${escapeHtml(new Date(options.revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(STAGE_LABELS[selected.stage])} · ${selectedSlides.length}枚 · ${formatDuration(selectedDuration)}</p></section>
-           ${selected.deck === null ? "" : `<section class="panel"><div class="section-head"><div><h2>この版の実表示</h2><p class="meta">読み取り専用です。ページ送り・段階表示も確認できます。</p></div><a class="button ghost" href="${frameUrl}" target="_blank" rel="noopener">別画面で確認</a></div><iframe class="revision-preview" title="v${options.revision.version}の発表プレビュー" src="${frameUrl}" style="--revision-aspect:${selected.deck.aspect_ratio === "4:3" ? "4 / 3" : "16 / 9"}"></iframe></section>`}
-           <section class="panel"><h2>この版のスライド</h2>${slideList}</section>
-           ${currentOnlyList}
-         </div><aside class="detail-column">
-           <section class="panel"><h2>現在版 v${options.current.version} との差</h2><dl class="stat-list"><dt>研究内容</dt><dd>${researchChanges.length === 0 ? "変更なし" : `${researchChanges.length}項目`}</dd><dt>発表全体の設定</dt><dd>${deckChanges.length === 0 ? "変更なし" : `${deckChanges.length}項目`}</dd><dt>スライド内容</dt><dd>${changed}枚</dd><dt>順番変更</dt><dd>${reordered}枚</dd><dt>この版だけにある</dt><dd>${added}枚</dd><dt>現在版だけにある</dt><dd>${removed}枚</dd><dt>発表時間差</dt><dd>${selectedDuration - currentDuration >= 0 ? "+" : ""}${selectedDuration - currentDuration}秒</dd></dl>${researchChanges.length === 0 ? "" : `<p class="inherit-note">研究内容: ${escapeHtml(researchChanges.map(([, label]) => label).join("、"))}</p>`}${deckChanges.length === 0 ? "" : `<p class="inherit-note">発表設定: ${escapeHtml(deckChanges.map(([, label]) => label).join("、"))}</p>`}</section>
-           <section class="panel"><h2>復元操作</h2><p class="prose">復元しても現在版は消えず、この内容を新しいversionとして保存します。</p>${isCurrent ? '<p class="success">これは現在の下書きです。</p>' : `<button type="button" data-op="commit" data-draft-restore="/api/projects/${escapeHtml(options.current.project_id)}/revisions/${options.revision.version}/restore" data-target-version="${options.revision.version}" data-current-version="${options.current.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button><p class="feedback" data-draft-restore-feedback aria-live="polite"></p>`}</section>
-         </aside></div>
-       </main><script src="${DASHBOARD_SCRIPT_SRC}" defer></script>`
-    ),
-    { headers: headers() }
-  );
-}
-
 export function projectDetailPage(options: {
   twitchLogin: string;
   csrfToken: string;
   project: ProjectRecord;
   assets: ProjectAsset[];
   publication: PublicationStatus;
-  draftRevisions: ProjectDraftRevisionSummary[];
   renderedQualityReport: RenderedQualityReport | null;
-  selectedLogPage?: number;
-  selectedResearchItem?: {
-    list: "findings" | "limitations";
-    index: number;
-  } | null;
 }): Response {
   const document = options.project.document;
   const projectBytes = projectDocumentBytes(document);
@@ -1764,20 +1561,6 @@ export function projectDetailPage(options: {
   const storageBreakdown = projectStorageWarning
     ? [
         { label: "スライド", href: "#presentation-structure", bytes: serializedValueBytes(document.deck?.slides ?? []) },
-        { label: "研究ログ", href: "#research-log", bytes: serializedValueBytes(document.logs) },
-        {
-          label: "研究内容",
-          href: "#basic-information",
-          bytes: serializedValueBytes({
-            title: document.title,
-            summary: document.summary,
-            question: document.question,
-            hypothesis: document.hypothesis,
-            method: document.method,
-            findings: document.findings,
-            limitations: document.limitations
-          })
-        },
         {
           label: "発表全体の設定",
           href: "#presentation-screen",
@@ -1791,59 +1574,6 @@ export function projectDetailPage(options: {
     ? ""
     : `<details class="storage-breakdown"><summary>容量の大きい順を確認</summary><ol>${storageBreakdown.map((item) => `<li><a href="${item.href}">${item.label}</a> · 約${Math.ceil(item.bytes / 1024)} KiB</li>`).join("")}</ol></details>`;
   const projectFieldsPath = `/api/projects/${escapeHtml(options.project.project_id)}/fields`;
-  const projectListItemsPath = `/api/projects/${escapeHtml(options.project.project_id)}/list-items`;
-  const renderResearchListEditor = (
-    list: "findings" | "limitations",
-    label: string,
-    placeholder: string
-  ): string => {
-    const values = document[list];
-    const selectedIndex = options.selectedResearchItem?.list === list
-      ? options.selectedResearchItem.index
-      : null;
-    const selectedValue = selectedIndex === null ? undefined : values[selectedIndex];
-    const rows = values.length === 0
-      ? `<p class="inherit-note">まだ項目がありません。</p>`
-      : `<ol class="preflight-list">${values.map((value, index) => {
-          const preview = value.replace(/\s+/g, " ").trim();
-          const current = selectedIndex === index;
-          return `<li class="preflight-item" data-state="${current ? "complete" : "recommendation"}"><span><strong>${index + 1}. ${escapeHtml(preview.slice(0, 120))}${preview.length > 120 ? "…" : ""}</strong><small>${value.length.toLocaleString("ja-JP")}文字</small></span><a class="preflight-action" href="?research_item=${list}:${index}#research-list-${list}"${current ? ' aria-current="true"' : ""}>${current ? "編集中" : "編集"} →</a></li>`;
-        }).join("")}</ol>`;
-    const selectedEditor = selectedValue === undefined
-      ? selectedIndex === null
-        ? ""
-        : `<p class="feedback warning">選んだ項目は見つかりません。一覧から選び直してください。</p>`
-      : `<form class="editor" id="research-item-${list}-${selectedIndex}" tabindex="-1" data-versioned-form data-project-list-item action="${projectListItemsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><input type="hidden" name="list" value="${list}"><input type="hidden" name="index" value="${selectedIndex}"><label>${escapeHtml(label)} ${Number(selectedIndex) + 1}<textarea name="value" maxlength="4000" required>${escapeHtml(selectedValue)}</textarea></label><div class="actions"><button type="submit" data-project-list-action="update">この項目を保存</button><button class="danger" type="submit" data-project-list-action="delete" formnovalidate>この項目を削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>`;
-    return `<fieldset id="research-list-${list}"><legend>${escapeHtml(label)} · ${values.length} / 100件</legend>${rows}${selectedEditor}<form class="editor" data-versioned-form data-project-list-item action="${projectListItemsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><input type="hidden" name="list" value="${list}"><label>新しい${escapeHtml(label)}<textarea name="value" maxlength="4000" required placeholder="${escapeHtml(placeholder)}"></textarea></label><div class="actions"><button type="submit" data-project-list-action="add"${values.length >= 100 ? " disabled" : ""}>1件追加</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></fieldset>`;
-  };
-  const findingsEditor = renderResearchListEditor(
-    "findings",
-    "わかったこと",
-    "観察や実験から確かめられたこと"
-  );
-  const limitationsEditor = renderResearchListEditor(
-    "limitations",
-    "限界・今後の課題",
-    "まだ確かめられていないことや次に試すこと"
-  );
-  const logPageSize = RESEARCH_LOG_PAGE_SIZE;
-  const logPageCount = Math.max(1, Math.ceil(document.logs.length / logPageSize));
-  const logPage = Math.min(Math.max(1, options.selectedLogPage ?? 1), logPageCount);
-  const logPageStart = (logPage - 1) * logPageSize;
-  const recentLogs = document.logs.slice().reverse().slice(logPageStart, logPageStart + logPageSize);
-  const logs = recentLogs.length
-    ? recentLogs
-        .map(
-          (entry) => {
-            const sourceUrl = safeResearchSourceUrl(entry.source_url);
-            return `<article class="log"><small>${escapeHtml(formatDate(entry.occurred_at))} · ${escapeHtml(entry.kind)}</small><p class="prose">${escapeHtml(entry.text)}</p>${sourceUrl === null ? "" : `<p><a class="back" href="${escapeHtml(sourceUrl.href)}" target="_blank" rel="noopener noreferrer" aria-label="${escapeHtml(formatDate(entry.occurred_at))}の出典 ${escapeHtml(sourceUrl.hostname)} を新しいタブで開く">出典 · ${escapeHtml(sourceUrl.hostname)} ↗</a></p>`}<form class="actions" data-versioned-form data-research-log-delete data-method="DELETE" action="/api/projects/${escapeHtml(options.project.project_id)}/logs/${escapeHtml(entry.id)}?log_page=${logPage}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><button class="danger" type="submit">このログを削除</button><span class="version" data-version-label>v${options.project.version}</span><span class="feedback" data-form-feedback aria-live="polite"></span></form></article>`;
-          }
-        )
-        .join("")
-    : `<p class="prose">まだ研究ログがありません。</p>`;
-  const logPager = document.logs.length <= logPageSize
-    ? ""
-    : `<nav class="voice-pager" aria-label="研究ログのページ">${logPage > 1 ? `<a class="button ghost" href="?log_page=${logPage - 1}#research-log">← 新しいログ</a>` : ""}<span>${logPage} / ${logPageCount}ページ · 全${document.logs.length}件</span>${logPage < logPageCount ? `<a class="button ghost" href="?log_page=${logPage + 1}#research-log">古いログ →</a>` : ""}</nav>`;
   const slides = document.deck?.slides ?? [];
   const deck = document.deck;
   const loadingScreen = {
@@ -1871,9 +1601,6 @@ export function projectDetailPage(options: {
         })
         .join("")
     : `<p class="prose">発表スライドはまだ構成されていません。</p>`;
-  const addSlidePrompt = `「${document.title}」の発表へ新しいスライドを1枚追加したいです。前後の流れを確認し、入れる位置・役割・内容を提案してから作成してください。`;
-  const reviseSlidesPrompt = `「${document.title}」の発表構成を見直したいです。現在の全スライドを確認し、過不足と順番の改善案を先に示してください。合意した部分だけを個別に変更してください。`;
-  const slideAiActions = `<details class="component-detail"><summary>AIでスライドを追加・構成変更</summary><div class="disclosure-body"><p class="inherit-note">接続中のAIクライアントへ依頼文を貼り付けます。AIは現在の構成を自動で確認できます。</p><div class="actions"><button type="button" data-op="ask" data-copy-text="${escapeHtml(addSlidePrompt)}">追加を頼む文をコピー</button><button type="button" data-op="ask" data-copy-text="${escapeHtml(reviseSlidesPrompt)}">構成見直しを頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
   const slideCreateForm = deck === null ? "" : slideCreator({
     action: `/api/projects/${escapeHtml(options.project.project_id)}/slides`,
     version: options.project.version,
@@ -1881,9 +1608,6 @@ export function projectDetailPage(options: {
     slideCount: slides.length,
     defaultPosition: slides.length
   });
-  const evaluationPrompt = `「${document.title}」をresearch://guide/evaluationの8観点でレビューしてください。research://projects/${options.project.project_id}を根拠にし、情報不足は0点ではなくNEにしてください。強み、最大のリスク、最優先の改善を一つずつ示し、最後はその改善につながる質問を一問だけしてください。`;
-  const imageAiPrompt = `research://projects/${options.project.project_id}の研究画像一覧を確認し、説明と寸法を根拠に「${document.title}」の発表で有効な使い方を提案してください。まだスライドは変更せず、使う画像と配置の合意後に個別編集してください。`;
-  const evaluationPanel = `<details class="panel panel-disclosure"><summary>AIで研究を8観点レビュー</summary><div class="disclosure-body"><p class="prose">問い、仮説、方法、証拠、考察、独自性、発表、制作整合性を0〜4で確認します。根拠がない項目はNEとして扱います。</p><div class="actions"><button type="button" data-copy-text="${escapeHtml(evaluationPrompt)}">評価を頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div></details>`;
   const assetCards = options.assets.length
     ? `<div class="asset-grid">${options.assets
         .map(
@@ -1945,16 +1669,6 @@ export function projectDetailPage(options: {
         const to = event.to_project_version === null ? "非公開" : `v${event.to_project_version}`;
         return `<article class="status-row"><span><strong>${escapeHtml(publicationActionLabels[event.action])}</strong><small>${escapeHtml(new Date(event.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></span><strong>${escapeHtml(from)} → ${escapeHtml(to)}</strong></article>`;
       }).join("")}</div></details>`;
-  const revisionSourceLabels = { created: "作成", edit: "編集", restore: "復元" } as const;
-  const draftHistoryPanel = options.draftRevisions.length === 0
-    ? ""
-    : `<details class="panel panel-disclosure"><summary>下書き履歴 · ${options.draftRevisions.length}件</summary><div class="disclosure-body"><p class="inherit-note">直近${PROJECT_DRAFT_REVISION_MINIMUM}版を必ず残し、最大${PROJECT_DRAFT_REVISION_LIMIT}版・合計${PROJECT_DRAFT_REVISION_BYTE_BUDGET / 1024 / 1024}MiBまで新しい版を優先して保存します。過去版は現在の下書きを消さず、新しいversionとして復元します。</p><div class="draft-history">${options.draftRevisions.map((revision) => {
-        const current = revision.version === options.project.version;
-        return `<article class="draft-revision"><div><p><strong>v${revision.version} · ${escapeHtml(revision.title)}</strong>${current ? ' <span class="success">現在</span>' : ""}</p><small>${escapeHtml(revisionSourceLabels[revision.source])} · ${escapeHtml(STAGE_LABELS[revision.stage])} · ${revision.slide_count}枚 · ${formatDuration(revision.total_duration_seconds)} · ${escapeHtml(new Date(revision.created_at).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))}</small></div><span class="actions"><a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}">内容を確認</a>${current ? "" : `<button type="button" data-op="commit" data-draft-restore="/api/projects/${escapeHtml(options.project.project_id)}/revisions/${revision.version}/restore" data-target-version="${revision.version}" data-current-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">この版を復元</button>`}</span></article>`;
-      }).join("")}</div><p class="feedback" data-draft-restore-feedback aria-live="polite"></p></div></details>`;
-  const researchReady =
-    (document.question?.trim().length ?? 0) > 0 &&
-    (document.method?.trim().length ?? 0) > 0;
   const slidesReady = slides.length > 0;
   const totalDurationSeconds = slides.reduce(
     (total, slide) => total + slide.duration_seconds,
@@ -2035,7 +1749,6 @@ export function projectDetailPage(options: {
         ? `要確認 ${options.renderedQualityReport?.issue_count ?? 0}件`
         : "確認済み";
   const journeySteps = [
-    { label: "研究内容", detail: "問いと方法", complete: researchReady },
     { label: "発表構成", detail: `${slides.length}枚`, complete: slidesReady },
     { label: "実表示", detail: renderedQualityLabel, complete: renderedQualityState === "clean" },
     ...(voiceConfigured
@@ -2059,19 +1772,12 @@ export function projectDetailPage(options: {
     { label: "公開", detail: publishedCurrent ? "最新版" : "未反映", complete: publishedCurrent, kind: "publication" }
   ];
   const journeyCompleted = journeySteps.filter((step) => step.complete).length;
-  const slidePrompt = `「${document.title}」の研究内容をもとに、発表スライドの構成を対話しながら作ってください。`;
-  const nextJourneyAction = !researchReady
+  const nextJourneyAction = !slidesReady
     ? {
-        title: "研究の問いと方法を整理する",
-        description: "まず基本情報を埋めると、AIが発表構成を作りやすくなります。",
-        action: `<a class="button" href="#basic-information">基本情報を編集</a>`
+        title: "AIと発表スライドを作る",
+        description: "接続中のAIクライアントへ「発表スライドの構成を作って」と伝えます。AIは現在の研究を読めます。",
+        action: ""
       }
-    : !slidesReady
-      ? {
-          title: "AIと発表スライドを作る",
-          description: "接続中のAIクライアントへ依頼文を貼り付けて、構成づくりを始めます。",
-          action: `<button type="button" data-op="ask" data-copy-text="${escapeHtml(slidePrompt)}">AIに頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span>`
-        }
       : !durationWithinLimit
         ? {
             title: "発表を20分以内に収める",
@@ -2128,13 +1834,6 @@ export function projectDetailPage(options: {
       ? "表示エンジンが更新されたため、新しいプレビューの確認が必要です。"
       : "公開中の版は、下書きを編集しても自動では変わりません。";
   const preflightItems = [
-    {
-      complete: researchReady,
-      recommended: false,
-      label: "研究の問いと方法",
-      detail: researchReady ? "発表の前提を確認できます。" : "基本情報で問いと方法を入力してください。",
-      href: "#basic-information"
-    },
     {
       complete: coverSlideCount > 0,
       recommended: true,
@@ -2242,9 +1941,11 @@ export function projectDetailPage(options: {
   const corePreflightItems = preflightItems.filter((item) => !item.recommended);
   const recommendedPreflightItems = preflightItems.filter((item) => item.recommended);
   const preflightChecklist = `<details${previewCurrent ? "" : " open"}><summary>公開前チェック · 基本 ${corePreflightItems.filter((item) => item.complete).length}/${corePreflightItems.length} · おすすめ ${recommendedPreflightItems.filter((item) => item.complete).length}/${recommendedPreflightItems.length}</summary><ul class="preflight-list">${preflightItems.map((item) => `<li class="preflight-item" data-state="${item.complete ? "complete" : item.recommended ? "recommendation" : "attention"}"><span><strong>${escapeHtml(item.label)}${item.recommended ? " · おすすめ" : ""}</strong><small>${escapeHtml(item.detail)}</small></span>${item.complete ? "" : `<a class="preflight-action" href="${item.href}">${item.recommended ? "確認へ" : "修正へ"} →</a>`}</li>`).join("")}</ul></details>`;
+  const publicMetaEditor = `<details class="component-detail"><summary>公開ページの題名と説明文</summary><div class="disclosure-body"><form class="editor" data-project-editor action="${projectFieldsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><label>題名<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label><label>説明文<textarea name="summary" maxlength="2000" placeholder="公開ページをSNSなどで共有したときに表示される説明です。">${escapeHtml(document.summary)}</textarea></label><div class="actions"><button type="submit">保存</button><span class="version" data-editor-version>v${options.project.version}</span></div><p class="feedback" data-editor-feedback aria-live="polite"></p></form></div></details>`;
   const publicationPanel = `<section class="panel publish-state" id="publication" tabindex="-1" data-publication>
     <h2>プレビューと公開</h2>
     <p class="feedback warning" data-publication-dirty aria-live="polite" hidden></p>
+    ${publicMetaEditor}
     ${preflightChecklist}
     <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
     <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
@@ -2337,41 +2038,13 @@ export function projectDetailPage(options: {
       `${accountHeader(options.twitchLogin, options.csrfToken)}
        <main data-surface="overview" id="main-content" tabindex="-1">
          <a class="back" href="/dashboard">← 自分の研究へ戻る</a>
-         <div class="card-top"><span class="stage">${STAGE_LABELS[document.stage]}</span><span class="version">v${options.project.version}</span></div>
+         <div class="card-top"><span class="version">v${options.project.version}</span></div>
          <h1 class="detail-title">${escapeHtml(document.title)}</h1>
          <p class="lead">${escapeHtml(document.summary || "概要はまだ記入されていません。")}</p>
-         <nav class="project-section-nav" aria-label="この研究の編集項目"><a href="#journey">現在地</a><a href="#basic-information">研究内容</a><a href="#presentation-structure">スライド</a><a href="#research-images">画像</a><a href="#voice-finishing">音声</a><a href="#publication">プレビューと公開</a></nav>
+         <nav class="project-section-nav" aria-label="この研究の編集項目"><a href="#journey">現在地</a><a href="#presentation-structure">スライド</a><a href="#research-images">画像</a><a href="#voice-finishing">音声</a><a href="#publication">プレビューと公開</a></nav>
          ${workflowPanel}
          <div class="detail-grid">
            <div class="detail-column">
-             <details class="panel panel-disclosure" id="basic-information" tabindex="-1"${researchReady && options.selectedResearchItem == null ? "" : " open"}><summary>研究内容を編集</summary><div class="disclosure-body">
-               <form class="editor" data-project-editor action="${projectFieldsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
-                 <fieldset><legend>題名と概要</legend><div class="editor-grid">
-                   <label>タイトル<input name="title" maxlength="120" required value="${escapeHtml(document.title)}"></label>
-                   <label>段階<select name="stage">${Object.entries(STAGE_LABELS).map(([value, label]) => `<option value="${value}"${document.stage === value ? " selected" : ""}>${label}</option>`).join("")}</select></label>
-                   <label class="wide">概要<textarea name="summary" maxlength="2000">${escapeHtml(document.summary)}</textarea></label>
-                 </div></fieldset>
-                 <div class="actions"><button type="submit">題名と概要を保存</button><span class="version" data-editor-version>v${options.project.version}</span></div>
-                 <p class="feedback" data-editor-feedback aria-live="polite"></p>
-               </form>
-               <form class="editor" data-project-editor action="${projectFieldsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
-                 <fieldset><legend>問いと仮説</legend><div class="editor-grid">
-                   <label class="wide">研究の問い<textarea name="question" maxlength="2000">${escapeHtml(document.question ?? "")}</textarea></label>
-                   <label class="wide">仮説<textarea name="hypothesis" maxlength="4000">${escapeHtml(document.hypothesis ?? "")}</textarea></label>
-                 </div></fieldset>
-                 <div class="actions"><button type="submit">問いと仮説を保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
-                 <p class="feedback" data-form-feedback aria-live="polite"></p>
-               </form>
-               <form class="editor" data-project-editor action="${projectFieldsPath}" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}">
-                 <fieldset><legend>方法</legend><div class="editor-grid">
-                   <label class="wide">方法<textarea name="method" maxlength="20000">${escapeHtml(document.method ?? "")}</textarea></label>
-                 </div></fieldset>
-                 <div class="actions"><button type="submit">方法を保存</button><span class="version" data-version-label>v${options.project.version}</span></div>
-                 <p class="feedback" data-form-feedback aria-live="polite"></p>
-               </form>
-               ${findingsEditor}
-               ${limitationsEditor}
-             </div></details>
              ${presentationSettingsPanel}
              ${qualitySweepPanel}
              <section class="panel" id="research-images" tabindex="-1"><h2>研究画像</h2><p class="meta">${options.assets.length} / ${PROJECT_IMAGE_LIMIT}件 · 圧縮後 ${assetTotalSize} を保存中</p>
@@ -2384,25 +2057,19 @@ export function projectDetailPage(options: {
                </form>
                ${assetCards}
                <p class="inherit-note">固定プレビューで実際に使う画像は30件・合計30MiBまでです。未使用画像は公開版へ複製されません。</p>
-               <div class="copy-box"><code>接続したAIは画像本体を引数へ含めず、asset IDと説明の一覧を取得できます。</code><div class="actions"><button type="button" data-op="ask" data-copy-text="${escapeHtml(imageAiPrompt)}">画像の使い方をAIへ相談</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div></div>
              </section>
-             <section class="panel" id="research-log" tabindex="-1"><h2>研究ログ</h2>${logs}${logPager}</section>
            </div>
            <aside class="detail-column">
              <section class="panel"><h2>研究情報</h2><dl class="stat-list">
-               <dt>段階</dt><dd>${STAGE_LABELS[document.stage]}</dd>
                <dt>version</dt><dd>${options.project.version}</dd>
                <dt>更新日</dt><dd>${escapeHtml(formatDate(options.project.updated_at))}</dd>
-               <dt>ログ</dt><dd>${document.logs.length}件</dd>
                <dt>スライド</dt><dd>${slides.length}枚</dd>
                <dt>想定時間</dt><dd data-state="${durationWithinLimit ? "ok" : "warning"}">${formatDuration(totalDurationSeconds)}${totalDurationSeconds > MAX_PRESENTATION_DURATION_SECONDS ? " · 20分超過" : ""}</dd>
              </dl><div class="project-storage" data-state="${projectStorageWarning ? "warning" : "ok"}"><span class="meta">保存容量 ${Math.ceil(projectBytes / 1024)} / ${MAX_PROJECT_DOCUMENT_BYTES / 1024} KiB（${projectStoragePercent}%）</span><progress max="${MAX_PROJECT_DOCUMENT_BYTES}" value="${projectBytes}">${projectStoragePercent}%</progress><small class="inherit-note">${projectStorageWarning ? "上限に近づいています。大きい項目から整理してください。" : `残り約${Math.floor((MAX_PROJECT_DOCUMENT_BYTES - projectBytes) / 1024)} KiBです。`}</small>${storageBreakdownHtml}</div></section>
-             ${draftHistoryPanel}
-             <section class="panel" id="presentation-structure" tabindex="-1"><div class="section-head"><div><h2>発表構成</h2><p class="inherit-note">一枚ずつ編集するか、実表示と原稿を並べてレビューします。</p></div>${slides.length === 0 ? "" : `<a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/review?slide=${escapeHtml(slides[0]?.id ?? "")}">全スライドをレビュー</a>`}</div><div class="slide-list">${slideRows}</div>${slideCreateForm}${slideAiActions}</section>
-             ${evaluationPanel}
+             <section class="panel" id="presentation-structure" tabindex="-1"><div class="section-head"><div><h2>発表構成</h2><p class="inherit-note">一枚ずつ編集するか、実表示と原稿を並べてレビューします。</p></div>${slides.length === 0 ? "" : `<a class="button ghost" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/review?slide=${escapeHtml(slides[0]?.id ?? "")}">全スライドをレビュー</a>`}</div><div class="slide-list">${slideRows}</div>${slideCreateForm}</section>
              ${voicePanel}
              ${publicationPanel}
-             <section class="panel"><details><summary>研究を完全に削除</summary><div class="disclosure-body"><p class="warning">この操作は取り消せません。下書き履歴、画像、生成音声、固定プレビュー、公開中の発表がすべて対象になり、公開URLも直ちに無効になります。</p><form class="editor" method="post" action="/dashboard/projects/${escapeHtml(options.project.project_id)}/delete"><input type="hidden" name="csrf_token" value="${escapeHtml(options.csrfToken)}"><input type="hidden" name="expected_version" value="${options.project.version}"><label>削除の確認<input name="confirmation" required pattern="DELETE" autocomplete="off" placeholder="DELETE"><small class="inherit-note">半角大文字で DELETE と入力してください。</small></label><button class="danger" type="submit">この研究を完全に削除</button></form></div></details></section>
+             <section class="panel"><details><summary>研究を完全に削除</summary><div class="disclosure-body"><p class="warning">この操作は取り消せません。画像、生成音声、固定プレビュー、公開中の発表がすべて対象になり、公開URLも直ちに無効になります。</p><form class="editor" method="post" action="/dashboard/projects/${escapeHtml(options.project.project_id)}/delete"><input type="hidden" name="csrf_token" value="${escapeHtml(options.csrfToken)}"><input type="hidden" name="expected_version" value="${options.project.version}"><label>削除の確認<input name="confirmation" required pattern="DELETE" autocomplete="off" placeholder="DELETE"><small class="inherit-note">半角大文字で DELETE と入力してください。</small></label><button class="danger" type="submit">この研究を完全に削除</button></form></div></details></section>
              <p class="hint">大きな構成変更はAIクライアント、文言の微調整と確認・公開はこの画面から行えます。</p>
            </aside>
          </div>
@@ -3119,9 +2786,6 @@ export function slideWorkspacePage(options: {
         <div class="actions"><button type="submit">テンプレートを保存</button><button class="danger" type="button" data-template-delete data-template-name="${escapeHtml(activeTemplate.name)}" data-delete-url="${projectPath}/templates/${escapeHtml(activeTemplate.id)}">このテンプレートを削除</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p>
       </form>`
     : `<p class="mode-note">組み込みスタイルを使用中です。テンプレートを選ぶと色、フォント、密度、余白、動きを編集できます。</p>`;
-  const designProposalPrompt = `MCPでproject_id ${options.project.project_id}のresearch、deck、research://guide/presentation-design-workflowを読んでください。研究内容と読み上げ原稿は変更せず、現在のdesign_notes「${activeTemplate?.design_notes ?? "未設定"}」を踏まえて、色替えではない研究固有デザインを3案提案してください。各案は名前、研究との接続、配色、font、領域、モチーフ、見出し・画像・パネル表現、動き、最も映える証拠を短く比較し、最後に採用する一案だけを質問してください。まだtoolで変更しないでください。`;
-  const designAuditPrompt = `MCPでproject_id ${options.project.project_id}のdeckとresearch://guide/presentation-design-workflowを読み、現在の発表デザインを監査してください。表紙、本文、結果、結びのeffective designを比較し、見た目の多様性とAI制作の10項目を根拠付きで採点してください。研究内容は変更せず、9/10へ届かない場合は最優先の一手だけを、小粒度tool名とfieldまで示してください。`;
-  const designAiActions = `<details class="component-detail"><summary>AIと研究固有デザインを作る</summary><div class="disclosure-body"><p class="inherit-note">AIは現在のdeckと実効デザインを読み、色だけでなくfont、領域、部品表現、動きが異なる3案を比較できます。採用前は変更しません。</p><div class="actions"><button type="button" data-op="ask" data-copy-text="${escapeHtml(designProposalPrompt)}">3案を相談する文をコピー</button><button type="button" data-op="ask" data-copy-text="${escapeHtml(designAuditPrompt)}">9/10監査を頼む文をコピー</button><span class="feedback" data-copy-feedback aria-live="polite"></span></div><ul class="quality-list"><li>基本デザインに研究の意図を残す</li><li>表紙・本文・結果・結びを同じ世界観で描き分ける</li><li>実rendererと品質確認で見切れ・コントラストを確認する</li></ul></div></details>`;
   const typographyEditor = `<form class="editor" data-typography-editor data-versioned-form action="${slidePath}/typography" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-typography-presets="${escapeHtml(JSON.stringify(typographyPreviewPresets))}" data-effective-typography="${escapeHtml(JSON.stringify(typography))}" data-csrf="${escapeHtml(options.csrfToken)}">
     <p class="inherit-note">定型レイアウトの文章配分を一枚単位で調整します。未入力の項目は選択した組版プリセットを使います。</p>
     <div class="editor-grid"><label>組版プリセット<select name="preset">${Object.entries(SLIDE_TYPOGRAPHY_LABELS).map(([value, label]) => `<option value="${value}"${typography.preset === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>段数<input name="columns" type="number" min="1" max="3" value="${slide.typography?.columns ?? ""}" placeholder="実効 ${typography.columns}"></label></div>
@@ -3331,7 +2995,6 @@ export function slideWorkspacePage(options: {
                <form class="editor" data-appearance-editor data-versioned-form action="${slidePath}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-preview-templates="${escapeHtml(JSON.stringify(appearancePreviewTemplates))}" data-csrf="${escapeHtml(options.csrfToken)}"><label>テンプレート<select name="template_id">${templateOptions}</select></label><div class="editor-grid"><label>このスライドの役割<select name="role">${Object.entries(SLIDE_ROLE_LABELS).map(([value, label]) => `<option value="${value}"${(slide.role ?? "content") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表紙レイアウト<select name="cover_layout">${[["center", "中央タイトル"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言を強調"], ["band", "中央帯"], ["corner", "左下タイトル"], ["frame", "額縁"]].map(([value, label]) => `<option value="${value}"${(slide.cover_layout ?? "center") === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div>${coverLayoutPicker}<p class="inherit-note">役割ごとの配色や部品表現は、選択中のデザインに設定した差分を自動で継承します。</p><div class="editor-grid"><label>色調<select name="tone">${Object.entries(TONE_LABELS).map(([value, label]) => `<option value="${value}"${slide.tone === value ? " selected" : ""}>${label}</option>`).join("")}</select></label><label>表示アニメーション<select name="enter_animation"><option value=""${slide.enter_animation === null || slide.enter_animation === undefined ? " selected" : ""}>テンプレートを継承</option>${animationOptions}</select></label></div>${tonePicker}${animationPicker(slide.enter_animation ?? "", true)}<div class="actions"><button type="submit">スライド外観を保存</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form>
                ${typographyEditor}
                ${templateCreator}
-               ${designAiActions}
                ${templateEditor}
              </div></details>
              <details class="inspector-section" id="inspector-narration" data-inspector-section="narration"><summary>読み上げ</summary><div class="inspector-body">

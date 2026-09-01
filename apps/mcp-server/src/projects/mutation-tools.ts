@@ -35,8 +35,6 @@ import {
   presentationTemplateSchema,
   presentationAspectRatioSchema,
   projectSlideSchema,
-  projectStageSchema,
-  researchLogEntrySchema,
   slideBlockFrameSchema,
   slideBlockStyleSchema,
   slideBlockSchema,
@@ -181,13 +179,6 @@ const slideBodyEditSchema = z.object({
   old_text: z.string().min(1).max(4_000).optional(),
   text: z.string().max(4_000).optional()
 });
-const researchTextEditSchema = z.object({
-  target: z.enum(["summary", "question", "hypothesis", "method"]),
-  operation: z.enum(["replace", "replace_once", "append", "prepend", "clear"]),
-  old_text: z.string().min(1).max(2_000).optional(),
-  text: z.string().max(2_000).optional()
-});
-
 export type VisualPreset = z.infer<typeof visualPresetSchema>;
 
 export const TEMPLATE_PRESET_DEFAULTS: Record<
@@ -581,42 +572,6 @@ function applySlideBodyEdit(
   return current.slice(0, first) + edit.text + current.slice(first + edit.old_text.length);
 }
 
-function applyResearchTextEdit(
-  currentValue: string | null,
-  edit: z.infer<typeof researchTextEditSchema>
-): string | null {
-  const current = currentValue ?? "";
-  if (edit.operation === "clear") return edit.target === "summary" ? "" : null;
-  if (edit.text === undefined) {
-    throw new ProjectToolError("INVALID_FIELDS", "text is required for this research text edit.");
-  }
-  let next: string;
-  if (edit.operation === "replace") next = edit.text;
-  else if (edit.operation === "append") next = current + edit.text;
-  else if (edit.operation === "prepend") next = edit.text + current;
-  else {
-    if (edit.old_text === undefined) {
-      throw new ProjectToolError("INVALID_FIELDS", "old_text is required for replace_once.");
-    }
-    const first = current.indexOf(edit.old_text);
-    const second = first === -1 ? -1 : current.indexOf(edit.old_text, first + edit.old_text.length);
-    if (first === -1 || second !== -1) {
-      throw new ProjectToolError(
-        "INVALID_CHANGE",
-        first === -1
-          ? "old_text was not found in the selected research field."
-          : "old_text must match exactly once in the selected research field."
-      );
-    }
-    next = current.slice(0, first) + edit.text + current.slice(first + edit.old_text.length);
-  }
-  const limit = { summary: 2_000, question: 2_000, hypothesis: 4_000, method: 20_000 }[edit.target];
-  if (next.length > limit) {
-    throw new ProjectToolError("INVALID_FIELDS", `The edited ${edit.target} exceeds ${limit} characters.`);
-  }
-  return next;
-}
-
 function upsertSceneComponent(
   document: ProjectDocument,
   slideId: string,
@@ -920,14 +875,13 @@ export function registerProjectMutationTools(
   server.registerTool(
     "update_project_fields",
     {
-      title: "研究の基本項目だけを更新",
+      title: "研究の題名と概要を更新",
       description:
-        "題名・段階または研究本文の最大2か所だけを変更します。本文はtext_editsのreplace_onceで現在のold_textを一度だけ置換し、長文全体を送り直しません。追記・前置・消去も選べます。",
+        "発表の題名と、公開ページのOGP説明文になる概要を変更します。どちらか一方だけでも送れます。",
       inputSchema: {
         ...projectIdInput,
-        stage: projectStageSchema.optional(),
         title: z.string().min(1).max(120).optional(),
-        text_edits: z.array(researchTextEditSchema).min(1).max(2).optional()
+        summary: z.string().max(2_000).optional()
       },
       outputSchema: mutationOutput,
       annotations: {
@@ -937,160 +891,24 @@ export function registerProjectMutationTools(
         openWorldHint: false
       }
     },
-    async ({ project_id, expected_version, stage, title, text_edits }) => {
-      if (stage === undefined && title === undefined && text_edits === undefined) {
-        return executeMutation(db, getAuthProps, {
-          projectId: project_id,
-          expectedVersion: expected_version,
-          changedKind: "fields_updated",
-          mutate: () => {
+    async ({ project_id, expected_version, title, summary }) => {
+      return executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "fields_updated",
+        changedId: [title === undefined ? "" : "title", summary === undefined ? "" : "summary"].filter(Boolean).join(","),
+        mutate: (document) => {
+          if (title === undefined && summary === undefined) {
             throw new ProjectToolError(
               "INVALID_CHANGE",
               "At least one field must be supplied."
             );
           }
-        });
-      }
-      return executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: "fields_updated",
-        changedId: [stage === undefined ? "" : "stage", title === undefined ? "" : "title", ...(text_edits?.map((edit) => edit.target) ?? [])].filter(Boolean).sort().join(","),
-        mutate: (document) => {
-          if (stage !== undefined) document.stage = stage;
           if (title !== undefined) document.title = title;
-          for (const edit of text_edits ?? []) {
-            const next = applyResearchTextEdit(document[edit.target], edit);
-            if (edit.target === "summary") document.summary = next ?? "";
-            else if (edit.target === "question") document.question = next;
-            else if (edit.target === "hypothesis") document.hypothesis = next;
-            else document.method = next;
-          }
+          if (summary !== undefined) document.summary = summary;
         }
       });
     }
-  );
-
-  server.registerTool(
-    "set_project_list_item",
-    {
-      title: "研究の箇条書きを一件編集",
-      description:
-        "findingsまたはlimitationsの一件を追加・置換・部分編集・削除します。追加はindexを省略してvalueを指定し、短い全体はvalue、既存の長文はtext_editで変更します。valueをnullまたはtext_editのclearにすると削除します。",
-      inputSchema: {
-        ...projectIdInput,
-        list: z.enum(["findings", "limitations"]),
-        index: z.number().int().nonnegative().max(99).optional(),
-        value: z.string().min(1).max(4_000).nullable().optional(),
-        text_edit: componentTextEditSchema.optional()
-      },
-      outputSchema: mutationOutput,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, list, index, value, text_edit }) =>
-      executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: `${list}_item_updated`,
-        changedId: index === undefined ? null : String(index),
-        mutate: (document) => {
-          const values = document[list];
-          if ((value === undefined) === (text_edit === undefined)) {
-            throw new ProjectToolError(
-              "INVALID_FIELDS",
-              "Specify exactly one of value or text_edit."
-            );
-          }
-          if (index === undefined) {
-            if (value === null || value === undefined || text_edit !== undefined) {
-              throw new ProjectToolError(
-                "INVALID_CHANGE",
-                "An index is required when editing or deleting an item."
-              );
-            }
-            values.push(value);
-            return;
-          }
-          if (index >= values.length) {
-            throw new ProjectToolError(
-              "INVALID_POSITION",
-              "The list index does not exist."
-            );
-          }
-          const nextValue = text_edit === undefined
-            ? value
-            : applyComponentTextEdit(values[index], text_edit, `${list} item`);
-          if (nextValue === null) values.splice(index, 1);
-          else {
-            if (nextValue === undefined || nextValue.length === 0 || nextValue.length > 4_000) {
-              throw new ProjectToolError(
-                "INVALID_FIELDS",
-                "The edited list item must contain between 1 and 4000 characters."
-              );
-            }
-            values[index] = nextValue;
-          }
-        }
-      })
-  );
-
-  server.registerTool(
-    "edit_research_log",
-    {
-      title: "研究ログを一件編集",
-      description: "観察、実験、判断、出典、メモを一件追加するか、IDを指定して一件削除します。entryとdelete_entry_idの片方だけを指定します。",
-      inputSchema: {
-        ...projectIdInput,
-        entry: researchLogEntrySchema.optional(),
-        delete_entry_id: z.string().uuid().optional()
-      },
-      outputSchema: mutationOutput,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: true,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, entry, delete_entry_id }) =>
-      executeMutation(db, getAuthProps, {
-        projectId: project_id,
-        expectedVersion: expected_version,
-        changedKind: entry === undefined ? "log_deleted" : "log_appended",
-        changedId: entry?.id ?? delete_entry_id,
-        mutate: (document) => {
-          if ((entry === undefined) === (delete_entry_id === undefined)) {
-            throw new ProjectToolError(
-              "INVALID_FIELDS",
-              "Specify exactly one of entry or delete_entry_id."
-            );
-          }
-          if (delete_entry_id !== undefined) {
-            const index = document.logs.findIndex((item) => item.id === delete_entry_id);
-            if (index === -1) {
-              throw new ProjectToolError(
-                "LOG_ENTRY_NOT_FOUND",
-                "The research log entry does not exist."
-              );
-            }
-            document.logs.splice(index, 1);
-            return;
-          }
-          if (entry === undefined) return;
-          if (document.logs.some((item) => item.id === entry.id)) {
-            throw new ProjectToolError(
-              "LOG_ENTRY_EXISTS",
-              "A log entry with this ID already exists."
-            );
-          }
-          document.logs.push(entry);
-        }
-      })
   );
 
   server.registerTool(

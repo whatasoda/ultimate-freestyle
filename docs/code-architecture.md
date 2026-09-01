@@ -28,15 +28,15 @@ transport ──> service ──> repository ──> generated Env bindings
 
 ## 現在の集中箇所
 
-2026-07-31時点では次のファイルが大きい。
+2026-08-31時点では次のファイルが大きい。
 
 | ファイル | およその行数 | 現在の責任 | 次の分割境界 |
 |---|---:|---|---|
-| `web/router.ts` | 4,900 | 全Web pathと更新handler | 認証済みroute群をproject、slide、voice、publication単位へ分ける |
-| `web/assets.ts` | 4,800 | dashboardのbrowser runtime | preview、form保存、review、voice、asset単位のbrowser module |
-| `web/pages.ts` | 3,200 | HTML shell、CSS、全画面 | shell／style、dashboard、project、slide、voice、review |
+| `web/assets.ts` | 5,000 | dashboardのbrowser runtime | preview、form保存、review、voice、asset単位のbrowser module |
+| `web/router.ts` | 4,800 | 全Web pathと更新handler | 認証済みroute群をproject、slide、voice、publication単位へ分ける |
 | `presentation/render.ts` | 3,100 | HTML生成、CSS、browser runtime | server render、style、runtime protocol |
-| `projects/mutation-tools.ts` | 2,800 | MCPの変更tool | research、deck、slide、component、template |
+| `web/pages.ts` | 3,000 | HTML shell、CSS、全画面 | shell／style、dashboard、project、slide、voice、review |
+| `projects/mutation-tools.ts` | 2,700 | MCPの変更tool | deck、slide、component、template |
 
 巨大ファイルを行数だけで分割しない。同じ入力契約、同じ永続化境界、同じruntime protocolを一緒に移し、公開APIと回帰テストを先に固定する。新規の通常moduleは500行程度、通常functionは80行程度を目安とし、超える場合は責任を再確認する。自己完結HTML・CSS文字列は生成物として別に扱うが、周辺の業務処理を混ぜない。
 

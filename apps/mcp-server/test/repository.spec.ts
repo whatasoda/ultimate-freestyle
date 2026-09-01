@@ -135,15 +135,14 @@ describe("auth repository", () => {
     );
     await env.DB.prepare(
       `INSERT INTO research_projects (
-         id, owner_user_id, title, stage, document_json,
+         id, owner_user_id, title, document_json,
          version, idempotency_key, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
     )
       .bind(
         "de1e7e00-0000-4000-8000-000000000001",
         userId,
         "削除対象",
-        "planning",
         "{}",
         "delete-account-test",
         now,

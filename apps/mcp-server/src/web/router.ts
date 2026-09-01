@@ -27,13 +27,10 @@ import {
   renderPresentationHtml
 } from "../presentation/render";
 import {
-  getProjectDraftRevision,
   getProject,
   listDashboardProjects,
-  listProjectDraftRevisions,
   deleteProject,
   mutateProject,
-  restoreProjectDraftRevision,
   ProjectRepositoryError
 } from "../projects/repository";
 import { TEMPLATE_PRESET_DEFAULTS } from "../projects/mutation-tools";
@@ -70,8 +67,6 @@ import {
   narrationSegmentSchema,
   presentationTemplateSchema,
   projectSlideSchema,
-  RESEARCH_LOG_LIMIT,
-  RESEARCH_LOG_PAGE_SIZE,
   type SlideSceneNode
 } from "../projects/schema";
 import {
@@ -104,7 +99,6 @@ import {
   dashboardPage,
   dataHandlingPage,
   dashboardStyleResponse,
-  draftRevisionPage,
   landingPage,
   projectDetailPage,
   projectNotFoundPage,
@@ -119,7 +113,6 @@ import {
   canvasBlockCreateRequestSchema,
   canvasBlockRequestSchema,
   deckSettingsRequestSchema,
-  draftRestoreRequestSchema,
   imageAltRequestSchema,
   narrationSegmentCreateRequestSchema,
   narrationSegmentDeleteRequestSchema,
@@ -127,7 +120,6 @@ import {
   narrationSettingsRequestSchema,
   previewRequestSchema,
   projectFieldsRequestSchema,
-  projectListItemRequestSchema,
   publishRequestSchema,
   reviewInstructionRequestSchema,
   sceneComponentActionRequestSchema,
@@ -332,34 +324,18 @@ async function handleProjectDetail(
   if (project === null) {
     return projectNotFoundPage();
   }
-  const [assets, publication, draftRevisions, renderedQualityReport] = await Promise.all([
+  const [assets, publication, renderedQualityReport] = await Promise.all([
     listProjectAssets(env.DB, session.userId, projectId),
     getPublicationStatus(env.DB, session.userId, projectId),
-    listProjectDraftRevisions(env.DB, session.userId, projectId, 50),
     getRenderedQualityReport(env.DB, session.userId, projectId)
   ]);
-  const searchParams = new URL(request.url).searchParams;
-  const selectedResearchItemMatch = searchParams
-    .get("research_item")
-    ?.match(/^(findings|limitations):(\d{1,2})$/);
-  const requestedLogPage = Number(searchParams.get("log_page"));
   return projectDetailPage({
     twitchLogin: session.twitchLogin,
     csrfToken: session.csrfToken,
     project,
     assets,
     publication: publication!,
-    draftRevisions,
-    renderedQualityReport,
-    selectedLogPage: Number.isInteger(requestedLogPage) && requestedLogPage > 0
-      ? Math.min(requestedLogPage, Math.ceil(RESEARCH_LOG_LIMIT / RESEARCH_LOG_PAGE_SIZE))
-      : 1,
-    selectedResearchItem: selectedResearchItemMatch?.[1] !== undefined && selectedResearchItemMatch[2] !== undefined
-      ? {
-          list: selectedResearchItemMatch[1] as "findings" | "limitations",
-          index: Number(selectedResearchItemMatch[2])
-        }
-      : null
+    renderedQualityReport
   });
 }
 
@@ -439,150 +415,6 @@ async function handleProjectDelete(
       );
     }
     throw error;
-  }
-}
-
-async function handleDraftRevisionPage(
-  request: Request,
-  env: Env,
-  projectId: string,
-  version: number
-): Promise<Response> {
-  if (request.method !== "GET") {
-    return new Response(null, { status: 405, headers: { allow: "GET" } });
-  }
-  const session = await readWebSession(request, env.DB);
-  if (session === null) return redirectPage("/", clearWebSessionCookies());
-  const [current, revision] = await Promise.all([
-    getProject(env.DB, session.userId, projectId),
-    getProjectDraftRevision(env.DB, session.userId, projectId, version)
-  ]);
-  if (current === null || revision === null) return projectNotFoundPage();
-  return draftRevisionPage({
-    twitchLogin: session.twitchLogin,
-    csrfToken: session.csrfToken,
-    current,
-    revision
-  });
-}
-
-async function handleDraftRevisionFrame(
-  request: Request,
-  env: Env,
-  projectId: string,
-  version: number
-): Promise<Response> {
-  if (request.method !== "GET") {
-    return new Response(null, { status: 405, headers: { allow: "GET" } });
-  }
-  const session = await readWebSession(request, env.DB);
-  if (session === null) return new Response(null, { status: 404 });
-  const revision = await getProjectDraftRevision(env.DB, session.userId, projectId, version);
-  if (revision === null || revision.document.deck === null) return new Response(null, { status: 404 });
-  const baseProject = {
-    project_id: revision.project_id,
-    version: revision.version,
-    created_at: revision.created_at,
-    updated_at: revision.created_at,
-    document: revision.document
-  };
-  const artifacts = await resolveVoiceArtifacts(env.DB, session.userId, baseProject);
-  const project = hydrateProjectVoice(
-    baseProject,
-    artifacts,
-    (segment) => `/api/projects/${projectId}/voice/audio/${segment.fingerprint}`
-  );
-  const html = renderPresentationHtml(project, { frameAncestors: "'self'" });
-  return new Response(html, {
-    headers: {
-      "cache-control": "private, no-store",
-      "content-type": "text/html; charset=utf-8",
-      "content-security-policy":
-        "default-src 'none'; style-src 'nonce-saijiyu-static'; script-src 'nonce-saijiyu-static'; media-src 'self' blob:; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
-      "permissions-policy":
-        "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
-      "referrer-policy": "no-referrer",
-      "strict-transport-security": "max-age=31536000",
-      "x-content-type-options": "nosniff",
-      "x-frame-options": "SAMEORIGIN"
-    }
-  });
-}
-
-async function handleDraftRevisionRestore(
-  request: Request,
-  env: Env,
-  projectId: string,
-  targetVersion: number
-): Promise<Response> {
-  if (request.method !== "POST") {
-    return new Response(null, { status: 405, headers: { allow: "POST" } });
-  }
-  const session = await requireWebSessionAndCsrf(request, env);
-  if (session === null) {
-    return jsonResponse(
-      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
-      403
-    );
-  }
-  const read = await readRequestJson(request);
-  if (!read.ok) return read.response;
-  const parsed = draftRestoreRequestSchema.safeParse(read.value);
-  if (!parsed.success) {
-    return jsonResponse(
-      { ok: false, error: { code: "INVALID_FIELDS", message: "復元対象を確認してください。" }, request_id: crypto.randomUUID() },
-      422
-    );
-  }
-  try {
-    const project = await restoreProjectDraftRevision(env.DB, {
-      ownerUserId: session.userId,
-      projectId,
-      expectedVersion: parsed.data.expected_version,
-      targetVersion
-    });
-    await recordWebAudit(env.DB, {
-      userId: session.userId,
-      eventType: "project.draft_restored",
-      outcome: "succeeded",
-      details: { project_id: projectId, target_version: targetVersion, version: project.version },
-      createdAt: new Date().toISOString()
-    });
-    return jsonResponse({
-      ok: true,
-      project_id: projectId,
-      restored_from_version: targetVersion,
-      version: project.version,
-      next_url: `/dashboard/projects/${projectId}`,
-      error: null,
-      request_id: crypto.randomUUID()
-    });
-  } catch (error) {
-    if (error instanceof ProjectRepositoryError && error.code === "PROJECT_TOO_LARGE") {
-      return projectMutationErrorResponse(error, "下書きを復元できませんでした。");
-    }
-    const code = error instanceof Error && "code" in error
-      ? String((error as { code: unknown }).code)
-      : "INTERNAL_ERROR";
-    const currentVersion = error instanceof Error && "currentVersion" in error
-      ? ((error as { currentVersion?: number }).currentVersion ?? null)
-      : null;
-    return jsonResponse(
-      {
-        ok: false,
-        current_version: currentVersion,
-        error: {
-          code,
-          message: code === "PROJECT_VERSION_CONFLICT"
-            ? "別の場所で更新されました。画面を読み込み直してください。"
-            : code === "PROJECT_NOT_FOUND"
-              ? "指定した下書き履歴が見つかりません。"
-              : "下書きを復元できませんでした。"
-        },
-        request_id: crypto.randomUUID()
-      },
-      code === "PROJECT_VERSION_CONFLICT" ? 409 : code === "PROJECT_NOT_FOUND" ? 404 : 500
-    );
   }
 }
 
@@ -1399,11 +1231,7 @@ async function handleProjectFieldsUpdate(
       expectedVersion: expected_version,
       mutate: (document) => {
         if (fields.title !== undefined) document.title = fields.title;
-        if (fields.stage !== undefined) document.stage = fields.stage;
         if (fields.summary !== undefined) document.summary = fields.summary;
-        if (fields.question !== undefined) document.question = fields.question.trim() || null;
-        if (fields.hypothesis !== undefined) document.hypothesis = fields.hypothesis.trim() || null;
-        if (fields.method !== undefined) document.method = fields.method.trim() || null;
       }
     });
     await recordWebAudit(env.DB, {
@@ -1455,168 +1283,6 @@ async function handleProjectFieldsUpdate(
       },
       status
     );
-  }
-}
-
-async function handleProjectListItemUpdate(
-  request: Request,
-  env: Env,
-  projectId: string
-): Promise<Response> {
-  if (request.method !== "PATCH") {
-    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
-  }
-  const session = await requireWebSessionAndCsrf(request, env);
-  if (session === null) {
-    return jsonResponse(
-      {
-        ok: false,
-        error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" },
-        request_id: crypto.randomUUID()
-      },
-      403
-    );
-  }
-  const read = await readRequestJson(request);
-  if (!read.ok) return read.response;
-  const parsed = projectListItemRequestSchema.safeParse(read.value);
-  if (!parsed.success) {
-    return jsonResponse(
-      {
-        ok: false,
-        error: { code: "INVALID_FIELDS", message: "入力内容を確認してください。" },
-        request_id: crypto.randomUUID()
-      },
-      422
-    );
-  }
-  try {
-    const input = parsed.data;
-    const project = await mutateProject(env.DB, {
-      ownerUserId: session.userId,
-      projectId,
-      expectedVersion: input.expected_version,
-      mutate: (document) => {
-        const values = document[input.list];
-        if (input.action === "add") {
-          if (values.length >= 100) {
-            const error = new Error("list full") as Error & { code: string };
-            error.code = "INVALID_FIELDS";
-            throw error;
-          }
-          values.push(input.value);
-          return;
-        }
-        if (input.index >= values.length) {
-          const error = new Error("item not found") as Error & { code: string };
-          error.code = "INVALID_FIELDS";
-          throw error;
-        }
-        if (input.action === "delete") values.splice(input.index, 1);
-        else values[input.index] = input.value;
-      }
-    });
-    await recordWebAudit(env.DB, {
-      userId: session.userId,
-      eventType: `project.${parsed.data.list}_item_${parsed.data.action === "add" ? "added" : parsed.data.action === "update" ? "updated" : "deleted"}`,
-      outcome: "succeeded",
-      details: {
-        project_id: projectId,
-        version: project.version,
-        index: "index" in parsed.data ? parsed.data.index : project.document[parsed.data.list].length - 1
-      },
-      createdAt: new Date().toISOString()
-    });
-    const itemIndex = parsed.data.action === "delete"
-      ? null
-      : "index" in parsed.data
-        ? parsed.data.index
-        : project.document[parsed.data.list].length - 1;
-    const listAnchor = `research-list-${parsed.data.list}`;
-    return jsonResponse({
-      ok: true,
-      project_id: projectId,
-      version: project.version,
-      updated_at: project.updated_at,
-      item_index: itemIndex,
-      next_url: itemIndex === null
-        ? `/dashboard/projects/${projectId}#${listAnchor}`
-        : `/dashboard/projects/${projectId}?research_item=${parsed.data.list}:${itemIndex}#research-item-${parsed.data.list}-${itemIndex}`,
-      error: null,
-      request_id: crypto.randomUUID()
-    });
-  } catch (error) {
-    return projectMutationErrorResponse(error, "項目を保存できませんでした。");
-  }
-}
-
-async function handleResearchLogDelete(
-  request: Request,
-  env: Env,
-  projectId: string,
-  entryId: string
-): Promise<Response> {
-  if (request.method !== "DELETE") {
-    return new Response(null, { status: 405, headers: { allow: "DELETE" } });
-  }
-  const session = await requireWebSessionAndCsrf(request, env);
-  if (session === null) {
-    return jsonResponse(
-      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
-      403
-    );
-  }
-  const read = await readRequestJson(request);
-  if (!read.ok) return read.response;
-  const parsed = previewRequestSchema.safeParse(read.value);
-  if (!parsed.success) {
-    return jsonResponse(
-      { ok: false, error: { code: "INVALID_FIELDS", message: "入力内容を確認してください。" }, request_id: crypto.randomUUID() },
-      422
-    );
-  }
-  try {
-    const logPageValue = new URL(request.url).searchParams.get("log_page");
-    const returnLogPage = logPageValue !== null && /^(?:[1-9]|1\d|2[0-5])$/.test(logPageValue)
-      ? Number(logPageValue)
-      : 1;
-    const project = await mutateProject(env.DB, {
-      ownerUserId: session.userId,
-      projectId,
-      expectedVersion: parsed.data.expected_version,
-      mutate: (document) => {
-        const index = document.logs.findIndex((entry) => entry.id === entryId);
-        if (index === -1) {
-          const error = new Error("log entry not found") as Error & { code: string };
-          error.code = "LOG_ENTRY_NOT_FOUND";
-          throw error;
-        }
-        document.logs.splice(index, 1);
-      }
-    });
-    await recordWebAudit(env.DB, {
-      userId: session.userId,
-      eventType: "project.research_log_deleted",
-      outcome: "succeeded",
-      details: { project_id: projectId, entry_id: entryId, version: project.version },
-      createdAt: new Date().toISOString()
-    });
-    const availableLogPage = Math.min(
-      returnLogPage,
-      Math.max(1, Math.ceil(project.document.logs.length / RESEARCH_LOG_PAGE_SIZE))
-    );
-    return jsonResponse({
-      ok: true,
-      project_id: projectId,
-      entry_id: entryId,
-      version: project.version,
-      updated_at: project.updated_at,
-      next_url: `/dashboard/projects/${projectId}${availableLogPage > 1 ? `?log_page=${availableLogPage}` : ""}#research-log`,
-      error: null,
-      request_id: crypto.randomUUID()
-    });
-  } catch (error) {
-    return projectMutationErrorResponse(error, "研究ログを削除できませんでした。");
   }
 }
 
@@ -4715,28 +4381,6 @@ export async function handleWebRequest(
   if (voicePageMatch?.[1] !== undefined) {
     return handleVoicePage(request, env, voicePageMatch[1]);
   }
-  const draftRevisionFrameMatch = path.match(
-    new RegExp(`^/dashboard/projects/${UUID_PATH}/revisions/(\\d{1,9})/frame$`, "i")
-  );
-  if (draftRevisionFrameMatch?.[1] !== undefined && draftRevisionFrameMatch[2] !== undefined) {
-    return handleDraftRevisionFrame(
-      request,
-      env,
-      draftRevisionFrameMatch[1],
-      Number(draftRevisionFrameMatch[2])
-    );
-  }
-  const draftRevisionPageMatch = path.match(
-    new RegExp(`^/dashboard/projects/${UUID_PATH}/revisions/(\\d{1,9})$`, "i")
-  );
-  if (draftRevisionPageMatch?.[1] !== undefined && draftRevisionPageMatch[2] !== undefined) {
-    return handleDraftRevisionPage(
-      request,
-      env,
-      draftRevisionPageMatch[1],
-      Number(draftRevisionPageMatch[2])
-    );
-  }
   const slideReviewPageMatch = path.match(
     new RegExp(`^/dashboard/projects/${UUID_PATH}/review$`, "i")
   );
@@ -4869,34 +4513,11 @@ export async function handleWebRequest(
   if (projectFieldsMatch?.[1] !== undefined) {
     return handleProjectFieldsUpdate(request, env, projectFieldsMatch[1]);
   }
-  const projectListItemMatch = path.match(
-    new RegExp(`^/api/projects/${UUID_PATH}/list-items$`, "i")
-  );
-  if (projectListItemMatch?.[1] !== undefined) {
-    return handleProjectListItemUpdate(request, env, projectListItemMatch[1]);
-  }
-  const researchLogMatch = path.match(
-    new RegExp(`^/api/projects/${UUID_PATH}/logs/${UUID_PATH}$`, "i")
-  );
-  if (researchLogMatch?.[1] !== undefined && researchLogMatch[2] !== undefined) {
-    return handleResearchLogDelete(request, env, researchLogMatch[1], researchLogMatch[2]);
-  }
   const qualityReportMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/quality-report$`, "i")
   );
   if (qualityReportMatch?.[1] !== undefined) {
     return handleRenderedQualityReportSave(request, env, qualityReportMatch[1]);
-  }
-  const draftRestoreMatch = path.match(
-    new RegExp(`^/api/projects/${UUID_PATH}/revisions/(\\d{1,9})/restore$`, "i")
-  );
-  if (draftRestoreMatch?.[1] !== undefined && draftRestoreMatch[2] !== undefined) {
-    return handleDraftRevisionRestore(
-      request,
-      env,
-      draftRestoreMatch[1],
-      Number(draftRestoreMatch[2])
-    );
   }
   const deckSettingsMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/presentation/settings$`, "i")

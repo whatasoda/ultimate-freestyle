@@ -36,14 +36,13 @@ beforeAll(async () => {
     ).bind(OTHER_OWNER_ID, "asset-other-twitch", "other", now, now),
     env.DB.prepare(
       `INSERT INTO research_projects (
-         id, owner_user_id, title, stage, document_json, version,
+         id, owner_user_id, title, document_json, version,
          idempotency_key, created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+       ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
     ).bind(
       PROJECT_ID,
       OWNER_ID,
       project.title,
-      project.stage,
       JSON.stringify(project),
       "asset-project",
       now,
@@ -167,61 +166,4 @@ describe("project image service", () => {
     expect(await removeProjectImage(env, OWNER_ID, asset.asset_id)).toBe(true);
   });
 
-  it("keeps an image needed to render a retained draft revision", async () => {
-    const bytes = onePixelPng();
-    const asset = await uploadProjectImage(
-      new Request("https://example.test/upload", {
-        method: "POST",
-        headers: { "content-type": "image/png" },
-        body: bytes
-      }),
-      env,
-      {
-        ownerUserId: OWNER_ID,
-        projectId: PROJECT_ID,
-        filename: "historical.png",
-        altText: "過去版に残る画像"
-      }
-    );
-    const historical = createEmptyProject("画像テスト") as unknown as Record<
-      string,
-      unknown
-    >;
-    historical.deck = {
-      slides: [
-        {
-          composition: {
-            mode: "canvas",
-            blocks: [{ kind: "image", asset_id: asset.asset_id }]
-          }
-        }
-      ]
-    };
-    await env.DB.prepare(
-      `INSERT INTO project_draft_revisions (
-         project_id, owner_user_id, version, document_json, source, created_at
-       ) VALUES (?, ?, 1, ?, 'edit', ?)`
-    )
-      .bind(
-        PROJECT_ID,
-        OWNER_ID,
-        JSON.stringify(historical),
-        "2026-07-26T01:00:00.000Z"
-      )
-      .run();
-
-    await expect(
-      removeProjectImage(env, OWNER_ID, asset.asset_id)
-    ).rejects.toMatchObject({
-      code: "ASSET_IN_USE",
-      message: expect.stringContaining("下書き履歴")
-    });
-
-    await env.DB.prepare(
-      "DELETE FROM project_draft_revisions WHERE project_id = ? AND version = 1"
-    )
-      .bind(PROJECT_ID)
-      .run();
-    expect(await removeProjectImage(env, OWNER_ID, asset.asset_id)).toBe(true);
-  });
 });

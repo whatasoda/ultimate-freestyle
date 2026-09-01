@@ -8,8 +8,7 @@ import {
   getProject,
   listProjects,
   ProjectRepositoryError,
-  projectStorageUsage,
-  restoreProjectDraftRevision
+  projectStorageUsage
 } from "./repository";
 import type { ProjectSizeDetails } from "./repository";
 import {
@@ -192,7 +191,6 @@ export function registerProjectTools(
             version: z.number().int().positive(),
             updated_at: z.string().datetime(),
             title: z.string(),
-            stage: z.string(),
             has_deck: z.boolean(),
             aspect_ratio: z.enum(["16:9", "4:3"]).nullable(),
             total_duration_seconds: z.number().int().nonnegative(),
@@ -247,7 +245,6 @@ export function registerProjectTools(
             version: project.version,
             updated_at: project.updated_at,
             title: project.document.title,
-            stage: project.document.stage,
             has_deck: deck !== null,
             aspect_ratio: deck?.aspect_ratio ?? null,
             total_duration_seconds: totalDurationSeconds,
@@ -338,7 +335,6 @@ export function registerProjectTools(
           project: {
             project_id: result.project.project_id,
             title: result.project.document.title,
-            stage: result.project.document.stage,
             version: result.project.version,
             has_presentation: result.project.document.deck !== null,
             slide_count: result.project.document.deck?.slides.length ?? 0,
@@ -362,82 +358,6 @@ export function registerProjectTools(
             project: null,
             storage: null,
             replayed: null,
-            error: { code: normalized.code, message: normalized.message }
-          },
-          true
-        );
-      }
-    }
-  );
-
-  server.registerTool(
-    "restore_draft_revision",
-    {
-      title: "過去の下書きを新しい版として復元",
-      description:
-        "research://projects/{id}/revisionsで候補を選び、revisions/{version}と必要なslides/{slideId}で現在版との差を確認した過去版を、現在の下書きを消さず新しいversionとして復元します。expected_versionには確認した現在版を指定します。",
-      inputSchema: {
-        project_id: z.string().uuid(),
-        expected_version: z.number().int().positive(),
-        target_version: z.number().int().positive()
-      },
-      outputSchema: {
-        ok: z.boolean(),
-        request_id: z.string().uuid(),
-        version: z.number().int().positive().nullable(),
-        current_version: z.number().int().positive().nullable(),
-        restored_from_version: z.number().int().positive().nullable(),
-        storage: projectStorageUsageSchema.nullable(),
-        error: projectErrorSchema.nullable()
-      },
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: false
-      }
-    },
-    async ({ project_id, expected_version, target_version }) => {
-      const requestId = crypto.randomUUID();
-      try {
-        const ownerUserId = requireSubject(getAuthProps, "research:write");
-        const project = await restoreProjectDraftRevision(db, {
-          ownerUserId,
-          projectId: project_id,
-          expectedVersion: expected_version,
-          targetVersion: target_version
-        });
-        await recordAuditEvent(db, {
-          userId: ownerUserId,
-          eventType: "project.draft_restored",
-          outcome: "succeeded",
-          details: {
-            project_id,
-            version: project.version,
-            restored_from_version: target_version,
-            source: "mcp"
-          },
-          createdAt: new Date().toISOString()
-        });
-        return toolResult({
-          ok: true,
-          request_id: requestId,
-          version: project.version,
-          current_version: project.version,
-          restored_from_version: target_version,
-          storage: projectStorageUsage(project.document),
-          error: null
-        });
-      } catch (error) {
-        const normalized = normalizeProjectToolError(error);
-        return toolResult(
-          {
-            ok: false,
-            request_id: requestId,
-            version: null,
-            current_version: normalized.currentVersion,
-            restored_from_version: null,
-            storage: null,
             error: { code: normalized.code, message: normalized.message }
           },
           true

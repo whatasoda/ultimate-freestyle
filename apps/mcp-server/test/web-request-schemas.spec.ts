@@ -3,7 +3,6 @@ import { describe, expect, it } from "vitest";
 import {
   narrationSegmentRequestSchema,
   projectFieldsRequestSchema,
-  projectListItemRequestSchema,
   reviewInstructionRequestSchema,
   sceneComponentActionRequestSchema,
   sceneComponentCreateRequestSchema,
@@ -24,13 +23,12 @@ describe("Web request schemas", () => {
     expect(
       projectFieldsRequestSchema.safeParse({
         expected_version: 1,
-        question: "氷は置く場所で融け方が変わるか？"
+        title: "題名だけ変える"
       }).success
     ).toBe(true);
     expect(
       projectFieldsRequestSchema.safeParse({
         expected_version: 1,
-        question: "問い",
         unknown: true
       }).success
     ).toBe(false);
@@ -47,23 +45,6 @@ describe("Web request schemas", () => {
   });
 
   it("keeps discriminated actions and their bounds stable", () => {
-    expect(
-      projectListItemRequestSchema.safeParse({
-        expected_version: 2,
-        action: "move",
-        list: "findings",
-        index: 0
-      }).success
-    ).toBe(false);
-    expect(
-      projectListItemRequestSchema.safeParse({
-        expected_version: 2,
-        action: "update",
-        list: "findings",
-        index: 99,
-        value: "観察結果"
-      }).success
-    ).toBe(true);
     expect(
       slideActionRequestSchema.safeParse({
         expected_version: 2,

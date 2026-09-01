@@ -9,7 +9,6 @@ import {
   narrationSegmentSchema,
   presentationAspectRatioSchema,
   presentationTemplateSchema,
-  projectStageSchema,
   slideBlockSchema,
   slideRoleSchema,
   slideSceneNodeSchema,
@@ -27,11 +26,7 @@ export const projectFieldsRequestSchema = z
   .object({
     expected_version: z.number().int().positive(),
     title: z.string().min(1).max(120).optional(),
-    stage: projectStageSchema.optional(),
-    summary: z.string().max(2_000).optional(),
-    question: z.string().max(2_000).optional(),
-    hypothesis: z.string().max(4_000).optional(),
-    method: z.string().max(20_000).optional()
+    summary: z.string().max(2_000).optional()
   })
   .strict()
   .refine(
@@ -39,37 +34,11 @@ export const projectFieldsRequestSchema = z
     { message: "更新する項目を1つ以上指定してください。" }
   );
 
-export const projectListItemRequestSchema = z.discriminatedUnion("action", [
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("add"),
-    list: z.enum(["findings", "limitations"]),
-    value: z.string().trim().min(1).max(4_000)
-  }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("update"),
-    list: z.enum(["findings", "limitations"]),
-    index: z.number().int().nonnegative().max(99),
-    value: z.string().trim().min(1).max(4_000)
-  }),
-  z.object({
-    expected_version: z.number().int().positive(),
-    action: z.literal("delete"),
-    list: z.enum(["findings", "limitations"]),
-    index: z.number().int().nonnegative().max(99)
-  })
-]);
-
 export const imageAltRequestSchema = z.object({
   alt_text: z.string().max(500)
 });
 
 export const previewRequestSchema = z.object({
-  expected_version: z.number().int().positive()
-});
-
-export const draftRestoreRequestSchema = z.object({
   expected_version: z.number().int().positive()
 });
 

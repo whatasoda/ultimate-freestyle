@@ -7,7 +7,7 @@ import { createServer } from "../src/server";
 import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { saveRenderedQualityReport } from "../src/projects/quality-reports";
-import { createEmptyProject, projectSummarySchema, researchLogEntrySchema } from "../src/projects/schema";
+import { createEmptyProject, projectSummarySchema } from "../src/projects/schema";
 import { setupZundamonProfile } from "../src/voicevox/service";
 
 async function readJsonResource(client: Client, uri: string): Promise<unknown> {
@@ -66,7 +66,6 @@ describe("MCP contract", () => {
           "update_slide_component",
           "edit_slide_component_tree",
           "update_project_fields",
-          "edit_research_log",
           "configure_deck",
           "create_presentation_template",
           "update_presentation_template_fields",
@@ -79,7 +78,6 @@ describe("MCP contract", () => {
           "update_slide_narration_voice",
           "get_voice_generation_status",
           "generate_voice_audio",
-          "restore_draft_revision",
           "move_slide",
           "delete_slide"
         ])
@@ -89,14 +87,6 @@ describe("MCP contract", () => {
       expect(tools.map((tool) => tool.name)).not.toContain("get_project_slide");
       expect(tools.map((tool) => tool.name)).not.toContain("evaluate_project");
       expect(tools.map((tool) => tool.name)).not.toContain("append_research_log");
-      const sourceLog = {
-        id: "45000000-0000-4000-8000-000000000045",
-        occurred_at: "2026-07-30T12:00:00.000Z",
-        kind: "source" as const,
-        text: "出典URLのprotocolを確認する。"
-      };
-      expect(researchLogEntrySchema.safeParse({ ...sourceLog, source_url: "https://example.com/evidence" }).success).toBe(true);
-      expect(researchLogEntrySchema.safeParse({ ...sourceLog, source_url: "javascript:alert(1)" }).success).toBe(false);
       const largestInputSchema = Math.max(
         ...tools.map((tool) => JSON.stringify(tool.inputSchema).length)
       );
@@ -141,20 +131,15 @@ describe("MCP contract", () => {
       const projectFieldsTool = tools.find(
         (tool) => tool.name === "update_project_fields"
       );
-      expect(JSON.stringify(projectFieldsTool?.inputSchema)).toContain('"text_edits"');
+      expect(
+        (projectFieldsTool?.inputSchema as { properties?: object }).properties
+      ).toHaveProperty("summary");
       expect(
         (projectFieldsTool?.inputSchema as { properties?: object }).properties
       ).not.toHaveProperty("method");
-      const projectListItemTool = tools.find(
-        (tool) => tool.name === "set_project_list_item"
-      );
-      expect(JSON.stringify(projectListItemTool?.inputSchema)).toContain('"text_edit"');
-      expect(tools).toContainEqual(
-        expect.objectContaining({
-          name: "edit_research_log",
-          annotations: expect.objectContaining({ destructiveHint: true })
-        })
-      );
+      expect(tools.map((tool) => tool.name)).not.toContain("set_project_list_item");
+      expect(tools.map((tool) => tool.name)).not.toContain("edit_research_log");
+      expect(tools.map((tool) => tool.name)).not.toContain("restore_draft_revision");
       const componentContentTool = tools.find(
         (tool) => tool.name === "update_slide_component_content"
       );
@@ -464,18 +449,13 @@ describe("MCP contract", () => {
         project: { project_id: firstProject.project_id, version: 1 }
       });
 
-      const updatedQuestion = "子どもの頃の記憶だけで、どこまで丸く作れるか？";
+      const updatedSummary = "子どもの頃の記憶だけで、どこまで丸く作れるか試した記録です。";
       const update = await client.callTool({
         name: "update_project_fields",
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 1,
-          stage: "design",
-          text_edits: [{
-            target: "question",
-            operation: "replace",
-            text: updatedQuestion
-          }]
+          summary: updatedSummary
         }
       });
       expect(update.structuredContent).toMatchObject({
@@ -489,11 +469,7 @@ describe("MCP contract", () => {
         arguments: {
           project_id: firstProject.project_id,
           expected_version: 1,
-          text_edits: [{
-            target: "summary",
-            operation: "replace",
-            text: "競合して保存されない概要"
-          }]
+          summary: "競合して保存されない概要"
         }
       });
       expect(conflict.isError).toBe(true);
@@ -536,7 +512,6 @@ describe("MCP contract", () => {
           {
             project_id: firstProject.project_id,
             title: "記憶と泥団子の研究",
-            stage: "design",
             version: 2,
             has_presentation: false,
             slide_count: 0,
@@ -602,15 +577,6 @@ describe("MCP contract", () => {
       });
       expect(await env.MEDIA_BUCKET.get(objectKey)).toBeNull();
 
-      const evaluationGuide = await client.readResource({
-        uri: "research://guide/evaluation"
-      });
-      expect(evaluationGuide.contents).toContainEqual(
-        expect.objectContaining({
-          text: expect.stringContaining("根拠不足は0ではなくNE")
-        })
-      );
-
       const { resourceTemplates } = await client.listResourceTemplates();
       expect(resourceTemplates).toEqual(
         expect.arrayContaining([
@@ -625,34 +591,6 @@ describe("MCP contract", () => {
           }),
           expect.objectContaining({
             uriTemplate: "research://projects/{id}/review-comments/pages/{page}"
-          }),
-          expect.objectContaining({
-            uriTemplate: "research://projects/{id}/research"
-          }),
-          expect.objectContaining({
-            uriTemplate: "research://projects/{id}/research/{section}/pages/{page}"
-          }),
-          expect.objectContaining({
-            uriTemplate: "research://projects/{id}/revisions"
-          }),
-          expect.objectContaining({
-            uriTemplate: "research://projects/{id}/revisions/{version}"
-          }),
-          expect.objectContaining({
-            uriTemplate:
-              "research://projects/{id}/revisions/{version}/slides/{slideId}"
-          }),
-          expect.objectContaining({
-            uriTemplate:
-              "research://projects/{id}/revisions/{version}/slides/{slideId}/content"
-          }),
-          expect.objectContaining({
-            uriTemplate:
-              "research://projects/{id}/revisions/{version}/slides/{slideId}/{section}/pages/{page}"
-          }),
-          expect.objectContaining({
-            uriTemplate:
-              "research://projects/{id}/revisions/{version}/slides/{slideId}/{section}/{itemId}"
           }),
           expect.objectContaining({
             uriTemplate: "research://projects/{id}/publication"
@@ -675,9 +613,6 @@ describe("MCP contract", () => {
           expect.objectContaining({
             uriTemplate:
               "research://projects/{id}/slides/{slideId}/elements/{elementId}"
-          }),
-          expect.objectContaining({
-            uriTemplate: "research://projects/{id}/research/logs/{logId}"
           }),
           expect.objectContaining({
             uriTemplate: "research://projects/{id}/slides/{slideId}/{section}/pages/{page}"
@@ -707,68 +642,6 @@ describe("MCP contract", () => {
           pages: 0,
           uri_template: `research://projects/${firstProject.project_id}/review-comments/pages/{page}`
         }
-      });
-      const projectResource = await client.readResource({
-        uri: `research://projects/${firstProject.project_id}/research`
-      });
-      expect(projectResource.contents).toContainEqual(
-        expect.objectContaining({
-          mimeType: "application/json",
-          text: expect.stringContaining(updatedQuestion)
-        })
-      );
-      const emptyFindingsPage = await readJsonResource(
-        client,
-        `research://projects/${firstProject.project_id}/research/findings/pages/1`
-      );
-      expect(emptyFindingsPage).toMatchObject({
-        ok: true,
-        section: "findings",
-        page: 1,
-        page_size: 10,
-        total_items: 0,
-        total_pages: 0,
-        items: []
-      });
-      const longLogId = "43000000-0000-4000-8000-000000000004";
-      const projectRow = await env.DB.prepare(
-        "SELECT document_json FROM research_projects WHERE id = ?"
-      ).bind(firstProject.project_id).first<{ document_json: string }>();
-      const projectDocument = JSON.parse(projectRow!.document_json);
-      projectDocument.logs = [{
-        id: longLogId,
-        occurred_at: "2026-07-30T09:00:00.000Z",
-        kind: "observation",
-        text: "長".repeat(10_000),
-        source_url: "https://example.com/evidence"
-      }];
-      await env.DB.prepare(
-        "UPDATE research_projects SET document_json = ? WHERE id = ?"
-      ).bind(JSON.stringify(projectDocument), firstProject.project_id).run();
-      const logsPage = await readJsonResource(
-        client,
-        `research://projects/${firstProject.project_id}/research/logs/pages/1`
-      );
-      expect(logsPage).toMatchObject({
-        section: "logs",
-        items: [{
-          position: 1,
-          log: {
-            id: longLogId,
-            character_count: 10_000,
-            uri: `research://projects/${firstProject.project_id}/research/logs/${longLogId}`
-          }
-        }]
-      });
-      expect(new TextEncoder().encode(JSON.stringify(logsPage)).byteLength).toBeLessThan(8 * 1024);
-      const logResource = await readJsonResource(
-        client,
-        `research://projects/${firstProject.project_id}/research/logs/${longLogId}`
-      );
-      expect(logResource).toMatchObject({
-        ok: true,
-        version: 2,
-        log: { id: longLogId, text: "長".repeat(10_000) }
       });
       const qualityResource = await readJsonResource(
         client,
@@ -819,41 +692,6 @@ describe("MCP contract", () => {
           }
         },
         next_action: "quality_review_complete"
-      });
-      const revisionResource = await readJsonResource(
-        client,
-        `research://projects/${firstProject.project_id}/revisions/1`
-      );
-      expect(revisionResource).toMatchObject({
-        ok: true,
-        project_id: firstProject.project_id,
-        current_version: 2,
-        revision: {
-          version: 1,
-          research: {
-            title: "記憶と泥団子の研究",
-            question: null,
-            findings: { count: 0, previews: [] },
-            limitations: { count: 0, previews: [] },
-            log_count: 0
-          },
-          presentation: null
-        },
-        diff: {
-          research_fields: expect.arrayContaining(["stage", "question"]),
-          presentation_settings: [],
-          current_only_slides: [],
-          duration_delta_seconds: 0
-        }
-      });
-      expect(new TextEncoder().encode(JSON.stringify(revisionResource)).byteLength).toBeLessThan(16 * 1024);
-      const missingRevisionSlide = await readJsonResource(
-        client,
-        `research://projects/${firstProject.project_id}/revisions/1/slides/missing`
-      );
-      expect(missingRevisionSlide).toMatchObject({
-        ok: false,
-        error: { code: "SLIDE_NOT_FOUND" }
       });
       const publicationResource = await readJsonResource(
         client,
@@ -1548,90 +1386,6 @@ describe("MCP contract", () => {
           })
         ])
       );
-      const revisions = await readJsonResource(
-        client,
-        `research://projects/${firstProject.project_id}/revisions`
-      );
-      expect(revisions).toMatchObject({
-        ok: true,
-        current_version: 22,
-        retention: {
-          maximum_versions: 50,
-          guaranteed_recent_versions: 10,
-          byte_budget: 8 * 1024 * 1024
-        },
-        selection_workflow: {
-          restore_tool: "restore_draft_revision",
-          current_project_uri: `research://projects/${firstProject.project_id}`
-        },
-        revisions: expect.arrayContaining([
-          expect.objectContaining({ version: 22, source: "edit" }),
-          expect.objectContaining({ version: 21, source: "edit" })
-        ])
-      });
-      const restoredDraft = await client.callTool({
-        name: "restore_draft_revision",
-        arguments: {
-          project_id: firstProject.project_id,
-          expected_version: 22,
-          target_version: 1
-        }
-      });
-      expect(restoredDraft.structuredContent).toMatchObject({
-        ok: true,
-        version: 23,
-        current_version: 23,
-        restored_from_version: 1
-      });
-      const editableLogId = "44000000-0000-4000-8000-000000000044";
-      const addedLog = await client.callTool({
-        name: "edit_research_log",
-        arguments: {
-          project_id: firstProject.project_id,
-          expected_version: 23,
-          entry: {
-            id: editableLogId,
-            occurred_at: now,
-            kind: "decision",
-            text: "ログの追加と削除を同じ小さな契約で扱う。",
-            source_url: null
-          }
-        }
-      });
-      expect(addedLog.structuredContent).toMatchObject({
-        ok: true,
-        version: 24
-      });
-      const deletedLog = await client.callTool({
-        name: "edit_research_log",
-        arguments: {
-          project_id: firstProject.project_id,
-          expected_version: 24,
-          delete_entry_id: editableLogId
-        }
-      });
-      expect(deletedLog.structuredContent).toMatchObject({
-        ok: true,
-        version: 25
-      });
-      const afterLogDelete = await readJsonResource(
-        client,
-        `research://projects/${firstProject.project_id}/research/logs/pages/1`
-      );
-      expect(afterLogDelete).toMatchObject({ total_items: 0, items: [] });
-      const missingLog = await client.callTool({
-        name: "edit_research_log",
-        arguments: {
-          project_id: firstProject.project_id,
-          expected_version: 25,
-          delete_entry_id: editableLogId
-        }
-      });
-      expect(missingLog).toMatchObject({
-        isError: true,
-        structuredContent: { error: { code: "LOG_ENTRY_NOT_FOUND" } }
-      });
-
       const otherSubjectId = "twitch-other-project-owner";
       await env.DB.prepare(
         `INSERT OR IGNORE INTO users (
@@ -1919,48 +1673,6 @@ describe("MCP contract", () => {
       expect(expandedTemplate.structuredContent).toMatchObject({
         ok: true,
         version: 15
-      });
-
-      const revisionSlide = await readJsonResource(
-        client,
-        `research://projects/${projectId}/revisions/14/slides/intro`
-      );
-      expect(revisionSlide).toMatchObject({
-        ok: true,
-        revision_version: 14,
-        slide: {
-          id: "intro",
-          content: {
-            uri: `research://projects/${projectId}/revisions/14/slides/intro/content`
-          },
-          narration: {
-            segments: {
-              count: 1,
-              uri_template: `research://projects/${projectId}/revisions/14/slides/intro/narration/pages/{page}`
-            }
-          }
-        }
-      });
-      expect(JSON.stringify(revisionSlide)).not.toContain('"segments":[');
-      const revisionNarrationPage = await readJsonResource(
-        client,
-        `research://projects/${projectId}/revisions/14/slides/intro/narration/pages/1`
-      );
-      expect(revisionNarrationPage).toMatchObject({
-        ok: true,
-        total_items: 1,
-        items: [{
-          at: 0,
-          uri: `research://projects/${projectId}/revisions/14/slides/intro/narration/0`
-        }]
-      });
-      const revisionNarration = await readJsonResource(
-        client,
-        `research://projects/${projectId}/revisions/14/slides/intro/narration/0`
-      );
-      expect(revisionNarration).toMatchObject({
-        ok: true,
-        item: { at: 0, text: "研究のきっかけから始めます。" }
       });
 
       const voiceStatus = await client.callTool({
@@ -2331,14 +2043,13 @@ describe("MCP contract", () => {
       ).bind(subjectId, "bounded-voice-user", "bounded-voice", now, now),
       env.DB.prepare(
         `INSERT INTO research_projects (
-           id, owner_user_id, title, stage, document_json, version,
+           id, owner_user_id, title, document_json, version,
            idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
       ).bind(
         projectId,
         subjectId,
         document.title,
-        document.stage,
         JSON.stringify(document),
         "bounded-voice-contract",
         now,
@@ -2467,14 +2178,13 @@ describe("MCP contract", () => {
       ).bind(subjectId, "narration-edit-user", "narration-edit", now, now),
       env.DB.prepare(
         `INSERT INTO research_projects (
-           id, owner_user_id, title, stage, document_json, version,
+           id, owner_user_id, title, document_json, version,
            idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
       ).bind(
         projectId,
         subjectId,
         document.title,
-        document.stage,
         JSON.stringify(document),
         "narration-edit-contract",
         now,
@@ -2553,71 +2263,36 @@ describe("MCP contract", () => {
         structuredContent: { error: { code: "INVALID_FIELDS" } }
       });
 
-      const addedFinding = await client.callTool({
-        name: "set_project_list_item",
-        arguments: {
-          project_id: projectId,
-          expected_version: 2,
-          list: "findings",
-          value: "古い観察では温度が一定だった。"
-        }
-      });
-      expect(addedFinding.structuredContent).toMatchObject({ ok: true, version: 3 });
-      const editedFinding = await client.callTool({
-        name: "set_project_list_item",
-        arguments: {
-          project_id: projectId,
-          expected_version: 3,
-          list: "findings",
-          index: 0,
-          text_edit: {
-            operation: "replace_once",
-            old_text: "古い観察",
-            text: "三回の観察"
-          }
-        }
-      });
-      expect(editedFinding.structuredContent).toMatchObject({ ok: true, version: 4 });
-      const findingsPage = await readJsonResource(
-        client,
-        `research://projects/${projectId}/research/findings/pages/1`
-      );
-      expect(findingsPage).toMatchObject({
-        ok: true,
-        version: 4,
-        items: [{ position: 1, text: "三回の観察では温度が一定だった。" }]
-      });
-
       const originalTemplate = await client.callTool({
         name: "create_presentation_template",
         arguments: {
           project_id: projectId,
-          expected_version: 4,
+          expected_version: 2,
           template_id: "paper-original",
           name: "紙面の原案",
           visual_preset: "paper"
         }
       });
-      expect(originalTemplate.structuredContent).toMatchObject({ ok: true, version: 5 });
+      expect(originalTemplate.structuredContent).toMatchObject({ ok: true, version: 3 });
       const copiedTemplate = await client.callTool({
         name: "create_presentation_template",
         arguments: {
           project_id: projectId,
-          expected_version: 5,
+          expected_version: 3,
           template_id: "paper-variant",
           name: "紙面の別案",
           copy_from_template_id: "paper-original",
           make_default: true
         }
       });
-      expect(copiedTemplate.structuredContent).toMatchObject({ ok: true, version: 6 });
+      expect(copiedTemplate.structuredContent).toMatchObject({ ok: true, version: 4 });
       const copiedDeck = await readJsonResource(
         client,
         `research://projects/${projectId}/deck`
       );
       expect(copiedDeck).toMatchObject({
         ok: true,
-        version: 6,
+        version: 4,
         deck: {
           settings: {
             default_template_id: "paper-variant",

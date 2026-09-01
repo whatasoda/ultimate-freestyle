@@ -190,7 +190,7 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
     word-break: auto-phrase;
     line-break: strict;
   }
-  :is(.dashboard-filter, .voice-filter, .step-control, .slide-actions, .inspector-tabs) :is(button, .button) {
+  :is(.voice-filter, .step-control, .slide-actions, .inspector-tabs) :is(button, .button) {
     white-space: nowrap;
   }
   /* 操作のラベルは縮めない。行が足りないときは説明文の側を折る。
@@ -289,14 +289,14 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
 
   :where(a, button, input, textarea, select, summary):focus-visible { outline-color: var(--accent); }
   input, textarea, select, .editor input, .editor textarea, .editor select,
-  .dashboard-search input, .dashboard-sort select, .review-composer textarea,
+  .review-composer textarea,
   .review-script textarea, .narration-outline textarea, .filmstrip-search input {
     border-color: var(--line-strong);
     background: var(--field);
     color: var(--ink);
   }
   input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
-  .dashboard-search, .editor label, .upload label, .asset-alt label, .review-composer label { color: var(--ink); }
+  .editor label, .upload label, .asset-alt label, .review-composer label { color: var(--ink); }
   .theme-toggle { gap: .45rem; min-height: 2.35rem; padding: .42rem .65rem; font-size: .78rem; }
   .theme-toggle-icon { display: grid; place-items: center; width: 1.15rem; height: 1.15rem; color: var(--accent-strong); font-size: 1rem; }
 
@@ -330,8 +330,6 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .project-status[data-state="ready"] { border-color: var(--line-strong); background: var(--sunken); color: var(--muted); }
       .project-status[data-kind="publication"][data-state="ready"] { border-color: var(--achieved); background: var(--achieved-surface); color: var(--achieved); }
   .project-status[data-state="attention"] { border-color: var(--caution); background: var(--caution-surface); color: var(--caution); }
-  .dashboard-filter button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-strong); }
-  .search-empty { border-color: var(--line-strong); }
   .danger-zone { border-color: var(--failure); background: var(--failure-surface); }
   .danger-zone > summary { color: var(--failure); }
   .danger-zone > p, .danger-zone label { color: var(--ink); }
@@ -373,7 +371,7 @@ export const DASHBOARD_DESIGN_STYLE = String.raw`
   .preflight-item[data-state="attention"]::before { background: var(--caution-surface); color: var(--caution); }
   .preflight-item[data-state="recommendation"]::before { background: transparent; box-shadow: inset 0 0 0 1px var(--caution-line); color: var(--caution); }
   .preflight-action:hover { background: var(--accent-soft); }
-  .publication-history .status-row, .draft-revision { border-color: var(--line); background: transparent; }
+  .publication-history .status-row { border-color: var(--line); background: transparent; }
   .success, .audio-state.ready { color: var(--muted) !important; }
   .warning, .audio-state, .voice-timing[data-state="warning"] { color: var(--caution) !important; }
   .feedback { color: var(--accent-strong); }

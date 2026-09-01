@@ -44,15 +44,9 @@ describe("presentation artifact renderer", () => {
       updated_at: "2026-07-26T12:30:00.000Z",
       document: {
         schema_version: 1,
-        stage: "production",
         title: "<script>alert('title')</script>",
         summary: "",
-        question: "何が変わる？",
-        hypothesis: null,
         method: null,
-        findings: [],
-        limitations: [],
-        logs: [],
         deck: {
           short_title: "安全な発表",
           description: "",
@@ -517,15 +511,9 @@ describe("presentation artifact renderer", () => {
       updated_at: "2026-07-26T12:00:00.000Z",
       document: {
         schema_version: 1,
-        stage: "discovery",
         title: "未構成",
         summary: "",
-        question: null,
-        hypothesis: null,
         method: null,
-        findings: [],
-        limitations: [],
-        logs: [],
         deck: null
       }
     });
@@ -543,15 +531,9 @@ describe("presentation artifact renderer", () => {
       updated_at: "2026-07-27T12:30:00.000Z",
       document: {
         schema_version: 1,
-        stage: "production",
         title: "自由構成",
         summary: "",
-        question: null,
-        hypothesis: null,
         method: null,
-        findings: [],
-        limitations: [],
-        logs: [],
         deck: {
           short_title: "自由構成",
           description: "",
@@ -649,15 +631,9 @@ describe("presentation artifact renderer", () => {
       updated_at: "2026-07-27T12:00:00.000Z",
       document: {
         schema_version: 1,
-        stage: "production",
         title: "範囲外",
         summary: "",
-        question: null,
-        hypothesis: null,
         method: null,
-        findings: [],
-        limitations: [],
-        logs: [],
         deck: {
           short_title: "範囲外",
           description: "",
@@ -711,15 +687,9 @@ describe("presentation artifact renderer", () => {
       updated_at: "2026-07-27T13:30:00.000Z",
       document: {
         schema_version: 1,
-        stage: "production",
         title: "リッチな構成",
         summary: "",
-        question: null,
-        hypothesis: null,
         method: null,
-        findings: [],
-        limitations: [],
-        logs: [],
         deck: {
           short_title: "リッチな構成",
           description: "",
@@ -1261,7 +1231,6 @@ describe("presentation artifact renderer", () => {
       ...projectWithNextSlide,
       document: {
         ...projectWithNextSlide.document,
-        question: "素材によって温度変化はどう変わるか？",
         method: "2種類を同じ条件で比較する。",
         deck: {
           ...projectWithNextSlide.document.deck!,
@@ -1277,7 +1246,6 @@ describe("presentation artifact renderer", () => {
       csrfToken: "csrf-token",
       project: overLimitProject,
       assets: [],
-      draftRevisions: [],
       renderedQualityReport: null,
       publication: {
         project_id: overLimitProject.project_id,
@@ -1300,13 +1268,14 @@ describe("presentation artifact renderer", () => {
       ...projectWithNextSlide,
       document: {
         ...projectWithNextSlide.document,
-        logs: Array.from({ length: 48 }, (_, index) => ({
-          id: `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
-          occurred_at: "2026-07-26T12:00:00.000Z",
-          kind: "observation",
-          text: "x".repeat(8_000),
-          source_url: null
-        }))
+        deck: {
+          ...projectWithNextSlide.document.deck!,
+          slides: Array.from({ length: 25 }, (_, index) => ({
+            ...projectWithNextSlide.document.deck!.slides[0]!,
+            id: `bulk-${index}`,
+            content_markdown: "x".repeat(20_000)
+          }))
+        }
       }
     });
     const storageWarningHtml = await projectDetailPage({
@@ -1314,7 +1283,6 @@ describe("presentation artifact renderer", () => {
       csrfToken: "csrf-token",
       project: storageWarningProject,
       assets: [],
-      draftRevisions: [],
       renderedQualityReport: null,
       publication: {
         project_id: storageWarningProject.project_id,
@@ -1328,10 +1296,9 @@ describe("presentation artifact renderer", () => {
       }
     }).text();
     expect(storageWarningHtml).toContain("容量の大きい順を確認");
-    expect(storageWarningHtml).toMatch(/研究ログ<\/a> · 約3\d\d KiB/);
-    expect(storageWarningHtml).toContain('href="#research-log"');
+    expect(storageWarningHtml).toContain('href="#presentation-structure"');
     const storageBreakdown = storageWarningHtml.slice(storageWarningHtml.indexOf("容量の大きい順を確認"));
-    expect(storageBreakdown.indexOf("研究ログ</a>")).toBeLessThan(storageBreakdown.indexOf("スライド</a>"));
+    expect(storageBreakdown.indexOf("スライド</a>")).toBeLessThan(storageBreakdown.indexOf("発表全体の設定</a>"));
 
     const qualityPriorityProject = projectRecordSchema.parse({
       ...overLimitProject,
@@ -1351,7 +1318,6 @@ describe("presentation artifact renderer", () => {
       csrfToken: "csrf-token",
       project: qualityPriorityProject,
       assets: [],
-      draftRevisions: [],
       renderedQualityReport: null,
       publication: {
         project_id: qualityPriorityProject.project_id,
@@ -1502,15 +1468,9 @@ describe("presentation artifact renderer", () => {
       updated_at: "2026-07-28T12:30:00.000Z",
       document: {
         schema_version: 1,
-        stage: "production",
         title: "表示preset",
         summary: "",
-        question: null,
-        hypothesis: null,
         method: null,
-        findings: [],
-        limitations: [],
-        logs: [],
         deck: {
           short_title: "表示preset",
           description: "",

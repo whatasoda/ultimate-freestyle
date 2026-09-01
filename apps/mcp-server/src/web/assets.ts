@@ -262,91 +262,6 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       publishFeedback.classList.remove("success");
     }
   };
-  const projectSearch = document.querySelector("[data-project-search]");
-  if (projectSearch instanceof HTMLInputElement) {
-    const projectCards = [...document.querySelectorAll("[data-project-card]")];
-    const projectFilters = [...document.querySelectorAll("[data-project-filter]")];
-    const projectSort = document.querySelector("[data-project-sort]");
-    const projectGrid = document.querySelector("[data-project-grid]");
-    const resultCount = document.querySelector("[data-project-count]");
-    const emptyResult = document.querySelector("[data-project-search-empty]");
-    const projectViewKey = "ultimate-freestyle:project-view";
-    const projectSearchKey = "ultimate-freestyle:project-search:" + (projectSearch.dataset.projectSearchUser || "unknown");
-    let savedProjectView = {};
-    try { savedProjectView = JSON.parse(localStorage.getItem(projectViewKey) || "{}"); } catch {}
-    if (!savedProjectView || typeof savedProjectView !== "object" || Array.isArray(savedProjectView)) savedProjectView = {};
-    let activeFilter = ["all", "ready", "published", "attention", "missing"].includes(savedProjectView.filter) ? savedProjectView.filter : "all";
-    const filterProjects = () => {
-      const query = projectSearch.value.trim().toLocaleLowerCase("ja");
-      let visible = 0;
-      for (const card of projectCards) {
-        if (!(card instanceof HTMLElement)) continue;
-        const matchesText = query === "" || (card.dataset.searchText || "").includes(query);
-        const matchesFilter = activeFilter === "all" ||
-          (activeFilter === "attention"
-            ? card.dataset.needsAttention === "true"
-            : ["ready", "missing"].includes(activeFilter)
-              ? card.dataset.presentation === activeFilter
-              : card.dataset.projectState === activeFilter);
-        const matches = matchesText && matchesFilter;
-        card.hidden = !matches;
-        if (matches) visible += 1;
-      }
-      if (resultCount instanceof HTMLElement) resultCount.textContent = visible + "件を表示";
-      if (emptyResult instanceof HTMLElement) emptyResult.hidden = visible > 0;
-    };
-    try { projectSearch.value = sessionStorage.getItem(projectSearchKey) || ""; } catch {}
-    projectSearch.addEventListener("input", () => {
-      try { sessionStorage.setItem(projectSearchKey, projectSearch.value); } catch {}
-      filterProjects();
-    });
-    projectSearch.addEventListener("keydown", (event) => {
-      if (event.key !== "Escape") return;
-      projectSearch.value = "";
-      try { sessionStorage.removeItem(projectSearchKey); } catch {}
-      filterProjects();
-      projectSearch.blur();
-    });
-    for (const button of projectFilters) {
-      if (!(button instanceof HTMLButtonElement)) continue;
-      button.setAttribute("aria-pressed", String(button.dataset.projectFilter === activeFilter));
-      button.addEventListener("click", () => {
-        activeFilter = button.dataset.projectFilter || "all";
-        for (const item of projectFilters) {
-          if (item instanceof HTMLButtonElement) item.setAttribute("aria-pressed", String(item === button));
-        }
-        try { localStorage.setItem(projectViewKey, JSON.stringify({ ...savedProjectView, filter: activeFilter })); } catch {}
-        savedProjectView.filter = activeFilter;
-        filterProjects();
-      });
-    }
-    if (projectSort instanceof HTMLSelectElement && projectGrid instanceof HTMLElement) {
-      const sortProjects = () => {
-        const mode = projectSort.value;
-        const sorted = [...projectCards].sort((first, second) => {
-          if (!(first instanceof HTMLElement) || !(second instanceof HTMLElement)) return 0;
-          if (mode === "title") return (first.dataset.title || "").localeCompare(second.dataset.title || "", "ja");
-          if (mode === "duration") {
-            const durationDifference = Number(second.dataset.duration || 0) - Number(first.dataset.duration || 0);
-            if (durationDifference !== 0) return durationDifference;
-          } else {
-            const updatedDifference = (second.dataset.updated || "").localeCompare(first.dataset.updated || "");
-            if (updatedDifference !== 0) return updatedDifference;
-          }
-          return (first.dataset.title || "").localeCompare(second.dataset.title || "", "ja");
-        });
-        projectGrid.append(...sorted);
-      };
-      if (["updated", "title", "duration"].includes(savedProjectView.sort)) projectSort.value = savedProjectView.sort;
-      sortProjects();
-      projectSort.addEventListener("change", () => {
-        savedProjectView.sort = projectSort.value;
-        try { localStorage.setItem(projectViewKey, JSON.stringify(savedProjectView)); } catch {}
-        sortProjects();
-      });
-    }
-    filterProjects();
-  }
   const qualitySweepButton = document.querySelector("[data-quality-sweep]");
   const qualitySweepFrame = document.querySelector("[data-quality-sweep-frame]");
   if (qualitySweepButton instanceof HTMLButtonElement && qualitySweepFrame instanceof HTMLIFrameElement) {
@@ -1084,20 +999,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const data = new FormData(form);
     const body = { expected_version: Number(form.dataset.version) };
     if (form.matches("[data-project-editor]")) {
-      for (const name of ["title", "stage", "summary", "question", "hypothesis", "method"]) {
+      for (const name of ["title", "summary"]) {
         if (data.has(name)) body[name] = String(data.get(name) || "");
       }
-    }
-    if (form.matches("[data-project-list-item]")) {
-      const action = submitter instanceof HTMLButtonElement
-        ? submitter.dataset.projectListAction || ""
-        : "";
-      Object.assign(body, {
-        action,
-        list: String(data.get("list") || "")
-      });
-      if (data.has("index")) body.index = Number(data.get("index"));
-      if (action !== "delete") body.value = String(data.get("value") || "");
     }
     if (form.matches("[data-slide-editor]")) Object.assign(body, {
       title: String(data.get("title") || ""),
@@ -1442,8 +1346,6 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     addEventListener("ultimate-freestyle:version-changed", persistDraft);
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
-      if (event.submitter instanceof HTMLButtonElement && event.submitter.dataset.projectListAction === "delete" && !confirm("この項目を削除しますか？")) return;
-      if (form.matches("[data-research-log-delete]") && !confirm("この研究ログを削除しますか？この操作は元に戻せません。")) return;
       const feedback = form.querySelector("[data-form-feedback], [data-editor-feedback]");
       const submitButtons = [...form.querySelectorAll('button[type="submit"]')];
       const nextUrl = event.submitter instanceof HTMLButtonElement
@@ -1518,11 +1420,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           feedback.classList.add("warning");
         }
         markDraftChanged();
-        if (form.matches("[data-project-list-item], [data-research-log-delete]") && result.next_url) {
-          location.href = result.next_url;
-          return;
-        }
-        if (form.matches("[data-project-editor], [data-project-list-item]")) {
+        if (form.matches("[data-project-editor]")) {
           setTimeout(() => location.reload(), 500);
           return;
         }
@@ -4473,37 +4371,6 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         setButtonBusy(rollbackButton, false);
         publishFeedback.textContent = caughtErrorMessage(error, "以前の公開版へ戻せませんでした。");
         publishFeedback.classList.add("warning");
-      }
-    });
-  }
-  const draftRestoreFeedback = document.querySelector("[data-draft-restore-feedback]");
-  for (const restoreButton of document.querySelectorAll("[data-draft-restore]")) {
-    if (!(restoreButton instanceof HTMLButtonElement) || !(draftRestoreFeedback instanceof HTMLElement)) continue;
-    restoreButton.addEventListener("click", async () => {
-      const dirty = document.querySelector('[data-dirty="true"]') !== null;
-      const prefix = dirty ? "未保存の入力は履歴に残りません。\n" : "";
-      if (!confirm(prefix + "v" + (restoreButton.dataset.targetVersion || "?") + " を新しい下書きとして復元しますか？ 現在の保存済み下書きも履歴に残ります。")) return;
-      setButtonBusy(restoreButton, true);
-      draftRestoreFeedback.textContent = "過去の下書きを新しいversionとして復元しています…";
-      draftRestoreFeedback.classList.remove("warning", "success");
-      try {
-        const response = await fetch(restoreButton.dataset.draftRestore || "", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            "x-csrf-token": restoreButton.dataset.csrf || ""
-          },
-          body: JSON.stringify({ expected_version: Number(restoreButton.dataset.currentVersion) })
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(apiErrorMessage(result, "下書きを復元できませんでした。"));
-        draftRestoreFeedback.textContent = "v" + result.restored_from_version + " をv" + result.version + "として復元しました。移動します…";
-        draftRestoreFeedback.classList.add("success");
-        location.href = result.next_url;
-      } catch (error) {
-        draftRestoreFeedback.textContent = caughtErrorMessage(error, "下書きを復元できませんでした。");
-        draftRestoreFeedback.classList.add("warning");
-        setButtonBusy(restoreButton, false);
       }
     });
   }

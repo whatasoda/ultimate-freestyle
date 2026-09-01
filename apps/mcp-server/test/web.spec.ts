@@ -13,7 +13,7 @@ import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
 import { DASHBOARD_SCRIPT } from "../src/web/assets";
 import { createEmptyProject } from "../src/projects/schema";
-import { MAX_PROJECT_DOCUMENT_BYTES, projectDocumentBytes } from "../src/projects/repository";
+import { MAX_PROJECT_DOCUMENT_BYTES } from "../src/projects/repository";
 import type { Fetcher } from "../src/auth/twitch";
 import {
   VOICEVOX_ENGINE
@@ -269,8 +269,6 @@ describe("Web dashboard", () => {
     const presentationAssetId = "30000000-0000-4000-8000-000000000003";
     const ownDocument = createEmptyProject("自分の研究 <script>alert(1)</script>");
     ownDocument.summary = "研究の概要です";
-    ownDocument.question = "なぜこうなるのか？";
-    ownDocument.findings = ["観察した結果"];
     ownDocument.deck = {
       short_title: "自分の研究",
       description: "",
@@ -384,39 +382,27 @@ describe("Web dashboard", () => {
       ).bind("twitch-other-id", "other-id", "other", now, now),
       env.DB.prepare(
         `INSERT INTO research_projects (
-           id, owner_user_id, title, stage, document_json, version,
+           id, owner_user_id, title, document_json, version,
            idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
       ).bind(
         "10000000-0000-4000-8000-000000000001",
         "twitch-dashboard-viewer-id",
         ownDocument.title,
-        ownDocument.stage,
         JSON.stringify(ownDocument),
         "own-project",
         now,
         now
       ),
       env.DB.prepare(
-        `INSERT INTO project_draft_revisions (
-           project_id, owner_user_id, version, document_json, source, created_at
-         ) VALUES (?, ?, 1, ?, 'created', ?)`
-      ).bind(
-        "10000000-0000-4000-8000-000000000001",
-        "twitch-dashboard-viewer-id",
-        JSON.stringify(ownDocument),
-        now
-      ),
-      env.DB.prepare(
         `INSERT INTO research_projects (
-           id, owner_user_id, title, stage, document_json, version,
+           id, owner_user_id, title, document_json, version,
            idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, 1, ?, ?, ?)`
       ).bind(
         "20000000-0000-4000-8000-000000000002",
         "twitch-other-id",
         otherDocument.title,
-        otherDocument.stage,
         JSON.stringify(otherDocument),
         "other-project",
         now,
@@ -457,24 +443,14 @@ describe("Web dashboard", () => {
     expect(dashboardHtml).toContain("1 / 20 件");
     expect(dashboardHtml).toContain("data-dashboard-theme-toggle");
     expect(dashboardHtml).toContain("data-dashboard-theme-label>ダーク");
-    expect(dashboardHtml).toContain("data-project-search");
-    expect(dashboardHtml).toContain('data-project-search-user="viewer&lt;script&gt;"');
-    expect(dashboardHtml).toContain("タイトル・制作段階");
-    expect(dashboardHtml).toContain("data-project-card");
     expect(dashboardHtml).toContain("発表 1枚 · 0分30秒");
-    expect(dashboardHtml).toContain("data-project-search-empty");
-    expect(dashboardHtml).toContain('data-project-filter="ready"');
-    expect(dashboardHtml).toContain('data-project-filter="published"');
-    expect(dashboardHtml).toContain('data-project-filter="attention"');
-    expect(dashboardHtml).toContain('data-project-filter="missing"');
-    expect(dashboardHtml).toContain('data-project-state="attention"');
-    expect(dashboardHtml).toContain('data-needs-attention="true"');
     expect(dashboardHtml).toContain("プレビュー未作成");
     expect(dashboardHtml).toContain("実表示 未確認");
     expect(dashboardHtml).toContain("次に：実表示 未確認 · プレビュー未作成");
     expect(dashboardHtml).toContain("音声 1/1 完成");
-    expect(dashboardHtml).toContain("data-project-sort");
-    expect(dashboardHtml).toContain("発表時間が長い順");
+    expect(dashboardHtml).not.toContain("data-project-search");
+    expect(dashboardHtml).not.toContain("data-project-filter");
+    expect(dashboardHtml).not.toContain("data-project-sort");
     expect(dashboardHtml).toContain("AIクライアントとの接続・再接続");
     expect(dashboardHtml).toContain("https://saijiyu-kenkyu.2764.moe/mcp");
     expect(dashboardHtml).toContain("TwitchのパスワードやtokenをAIへ貼る必要はありません");
@@ -500,8 +476,6 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("研究の概要です");
     expect(detailHtml).toContain("保存容量");
     expect(detailHtml).toContain(`progress max="${MAX_PROJECT_DOCUMENT_BYTES}"`);
-    expect(detailHtml).toContain("なぜこうなるのか？");
-    expect(detailHtml).toContain("観察した結果");
     expect(detailHtml).toContain(
       "自分の研究 &lt;script&gt;alert(1)&lt;/script&gt;"
     );
@@ -594,14 +568,13 @@ describe("Web dashboard", () => {
     expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:preview-review");
     expect(DASHBOARD_SCRIPT).toContain("recordCompletedPreview");
     expect(detailHtml).toContain("公開前チェック ·");
-    expect(detailHtml).toContain("基本 2/5 · おすすめ 3/5");
+    expect(detailHtml).toContain("基本 2/4 · おすすめ 3/5");
     expect(detailHtml).toContain("固定版のVOICEVOX音声");
     expect(detailHtml).toContain('data-can-preview="false"');
     expect(detailHtml).toContain("公開版の画像容量");
     expect(detailHtml).toContain("表紙スライド · おすすめ");
     expect(detailHtml).toContain("文字量と表示枠 · おすすめ");
     expect(detailHtml).toContain('data-state="recommendation"');
-    expect(detailHtml).toContain("研究の問いと方法");
     expect(detailHtml).toContain("表紙スライド");
     expect(detailHtml).toContain("画像の説明");
     expect(detailHtml).toContain("表示・読み上げ文");
@@ -610,37 +583,27 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain('<dt>想定時間</dt><dd data-state="ok">0分30秒</dd>');
     expect(detailHtml).toContain("固定プレビュー");
     expect(detailHtml).toContain("修正へ →");
-    expect(detailHtml).toContain('href="#basic-information"');
+    expect(detailHtml).not.toContain('href="#basic-information"');
     expect(detailHtml).toContain('id="research-images"');
     expect(detailHtml).toContain('id="presentation-structure"');
-    expect(detailHtml).toContain("基本情報を編集");
-    expect(detailHtml.match(/data-project-editor/g)).toHaveLength(3);
-    expect(detailHtml.match(/data-project-list-item/g)).toHaveLength(2);
-    expect(detailHtml).toContain("題名と概要を保存");
-    expect(detailHtml).toContain("問いと仮説を保存");
-    expect(detailHtml).toContain("方法を保存");
-    expect(detailHtml).toContain("わかったこと · 1 / 100件");
-    expect(detailHtml).toContain("限界・今後の課題 · 0 / 100件");
-    expect(detailHtml).toContain(
-      "?research_item=findings:0#research-list-findings"
-    );
-    expect(detailHtml).toContain("1件追加");
+    expect(detailHtml).not.toContain("研究内容を編集");
+    expect(detailHtml.match(/data-project-editor/g)).toHaveLength(1);
+    expect(detailHtml).toContain("公開ページの題名と説明文");
+    expect(detailHtml).not.toContain("問いと仮説を保存");
+    expect(detailHtml).not.toContain("わかったこと");
+    expect(detailHtml).not.toContain("限界・今後の課題");
     expect(detailHtml).toContain("発表画面と0ページ目");
     expect(detailHtml).toContain("data-deck-editor");
     expect(detailHtml).toContain("ワイド 16:9");
     expect(detailHtml).toContain("標準 4:3");
     expect(detailHtml).toContain("完成までの流れ");
     expect(detailHtml).toContain("VOICEVOX<small>0/1区間</small>");
-    expect(detailHtml).toContain('<progress max="6" value="1">1 / 6</progress>');
+    expect(detailHtml).toContain('<progress max="5" value="1">1 / 5</progress>');
     expect(detailHtml).toContain("プレビュー<small>未作成</small>");
-    expect(detailHtml).toContain("研究の問いと方法を整理する");
     expect(detailHtml).toContain("現在の下書きをプレビュー");
-    expect(detailHtml).toContain("AIでスライドを追加・構成変更");
-    expect(detailHtml).toContain("追加を頼む文をコピー");
-    expect(detailHtml).toContain("構成見直しを頼む文をコピー");
-    expect(detailHtml).toContain("AIで研究を8観点レビュー");
-    expect(detailHtml).toContain("評価を頼む文をコピー");
-    expect(detailHtml).toContain("根拠がない項目はNE");
+    expect(detailHtml).not.toContain("追加を頼む文をコピー");
+    expect(detailHtml).not.toContain("構成見直しを頼む文をコピー");
+    expect(detailHtml).not.toContain("AIで研究を8観点レビュー");
     expect(detailHtml).toContain("VOICEVOX音声は 0 / 1 区間まで生成済みです");
     expect(detailHtml).toMatch(/data-create-preview=[^>]+ disabled/);
     expect(detailHtml).toContain("data-preview-link");
@@ -659,33 +622,7 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("data-image-alt");
     expect(detailHtml).toContain("説明を保存");
     expect(detailHtml).toContain("自由配置 1パーツ");
-    expect(detailHtml).toContain("/revisions/1\">内容を確認");
-    expect(detailHtml).toContain("直近10版を必ず残し、最大50版・合計8MiB");
-
-    const selectedFindingDetail = await requestProvider(
-      provider,
-      new Request(
-        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001?research_item=findings:0",
-        { headers: { cookie: browserCookies } }
-      ),
-      authEnv
-    );
-    const selectedFindingHtml = await selectedFindingDetail.text();
-    expect(selectedFindingHtml.match(/data-project-list-item/g)).toHaveLength(3);
-    expect(selectedFindingHtml).toContain('name="index" value="0"');
-    expect(selectedFindingHtml).toContain('id="research-item-findings-0" tabindex="-1"');
-    expect(selectedFindingHtml).toContain(
-      'data-project-list-action="update"'
-    );
-    expect(selectedFindingHtml).toContain(
-      'data-project-list-action="delete"'
-    );
-    expect(selectedFindingHtml).toContain(
-      'data-project-list-action="delete" formnovalidate'
-    );
-    expect(selectedFindingHtml).toContain(
-      '<textarea name="value" maxlength="4000" required>観察した結果</textarea>'
-    );
+    expect(detailHtml).not.toContain("下書き履歴");
 
     const qualityReport = await requestProvider(
       provider,
@@ -756,7 +693,7 @@ describe("Web dashboard", () => {
       '/dashboard/projects/10000000-0000-4000-8000-000000000001/slides/intro'
     );
 
-    const draftRevision = await requestProvider(
+    const removedRevisionPage = await requestProvider(
       provider,
       new Request(
         "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/revisions/1",
@@ -764,26 +701,7 @@ describe("Web dashboard", () => {
       ),
       authEnv
     );
-    const draftRevisionHtml = await draftRevision.text();
-    expect(draftRevision.status).toBe(200);
-    expect(draftRevisionHtml).toContain("v1を復元前に確認");
-    expect(draftRevisionHtml).toContain("現在版 v1 との差");
-    expect(draftRevisionHtml).toContain("これは現在の下書きです");
-    expect(draftRevisionHtml).toContain("研究内容</dt><dd>変更なし");
-    expect(draftRevisionHtml).toContain("発表全体の設定</dt><dd>変更なし");
-    expect(draftRevisionHtml).toContain("<span>同じ</span>");
-    expect(draftRevisionHtml).toContain("/revisions/1/frame?slide=0&amp;step=0");
-
-    const draftRevisionFrame = await requestProvider(
-      provider,
-      new Request(
-        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001/revisions/1/frame?slide=0&step=0",
-        { headers: { cookie: browserCookies } }
-      ),
-      authEnv
-    );
-    expect(draftRevisionFrame.status).toBe(200);
-    expect(await draftRevisionFrame.text()).toContain('data-renderer-version="uf-renderer@120"');
+    expect(removedRevisionPage.status).toBe(404);
 
     const voicePage = await requestProvider(
       provider,
@@ -1084,10 +1002,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('name="role_style_density"');
     expect(workspaceHtml).toContain('name="role_style_spacing_scale"');
     expect(workspaceHtml).toContain('name="role_style_motion_style"');
-    expect(workspaceHtml).toContain("AIと研究固有デザインを作る");
-    expect(workspaceHtml).toContain("3案を相談する文をコピー");
-    expect(workspaceHtml).toContain("9/10監査を頼む文をコピー");
-    expect(workspaceHtml).toContain("research://guide/presentation-design-workflow");
+    expect(workspaceHtml).not.toContain("AIと研究固有デザインを作る");
+    expect(workspaceHtml).not.toContain("3案を相談する文をコピー");
     expect(workspaceHtml).toContain('name="motif_opacity"');
     expect(workspaceHtml).toContain('name="motif_scale"');
     expect(workspaceHtml).toContain("data-template-delete");
@@ -1309,9 +1225,8 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('event.key.toLowerCase() !== "s"');
     expect(dashboardScriptText).toContain("form.requestSubmit()");
     expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
-    expect(dashboardScriptText).toContain("data-project-search-empty");
-    expect(dashboardScriptText).toContain("filterProjects");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:project-search:");
+    expect(dashboardScriptText).not.toContain("data-project-search-empty");
+    expect(dashboardScriptText).not.toContain("filterProjects");
     expect(dashboardScriptText).toContain("ultimate-freestyle:filmstrip-search:");
     expect(dashboardScriptText).toContain('filmstripSlides.length + "枚"');
     expect(dashboardScriptText).toContain("ultimate-freestyle:quality-sweep:");
@@ -1323,7 +1238,6 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain('persistQualitySweep("completed")');
     expect(dashboardScriptText).toContain('void saveQualitySweep("completed")');
     expect(dashboardScriptText).toContain("前回の確認結果：");
-    expect(dashboardScriptText).toContain('card.dataset.needsAttention === "true"');
     expect(dashboardScriptText).toContain("updateImagePreview");
     expect(dashboardScriptText).toContain("URL.revokeObjectURL");
     expect(dashboardScriptText).toContain("画像の解像度を確認しています");
@@ -1352,7 +1266,6 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain(
       "serializeVersionedForm(form, event.submitter)"
     );
-    expect(dashboardScriptText).toContain("この項目を削除しますか？");
     expect(dashboardScriptText).toContain("syncPublicationDirtyState(dirtyCount)");
     expect(dashboardScriptText).toContain("未保存の入力を保護するため自動再読み込みを止めました");
     expect(dashboardScriptText).toContain("result.voice_generation_required");
@@ -1467,8 +1380,6 @@ describe("Web dashboard", () => {
     expect(dashboardScriptText).toContain("delete owner[key]");
     expect(dashboardScriptText).toContain("changingConfiguredVoice");
     expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
-    expect(dashboardScriptText).toContain('[data-research-log-delete]');
-    expect(dashboardScriptText).toContain("この研究ログを削除しますか？この操作は元に戻せません。");
 
     const rejectedUpload = await requestProvider(
       provider,
@@ -1499,247 +1410,6 @@ describe("Web dashboard", () => {
       /name="csrf_token" value="([^"]+)"/
     )?.[1];
     expect(csrfToken).toBeTruthy();
-    const listItemProjectId = "90000000-0000-4000-8000-000000000009";
-    const researchLogEntryId = "91000000-0000-4000-8000-000000000019";
-    const listItemDocument = createEmptyProject("項目編集の契約確認");
-    listItemDocument.question = "選択フォームを開けるか？";
-    listItemDocument.method = "選択URLから確認する";
-    listItemDocument.logs.push({
-      id: researchLogEntryId,
-      occurred_at: now,
-      kind: "observation",
-      text: "削除導線を確認する研究ログ",
-      source_url: "https://example.com/evidence?trial=1&result=ok"
-    });
-    for (let index = 1; index <= 20; index += 1) {
-      listItemDocument.logs.push({
-        id: `91${String(index).padStart(6, "0")}-0000-4000-8000-000000000019`,
-        occurred_at: now,
-        kind: "note",
-        text: `新しい研究ログ ${index}`,
-        source_url: null
-      });
-    }
-    await env.DB.batch([
-      env.DB.prepare(
-        `INSERT INTO research_projects (
-           id, owner_user_id, title, stage, document_json, version,
-           idempotency_key, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
-      ).bind(
-        listItemProjectId,
-        "twitch-dashboard-viewer-id",
-        listItemDocument.title,
-        listItemDocument.stage,
-        JSON.stringify(listItemDocument),
-        "list-item-project",
-        now,
-        now
-      ),
-      env.DB.prepare(
-        `INSERT INTO project_draft_revisions (
-           project_id, owner_user_id, version, document_json, source, created_at
-         ) VALUES (?, ?, 1, ?, 'created', ?)`
-      ).bind(
-        listItemProjectId,
-        "twitch-dashboard-viewer-id",
-        JSON.stringify(listItemDocument),
-        now
-      )
-    ]);
-    const mutateListItem = async (body: Record<string, unknown>) =>
-      requestProvider(
-        provider,
-        new Request(
-          `https://saijiyu-kenkyu.2764.moe/api/projects/${listItemProjectId}/list-items`,
-          {
-            method: "PATCH",
-            headers: {
-              cookie: browserCookies,
-              "content-type": "application/json",
-              "x-csrf-token": csrfToken ?? ""
-            },
-            body: JSON.stringify(body)
-          }
-        ),
-        authEnv
-      );
-    const addListItem = await mutateListItem({
-      expected_version: 1,
-      action: "add",
-      list: "findings",
-      value: "追加した発見"
-    });
-    expect(addListItem.status).toBe(200);
-    expect(await addListItem.json()).toMatchObject({
-      ok: true,
-      version: 2,
-      item_index: 0,
-      next_url: `/dashboard/projects/${listItemProjectId}?research_item=findings:0#research-item-findings-0`
-    });
-    const updateListItem = await mutateListItem({
-      expected_version: 2,
-      action: "update",
-      list: "findings",
-      index: 0,
-      value: "更新した発見"
-    });
-    expect(updateListItem.status).toBe(200);
-    expect(await updateListItem.json()).toMatchObject({
-      ok: true,
-      version: 3,
-      item_index: 0
-    });
-    const selectedListItemDetail = await requestProvider(
-      provider,
-      new Request(
-        `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${listItemProjectId}?research_item=findings:0`,
-        { headers: { cookie: browserCookies } }
-      ),
-      authEnv
-    );
-    const selectedListItemHtml = await selectedListItemDetail.text();
-    expect(selectedListItemHtml).toContain('id="basic-information" tabindex="-1" open');
-    expect(selectedListItemHtml).toContain('id="research-item-findings-0" tabindex="-1"');
-    expect(selectedListItemHtml).not.toContain(researchLogEntryId);
-    expect(selectedListItemHtml).toContain("1 / 2ページ · 全21件");
-    expect(selectedListItemHtml).toContain('href="?log_page=2#research-log">古いログ →</a>');
-    const olderLogPage = await requestProvider(
-      provider,
-      new Request(
-        `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${listItemProjectId}?log_page=2#research-log`,
-        { headers: { cookie: browserCookies } }
-      ),
-      authEnv
-    );
-    const olderLogHtml = await olderLogPage.text();
-    expect(olderLogHtml).toContain(`action="/api/projects/${listItemProjectId}/logs/${researchLogEntryId}?log_page=2"`);
-    expect(olderLogHtml).toContain("2 / 2ページ · 全21件");
-    expect(olderLogHtml).toContain("← 新しいログ");
-    expect(olderLogHtml).toContain('href="https://example.com/evidence?trial=1&amp;result=ok"');
-    expect(olderLogHtml).toContain('aria-label="2026/07/26の出典 example.com を新しいタブで開く">出典 · example.com ↗</a>');
-    const deleteListItem = await mutateListItem({
-      expected_version: 3,
-      action: "delete",
-      list: "findings",
-      index: 0
-    });
-    expect(deleteListItem.status).toBe(200);
-    expect(await deleteListItem.json()).toMatchObject({
-      ok: true,
-      version: 4,
-      item_index: null,
-      next_url: `/dashboard/projects/${listItemProjectId}#research-list-findings`
-    });
-    expect(
-      JSON.parse(
-        (await env.DB.prepare(
-          "SELECT document_json FROM research_projects WHERE id = ?"
-        ).bind(listItemProjectId).first<{ document_json: string }>())!.document_json
-      ).findings
-    ).toEqual([]);
-    const deleteResearchLog = await requestProvider(
-      provider,
-      new Request(
-        `https://saijiyu-kenkyu.2764.moe/api/projects/${listItemProjectId}/logs/${researchLogEntryId}?log_page=2`,
-        {
-          method: "DELETE",
-          headers: {
-            cookie: browserCookies,
-            "content-type": "application/json",
-            "x-csrf-token": csrfToken ?? ""
-          },
-          body: JSON.stringify({ expected_version: 4 })
-        }
-      ),
-      authEnv
-    );
-    expect(deleteResearchLog.status).toBe(200);
-    expect(await deleteResearchLog.json()).toMatchObject({
-      ok: true,
-      version: 5,
-      entry_id: researchLogEntryId,
-      next_url: `/dashboard/projects/${listItemProjectId}#research-log`
-    });
-    expect(
-      JSON.parse(
-        (await env.DB.prepare(
-          "SELECT document_json FROM research_projects WHERE id = ?"
-        ).bind(listItemProjectId).first<{ document_json: string }>())!.document_json
-      ).logs
-    ).toHaveLength(20);
-    const nearLimitDocument = createEmptyProject("容量境界の表示確認");
-    while (nearLimitDocument.findings.length < 100) {
-      const candidate = structuredClone(nearLimitDocument);
-      candidate.findings.push("観".repeat(4_000));
-      if (projectDocumentBytes(candidate) > MAX_PROJECT_DOCUMENT_BYTES) break;
-      nearLimitDocument.findings = candidate.findings;
-    }
-    expect(nearLimitDocument.findings.length).toBeGreaterThan(0);
-    await env.DB.prepare(
-      "UPDATE research_projects SET title = ?, document_json = ? WHERE id = ?"
-    ).bind(
-      nearLimitDocument.title,
-      JSON.stringify(nearLimitDocument),
-      listItemProjectId
-    ).run();
-    const oversizedListItem = await mutateListItem({
-      expected_version: 5,
-      action: "add",
-      list: "findings",
-      value: "観".repeat(4_000)
-    });
-    expect(oversizedListItem.status).toBe(422);
-    expect(await oversizedListItem.json()).toMatchObject({
-      ok: false,
-      error: {
-        code: "PROJECT_TOO_LARGE",
-        details: {
-          current_bytes: projectDocumentBytes(nearLimitDocument),
-          limit_bytes: MAX_PROJECT_DOCUMENT_BYTES
-        }
-      }
-    });
-    const maximumListDocument = createEmptyProject("最大件数の表示確認");
-    maximumListDocument.findings = Array.from(
-      { length: 100 },
-      (_, index) => `発見${index + 1} ${"観".repeat(980)}`
-    );
-    maximumListDocument.limitations = Array.from(
-      { length: 100 },
-      (_, index) => `限界${index + 1} ${"未".repeat(980)}`
-    );
-    await env.DB.prepare(
-      "UPDATE research_projects SET title = ?, document_json = ? WHERE id = ?"
-    ).bind(
-      maximumListDocument.title,
-      JSON.stringify(maximumListDocument),
-      listItemProjectId
-    ).run();
-    const maximumListDetail = await requestProvider(
-      provider,
-      new Request(
-        `https://saijiyu-kenkyu.2764.moe/dashboard/projects/${listItemProjectId}`,
-        { headers: { cookie: browserCookies } }
-      ),
-      authEnv
-    );
-    const maximumListHtml = await maximumListDetail.text();
-    expect(maximumListDetail.status).toBe(200);
-    expect(maximumListHtml).toContain("わかったこと · 100 / 100件");
-    expect(maximumListHtml).toContain("限界・今後の課題 · 100 / 100件");
-    expect(maximumListHtml).not.toContain("観".repeat(500));
-    expect(new TextEncoder().encode(maximumListHtml).byteLength).toBeLessThan(
-      500_000
-    );
-    await env.DB.batch([
-      env.DB.prepare(
-        "DELETE FROM project_draft_revisions WHERE project_id = ?"
-      ).bind(listItemProjectId),
-      env.DB.prepare("DELETE FROM research_projects WHERE id = ?").bind(
-        listItemProjectId
-      )
-    ]);
     const altUpdate = await requestProvider(
       provider,
       new Request(
@@ -1775,9 +1445,7 @@ describe("Web dashboard", () => {
           body: JSON.stringify({
             expected_version: 1,
             title: "Webで微調整した研究",
-            stage: "design",
             summary: "Webから保存した概要",
-            question: "微調整後の問い？"
           })
         }
       ),
@@ -1873,11 +1541,7 @@ describe("Web dashboard", () => {
           body: JSON.stringify({
             expected_version: 1,
             title: "競合する変更",
-            stage: "design",
-            summary: "",
-            question: "",
-            hypothesis: "",
-            method: ""
+            summary: ""
           })
         }
       ),
@@ -1890,7 +1554,7 @@ describe("Web dashboard", () => {
       error: { code: "PROJECT_VERSION_CONFLICT" }
     });
 
-    const largeJapaneseMethod = await requestProvider(
+    const largeJapaneseSummary = await requestProvider(
       provider,
       new Request(
         "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/fields",
@@ -1903,14 +1567,14 @@ describe("Web dashboard", () => {
           },
           body: JSON.stringify({
             expected_version: 1,
-            method: "観".repeat(20_000)
+            summary: "観".repeat(2_000)
           })
         }
       ),
       authEnv
     );
-    expect(largeJapaneseMethod.status).toBe(409);
-    expect(await largeJapaneseMethod.json()).toMatchObject({
+    expect(largeJapaneseSummary.status).toBe(409);
+    expect(await largeJapaneseSummary.json()).toMatchObject({
       error: { code: "PROJECT_VERSION_CONFLICT" }
     });
 
@@ -2069,23 +1733,6 @@ describe("Web dashboard", () => {
       VOICEVOX_ENGINE.version,
       VOICEVOX_ENGINE.imageDigest,
       now
-    ).run();
-
-    ownDocument.method = "同じ条件で観察する";
-    const previewReadyRow = await env.DB.prepare(
-      "SELECT document_json FROM research_projects WHERE id = ?"
-    ).bind("10000000-0000-4000-8000-000000000001").first<{
-      document_json: string;
-    }>();
-    const previewReadyDocument = JSON.parse(previewReadyRow!.document_json) as {
-      method: string;
-    };
-    previewReadyDocument.method = ownDocument.method;
-    await env.DB.prepare(
-      "UPDATE research_projects SET document_json = ? WHERE id = ?"
-    ).bind(
-      JSON.stringify(previewReadyDocument),
-      "10000000-0000-4000-8000-000000000001"
     ).run();
 
     const cleanQualityReport = await requestProvider(
@@ -2433,7 +2080,6 @@ describe("Web dashboard", () => {
     expect(publishedDetailHtml).toContain("公開操作履歴 · 1件");
     expect(publishedDetailHtml).toContain("公開開始");
     expect(publishedDetailHtml).toContain("非公開 → v4");
-    expect(publishedDetailHtml).toContain("下書き履歴 · 4件");
     expect(publishedDetailHtml).toContain("公開中");
     expect(publishedDetailHtml).toContain("最新版が公開されています");
     expect(publishedDetailHtml).toContain("この版を確認");
@@ -3646,7 +3292,7 @@ describe("Web dashboard", () => {
     expect(rolledBackPage.status).toBe(200);
     expect(await rolledBackPage.text()).toContain("Webで微調整した研究");
 
-    const restoreDraft = await requestProvider(
+    const removedRestore = await requestProvider(
       provider,
       new Request(
         "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/revisions/4/restore",
@@ -3662,26 +3308,8 @@ describe("Web dashboard", () => {
       ),
       authEnv
     );
-    expect(restoreDraft.status).toBe(200);
-    expect(await restoreDraft.json()).toMatchObject({
-      ok: true,
-      restored_from_version: 4,
-      version: 39
-    });
-    const restoredDetail = await requestProvider(
-      provider,
-      new Request(
-        "https://saijiyu-kenkyu.2764.moe/dashboard/projects/10000000-0000-4000-8000-000000000001",
-        { headers: { cookie: browserCookies } }
-      ),
-      authEnv
-    );
-    const restoredDetailHtml = await restoredDetail.text();
-    expect(restoredDetailHtml).toContain("下書き履歴 · 39件");
-    expect(restoredDetailHtml).toContain("v39");
-    expect(restoredDetailHtml).toContain("復元");
-    expect(DASHBOARD_SCRIPT).toContain("data-draft-restore");
-    expect(DASHBOARD_SCRIPT).toContain("現在の保存済み下書きも履歴に残ります");
+    expect(removedRestore.status).toBe(404);
+    expect(DASHBOARD_SCRIPT).not.toContain("data-draft-restore");
 
     const createLongSlide = await requestProvider(
       provider,
@@ -3695,7 +3323,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 39,
+            expected_version: 38,
             title: "長文を分ける",
             position: 1,
             template: "flow"
@@ -3709,7 +3337,7 @@ describe("Web dashboard", () => {
       slide_id: string;
       version: number;
     };
-    expect(longSlideResult.version).toBe(40);
+    expect(longSlideResult.version).toBe(39);
     const longSlideWorkspace = await requestProvider(
       provider,
       new Request(
@@ -3760,7 +3388,7 @@ describe("Web dashboard", () => {
             "x-csrf-token": csrfToken ?? ""
           },
           body: JSON.stringify({
-            expected_version: 40,
+            expected_version: 39,
             split_offset: splitOffset,
             title: "長文を分ける",
             duration_seconds: 60,
@@ -3776,7 +3404,7 @@ describe("Web dashboard", () => {
       version: number;
       next_slide_id: string;
     };
-    expect(splitResult.version).toBe(41);
+    expect(splitResult.version).toBe(40);
     const splitDocument = await env.DB.prepare(
       "SELECT document_json FROM research_projects WHERE id = ?"
     ).bind("10000000-0000-4000-8000-000000000001").first<{

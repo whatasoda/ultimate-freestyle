@@ -142,35 +142,19 @@ export async function removeProjectImage(
     return false;
   }
   const reference = await env.DB.prepare(
-    `SELECT documents.source
-     FROM (
-       SELECT 'current' AS source, document_json
-       FROM research_projects
-       WHERE id = ? AND owner_user_id = ?
-       UNION ALL
-       SELECT 'history' AS source, document_json
-       FROM project_draft_revisions
-       WHERE project_id = ? AND owner_user_id = ?
-     ) AS documents,
-     json_tree(documents.document_json) AS values_tree
-     WHERE values_tree.key = 'asset_id' AND values_tree.value = ?
-     ORDER BY documents.source = 'current' DESC
+    `SELECT 1 AS used
+     FROM research_projects,
+     json_tree(research_projects.document_json) AS values_tree
+     WHERE research_projects.id = ? AND research_projects.owner_user_id = ?
+       AND values_tree.key = 'asset_id' AND values_tree.value = ?
      LIMIT 1`
   )
-    .bind(
-      asset.project_id,
-      ownerUserId,
-      asset.project_id,
-      ownerUserId,
-      assetId
-    )
-    .first<{ source: "current" | "history" }>();
+    .bind(asset.project_id, ownerUserId, assetId)
+    .first<{ used: number }>();
   if (reference !== null) {
     throw new AssetServiceError(
       "ASSET_IN_USE",
-      reference.source === "current"
-        ? "この画像は現在のスライドで使用中です。スライドから外してから削除してください。"
-        : "この画像は保持中の下書き履歴で使用中のため削除できません。履歴が更新され、参照する版が保持対象から外れるまで画像は保護されます。"
+      "この画像は現在のスライドで使用中です。スライドから外してから削除してください。"
     );
   }
   await env.MEDIA_BUCKET.delete(asset.object_key);
