@@ -1,0 +1,265 @@
+// 制御画面のプレビュー生成と、配信JSの振る舞いテストで同じ固定データを使う。
+// 二つに分かれていると、片方だけschemaの変更へ追従して食い違う。
+import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
+import { projectRecordSchema } from "../src/projects/schema";
+import type { DashboardProjectSummary } from "../src/projects/repository";
+import type { PublicationStatus } from "../src/publications/service";
+
+const PROJECT_ID = "63ab1ec4-20a0-4cf6-a1a0-f74ced56778a";
+const LOGIN = "researcher";
+const CSRF = "preview-csrf-token";
+
+const project = projectRecordSchema.parse({
+  project_id: PROJECT_ID,
+  version: 12,
+  created_at: "2026-07-20T09:00:00.000Z",
+  updated_at: "2026-08-05T14:20:00.000Z",
+  document: {
+    schema_version: 1,
+    title: "氷が溶ける速さと素材の関係",
+    summary: "同じ室温でも、氷が接する素材で溶ける速さがどれだけ変わるかを測った。",
+    question: "金属・木・布のうち、氷が最も速く溶けるのはどれか。",
+    hypothesis: "触ると冷たい金属がいちばん速く溶ける。",
+    method: "同じ製氷皿の氷を3種類の素材へ同時に置き、1分ごとに撮影して完全に溶けるまでの時間を比べた。3回繰り返した。",
+    findings: [
+      "金属では平均18分、木では31分、布では47分で溶け切った。",
+      "触ったときの冷たさは、素材の温度ではなく熱の移りやすさを表していた。"
+    ],
+    limitations: [
+      "素材の厚さと表面積をそろえられていない。",
+      "表面温度を測っていないため、開始条件が同一とは言い切れない。"
+    ],
+    logs: [
+      {
+        id: "3f2b1c88-0b4e-4c1a-9e2a-1d4c6f8a0b11",
+        occurred_at: "2026-07-22T10:00:00.000Z",
+        kind: "observation",
+        text: "金属トレーの氷だけ、5分の時点で底面に水が広がっていた。",
+        source_url: null
+      },
+      {
+        id: "9a7d2e10-5c3f-4b88-8f21-77c9e0d3a542",
+        occurred_at: "2026-07-24T10:00:00.000Z",
+        kind: "note",
+        text: "3回目は室温が1.5度高く、全体的に短くなった。回ごとの比較には使わない。",
+        source_url: null
+      }
+    ],
+    deck: {
+      short_title: "氷と素材",
+      description: "素材ごとの熱の移りやすさを、溶ける速さから確かめる。",
+      author: "researcher",
+      year: 2026,
+      accent: "#2389c9",
+      layout: "minimal",
+      aspect_ratio: "16:9",
+      loading_screen: {
+        enabled: true,
+        style: "orbit",
+        message: "画像と音声を準備しています",
+        show_progress: true,
+        minimum_duration_ms: 600
+      },
+      narration_defaults: {
+        display: "commentary",
+        speaker: null,
+        credit: null
+      },
+      voicevox: null,
+      slides: [
+        {
+          id: "cover",
+          title: "氷が溶ける速さと素材の関係",
+          duration_seconds: 40,
+          reveal_steps: 0,
+          tone: "light",
+          role: "cover",
+          content_markdown: "# 氷が溶ける速さと素材の関係\n\n触ると冷たい素材ほど、氷を速く溶かすのか。",
+          reveal_blocks: [],
+          sidebar_markdown: null,
+          narration: {
+            display: "commentary",
+            speaker: null,
+            segments: [
+              { at: 0, text: "氷が溶ける速さと素材の関係について発表します。", audio_src: null }
+            ]
+          }
+        },
+        {
+          id: "method",
+          title: "実験方法",
+          duration_seconds: 90,
+          reveal_steps: 2,
+          tone: "light",
+          role: "content",
+          content_markdown: "## 実験方法\n\n同じ製氷皿で作った氷を、金属トレー・木の板・乾いた布へ同時に置いた。",
+          reveal_blocks: [
+            { at: 1, markdown: "- 直射日光とエアコンの風を避けた場所を選ぶ" },
+            { at: 2, markdown: "- 素材は実験前に同じ部屋へ30分置いて温度をそろえる" }
+          ],
+          sidebar_markdown: "製氷皿は1種類のみ。氷の質量はそろえていない。",
+          narration: {
+            display: "commentary",
+            speaker: null,
+            segments: [
+              { at: 0, text: "同じ製氷皿で作った氷を、3種類の素材へ同時に置きました。", audio_src: null },
+              { at: 1, text: "日光やエアコンの風が直接当たらない場所を選びました。", audio_src: null },
+              { at: 2, text: "素材はあらかじめ同じ部屋へ30分置き、温度をそろえました。", audio_src: null }
+            ]
+          }
+        },
+        {
+          id: "result",
+          title: "結果",
+          duration_seconds: 80,
+          reveal_steps: 1,
+          tone: "signal",
+          role: "result",
+          content_markdown: "## 完全に溶けるまでの時間\n\n| 素材 | 平均 |\n|---|---:|\n| 金属 | 18分 |\n| 木 | 31分 |\n| 布 | 47分 |",
+          reveal_blocks: [
+            { at: 1, markdown: "金属と布の差は約2.6倍だった。" }
+          ],
+          sidebar_markdown: "3回の平均値。3回目は室温が1.5度高い。",
+          narration: {
+            display: "commentary",
+            speaker: null,
+            segments: [
+              { at: 0, text: "完全に溶けるまでの時間は、金属が18分、木が31分、布が47分でした。", audio_src: null },
+              { at: 1, text: "金属と布ではおよそ2.6倍の差がありました。", audio_src: null }
+            ]
+          }
+        },
+        {
+          id: "closing",
+          title: "分かったことと限界",
+          duration_seconds: 60,
+          reveal_steps: 1,
+          tone: "quiet",
+          role: "closing",
+          content_markdown: "## 分かったこと\n\n冷たく感じるのは温度ではなく、熱の移りやすさだった。",
+          reveal_blocks: [
+            { at: 1, markdown: "厚さと表面積をそろえていないため、素材一般の性質までは言えない。" }
+          ],
+          sidebar_markdown: null,
+          narration: {
+            display: "commentary",
+            speaker: null,
+            segments: [
+              { at: 0, text: "触ったときの冷たさは温度ではなく、熱の移りやすさを表していました。", audio_src: null },
+              { at: 1, text: "ただし厚さと表面積をそろえていないため、素材一般の性質までは言えません。", audio_src: null }
+            ]
+          }
+        }
+      ]
+    }
+  }
+});
+
+const dashboardProjects: DashboardProjectSummary[] = [
+  {
+    project_id: PROJECT_ID,
+    title: project.document.title,
+    version: project.version,
+    has_presentation: true,
+    slide_count: 4,
+    total_duration_seconds: 270,
+    created_at: project.created_at,
+    updated_at: project.updated_at,
+    voice_segment_count: 9,
+    voice_ready_count: 9,
+    publication_slug: "ice-and-materials",
+    preview_project_version: project.version,
+    preview_renderer_version: PRESENTATION_RENDERER_VERSION,
+    preview_reviewed_at: "2026-08-05T15:00:00.000Z",
+    published_project_version: 11,
+    published_renderer_version: PRESENTATION_RENDERER_VERSION,
+    quality_project_version: project.version,
+    quality_renderer_version: PRESENTATION_RENDERER_VERSION,
+    quality_status: "completed"
+  },
+  {
+    project_id: "0f6c1d4a-2b7e-4a9c-9f10-53d8ab2c7e64",
+    title: "夕方の教室がいちばん暗くなる時刻",
+    version: 3,
+    has_presentation: true,
+    slide_count: 2,
+    total_duration_seconds: 95,
+    created_at: "2026-08-01T09:00:00.000Z",
+    updated_at: "2026-08-06T11:30:00.000Z",
+    voice_segment_count: 4,
+    voice_ready_count: 1,
+    publication_slug: null,
+    preview_project_version: 2,
+    preview_renderer_version: PRESENTATION_RENDERER_VERSION,
+    preview_reviewed_at: null,
+    published_project_version: null,
+    published_renderer_version: null,
+    quality_project_version: null,
+    quality_renderer_version: null,
+    quality_status: null
+  },
+  {
+    project_id: "b41e9c07-8d52-4f33-a6c8-1e0975fd3a28",
+    title: "まだ名前のない研究",
+    version: 1,
+    has_presentation: false,
+    slide_count: 0,
+    total_duration_seconds: 0,
+    created_at: "2026-08-07T08:00:00.000Z",
+    updated_at: "2026-08-07T08:00:00.000Z",
+    voice_segment_count: 0,
+    voice_ready_count: 0,
+    publication_slug: null,
+    preview_project_version: null,
+    preview_renderer_version: null,
+    preview_reviewed_at: null,
+    published_project_version: null,
+    published_renderer_version: null,
+    quality_project_version: null,
+    quality_renderer_version: null,
+    quality_status: null
+  }
+];
+
+const publication: PublicationStatus = {
+  project_id: PROJECT_ID,
+  draft_version: project.version,
+  current_renderer_version: PRESENTATION_RENDERER_VERSION,
+  slug: "ice-and-materials",
+  latest_preview: null,
+  published: null,
+  published_history: [],
+  events: []
+};
+
+const voice = {
+  ok: true as const,
+  project_id: PROJECT_ID,
+  version: project.version,
+  configured: true,
+  default_profile: {
+    id: "voicevox-style-3",
+    label: "ずんだもん・ノーマル",
+    speaker_name: "ずんだもん",
+    style_name: "ノーマル"
+  },
+  summary: {
+    total: 9,
+    ready: 9,
+    needs_generation: 0,
+    failed: 0
+  },
+  segments: [],
+  active_job: null,
+  latest_job: null
+};
+
+export {
+  PROJECT_ID,
+  LOGIN,
+  CSRF,
+  project,
+  dashboardProjects,
+  publication,
+  voice
+};

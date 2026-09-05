@@ -11,7 +11,6 @@ import { createWebSession } from "../src/auth/web-session";
 import { WEB_CSRF_COOKIE } from "../src/auth/security";
 import { createProjectAsset } from "../src/assets/repository";
 import { PRESENTATION_RENDERER_VERSION } from "../src/presentation/render";
-import { DASHBOARD_SCRIPT } from "../src/web/assets";
 import { createEmptyProject } from "../src/projects/schema";
 import { MAX_PROJECT_DOCUMENT_BYTES } from "../src/projects/repository";
 import type { Fetcher } from "../src/auth/twitch";
@@ -496,28 +495,14 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain('class="project-section-nav" aria-label="この研究の編集項目"');
     expect(detailHtml).toContain('<a href="#publication">プレビューと公開</a>');
     expect(detailHtml).toContain('id="voice-finishing" tabindex="-1"');
-    expect(DASHBOARD_SCRIPT).toContain('target.focus({ preventScroll: true })');
-    expect(DASHBOARD_SCRIPT).toContain('fragmentTarget.focus({ preventScroll: true })');
-    expect(DASHBOARD_SCRIPT).toContain('new IntersectionObserver((entries) =>');
-    expect(DASHBOARD_SCRIPT).toContain('setAttribute("aria-current", "location")');
-    expect(DASHBOARD_SCRIPT).toContain('const navigationFocusKey = "ultimate-freestyle:navigation-focus"');
-    expect(DASHBOARD_SCRIPT).toContain('Math.ceil(details.exceeded_by_bytes / 1024) + " KiB超過"');
-    expect(DASHBOARD_SCRIPT).toContain('rememberNavigationFocus("component"');
-    expect(DASHBOARD_SCRIPT).toContain('"ultimate-freestyle:dashboard-theme"');
-    expect(DASHBOARD_SCRIPT).toContain("dashboardThemeButtons.length > 0");
-    expect(DASHBOARD_SCRIPT).toContain("localStorage.setItem(dashboardThemeStorageKey, theme)");
-    expect(DASHBOARD_SCRIPT).toContain('setMobilePane("edit")');
     expect(detailHtml).not.toContain("<style>");
     expect(detail.headers.get("content-security-policy")).toContain(
       "style-src 'self' 'unsafe-inline'"
     );
-    expect(DASHBOARD_SCRIPT).toContain("指定フォントがこの端末になく");
-    expect(DASHBOARD_SCRIPT).toContain("代替フォントで表示されています");
     expect(detailHtml).toContain("data-slide-create");
     expect(detailHtml).toContain("追加して編集する");
     expect(detailHtml).toContain("画像を選択、またはここへドロップ");
     expect(detailHtml).toContain('data-loading-style-pick="research-log"');
-    expect(DASHBOARD_SCRIPT).toContain('dropzone.addEventListener("drop"');
     expect(detailHtml).toContain("0ページ目と全スライドの実表示を測定");
     expect(detailHtml).toContain('id="rendered-quality" open');
     expect(detailHtml).toContain('data-rendered-quality-state>未測定');
@@ -528,40 +513,11 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
     expect(detailHtml).toContain('data-project-version="1"');
     expect(detailHtml).toContain("段階を順番に描画");
-    expect(DASHBOARD_SCRIPT).toContain("advanceQualitySweep");
-    expect(DASHBOARD_SCRIPT).toContain('url.searchParams.set("prelude", "1")');
-    expect(DASHBOARD_SCRIPT).toContain("Number(data.step) !== sweepStep");
-    expect(DASHBOARD_SCRIPT).toContain('slide.id === "__prelude__" && data.ready !== true');
-    expect(DASHBOARD_SCRIPT).toContain("qualitySweepButton.dataset.preludeMinimumMs");
-    expect(DASHBOARD_SCRIPT).toContain('sharedState.textContent = "測定済み"');
     expect(detailHtml).toContain('data-prelude-minimum-ms="500"');
     expect(detailHtml).toContain("data-quality-sweep-cancel");
-    expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:set-position");
     expect(detailHtml).toContain("data-copy-public");
     expect(detailHtml).toContain('data-published-current="false"');
     expect(detailHtml).toContain('data-preview-current="false"');
-    expect(DASHBOARD_SCRIPT).toContain("公開URLをコピーしました");
-    expect(DASHBOARD_SCRIPT).toContain("大きな画像を圧縮しています");
-    expect(DASHBOARD_SCRIPT).toContain('未保存 " + dirtyCount + "件');
-    expect(DASHBOARD_SCRIPT).toContain("publicationBaseDisabled");
-    expect(DASHBOARD_SCRIPT).toContain('publishButton.dataset.previewCurrent = "false"');
-    expect(DASHBOARD_SCRIPT).toContain('publishButton.dataset.previewReviewed = "false"');
-    expect(DASHBOARD_SCRIPT).not.toContain("disabledBeforeDirty");
-    expect(DASHBOARD_SCRIPT).toContain("templates[templateId]?.template_name");
-    expect(DASHBOARD_SCRIPT).toContain("result.affected_slides.total");
-    expect(DASHBOARD_SCRIPT).toContain("appearanceEditor.dataset.previewTemplates = JSON.stringify(templates)");
-    expect(DASHBOARD_SCRIPT).toContain("...template");
-    expect(DASHBOARD_SCRIPT).toContain("apply_line_height");
-    expect(DASHBOARD_SCRIPT).toContain("const postPreviewMessage = (message) =>");
-    expect(DASHBOARD_SCRIPT).toContain('data?.type === "ultimate-freestyle:preview-applied"');
-    expect(DASHBOARD_SCRIPT).toContain("中央プレビューへ反映しました。保存すると確定します。");
-    expect(DASHBOARD_SCRIPT).toContain("templateRoleStyles(templateEditor, new FormData(templateEditor), activeRoleStyleRole)");
-    expect(DASHBOARD_SCRIPT).toContain('templates[""] = previewTemplate(result.default_template)');
-    expect(DASHBOARD_SCRIPT).toContain("activeFilmstrip.dataset.roleLabel = nextRole");
-    expect(DASHBOARD_SCRIPT).toContain("固定プレビューを準備しています…");
-    expect(DASHBOARD_SCRIPT).toContain("文字の見切れ、読み上げ、自動送り");
-    expect(DASHBOARD_SCRIPT).toContain("ultimate-freestyle:preview-review");
-    expect(DASHBOARD_SCRIPT).toContain("recordCompletedPreview");
     expect(detailHtml).not.toContain("公開前チェック");
     expect(detailHtml).not.toContain("文字量と表示枠");
     expect(detailHtml).toContain('data-can-preview="false"');
@@ -593,12 +549,9 @@ describe("Web dashboard", () => {
     expect(detailHtml).toContain("data-preview-link");
     expect(detailHtml).toContain("data-review-preview");
     expect(detailHtml).toContain("終了画面の到達待ち");
-    expect(DASHBOARD_SCRIPT).not.toContain("固定プレビューを最後の終了画面まで確認しましたか？");
     expect(detailHtml).toContain("data-public-link");
     expect(detailHtml).toContain("data-unpublish");
     expect(detailHtml).toContain("公開を停止");
-    expect(DASHBOARD_SCRIPT).toContain('method: "DELETE"');
-    expect(DASHBOARD_SCRIPT).toContain("固定プレビューと編集内容は残っています");
     expect(detailHtml).toContain("data-upload-preview");
     expect(detailHtml).toContain("保存時に最大2560pxのWebPへ圧縮");
     expect(detailHtml).toContain("data-delete-feedback");
@@ -732,9 +685,6 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("data-voice-profile-tuning-reset");
     expect(voicePageHtml).toContain("VOICEVOX標準値へ戻す");
     expect(voicePageHtml).toContain("抑揚・間・前後無音はVOICEVOX生成後");
-    expect(DASHBOARD_SCRIPT).toContain("既定のトーンを保存しています");
-    expect(DASHBOARD_SCRIPT).toContain("これは最自由研究の読み上げテストです");
-    expect(DASHBOARD_SCRIPT).toContain("rebuildVoiceStyles");
     expect(voicePageHtml).toContain("おすすめの声");
     expect(voicePageHtml).toContain('data-voice-configured="true"');
     expect(voicePageHtml).toContain("該当区間の再生成が必要になります");
@@ -745,8 +695,6 @@ describe("Web dashboard", () => {
     expect(voicePageHtml).toContain("スライド名・原稿・声を検索");
     expect(voicePageHtml).toContain("data-voice-preview-feedback");
     expect(voicePageHtml).toContain("?step=0&narration=0#narration-segment-0");
-    expect(DASHBOARD_SCRIPT).toContain("data-voice-preview-seek");
-    expect(DASHBOARD_SCRIPT).toContain("updatePreviewTimeline");
     expect(voicePageHtml).toContain("data-voice-filter-empty");
     expect(voicePageHtml).toContain("固定プレビューを作る前に全区間の生成が必要です");
 
@@ -783,16 +731,6 @@ describe("Web dashboard", () => {
     expect(emptyReviewHtml).toContain("data-review-selection-toolbar");
     expect(emptyReviewHtml).toContain("data-review-selection-action");
     expect(emptyReviewHtml).toContain("近くに出る「コメントを追加」");
-    expect(DASHBOARD_SCRIPT).toContain("captureSelection");
-    expect(DASHBOARD_SCRIPT).toContain("showReviewSelectionToolbar");
-    expect(DASHBOARD_SCRIPT).toContain("applyPendingReviewSelection");
-    expect(DASHBOARD_SCRIPT).toContain("reloadReviewPage(result.next_url)");
-    expect(DASHBOARD_SCRIPT).toContain('history.replaceState(null, "", destination.pathname + destination.search + destination.hash)');
-    expect(DASHBOARD_SCRIPT).toContain('CSS.highlights.set("review-selection"');
-    expect(DASHBOARD_SCRIPT).toContain('addEventListener("pointerup"');
-    expect(DASHBOARD_SCRIPT).toContain("一度に選択できるのは2000文字まで");
-    expect(DASHBOARD_SCRIPT).toContain('composer.scrollIntoView({ block: "start", behavior: "smooth" })');
-    expect(DASHBOARD_SCRIPT).toContain('feedback.classList.remove("warning", "success")');
 
     const createReviewCommentResponse = await requestProvider(
       provider,
@@ -888,27 +826,15 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-composition-mode="canvas"');
     expect(workspaceHtml).toContain('data-inspector-section="structure" open');
     expect(workspaceHtml).toContain('class="mobile-workspace-tabs" role="tablist" aria-label="モバイル編集表示" hidden');
-    expect(DASHBOARD_SCRIPT).toContain('mobileWorkspaceTabs.hidden = false');
     expect(workspaceHtml).toContain('data-mobile-pane="preview"');
     expect(workspaceHtml).toContain('data-mobile-pane="edit"');
     expect(workspaceHtml).toContain('data-mobile-pane="slides"');
     expect(workspaceHtml).toContain('role="tablist"');
     expect(workspaceHtml).not.toContain('id="workspace-preview-pane" role="tabpanel"');
-    expect(DASHBOARD_SCRIPT).toContain('panel.setAttribute("role", "tabpanel")');
-    expect(DASHBOARD_SCRIPT).toContain('panel.removeAttribute("role")');
-    expect(DASHBOARD_SCRIPT).toContain("revealFragmentTarget(fragmentTarget)");
-    expect(DASHBOARD_SCRIPT).toContain("if (fragmentTarget.tabIndex === -1)");
-    expect(DASHBOARD_SCRIPT).toContain("try { return decodeURIComponent(value); } catch { return value; }");
-    expect(DASHBOARD_SCRIPT).toContain("details.open = true");
-    expect(DASHBOARD_SCRIPT).toContain('link.scrollIntoView({');
-    expect(DASHBOARD_SCRIPT).toContain('inline: "nearest"');
     expect(workspaceHtml).toContain('data-mobile-preview-badge');
     expect(workspaceHtml).toContain('data-markdown-action="heading"');
     expect(workspaceHtml).toContain('data-markdown-action="bold"');
     expect(workspaceHtml).toContain('data-markdown-action="table"');
-    expect(DASHBOARD_SCRIPT).toContain('field.dispatchEvent(new Event("input"');
-    expect(DASHBOARD_SCRIPT).toContain("updateRecommendedBodyLimit");
-    expect(DASHBOARD_SCRIPT).toContain("data-component-color-hex");
     expect(workspaceHtml).toContain("自由配置 1パーツ");
     expect(workspaceHtml).toContain("data-canvas-block-editor");
     expect(workspaceHtml).toContain("位置と大きさ");
@@ -1012,14 +938,6 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-font-pick="handwritten"');
     expect(workspaceHtml).toContain('data-font-pick="condensed"');
     expect(workspaceHtml).toContain("本文と見出しのフォントをまとめて選ぶ");
-    expect(DASHBOARD_SCRIPT).toContain('design_notes: String(data.get("design_notes")');
-    expect(DASHBOARD_SCRIPT).toContain('motif: String(data.get("motif")');
-    expect(DASHBOARD_SCRIPT).toContain('motif_color: String(data.get("motif_color")');
-    expect(DASHBOARD_SCRIPT).toContain("const templateRoleStyles =");
-    expect(DASHBOARD_SCRIPT).toContain('const roleStyleStringFields = ["region_layout"');
-    expect(DASHBOARD_SCRIPT).toContain('const roleStyleNumberFields = ["sidebar_width_percent"');
-    expect(DASHBOARD_SCRIPT).toContain("role_styles: templateRoleStyles(form, data)");
-    expect(DASHBOARD_SCRIPT).toContain("slideRoleLabels");
     expect(workspaceHtml).toContain('data-animation-pick="wipe"');
     expect(workspaceHtml).toContain("動きをもう一度見る");
     expect(workspaceHtml).toContain('data-tone-pick="signal"');
@@ -1199,180 +1117,6 @@ describe("Web dashboard", () => {
     expect(dashboardStyleText).toContain(".skip-link:focus { translate: 0;");
     const dashboardScriptText = await dashboardScript.text();
     expect(() => new Function(dashboardScriptText)).not.toThrow();
-    expect(dashboardScriptText).toContain("queueMicrotask(syncFramePosition)");
-    expect(dashboardScriptText).not.toContain("qualitySummary");
-    expect(dashboardScriptText).toContain("Array.isArray(data.fits)");
-    expect(dashboardScriptText).toContain("最小縮小率 ");
-    expect(dashboardScriptText).toContain("最小文字 ");
-    expect(dashboardScriptText).toContain("最小コントラスト ");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:save-component");
-    expect(dashboardScriptText).toContain("未保存の変更はありません");
-    expect(dashboardScriptText).toContain("syncPageVersion(result.version)");
-    expect(dashboardScriptText).toContain('addEventListener("beforeunload"');
-    expect(dashboardScriptText).toContain("ultimate-freestyle:form-draft:");
-    expect(dashboardScriptText).toContain("更新前の未保存入力を復元しました");
-    expect(dashboardScriptText).toContain("現在版へ入力を適用");
-    expect(dashboardScriptText).toContain("退避内容をコピー");
-    expect(dashboardScriptText).toContain("current_version: Number(result.current_version)");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:version-changed");
-    expect(dashboardScriptText).toContain('field.maxLength * 0.9');
-    expect(dashboardScriptText).toContain('event.key.toLowerCase() !== "s"');
-    expect(dashboardScriptText).toContain("form.requestSubmit()");
-    expect(dashboardScriptText).toContain('setAttribute("aria-busy", "true")');
-    expect(dashboardScriptText).not.toContain("data-project-search-empty");
-    expect(dashboardScriptText).not.toContain("filterProjects");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:filmstrip-search:");
-    expect(dashboardScriptText).toContain('filmstripSlides.length + "枚"');
-    expect(dashboardScriptText).toContain("ultimate-freestyle:quality-sweep:");
-    expect(dashboardScriptText).toContain("data-voicevox-sample");
-    expect(dashboardScriptText).toContain("data-segment-voicevox-sample");
-    expect(dashboardScriptText).toContain("未保存の声とトーンで短い固定文");
-    expect(dashboardScriptText).toContain('voicevoxSampleButton.textContent = "準備を中止"');
-    expect(dashboardScriptText).toContain('response.headers.get("x-voicevox-cache")');
-    expect(dashboardScriptText).toContain('persistQualitySweep("completed")');
-    expect(dashboardScriptText).toContain('void saveQualitySweep("completed")');
-    expect(dashboardScriptText).toContain("段階まで測定しました");
-    expect(dashboardScriptText).toContain("updateImagePreview");
-    expect(dashboardScriptText).toContain("URL.revokeObjectURL");
-    expect(dashboardScriptText).toContain("画像の解像度を確認しています");
-    expect(dashboardScriptText).toContain("width * height > 40_000_000");
-    expect(dashboardScriptText).toContain("setPreviewFocus");
-    expect(dashboardScriptText).toContain("workspace-preview-focus");
-    expect(dashboardScriptText).toContain("workspace-mobile-pane");
-    expect(dashboardScriptText).toContain('#narration-segment-');
-    expect(dashboardScriptText).toContain('setMobilePane("edit")');
-    expect(dashboardScriptText).toContain('setMobilePane("edit")');
-    expect(dashboardScriptText).toContain('event.key === "ArrowRight"');
-    expect(dashboardScriptText).toContain('mobilePreviewPending');
-    expect(dashboardScriptText).toContain('const markMobilePreviewPending = (awaitDiagnostics = false)');
-    expect(dashboardScriptText).toContain('previewFrameLoadedGeneration === previewFrameGeneration');
-    expect(dashboardScriptText).toContain('confirmMobilePreview()');
-    expect(dashboardScriptText).not.toContain('if (pane === "preview") document.body.dataset.mobilePreviewPending = "false"');
-    expect(dashboardScriptText).toContain("const apiErrorMessage =");
-    expect(dashboardScriptText).toContain("別の画面またはAIから先に更新されました");
-    expect(dashboardScriptText).toContain("サーバーと通信できませんでした");
-    expect(dashboardScriptText).toContain("publicLink.hidden = false");
-    expect(dashboardScriptText).toContain("到達記録を再試行");
-    expect(dashboardScriptText).toContain("500 * (2 ** (reviewRetryCount - 1))");
-    expect(dashboardScriptText).toContain("reloadPublicationWhenSafe(publishFeedback)");
-    expect(dashboardScriptText).toContain('[data-versioned-form], [data-project-editor]');
-    expect(dashboardScriptText).toContain("if (data.has(name)) body[name]");
-    expect(dashboardScriptText).toContain(
-      "serializeVersionedForm(form, event.submitter)"
-    );
-    expect(dashboardScriptText).toContain("syncPublicationDirtyState(dirtyCount)");
-    expect(dashboardScriptText).toContain("未保存の入力を保護するため自動再読み込みを止めました");
-    expect(dashboardScriptText).toContain("result.voice_generation_required");
-    expect(dashboardScriptText).toContain("VOICEVOX音声を再生成してください");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:voice-selection:");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:voice-tuning:");
-    expect(dashboardScriptText).toContain("未保存選択を復元しました");
-    expect(dashboardScriptText).toContain("未保存のトーン調整を復元しました");
-    expect(dashboardScriptText).toContain("結果を反映しています");
-    expect(dashboardScriptText).toContain('job.status === "completed" ? 800 : 1200');
-    expect(dashboardScriptText).toContain("この画像はスライドで使用中です");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-fields");
-    expect(dashboardScriptText).toContain("入力内容をプレビューへ反映しています");
-    expect(dashboardScriptText).toContain("代替テキストを編集中です");
-    expect(dashboardScriptText).toContain("基本情報と代替テキストを保存しました");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-typography");
-    expect(dashboardScriptText).toContain("組版をプレビューへ反映しています");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-template");
-    expect(dashboardScriptText).toContain("テンプレートをプレビューへ反映しています");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-appearance");
-    expect(dashboardScriptText).toContain("スライド外観をプレビューへ反映しています");
-    expect(dashboardScriptText).toContain("const colorContrast =");
-    expect(dashboardScriptText).toContain("4.5:1未満の組み合わせを見直してください");
-    expect(dashboardScriptText).toContain("button.dataset.copySuccess");
-    expect(dashboardScriptText).toContain("まだ画像がありません");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-narration-settings");
-    expect(dashboardScriptText).toContain("data-narration-color-preview");
-    expect(dashboardScriptText).toContain("data-narration-color-pick");
-    expect(dashboardScriptText).toContain("data-narration-color-reset");
-    expect(dashboardScriptText).toContain("読み上げ枠をプレビューへ反映しています");
-    expect(dashboardScriptText).toContain("説明を保存しています");
-    expect(dashboardScriptText).toContain("SpeechSynthesisUtterance");
-    expect(dashboardScriptText).toContain('segmentTuningValue(form, "speedScale"');
-    expect(dashboardScriptText).toContain("updateSegmentDuration(form)");
-    expect(dashboardScriptText).toContain("profileTunings[profileSelect.value]");
-    expect(dashboardScriptText).toContain('field.placeholder = "実効 "');
-    expect(dashboardScriptText).toContain("button.dataset.effectiveTuning");
-    expect(dashboardScriptText).toContain("workspace-inspector");
-    expect(dashboardScriptText).toContain("data-scene-component-editor");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:select-component");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:move-component");
-    expect(dashboardScriptText).toContain("保存すると確定します");
-    expect(dashboardScriptText).toContain('["x", "y", "width", "height"]');
-    expect(dashboardScriptText).toContain("ultimate-freestyle:set-editor-options");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:grid-snap");
-    expect(dashboardScriptText).toContain("data-component-frame-reset");
-    expect(dashboardScriptText).toContain("form.dataset.component = JSON.stringify");
-    expect(dashboardScriptText).toContain("data-slide-create");
-    expect(dashboardScriptText).toContain("data-composition-create");
-    expect(dashboardScriptText).toContain("行が省略されています");
-    expect(dashboardScriptText).toContain("data.clamps");
-    expect(dashboardScriptText).toContain("data-scene-component-action");
-    expect(dashboardScriptText).toContain('action === "delete_tree"');
-    expect(dashboardScriptText).toContain("affected_component_count");
-    expect(dashboardScriptText).toContain("data-scene-component-create");
-    expect(dashboardScriptText).toContain("data-scene-pattern-create");
-    expect(dashboardScriptText).toContain("data-scene-item-action");
-    expect(dashboardScriptText).toContain("data-component-order");
-    expect(dashboardScriptText).toContain("form.requestSubmit()");
-    expect(dashboardScriptText).toContain("updateContentStructure");
-    expect(dashboardScriptText).toContain("spokenCharacters / 6");
-    expect(dashboardScriptText).toContain("data-component-field");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-scene-component");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-canvas-block");
-    expect(dashboardScriptText).toContain("syncSceneComponentDraft(form)");
-    expect(dashboardScriptText).toContain("syncCanvasBlockDraft(form)");
-    expect(dashboardScriptText).not.toContain("syncSceneComponentDrafts");
-    expect(dashboardScriptText).not.toContain("syncCanvasBlockDrafts");
-    expect(dashboardScriptText).toContain("data-canvas-block-editor");
-    expect(dashboardScriptText).toContain("data-canvas-block-action");
-    expect(dashboardScriptText).toContain("data-canvas-block-create");
-    expect(dashboardScriptText).toContain("表示パーツを複製しています");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:preview-composition");
-    expect(dashboardScriptText).toContain("表示パーツの変更をプレビューへ反映しています");
-    expect(dashboardScriptText).toContain("data-component-frame-toggle");
-    expect(dashboardScriptText).toContain("data-component-parent-select");
-    expect(dashboardScriptText).toContain('parentKind === "stack" || parentKind === "grid"');
-    expect(dashboardScriptText).toContain("fontProbeContext.measureText");
-    expect(dashboardScriptText).toContain("localFontAvailable");
-    expect(dashboardScriptText).toContain("button.dataset.fontAvailable = String(available)");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:persist-drafts");
-    expect(dashboardScriptText).toContain('positionUrl.searchParams.set("step", String(currentStep))');
-    expect(dashboardScriptText).toContain('positionUrl.searchParams.set("component", workspace.dataset.selectedComponent)');
-    expect(dashboardScriptText).toContain('history.replaceState(history.state, "", positionUrl)');
-    expect(dashboardScriptText).toContain('positionUrl.searchParams.set("narration", workspace.dataset.selectedNarration)');
-    expect(dashboardScriptText).toContain("data-component-search");
-    expect(dashboardScriptText).toContain("data-component-tree-toggle");
-    expect(dashboardScriptText).toContain("ultimate-freestyle:component-tree:");
-    expect(dashboardScriptText).toContain("applyComponentTreeCollapse");
-    expect(dashboardScriptText).toContain("selectedTreeItem");
-    expect(dashboardScriptText).toContain("data-component-tree-expand-all");
-    expect(dashboardScriptText).toContain("data-component-tree-collapse-all");
-    expect(dashboardScriptText).toContain("data-component-tree-status");
-    expect(dashboardScriptText).toContain("announceComponentTree");
-    expect(dashboardScriptText).toContain("revealSelectedTreePath");
-    expect(dashboardScriptText).toContain("data-component-current-path");
-    expect(dashboardScriptText).toContain("selectedParent?.dataset.parentPath");
-    expect(dashboardScriptText).toContain('row.hidden = !contextualRows.has(row)');
-    expect(dashboardScriptText).toContain("matchingRows");
-    expect(dashboardScriptText).toContain('sessionStorage.removeItem(form.dataset.draftKey)');
-    expect(dashboardScriptText).toContain('Number(link.dataset.narrationSelect) !== deletedAt');
-    expect(dashboardScriptText).toContain("data-narration-search");
-    expect(dashboardScriptText).toContain('link.scrollIntoView({ block: "nearest", inline: "center" })');
-    expect(dashboardScriptText).toContain("ultimate-freestyle:set-editor-selection");
-    expect(dashboardScriptText).toContain("navigateToComponent(data.component_id)");
-    expect(dashboardScriptText).toContain("component.frame = null");
-    expect(dashboardScriptText).toContain("左位置と幅の合計を100%以内にしてください");
-    expect(dashboardScriptText).toContain("スライド枠を越えています");
-    expect(dashboardScriptText).toContain("data-component-frame-preset");
-    expect(dashboardScriptText).toContain("data-component-style-reset");
-    expect(dashboardScriptText).toContain("delete owner[key]");
-    expect(dashboardScriptText).toContain("changingConfiguredVoice");
-    expect(dashboardScriptText).toContain("新しい声で再生成が必要になります");
 
     const rejectedUpload = await requestProvider(
       provider,
@@ -2013,9 +1757,6 @@ describe("Web dashboard", () => {
     expect(reviewedPreviewDetailHtml).toContain(
       "確認したプレビューを公開する"
     );
-    expect(DASHBOARD_SCRIPT).toContain(
-      "reloadPublicationWhenSafe(publishFeedback)"
-    );
 
     const publish = await requestProvider(
       provider,
@@ -2077,8 +1818,6 @@ describe("Web dashboard", () => {
     expect(publishedDetailHtml).toContain("この版を確認");
     expect(publishedDetailHtml).toContain(`/preview/${previewResult.revision.revision_id}`);
     expect(publishedDetailHtml).toContain(previewResult.revision.content_hash.slice(0, 8));
-    expect(DASHBOARD_SCRIPT).toContain("data-publish-rollback");
-    expect(DASHBOARD_SCRIPT).toContain("以前の公開版へ戻しました");
     const publicPage = await requestProvider(
       provider,
       new Request(`https://saijiyu-kenkyu.2764.moe${publishResult.public_url}`),
@@ -3213,16 +2952,8 @@ describe("Web dashboard", () => {
     expect(flowWorkspaceHtml).toContain('data-inspector-section="content" open');
     expect(flowWorkspaceHtml).toContain('class="inspector-tabs" role="tablist" aria-label="編集項目" hidden');
     expect(flowWorkspaceHtml).toContain('id="inspector-tab-content" type="button" role="tab"');
-    expect(DASHBOARD_SCRIPT).toContain('mobileInspectorTabs.hidden = false');
     expect(flowWorkspaceHtml).not.toContain('data-inspector-pane="quality"');
     expect(flowWorkspaceHtml).toContain('id="inspector-tab-content"');
-    expect(DASHBOARD_SCRIPT).toContain('const mobileInspectorMedia = matchMedia("(max-width: 48rem)")');
-    expect(DASHBOARD_SCRIPT).toContain('selectInspectorPane(next.dataset.inspectorPane');
-    expect(DASHBOARD_SCRIPT).toContain('panel.setAttribute("aria-labelledby", button.id)');
-    expect(DASHBOARD_SCRIPT).toContain('details.hidden = inspectorDockAlways && !selected');
-    expect(DASHBOARD_SCRIPT).toContain('details.hidden = false');
-    expect(DASHBOARD_SCRIPT).toContain('document.addEventListener("visibilitychange"');
-    expect(DASHBOARD_SCRIPT).toContain('void pollJob(activePollUrl)');
     expect(flowWorkspaceHtml).toContain("内容を保存");
     expect(flowWorkspaceHtml).toContain("data-composition-create");
     expect(flowWorkspaceHtml).toContain("選んだ自由構成を開始");
@@ -3301,7 +3032,6 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(removedRestore.status).toBe(404);
-    expect(DASHBOARD_SCRIPT).not.toContain("data-draft-restore");
 
     const createLongSlide = await requestProvider(
       provider,
@@ -3432,10 +3162,6 @@ describe("Web dashboard", () => {
       composition: null
     });
     expect(splitBefore.duration_seconds + splitAfter.duration_seconds).toBe(60);
-    expect(DASHBOARD_SCRIPT).toContain("本文の先頭と末尾以外へカーソルを置いてください");
-    expect(DASHBOARD_SCRIPT).toContain("内容以外の未保存設定を先に保存してください");
-    expect(DASHBOARD_SCRIPT).toContain("段階表示と読み上げは想定時間の位置に応じて前後へ分けます");
-    expect(DASHBOARD_SCRIPT).toContain("sessionStorage.removeItem(form.dataset.draftKey)");
 
     const unsupportedUpload = await requestProvider(
       provider,

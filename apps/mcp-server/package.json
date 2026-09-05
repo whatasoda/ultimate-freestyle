@@ -17,7 +17,8 @@
     "typecheck": "tsc --noEmit",
     "types": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types src/worker-configuration.d.ts --config wrangler.jsonc --env-file .dev.vars.example --include-runtime=false",
     "types:check": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler types src/worker-configuration.d.ts --config wrangler.jsonc --env-file .dev.vars.example --include-runtime=false --check",
-    "check": "bun run types:check && bun run typecheck && bun run test:coverage && bun run build"
+    "check": "bun run types:check && bun run typecheck && bun run test:coverage && bun run test:runtime && bun run build",
+    "test:runtime": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vitest run --config vitest.runtime.config.ts"
   },
   "dependencies": {
     "@cloudflare/containers": "0.3.7",

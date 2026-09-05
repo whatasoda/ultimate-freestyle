@@ -48,10 +48,24 @@ transport ──> service ──> repository ──> generated Env bindings
    - `@cloudflare/vitest-pool-workers`上でD1、KV、R2、Queue、OAuth、MCP、Web routeを確認する。
 3. generated artifact test
    - 発表HTML、dashboard JS、CSSのCSP、escape、runtime protocol、versionを確認する。
-4. deploy smoke
+4. browser runtime test
+   - `happy-dom`へ配信JSを読み込み、利用者と同じ操作を起こして結果を見る。`bun run test:mcp:runtime`。
+5. deploy smoke
    - main push後にmigration、Worker、Container、本番endpointを確認する。
 
-`bun run test:mcp`は型生成確認、TypeScript、Istanbul coverage付きWorkers test、dry-run deployを実行する。coverageだけを見る場合は`bun run test:mcp:coverage`を使い、詳細は`coverage/mcp-server/coverage-summary.json`へ出力する。
+**配信JSはソースをgrepして確かめない。** WorkersにもnodeにもDOMが無いため、以前は
+`expect(DASHBOARD_SCRIPT).toContain("new IntersectionObserver((entries) =>")` のように
+ソースへ特定の式が書かれていることだけを269箇所で確認していた。式があっても動く保証は
+無く、変数名や文言を変えただけで落ちる一方、振る舞いが壊れても気づけない。実際、画面の
+文言を一つ変えるたびに十数箇所が落ちて、整理の妨げになっていた。DOMを与えて実行する層
+（4）へ移し、grepは全廃した。
+
+coverageの下限はこの全廃に合わせて下げてある。grepは`assets.ts`の文字列定義を参照する
+だけで実行していないのに、行が踏まれた扱いになって数字を押し上げていた。現在の値は実際
+に走った量である。
+
+`bun run test:mcp`は型生成確認、TypeScript、Istanbul coverage付きWorkers test、
+browser runtime test、dry-run deployを実行する。coverageだけを見る場合は`bun run test:mcp:coverage`を使い、詳細は`coverage/mcp-server/coverage-summary.json`へ出力する。
 
 基準値は現在の実測値を下回らないための下限であり、品質の最終目標ではない。
 
