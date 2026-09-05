@@ -441,7 +441,10 @@ const DASHBOARD_STYLE = String.raw`
       .journey-facts dd { margin: 0; font-size: .82rem; font-weight: 760; }
       .detail-flow .editor label:not(.wide):not(.check-label) { max-width: 34rem; }
       .detail-flow .upload label:not(.upload-dropzone) { max-width: 34rem; }
-      .detail-flow .publish-state > .status-row { max-width: 34rem; }
+      .publish-facts { border-top: 0; padding-top: 0; }
+      .detail-flow section > :is(button, .button), .detail-flow .publish-state > :is(button, .button) { justify-self: start; }
+      .detail-flow .panel > form > button[type="submit"] { justify-self: start; }
+      .detail-flow .disclosure-body > form > button { justify-self: start; }
       .panel { padding: 1.25rem; border: 1px solid var(--line); border-radius: 1rem; background: var(--panel); }
       .panel-disclosure { padding: 0; }
       .panel-disclosure > summary { padding: 1.15rem 1.25rem; cursor: pointer; font-weight: 820; }
@@ -1772,21 +1775,25 @@ export function projectDetailPage(options: {
     <h2>プレビューと公開</h2>
     <p class="feedback warning" data-publication-dirty aria-live="polite" hidden></p>
     ${publicMetaEditor}
-    <div class="status-row"><span>下書き</span><strong>v${options.project.version}</strong></div>
-    <div class="status-row"><span>表示エンジン</span><strong>${escapeHtml(options.publication.current_renderer_version)}</strong></div>
-    <div class="status-row"><span>実表示の測定</span><strong data-rendered-quality-state>${escapeHtml(renderedQualityLabel)}</strong></div>
-    <div class="status-row"><span>最新プレビュー</span><strong data-preview-status>${preview === null ? "未作成" : `v${preview.project_version} · ${escapeHtml(preview.renderer_version)}${previewCurrent ? "" : " · 要再生成"}`}</strong></div>
-    <div class="status-row"><span>プレビュー確認</span><strong data-preview-review-status>${previewReviewed ? "確認済み" : previewCurrent ? "終了画面の到達待ち" : "対象なし"}</strong></div>
-    <div class="status-row"><span>公開中</span><strong data-published-status>${published === null ? "未公開" : `v${published.project_version} · ${escapeHtml(published.renderer_version)}`}</strong></div>
-    <a class="button ghost" data-preview-link href="${preview === null ? "#" : `/preview/${escapeHtml(preview.revision_id)}`}" target="_blank" rel="noopener"${preview === null ? " hidden" : ""}>最新プレビューを開く</a>
-    <a class="button ghost" data-public-link href="${published !== null && options.publication.slug !== null ? `/p/${escapeHtml(options.publication.slug)}` : "#"}" target="_blank" rel="noopener"${published === null || options.publication.slug === null ? " hidden" : ""}>公開ページを開く</a>
-    <button type="button" data-copy-public${published === null || options.publication.slug === null ? " hidden" : ""}>公開URLをコピー</button><span class="feedback" data-copy-public-feedback aria-live="polite"></span>
-    <button class="danger" type="button" data-op="commit" data-unpublish="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-csrf="${escapeHtml(options.csrfToken)}"${published === null ? " hidden" : ""}>公開を停止</button>
+    <dl class="journey-facts publish-facts">
+      <div><dt>下書き</dt><dd><span>v${options.project.version}</span></dd></div>
+      <div><dt>表示エンジン</dt><dd><span>${escapeHtml(options.publication.current_renderer_version)}</span></dd></div>
+      <div><dt>実表示の測定</dt><dd><span data-rendered-quality-state>${escapeHtml(renderedQualityLabel)}</span></dd></div>
+      <div><dt>最新プレビュー</dt><dd><span data-preview-status>${preview === null ? "未作成" : `v${preview.project_version} · ${escapeHtml(preview.renderer_version)}${previewCurrent ? "" : " · 要再生成"}`}</span></dd></div>
+      <div><dt>プレビュー確認</dt><dd><span data-preview-review-status>${previewReviewed ? "確認済み" : previewCurrent ? "終了画面の到達待ち" : "対象なし"}</span></dd></div>
+      <div><dt>公開中</dt><dd><span data-published-status>${published === null ? "未公開" : `v${published.project_version} · ${escapeHtml(published.renderer_version)}`}</span></dd></div>
+    </dl>
+    <div class="actions">
+      <a class="button ghost" data-preview-link href="${preview === null ? "#" : `/preview/${escapeHtml(preview.revision_id)}`}" target="_blank" rel="noopener"${preview === null ? " hidden" : ""}>最新プレビューを開く</a>
+      <a class="button ghost" data-public-link href="${published !== null && options.publication.slug !== null ? `/p/${escapeHtml(options.publication.slug)}` : "#"}" target="_blank" rel="noopener"${published === null || options.publication.slug === null ? " hidden" : ""}>公開ページを開く</a>
+      <button type="button" data-copy-public${published === null || options.publication.slug === null ? " hidden" : ""}>公開URLをコピー</button><span class="feedback" data-copy-public-feedback aria-live="polite"></span>
+    </div>
     ${publicationHistory}
     ${publicationEvents}
     <div class="commit-zone" role="group" aria-labelledby="publication-gate">
     <p class="commit-zone-label" id="publication-gate">ここから先の操作は公開に反映されます</p>
     <div class="actions">
+      <button class="danger" type="button" data-op="commit" data-unpublish="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-csrf="${escapeHtml(options.csrfToken)}"${published === null ? " hidden" : ""}>公開を停止</button>
       <button type="button" data-op="commit" data-create-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews" data-version="${options.project.version}" data-can-preview="${String(slides.length > 0 && !voiceIncomplete)}" data-csrf="${escapeHtml(options.csrfToken)}"${slides.length === 0 || voiceIncomplete ? " disabled" : ""}>現在の下書きをプレビュー</button>
       <button type="button" data-op="commit" data-review-preview="/api/projects/${escapeHtml(options.project.project_id)}/previews/${escapeHtml(preview?.revision_id ?? "")}/review" data-project="${escapeHtml(options.project.project_id)}" data-version="${options.project.version}" data-renderer="${escapeHtml(options.publication.current_renderer_version)}" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-review-available="false" data-csrf="${escapeHtml(options.csrfToken)}" disabled>${previewReviewed ? "プレビュー確認済み" : "終了画面の到達待ち"}</button>
       <button type="button" data-op="commit" data-publish-preview="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(preview?.revision_id ?? "")}" data-csrf="${escapeHtml(options.csrfToken)}" data-duration-valid="${String(durationWithinLimit)}" data-preview-current="${String(previewCurrent)}" data-preview-reviewed="${String(previewReviewed)}" data-published-current="${String(publishedCurrent)}"${previewReviewed && durationWithinLimit && !publishedCurrent ? "" : " disabled"}>${publishedCurrent ? "この版は公開済み" : "確認した版を公開"}</button>
@@ -1795,8 +1802,10 @@ export function projectDetailPage(options: {
     <p class="feedback${!durationWithinLimit || (voiceIncomplete && !previewCurrent) || (preview !== null && !previewCurrent) || (previewCurrent && !previewReviewed) ? " warning" : ""}" data-publish-feedback aria-live="polite">${slides.length === 0 ? "スライドを1枚以上作るとプレビューできます。" : !durationWithinLimit ? `想定発表時間が${formatDuration(totalDurationSeconds)}です。20分以内に短縮してから公開してください。プレビューは短縮前でも確認できます。` : previewCurrent && !previewReviewed ? "固定プレビューを最後の終了画面まで進めると、自動で確認済みになります。" : voiceIncomplete && !previewCurrent ? `VOICEVOX音声は ${readyVoiceSegments} / ${narrationSegments.length} 区間まで生成済みです。設定した声を固定プレビューへ反映するため、全区間を生成してください。` : preview !== null && !previewCurrent ? previewStaleMessage : "公開中の版は、下書きや表示エンジンを更新しても自動では変わりません。"}</p>
   </section>`;
   const voicePanel = `<section class="panel publish-state" id="voice-finishing" tabindex="-1"><h2>読み上げ音声</h2>
-    <div class="status-row"><span>読み上げ区間</span><strong>${narrationSegments.length}件</strong></div>
-    <div class="status-row"><span>VOICEVOX生成済み</span><strong>${readyVoiceSegments} / ${narrationSegments.length}</strong></div>
+    <dl class="journey-facts publish-facts">
+      <div><dt>読み上げ区間</dt><dd>${narrationSegments.length}件</dd></div>
+      <div><dt>VOICEVOX生成済み</dt><dd>${readyVoiceSegments} / ${narrationSegments.length}</dd></div>
+    </dl>
     <a class="button" href="/dashboard/projects/${escapeHtml(options.project.project_id)}/voice">音声を仕上げる</a>
     <p class="feedback">VOICEVOXの話者・スタイル・調声、生成状況、区間ごとの試聴を一つの画面で確認できます。</p>
   </section>`;
