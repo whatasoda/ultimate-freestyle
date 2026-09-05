@@ -81,6 +81,7 @@ import {
   readOwnerPresentationAsset,
   readPublishedPresentationAudio,
   readPublishedPresentation,
+  readPublishedRevision,
   readPublishedPresentationAsset
 } from "../publications/service";
 import {
@@ -3886,6 +3887,7 @@ async function handlePreviewPublish(
         ok: true,
         publication: status,
         public_url: null,
+        version_url: null,
         error: null,
         request_id: crypto.randomUUID()
       });
@@ -3923,6 +3925,7 @@ async function handlePreviewPublish(
       ok: true,
       publication: status,
       public_url: `/p/${status.slug}`,
+      version_url: `/p/${status.slug}/r/${parsed.data.revision_id}`,
       error: null,
       request_id: crypto.randomUUID()
     });
@@ -4320,6 +4323,27 @@ export async function handleWebRequest(
     }
     return presentationResponse(
       await readPublishedPresentation(env, publicPageMatch[1]),
+      "public, max-age=60, stale-while-revalidate=300"
+    );
+  }
+  const publicRevisionMatch = path.match(
+    new RegExp(`^/p/${UUID_PATH}/r/${UUID_PATH}$`, "i")
+  );
+  if (
+    publicRevisionMatch?.[1] !== undefined &&
+    publicRevisionMatch[2] !== undefined
+  ) {
+    if (request.method !== "GET") {
+      return new Response(null, { status: 405, headers: { allow: "GET" } });
+    }
+    // immutableにしない。内容は不変でも公開停止で到達不可になるため、
+    // ブラウザキャッシュが停止後の版を配り続ける。
+    return presentationResponse(
+      await readPublishedRevision(
+        env,
+        publicRevisionMatch[1],
+        publicRevisionMatch[2]
+      ),
       "public, max-age=60, stale-while-revalidate=300"
     );
   }

@@ -769,6 +769,25 @@ export async function readPublishedPresentation(
   return row === null ? null : env.MEDIA_BUCKET.get(row.object_key);
 }
 
+export async function readPublishedRevision(
+  env: Pick<Env, "DB" | "MEDIA_BUCKET">,
+  slug: string,
+  revisionId: string
+): Promise<R2ObjectBody | null> {
+  const row = await env.DB
+    .prepare(
+      `SELECT r.object_key
+       FROM project_publications p
+       JOIN presentation_revisions r ON r.project_id = p.project_id
+       WHERE p.slug = ? AND r.id = ?
+         AND r.published_at IS NOT NULL
+         AND p.published_revision_id IS NOT NULL`
+    )
+    .bind(slug, revisionId)
+    .first<{ object_key: string }>();
+  return row === null ? null : env.MEDIA_BUCKET.get(row.object_key);
+}
+
 export async function readOwnerPresentationAsset(
   env: Pick<Env, "DB" | "MEDIA_BUCKET">,
   ownerUserId: string,
@@ -796,9 +815,11 @@ export async function readPublishedPresentationAsset(
     .prepare(
       `SELECT a.object_key
        FROM presentation_revision_assets a
-       JOIN project_publications p
-         ON p.published_revision_id = a.revision_id
-       WHERE a.revision_id = ? AND a.asset_id = ?`
+       JOIN presentation_revisions r ON r.id = a.revision_id
+       JOIN project_publications p ON p.project_id = r.project_id
+       WHERE a.revision_id = ? AND a.asset_id = ?
+         AND r.published_at IS NOT NULL
+         AND p.published_revision_id IS NOT NULL`
     )
     .bind(revisionId, assetId)
     .first<{ object_key: string }>();
@@ -842,8 +863,11 @@ export async function readPublishedPresentationAudio(
     .prepare(
       `SELECT a.object_key
        FROM presentation_revision_audio a
-       JOIN project_publications p ON p.published_revision_id = a.revision_id
-       WHERE a.revision_id = ? AND a.slide_id = ? AND a.segment_at = ?`
+       JOIN presentation_revisions r ON r.id = a.revision_id
+       JOIN project_publications p ON p.project_id = r.project_id
+       WHERE a.revision_id = ? AND a.slide_id = ? AND a.segment_at = ?
+         AND r.published_at IS NOT NULL
+         AND p.published_revision_id IS NOT NULL`
     )
     .bind(revisionId, slideId, segmentAt)
     .first<{ object_key: string }>();

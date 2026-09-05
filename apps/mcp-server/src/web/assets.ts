@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "197";
+export const DASHBOARD_ASSET_VERSION = "198";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -3978,6 +3978,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const previewLink = document.querySelector("[data-preview-link]");
   const publicLink = document.querySelector("[data-public-link]");
   const copyPublicButton = document.querySelector("[data-copy-public]");
+  const copyVersionButton = document.querySelector("[data-copy-version]");
   const copyPublicFeedback = document.querySelector("[data-copy-public-feedback]");
   const unpublishButton = document.querySelector("[data-unpublish]");
   if (previewButton instanceof HTMLButtonElement && publishFeedback instanceof HTMLElement) {
@@ -4163,6 +4164,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         publishButton.dataset.publishedCurrent = "true";
         publishButton.textContent = "この版は公開済み";
         if (copyPublicButton instanceof HTMLButtonElement) copyPublicButton.hidden = false;
+        if (copyVersionButton instanceof HTMLButtonElement && result.version_url) {
+          copyVersionButton.dataset.copyUrl = result.version_url;
+          copyVersionButton.hidden = false;
+        }
         if (unpublishButton instanceof HTMLButtonElement) {
           unpublishButton.disabled = false;
           unpublishButton.hidden = false;
@@ -4197,6 +4202,10 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           publicLink.hidden = true;
         }
         if (copyPublicButton instanceof HTMLButtonElement) copyPublicButton.hidden = true;
+        if (copyVersionButton instanceof HTMLButtonElement) {
+          copyVersionButton.dataset.copyUrl = "";
+          copyVersionButton.hidden = true;
+        }
         if (publishButton instanceof HTMLButtonElement) {
           publishButton.dataset.publishedCurrent = "false";
           publishButton.textContent = "確認した版を公開";
@@ -4250,6 +4259,24 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       } catch {
         if (copyPublicFeedback instanceof HTMLElement) copyPublicFeedback.textContent = "コピーできませんでした。公開ページを開いてURLをコピーしてください。";
       }
+    });
+  }
+  for (const copyUrlButton of document.querySelectorAll("[data-copy-url]")) {
+    if (!(copyUrlButton instanceof HTMLButtonElement)) continue;
+    copyUrlButton.addEventListener("click", async () => {
+      const target = copyUrlButton.dataset.copyUrl || "";
+      if (!target) return;
+      if (copyUrlButton.dataset.copyLabel === undefined) {
+        copyUrlButton.dataset.copyLabel = copyUrlButton.textContent || "";
+      }
+      const restore = copyUrlButton.dataset.copyLabel;
+      try {
+        await navigator.clipboard.writeText(new URL(target, location.origin).href);
+        copyUrlButton.textContent = "コピーしました";
+      } catch {
+        copyUrlButton.textContent = "コピーできません";
+      }
+      setTimeout(() => { copyUrlButton.textContent = restore; }, 2000);
     });
   }
 

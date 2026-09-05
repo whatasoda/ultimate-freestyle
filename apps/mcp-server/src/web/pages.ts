@@ -708,7 +708,7 @@ const DASHBOARD_STYLE = String.raw`
       .publication-history { display: grid; gap: .35rem; margin-top: .65rem; }
       .publication-history .status-row { align-items: center; padding: .55rem .65rem; border: 1px solid var(--line); border-radius: .55rem; }
       .publication-history .status-row span, .publication-history .status-row small { display: grid; gap: .12rem; }
-      .publication-history .actions { display: flex; align-items: center; gap: .4rem; }
+      .publication-history .status-row .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .4rem; }
       .revision-preview { width: 100%; aspect-ratio: var(--revision-aspect, 16 / 9); border: 1px solid var(--accent-strong); border-radius: .8rem; background: var(--accent-soft); }
       .revision-slide-list { display: grid; gap: .45rem; margin: 0; padding: 0; list-style: none; }
       .revision-slide-list li { display: grid; grid-template-columns: 2.5rem minmax(0, 1fr) auto; gap: .6rem; padding: .65rem; border: 1px solid var(--line); border-radius: .6rem; color: var(--accent-strong); }
@@ -1653,7 +1653,13 @@ export function projectDetailPage(options: {
           ? revision.created_at
           : revision.published_at;
         const revisionMeta = `${(revision.byte_size / 1024).toFixed(1)} KB · ${revision.content_hash.slice(0, 8)}`;
-        return `<article class="status-row"><span><strong>v${revision.project_version} · ${escapeHtml(revision.renderer_version)}</strong><small>${escapeHtml(new Date(publishedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(revisionMeta)}</small></span><span class="actions"><a class="button ghost" href="/preview/${escapeHtml(revision.revision_id)}" target="_blank" rel="noopener">この版を確認</a>${active ? '<strong class="success">公開中</strong>' : `<button type="button" data-publish-rollback="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(revision.revision_id)}" data-csrf="${escapeHtml(options.csrfToken)}">この版へ戻す</button>`}</span></article>`;
+        const versionUrl = options.publication.slug === null || published === null
+          ? null
+          : `/p/${options.publication.slug}/r/${revision.revision_id}`;
+        const versionUrlAction = versionUrl === null
+          ? ""
+          : `<button type="button" data-copy-url="${escapeHtml(versionUrl)}">この版のURLをコピー</button>`;
+        return `<article class="status-row"><span><strong>v${revision.project_version} · ${escapeHtml(revision.renderer_version)}</strong><small>${escapeHtml(new Date(publishedAt).toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" }))} · ${escapeHtml(revisionMeta)}</small></span><span class="actions"><a class="button ghost" href="/preview/${escapeHtml(revision.revision_id)}" target="_blank" rel="noopener">この版を確認</a>${versionUrlAction}${active ? '<strong class="success">公開中</strong>' : `<button type="button" data-publish-rollback="/api/projects/${escapeHtml(options.project.project_id)}/publish" data-revision="${escapeHtml(revision.revision_id)}" data-csrf="${escapeHtml(options.csrfToken)}">この版へ戻す</button>`}</span></article>`;
       }).join("")}</div></details>`;
   const publicationActionLabels = {
     publish: "公開開始",
@@ -1798,8 +1804,10 @@ export function projectDetailPage(options: {
     <div class="actions">
       <a class="button ghost" data-preview-link href="${preview === null ? "#" : `/preview/${escapeHtml(preview.revision_id)}`}" target="_blank" rel="noopener"${preview === null ? " hidden" : ""}>最新プレビューを開く</a>
       <a class="button ghost" data-public-link href="${published !== null && options.publication.slug !== null ? `/p/${escapeHtml(options.publication.slug)}` : "#"}" target="_blank" rel="noopener"${published === null || options.publication.slug === null ? " hidden" : ""}>公開ページを開く</a>
-      <button type="button" data-copy-public${published === null || options.publication.slug === null ? " hidden" : ""}>公開URLをコピー</button><span class="feedback" data-copy-public-feedback aria-live="polite"></span>
+      <button type="button" data-copy-public${published === null || options.publication.slug === null ? " hidden" : ""}>公開URLをコピー</button>
+      <button type="button" data-copy-version data-copy-url="${published !== null && options.publication.slug !== null ? escapeHtml(`/p/${options.publication.slug}/r/${published.revision_id}`) : ""}"${published === null || options.publication.slug === null ? " hidden" : ""}>この版のURLをコピー</button><span class="feedback" data-copy-public-feedback aria-live="polite"></span>
     </div>
+    <p class="inherit-note">公開URLは常に公開中の版を映す。版指定URLはその版だけを指し続ける。公開を停止すると、どちらも見られなくなる。</p>
     ${publicationHistory}
     ${publicationEvents}
     <div class="commit-zone" role="group" aria-labelledby="publication-gate">

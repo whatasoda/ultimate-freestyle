@@ -486,8 +486,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=197"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=197"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=198"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=198"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -817,7 +817,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=197"'
+      'href="/assets/dashboard.css?v=198"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1013,7 +1013,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=197"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=198"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1022,7 +1022,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=197"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=198"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1034,7 +1034,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=197", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=198", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1045,7 +1045,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=197", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=198", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1770,6 +1770,7 @@ describe("Web dashboard", () => {
     expect(publish.status).toBe(200);
     const publishResult = (await publish.json()) as {
       public_url: string;
+      version_url: string;
       publication: {
         published_history: Array<{ revision_id: string }>;
         events: Array<{ action: string; from_revision_id: string | null; to_revision_id: string | null }>;
@@ -1841,6 +1842,50 @@ describe("Web dashboard", () => {
     expect(publishedAudio.headers.get("cache-control")).toContain("immutable");
     expect(new Uint8Array(await publishedAudio.arrayBuffer())).toEqual(voiceBytes);
 
+    expect(publishResult.version_url).toBe(
+      `${publishResult.public_url}/r/${previewResult.revision.revision_id}`
+    );
+    expect(publishedDetailHtml).toContain(
+      `data-copy-url="${publishResult.version_url}"`
+    );
+    const versionPage = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${publishResult.version_url}`),
+      authEnv
+    );
+    expect(versionPage.status).toBe(200);
+    expect(versionPage.headers.get("cache-control")).not.toContain("immutable");
+    expect(await versionPage.text()).toContain("Webで微調整した研究");
+
+    const unpublishedRevisionId = "20000000-0000-4000-8000-0000000000ff";
+    const unpublishedObjectKey = "presentation-revisions/never-published.html";
+    await env.MEDIA_BUCKET.put(unpublishedObjectKey, "<html>leaked</html>");
+    await env.DB.prepare(
+      `INSERT INTO presentation_revisions (
+         id, project_id, owner_user_id, project_version, renderer_version,
+         object_key, content_hash, byte_size, created_at, reviewed_at, published_at
+       )
+       SELECT ?, project_id, owner_user_id, project_version, renderer_version,
+              ?, content_hash, byte_size, created_at, reviewed_at, NULL
+       FROM presentation_revisions WHERE id = ?`
+    ).bind(
+      unpublishedRevisionId,
+      unpublishedObjectKey,
+      previewResult.revision.revision_id
+    ).run();
+    const unpublishedRevisionPage = await requestProvider(
+      provider,
+      new Request(
+        `https://saijiyu-kenkyu.2764.moe${publishResult.public_url}/r/${unpublishedRevisionId}`
+      ),
+      authEnv
+    );
+    expect(unpublishedRevisionPage.status).toBe(404);
+    await env.DB.prepare("DELETE FROM presentation_revisions WHERE id = ?")
+      .bind(unpublishedRevisionId)
+      .run();
+    await env.MEDIA_BUCKET.delete(unpublishedObjectKey);
+
     const unpublish = await requestProvider(
       provider,
       new Request(
@@ -1875,6 +1920,12 @@ describe("Web dashboard", () => {
       authEnv
     );
     expect(unpublishedPage.status).toBe(404);
+    const unpublishedVersionPage = await requestProvider(
+      provider,
+      new Request(`https://saijiyu-kenkyu.2764.moe${publishResult.version_url}`),
+      authEnv
+    );
+    expect(unpublishedVersionPage.status).toBe(404);
 
     const templateUpdate = await requestProvider(
       provider,
