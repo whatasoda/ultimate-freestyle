@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "193";
+export const DASHBOARD_ASSET_VERSION = "194";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
