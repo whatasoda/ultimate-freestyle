@@ -137,16 +137,12 @@ export const slideTypographyPresetSchema = z.enum([
   "dense"
 ]);
 
+// 倍率・行間・間隔・揃えはpresetが安全な組み合わせとして持つ。1枚ずつ上書きできるように
+// していたが、実rendererが自動縮小と見切れ測定を担うため、個別の微調整は判断材料を持たない
+// まま数値を動かす操作になっていた。presetと段数だけを残す。
 export const slideTypographySchema = z.object({
   preset: slideTypographyPresetSchema,
-  columns: z.number().int().min(1).max(3).optional(),
-  body_scale: z.number().min(0.5).max(1.4).multipleOf(0.05).optional(),
-  heading_scale: z.number().min(0.5).max(1.5).multipleOf(0.05).optional(),
-  line_height: z.number().min(1).max(2).multipleOf(0.05).optional(),
-  paragraph_spacing_em: z.number().min(0).max(2).multipleOf(0.05).optional(),
-  column_gap_em: z.number().min(0.5).max(5).multipleOf(0.1).optional(),
-  text_align: z.enum(["start", "center"]).optional(),
-  vertical_align: z.enum(["start", "center"]).optional()
+  columns: z.number().int().min(1).max(3).optional()
 });
 
 export type SlideTypography = z.infer<typeof slideTypographySchema>;
@@ -657,6 +653,9 @@ const narrationVoiceTuningSchema = z
   .nullable()
   .optional();
 
+// cueは読み上げ本文の入れ物であり、textを連結したものが区間の本文になる。声と休符は
+// 文ごとに変える意味があるが、調声はここまで下ろさない。区間の調声7項目に対して、cueごと
+// にさらに速度・高さ・抑揚を持たせると、同じ区間の中で三段の継承を追うことになる。
 export const narrationVoiceCueSchema = z.object({
   id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
   text: z.string().min(1).max(500),
@@ -665,7 +664,6 @@ export const narrationVoiceCueSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9-]{0,63}$/)
     .nullable()
     .optional(),
-  voice_tuning: narrationVoiceTuningSchema,
   pause_after_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional()
 });
 

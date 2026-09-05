@@ -136,14 +136,12 @@ describe("VOICEVOX project schema", () => {
         id: "calm",
         text: "ここは静かに。",
         voice_profile_id: "zundamon-normal",
-        voice_tuning: { speedScale: 0.9, intonationScale: 0.8 },
         pause_after_ms: 800
       },
       {
         id: "emphasis",
         text: "ここから強く。",
         voice_profile_id: null,
-        voice_tuning: { pitchScale: 0.05, intonationScale: 1.4 },
         pause_after_ms: 0
       }
     ];

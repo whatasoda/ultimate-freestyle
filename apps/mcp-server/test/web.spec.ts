@@ -486,8 +486,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=195"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=195"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=196"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=196"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -817,7 +817,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=195"'
+      'href="/assets/dashboard.css?v=196"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -859,8 +859,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain("プレビューを読み込み中…");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("読み上げ枠の色");
-    expect(workspaceHtml).toContain('name="appearance_background"');
-    expect(workspaceHtml).toContain("話者・進捗色");
+    expect(workspaceHtml).not.toContain('name="appearance_background"');
+    expect(workspaceHtml).toContain('narration-palette');
     expect(workspaceHtml).toContain("夜のパネル");
     expect(workspaceHtml).toContain("ずんだ色");
     expect(workspaceHtml).toContain("形式の既定");
@@ -1020,7 +1020,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=195"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=196"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1029,7 +1029,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=195"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=196"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1041,7 +1041,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=195", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=196", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1052,7 +1052,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=195", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=196", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -2210,14 +2210,7 @@ describe("Web dashboard", () => {
             expected_version: 9,
             typography: {
               preset: "columns",
-              columns: 3,
-              body_scale: 0.6,
-              heading_scale: 0.7,
-              line_height: 1.55,
-              paragraph_spacing_em: 0.6,
-              column_gap_em: 2.4,
-              text_align: "start",
-              vertical_align: "start"
+              columns: 3
             }
           })
         }
@@ -2239,7 +2232,7 @@ describe("Web dashboard", () => {
     const typographyWorkspaceHtml = await typographyWorkspace.text();
     expect(typographyWorkspaceHtml).toContain("2段組み（長文） · 3段");
     expect(typographyWorkspaceHtml).toContain('data-typography-editor');
-    expect(typographyWorkspaceHtml).toContain('name="body_scale"');
+    expect(typographyWorkspaceHtml).not.toContain('name="body_scale"');
 
     const profileTuningUpdate = await requestProvider(
       provider,

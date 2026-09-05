@@ -558,8 +558,7 @@ export function renderPresentationHtml(
                 prePhonemeLength: 0.1,
                 postPhonemeLength: 0.1,
                 ...(cueProfile?.tuning ?? profile?.tuning ?? {}),
-                ...(segment.voice_tuning ?? {}),
-                ...(cue.voice_tuning ?? {})
+                ...(segment.voice_tuning ?? {})
               }
             };
           }) ?? null

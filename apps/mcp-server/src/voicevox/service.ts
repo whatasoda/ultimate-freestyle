@@ -285,10 +285,7 @@ async function buildVoicePlan(
           speakerUuid: cueProfile.speaker_uuid,
           styleId: cueProfile.style_id,
           profileTuning: cueProfile.tuning,
-          segmentTuning: {
-            ...(segment.voice_tuning ?? {}),
-            ...(cue.voice_tuning ?? {})
-          },
+          segmentTuning: segment.voice_tuning ?? {},
           pauseAfterMs: cue.pause_after_ms
         };
       });

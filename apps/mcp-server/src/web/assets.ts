@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "195";
+export const DASHBOARD_ASSET_VERSION = "196";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -1163,17 +1163,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const stringValue = (name) => value(name) instanceof HTMLInputElement || value(name) instanceof HTMLTextAreaElement || value(name) instanceof HTMLSelectElement
           ? value(name).value
           : "";
-        const cueTuning = {};
-        for (const key of ["speedScale", "pitchScale", "intonationScale"]) {
-          const raw = stringValue("cue_" + key).trim();
-          if (raw !== "" && Number.isFinite(Number(raw))) cueTuning[key] = Number(raw);
-        }
         const pauseSeconds = Number(stringValue("cue_pause_after_seconds") || 0);
         return {
           id: stringValue("cue_id") || "cue-" + (index + 1),
           text: stringValue("cue_text"),
           voice_profile_id: stringValue("cue_profile_id") || null,
-          voice_tuning: Object.keys(cueTuning).length ? cueTuning : null,
           pause_after_ms: Math.round(Math.max(0, pauseSeconds) * 10) * 100
         };
       });
@@ -3137,10 +3131,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const cues = voiceCueElements(form);
     const speechSeconds = cues.length > 0
       ? cues.reduce((total, cue) => {
-          const speedValue = Number(voiceCueFieldValue(cue, "cue_speedScale"));
-          const speed = voiceCueFieldValue(cue, "cue_speedScale").trim() === "" || !Number.isFinite(speedValue)
-            ? segmentTuningValue(form, "speedScale")
-            : speedValue;
+          const speed = segmentTuningValue(form, "speedScale");
           return total + Math.max(1.2, voiceCueFieldValue(cue, "cue_text").length / (7 * speed)) + Math.max(0, Number(voiceCueFieldValue(cue, "cue_pause_after_seconds") || 0));
         }, 0)
       : Math.max(1.5, text.value.length / (7 * segmentTuningValue(form, "speedScale")));
@@ -3182,26 +3173,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         syncVoiceCueForm(form);
         updateSegmentDuration(form);
         form.dispatchEvent(new Event("input", { bubbles: true }));
-        return;
       }
-      const presetButton = target.closest("[data-voice-cue-preset]");
-      if (!(presetButton instanceof HTMLButtonElement)) return;
-      const cue = presetButton.closest("[data-voice-cue]");
-      if (!(cue instanceof HTMLFieldSetElement)) return;
-      const presets = {
-        standard: { speedScale: 1, pitchScale: 0, intonationScale: 1 },
-        emphasis: { speedScale: 1.08, pitchScale: 0.04, intonationScale: 1.35 },
-        calm: { speedScale: 0.9, pitchScale: -0.03, intonationScale: 0.8 },
-        quick: { speedScale: 1.3, pitchScale: 0.01, intonationScale: 1.1 }
-      };
-      const preset = presets[presetButton.dataset.voiceCuePreset];
-      if (!preset) return;
-      for (const [key, value] of Object.entries(preset)) {
-        const field = voiceCueField(cue, "cue_" + key);
-        if (field instanceof HTMLInputElement) field.value = String(value);
-      }
-      updateSegmentDuration(form);
-      form.dispatchEvent(new Event("input", { bubbles: true }));
     });
   }
 
@@ -3274,8 +3246,8 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const previewCues = cues.length > 0
         ? cues.map((cue) => ({
             text: voiceCueFieldValue(cue, "cue_text"),
-            speed: Number(voiceCueFieldValue(cue, "cue_speedScale") || segmentTuningValue(form, "speedScale")),
-            pitch: Number(voiceCueFieldValue(cue, "cue_pitchScale") || segmentTuningValue(form, "pitchScale")),
+            speed: Number(segmentTuningValue(form, "speedScale")),
+            pitch: Number(segmentTuningValue(form, "pitchScale")),
             pause: Math.max(0, Number(voiceCueFieldValue(cue, "cue_pause_after_seconds") || 0) * 1000)
           }))
         : [{ text: String(new FormData(form).get("text") || ""), speed: segmentTuningValue(form, "speedScale"), pitch: segmentTuningValue(form, "pitchScale"), pause: 0 }];

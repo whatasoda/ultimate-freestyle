@@ -220,18 +220,10 @@ describe("VOICEVOX generation", () => {
                 audio_src: null,
                 pause_before_ms: 500,
                 pause_after_ms: 1_000,
+                voice_tuning: { speedScale: 0.9, intonationScale: 0.8 },
                 voice_cues: [
-                  {
-                    id: "calm",
-                    text: "ずんだもんの音声を",
-                    voice_tuning: { speedScale: 0.9, intonationScale: 0.8 },
-                    pause_after_ms: 800
-                  },
-                  {
-                    id: "emphasis",
-                    text: "生成します。",
-                    voice_tuning: { pitchScale: 0.05, intonationScale: 1.4 }
-                  }
+                  { id: "calm", text: "ずんだもんの音声を", pause_after_ms: 800 },
+                  { id: "emphasis", text: "生成します。" }
                 ]
               }
             ]
@@ -319,7 +311,7 @@ describe("VOICEVOX generation", () => {
       parts: [
         { kind: "speech", text: "ずんだもんの音声を", style_id: 3, tuning: { speedScale: 0.9, intonationScale: 0.8 } },
         { kind: "pause", duration_ms: 800 },
-        { kind: "speech", text: "生成します。", style_id: 3, tuning: { pitchScale: 0.05, intonationScale: 1.4 } }
+        { kind: "speech", text: "生成します。", style_id: 3, tuning: { speedScale: 0.9, intonationScale: 0.8 } }
       ]
     });
     const job = await getVoiceGenerationJob(
@@ -336,9 +328,9 @@ describe("VOICEVOX generation", () => {
     const status = await getVoiceProjectStatus(env.DB, userId, projectId);
     expect(status?.summary).toMatchObject({ total: 1, ready: 1, needs_generation: 0 });
     expect(status?.segments[0]?.effective_tuning).toMatchObject({
-      speedScale: 1.05,
+      speedScale: 0.9,
       pitchScale: 0,
-      intonationScale: 1
+      intonationScale: 0.8
     });
     const storedProject = await getProject(env.DB, userId, projectId);
     expect(storedProject).not.toBeNull();
