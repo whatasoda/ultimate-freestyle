@@ -6,7 +6,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@120";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@121";
 
 function escapeHtml(value: string): string {
   return value
@@ -958,7 +958,7 @@ export function renderPresentationHtml(
     .narration[data-size="compact"] { max-height: 15cqh; padding-block: 1.05cqh; font-size: calc(1.35cqw * var(--aspect-font-scale) * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
     .narration[data-size="large"] { max-height: 34cqh; padding-block: 2.2cqh; font-size: calc(2.15cqw * var(--aspect-font-scale) * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
     .narration[data-text-align="center"] { text-align: center; }
-    .narration[data-placement="overlay-bottom"] { position: absolute; z-index: 30; right: 4%; bottom: 3%; left: 4%; width: auto; max-height: 30%; border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.2cqw; box-shadow: 0 1.1cqw 3cqw #0008; }
+    .narration[data-placement="overlay-bottom"] { position: absolute; z-index: 30; right: 4%; bottom: 3%; left: 4%; width: auto; max-height: 30%; border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.2cqw; }
     .narration[data-placement="sidebar"] { position: absolute; z-index: 30; top: 5%; right: 3%; bottom: 5%; width: min(36%, 34cqw); max-height: none; border: max(1px, .07cqw) solid var(--theme-border); border-radius: 1.1cqw; }
     .narration-speaker { justify-self: start; max-width: 80%; padding: .35cqh .8cqw; border-radius: .4cqw; background: var(--narration-custom-accent, var(--accent)); color: #10131a; font-size: .68em; font-weight: 850; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .narration[data-speaker-visible="false"] .narration-speaker, .narration-speaker[hidden] { display: none; }
@@ -966,9 +966,9 @@ export function renderPresentationHtml(
     .narration-text { display: -webkit-box; margin: 0; overflow: hidden; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: var(--narration-max-lines); }
     .narration-inline-progress { align-self: end; display: block; width: 0; height: .32cqh; border-radius: 99px; background: var(--narration-custom-accent, var(--accent)); transition: width .15s linear; }
     .narration[data-progress-visible="false"] .narration-inline-progress { display: none; }
-    .narration[data-display="dialogue"] { margin: 0 4% 3%; border: max(1px, .07cqw) solid var(--narration-custom-border, var(--theme-border)); border-radius: var(--narration-custom-radius, 1.1cqw); background: var(--narration-custom-background, linear-gradient(135deg, color-mix(in srgb, var(--theme-surface) 96%, #08111f), var(--theme-surface))); box-shadow: 0 .8cqw 2.3cqw #0007, inset 0 1px #ffffff16; }
-    .narration[data-display="commentary"] { max-height: 19cqh; padding-block: 1.35cqh; border-top-color: color-mix(in srgb, var(--accent) 45%, transparent); text-align: center; font-weight: 800; text-shadow: 0 .15cqw .7cqw #000; }
-    .narration[data-display="subtitle"] { max-height: 16cqh; margin: 0 9% 2.5%; border: 0; border-radius: var(--narration-custom-radius, .6cqw); background: var(--narration-custom-background, #000c); text-align: center; font-weight: 750; text-shadow: 0 .12cqw .45cqw #000; }
+    .narration[data-display="dialogue"] { margin: 0 4% 3%; border: max(1px, .07cqw) solid var(--narration-custom-border, var(--theme-border)); border-radius: var(--narration-custom-radius, 1.1cqw); background: var(--narration-custom-background, linear-gradient(135deg, color-mix(in srgb, var(--theme-surface) 96%, #08111f), var(--theme-surface))); }
+    .narration[data-display="commentary"] { max-height: 19cqh; padding-block: 1.35cqh; border-top-color: color-mix(in srgb, var(--accent) 45%, transparent); text-align: center; font-weight: 800; }
+    .narration[data-display="subtitle"] { max-height: 16cqh; margin: 0 9% 2.5%; border: 0; border-radius: var(--narration-custom-radius, .6cqw); background: var(--narration-custom-background, #000c); text-align: center; font-weight: 750; }
     .narration[data-display="minimal"] { justify-self: center; width: fit-content; max-width: 82%; max-height: 13cqh; margin-bottom: 2.5%; padding: .8cqh 1.4cqw; border: 0; border-radius: var(--narration-custom-radius, 99px); background: var(--narration-custom-background, #000a); text-align: center; }
     .narration[data-display="inline"] { max-height: 25cqh; padding-block: 1.1cqh; border-top-color: var(--narration-custom-border, #cbd5e1); background: var(--narration-custom-background, #f8fafcee); color: var(--narration-custom-foreground, #172033); font-size: calc(1.1cqw * var(--aspect-font-scale) * var(--template-font-scale) * var(--narration-text-scale) * var(--fit-scale)); }
     .narration[data-display="inline"] .narration-track { display: grid; gap: .32em; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }

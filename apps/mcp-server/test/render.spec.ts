@@ -215,7 +215,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@120");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@121");
     expect(html).toContain("type: 'ultimate-freestyle:preview-applied'");
     expect(html).toContain("[data-flow-content] .reveal-block");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");

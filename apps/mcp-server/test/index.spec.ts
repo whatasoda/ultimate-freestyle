@@ -124,7 +124,7 @@ describe("MCP Worker", () => {
       ok: true,
       service: "ultimate-freestyle-mcp",
       version: "0.16.0",
-      renderer_version: "uf-renderer@120",
+      renderer_version: "uf-renderer@121",
       mode: "active",
       eligibility: {
         broadcaster_id: "67879379",
