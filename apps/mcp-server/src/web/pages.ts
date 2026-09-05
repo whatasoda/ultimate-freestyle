@@ -67,6 +67,20 @@ const ANIMATION_LABELS = {
   blur: "ぼかし解除"
 } as const;
 
+// Web UIから選べるのはこの4つ。動きの質が重なるもの（左右のスライド、ポップとズーム、
+// ワイプ、ぼかし）はrendererとschemaに残し、AIから指定できる状態を保つ。発表中に見るのは
+// 「出るか、出ないか」と「どの向きに出るか」であり、種類を並べても選ぶ根拠が増えない。
+const ANIMATION_PICKS = ["none", "fade", "rise", "zoom"] as const;
+
+// 現在の値が候補外なら、それを先頭へ足して選択状態を保てるようにする。
+function animationChoices(current: string): Array<[string, string]> {
+  const picks: Array<[string, string]> = ANIMATION_PICKS.map((value) => [value, ANIMATION_LABELS[value]]);
+  return current !== "" && !ANIMATION_PICKS.includes(current as (typeof ANIMATION_PICKS)[number]) &&
+    current in ANIMATION_LABELS
+    ? [[current, ANIMATION_LABELS[current as keyof typeof ANIMATION_LABELS]], ...picks]
+    : picks;
+}
+
 const VISUAL_LABELS = {
   studio: "スタジオ",
   paper: "紙面",
@@ -2529,7 +2543,7 @@ export function slideWorkspacePage(options: {
       appearancePreviewFor(template.id)
     ])
   ]);
-  const animationOptions = Object.entries(ANIMATION_LABELS)
+  const animationOptions = animationChoices(slide.enter_animation ?? "")
     .map(
       ([value, label]) => `<option value="${value}"${slide.enter_animation === value ? " selected" : ""}>${escapeHtml(label)}</option>`
     )
@@ -2591,16 +2605,33 @@ export function slideWorkspacePage(options: {
       <p class="quality-status" data-role-contrast-status data-level="${roleMainContrast !== null && roleSidebarContrast !== null && roleMainContrast >= 4.5 && roleSidebarContrast >= 4.5 ? "ok" : "warning"}">この役割の本文 ${roleMainContrast?.toFixed(1)}:1 · 補足 ${roleSidebarContrast?.toFixed(1)}:1</p>
     </div>
   </fieldset>`;
-  const coverLayoutPicker = `<div class="cover-picker" role="group" aria-label="表紙レイアウトを選ぶ">${[["center", "中央"], ["split", "左右分割"], ["poster", "ポスター"], ["minimal", "余白重視"], ["statement", "一言強調"], ["band", "中央帯"], ["corner", "左下"], ["frame", "額縁"]].map(([value, label]) => `<button class="cover-pick" type="button" data-cover-pick="${value}" aria-pressed="${String((slide.cover_layout ?? "center") === value)}"><span class="cover-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
+  // 表紙は研究の顔なので選べる形を残すが、8つは違いを見分けながら選ぶ数ではない。
+  // 残りはschemaとrendererに残し、AIから指定できる。現在の値が候補外なら先頭へ足す。
+  const COVER_LAYOUT_LABELS: Record<string, string> = {
+    center: "中央", split: "左右分割", poster: "ポスター", minimal: "余白重視",
+    statement: "一言強調", band: "中央帯", corner: "左下", frame: "額縁"
+  };
+  const COVER_LAYOUT_PICKS = ["center", "split", "poster", "statement"];
+  const coverLayoutChoices = (current: string): Array<[string, string]> => {
+    const picks = COVER_LAYOUT_PICKS.map((value) => [value, COVER_LAYOUT_LABELS[value]] as [string, string]);
+    return COVER_LAYOUT_PICKS.includes(current) || !(current in COVER_LAYOUT_LABELS)
+      ? picks
+      : [[current, COVER_LAYOUT_LABELS[current]] as [string, string], ...picks];
+  };
+  const coverLayoutPicker = `<div class="cover-picker" role="group" aria-label="表紙レイアウトを選ぶ">${coverLayoutChoices(slide.cover_layout ?? "center").map(([value, label]) => `<button class="cover-pick" type="button" data-cover-pick="${value}" aria-pressed="${String((slide.cover_layout ?? "center") === value)}"><span class="cover-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const narrationDisplayPicker = `<div class="narration-picker" role="group" aria-label="読み上げ文の表示形式を選ぶ">${Object.entries(NARRATION_DISPLAY_LABELS).map(([value, label]) => `<button class="narration-display-pick" type="button" data-narration-display-pick="${value}" aria-pressed="${String(narrationDisplay === value)}"><span class="narration-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const regionLayoutPicker = activeTemplate === undefined ? "" : `<div class="region-picker" role="group" aria-label="本文と補足の領域配置を選ぶ">${[["single", "単一"], ["sidebar-right", "右補足"], ["sidebar-left", "左補足"], ["lower-third", "下段補足"], ["split", "左右均等"], ["top-band", "上段補足"], ["focus", "中央集中"]].map(([value, label]) => `<button class="region-pick" type="button" data-region-pick="${value}" aria-pressed="${String(activeTemplate.region_layout === value)}"><span class="region-wire" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
   const animationPicker = (selected: string, inherit: boolean) => {
     const icons: Record<string, string> = { none: "—", fade: "◌", rise: "↑", zoom: "⊕", wipe: "▰", "slide-left": "←", "slide-right": "→", pop: "✦", blur: "◎" };
-    const entries = inherit ? [["", "テンプレートを継承"] as const, ...Object.entries(ANIMATION_LABELS)] : Object.entries(ANIMATION_LABELS);
+    const entries = inherit
+      ? [["", "テンプレートを継承"] as [string, string], ...animationChoices(selected)]
+      : animationChoices(selected);
     return `<div class="animation-picker" role="group" aria-label="表示アニメーションを選ぶ">${entries.map(([value, label]) => `<button class="animation-pick" type="button" data-animation-pick="${value}" data-animation-target="enter_animation" aria-pressed="${String(selected === value)}"><span class="animation-symbol" aria-hidden="true">${icons[value] ?? "↗"}</span><span>${label}</span></button>`).join("")}</div><button class="animation-replay" type="button" data-animation-replay="enter_animation">▶ 動きをもう一度見る</button>`;
   };
   const tonePicker = `<div class="tone-picker" role="group" aria-label="スライドの色調を選ぶ">${Object.entries(TONE_LABELS).map(([value, label]) => `<button class="tone-pick" type="button" data-tone-pick="${value}" aria-pressed="${String(slide.tone === value)}"><span class="tone-swatch" aria-hidden="true"></span><span>${label}</span></button>`).join("")}</div>`;
-  const templateCreator = `<details class="component-detail"${activeTemplate === undefined ? " open" : ""}><summary>研究に合わせたデザインを作る</summary><form class="editor" data-template-create data-versioned-form data-method="POST" action="${projectPath}/templates" data-version="${options.project.version}" data-csrf="${escapeHtml(options.csrfToken)}"><div class="editor-grid"><label>デザイン名<input name="name" maxlength="80" required value="自分のスタイル"></label><label>ID<input name="template_id" pattern="[a-z0-9][a-z0-9-]{0,63}" required value="style-${options.project.version}"></label></div><label>どんな見た目にしたいか<textarea name="design_notes" maxlength="1000" placeholder="例: 植物観察の手帳らしさ。緑は落ち着いた色にして、写真を大きく見せる。派手なネオン表現は避ける。"></textarea></label><div class="editor-grid"><label>既存案から引き継ぐ（任意）<select name="source_template_id"><option value="">安全な出発点から作る</option>${(deck.templates ?? []).map((template) => `<option value="${escapeHtml(template.id)}">${escapeHtml(template.name)}${deck.default_template_id === template.id ? " · 発表全体の既定" : ""}</option>`).join("")}</select></label><label>出発点の見た目<select name="visual_preset">${Object.entries(VISUAL_LABELS).map(([value, label]) => `<option value="${value}">${label}</option>`).join("")}</select></label></div><p class="inherit-note">出発点は読みやすい色・文字・余白をまとめて用意するだけです。作成後にモチーフ、見出し、画像、配色を独立して変えられます。既存案を選ぶと、その設定を複製します。</p><label class="check-label"><input type="checkbox" name="make_default" checked>発表全体の既定デザインにする</label><div class="actions"><button type="submit">デザインを作って調整する</button><span class="version" data-version-label>v${options.project.version}</span></div><p class="feedback" data-form-feedback aria-live="polite"></p></form></details>`;
+  // 研究固有のデザインを作る操作は、名前・ID・方針・出発点・引き継ぎ元を一度に決める設計判断
+  // であって、見た結果を直す仕上げではない。作成と調整はAIへ渡し、ここでは既存の適用だけ扱う。
+  const templateCreator = `<p class="inherit-note">研究に合わせたデザインを新しく作るときは、接続中のAIへ頼みます。AIは現在の発表と実効デザインを読み、配色だけでなくfont・領域・部品表現・動きの違う案を作れます。ここでは作られたデザインを選んで適用します。</p>`;
   const templateEditor = activeTemplate
       ? `<form class="editor" data-template-editor data-versioned-form action="${projectPath}/templates/${escapeHtml(activeTemplate.id)}" data-version="${options.project.version}" data-slide-id="${escapeHtml(slide.id)}" data-template-id="${escapeHtml(activeTemplate.id)}" data-csrf="${escapeHtml(options.csrfToken)}">
         <p class="inherit-note" data-template-impact>保存すると現在${directTemplateSlides + inheritedTemplateSlides}枚へ反映されます（直接指定 ${directTemplateSlides}枚・既定を継承 ${inheritedTemplateSlides}枚）。</p>

@@ -486,8 +486,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=196"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=196"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=197"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=197"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -817,7 +817,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=196"'
+      'href="/assets/dashboard.css?v=197"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -897,9 +897,6 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-visual-pick="terminal"');
     expect(workspaceHtml).toContain("強調見出し");
     expect(workspaceHtml).toContain("data-template-editor");
-    expect(workspaceHtml).toContain("研究に合わせたデザインを作る");
-    expect(workspaceHtml).toContain("どんな見た目にしたいか");
-    expect(workspaceHtml).toContain("デザインを作って調整する");
     expect(workspaceHtml).toContain('name="design_notes"');
     expect(workspaceHtml).toContain("このデザインの方針");
     expect(workspaceHtml).toContain('data-design-field="motif"');
@@ -928,7 +925,6 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('name="motif_opacity"');
     expect(workspaceHtml).toContain('name="motif_scale"');
     expect(workspaceHtml).toContain("data-template-delete");
-    expect(workspaceHtml).toContain('name="make_default"');
     expect(workspaceHtml).toContain('data-visual-pick="neon"');
     expect(workspaceHtml).toContain("配色プリセットを選ぶ");
     expect(workspaceHtml).toContain("data-visual-palette=");
@@ -938,20 +934,17 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('data-font-pick="handwritten"');
     expect(workspaceHtml).toContain('data-font-pick="condensed"');
     expect(workspaceHtml).toContain("本文と見出しのフォントをまとめて選ぶ");
-    expect(workspaceHtml).toContain('data-animation-pick="wipe"');
+    expect(workspaceHtml).toContain('data-animation-pick="fade"');
+    expect(workspaceHtml).not.toContain('data-animation-pick="wipe"');
     expect(workspaceHtml).toContain("動きをもう一度見る");
     expect(workspaceHtml).toContain('data-tone-pick="signal"');
     expect(workspaceHtml).toContain('data-cover-pick="statement"');
-    expect(workspaceHtml).toContain('data-cover-pick="band"');
-    expect(workspaceHtml).toContain('data-cover-pick="corner"');
-    expect(workspaceHtml).toContain('data-cover-pick="frame"');
+    expect(workspaceHtml).not.toContain('data-cover-pick="band"');
     expect(workspaceHtml).toContain("表紙レイアウトを選ぶ");
     expect(workspaceHtml).toContain('data-narration-display-pick="inline"');
     expect(workspaceHtml).toContain("読み上げ文の表示形式を選ぶ");
     expect(workspaceHtml).toContain('data-region-pick="sidebar-right"');
     expect(workspaceHtml).toContain("本文と補足の領域配置を選ぶ");
-    expect(workspaceHtml).toContain("data-template-create");
-    expect(workspaceHtml).toContain("研究に合わせたデザインを作る");
     expect(workspaceHtml).toContain("data-narration-settings-editor");
     expect(workspaceHtml).toContain("data-segment-editor");
     expect(workspaceHtml).toContain("data-voice-cue");
@@ -1020,7 +1013,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=196"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=197"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1029,7 +1022,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=196"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=197"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1041,7 +1034,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=196", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=197", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1052,7 +1045,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=196", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=197", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
