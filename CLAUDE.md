@@ -4,16 +4,11 @@
 
 まず `AGENTS.md` を読む。リポジトリ共通の方針、移行状態、MCP実装ルールはそちらを正本とし、このファイルには重複させない。ここにはClaudeで作業するときの読み順、面ごとの担当、skillの選び方だけを置く。
 
-## 2つの面
+## 対象
 
-このリポジトリには性質の違う2つのアプリがある。どちらを触るかを最初に決める。
+アプリは1つで、`apps/mcp-server/` にRemote MCP・制御画面・発表rendererが同居する。研究データはD1、素材はR2に置く。共有schemaは `packages/research-schema/`。
 
-| 面 | 場所 | 状態 |
-|---|---|---|
-| Remote MCP・制御画面・発表renderer | `apps/mcp-server/` | 現行。研究データはD1、素材はR2 |
-| 旧発表アプリ（Next.js） | リポジトリ直下の `app/`、`components/`、`researches/` | 移行途中。共有schemaとrendererを抽出したら `apps/presentation/` へ移す |
-
-新しい機能は `apps/mcp-server/` 側へ作る。旧発表アプリは既存研究を壊さない範囲の修正に留める。
+旧発表アプリ（Next.js）は2026-09-05に削除した。移行途中のまま実データの研究を持たず（`researches/` はstarterのみ）、GitHub Pagesへの公開も既に終えていた一方、そのビルド依存（vinext系）の脆弱性が本番Workerのデプロイを止めていた。復元が要るときは `git show df5a31c^:app` のように履歴から取り出す。
 
 ## 正本と履歴
 
@@ -45,13 +40,10 @@
 
 package.jsonのscriptは必ず `bun run <script>` で実行する。`bun test`、`bun build`、`bun deploy` はbun組み込みコマンドであり、scriptを実行しない。
 
-全体・旧発表アプリ:
+全体:
 
-- 開発: `bun run dev`
-- ローカルVOICEVOX音声で開発: `bun run dev:voicevox`（先に生成が必要）
-- 検証: `bun run test`
+- 検証: `bun run test`（`test:mcp` と同じ）
 - lint: `bun run lint`
-- VOICEVOX MP3一括生成: `bun run voicevox:generate -- <slug>`（ENGINEとffmpegが必要）
 
 `apps/mcp-server/`:
 
@@ -68,24 +60,9 @@ package.jsonのscriptは必ず `bun run <script>` で実行する。`bun test`�
 
 サーバへ送る操作とスライド編集画面の中央プレビューiframeは動かない。それらの確認には `bun run dev:mcp` と実ログインが要る。
 
-## 旧発表アプリを触るとき
-
-`researches/<slug>/deck.tsx` を編集する場合だけ適用する。現行の制御画面から作る研究データには当てはまらない。
-
-- 研究固有の内容は `researches/<slug>/`、素材は `public/researches/<slug>/` に置く。研究を追加したら `researches/registry.ts` に登録する。
-- 共通の発表操作、タイマー、進捗、読み上げは `components/presentation/` に置く。
-- `<Reveal at={n}>` の最大値、`revealSteps`、`narration.segments[].at` を一致させる。
-- 読み上げ原稿をスライド本文へコピーしない。表示と音声は必ず同じ `narration.segments[].text` を参照する。
-- `durationSeconds` は実際に読み上げて見積もる。発表時間は20分以内に収め、合計を必ず確認する。
-- 発表内容は16:9の `.stage` 内に限定し、タイマー・進捗・音声・操作ボタンは枠外へ置く。スライド内の寸法にはコンテナ単位（`cqw`、`cqh`）を使い、`vw`・`vh` に依存させない。
-- レイアウトは `cinematic`、`biim`、`minimal` の3種類を維持する。研究データやスライド部品をレイアウト固有に分岐させず、`data-layout` 配下の共通CSSで表現する。
-- 発表物間のナビゲーションは追加しない。各研究は `/present/<slug>` から直接開く。
-- 本番操作を妨げるフォーム、モーダル、通常のサイトヘッダーを発表画面へ追加しない。
-- ローカルVOICEVOX生成ファイルは `public/.voicevox-preview/` に置かれ、コミットしない。生成MP3を `public/researches/<slug>/audio/` へコミットせず、Git LFSも使わない。
-
 ## 共通の制約
 
-- 公開素材のURLへドメイン名を直接埋め込まない。`/researches/<slug>/...` の同一host相対URLを使う。
+- 公開素材のURLへドメイン名を直接埋め込まない。同一host相対URLを使う。
 - 新しい依存関係は、CSSと既存コードでは実現できない場合にだけ追加する。
 - `prefers-reduced-motion` を壊さない。
 - 音声なしでも研究内容が完全に伝わる状態を保つ。

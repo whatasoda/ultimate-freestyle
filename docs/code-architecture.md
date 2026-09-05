@@ -70,8 +70,7 @@ Cloudflare Workers Vitest integrationはV8 coverageに対応していないた�
 2. schema、transport、service、repositoryのどの境界かを決める。
 3. 移動と振る舞い変更を同じcommitへ混ぜない。
 4. `bun run test:mcp:coverage`で下限と未検証行を確認する。
-5. `bun run test`で旧発表アプリを含む全体を確認する。
-6. renderer、dashboard asset、MCP serviceのversionは外部artifactが変わる場合だけ上げる。
+5. renderer、dashboard asset、MCP serviceのversionは外部artifactが変わる場合だけ上げる。
 
 ## 次に進める整理
 
