@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "200";
+export const DASHBOARD_ASSET_VERSION = "201";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -4284,15 +4284,27 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   if (reviewPage instanceof HTMLElement) {
     const navigation = performance.getEntriesByType("navigation")[0];
     const reviewScrollKey = "ultimate-freestyle:review-scroll:" + (reviewPage.dataset.projectId || "");
-    let savedReviewScroll = null;
+    const reviewFilmstrip = reviewPage.querySelector(".review-filmstrip");
+    const reviewFilmstripList = reviewPage.querySelector(".review-filmstrip-list");
+    let savedReviewPosition = null;
     try {
       const saved = sessionStorage.getItem(reviewScrollKey);
       sessionStorage.removeItem(reviewScrollKey);
       const parsed = saved === null ? null : JSON.parse(saved);
-      if (parsed && Number.isFinite(parsed.top) && parsed.top >= 0) savedReviewScroll = parsed.top;
+      if (parsed && Number.isFinite(parsed.top) && parsed.top >= 0) {
+        savedReviewPosition = {
+          top: parsed.top,
+          filmstripTop: Number.isFinite(parsed.filmstripTop) && parsed.filmstripTop >= 0 ? parsed.filmstripTop : 0,
+          filmstripLeft: Number.isFinite(parsed.filmstripLeft) && parsed.filmstripLeft >= 0 ? parsed.filmstripLeft : 0
+        };
+      }
     } catch {}
-    if (savedReviewScroll !== null) {
-      requestAnimationFrame(() => scrollTo({ top: savedReviewScroll, behavior: "auto" }));
+    if (savedReviewPosition !== null) {
+      requestAnimationFrame(() => {
+        if (reviewFilmstrip instanceof HTMLElement) reviewFilmstrip.scrollTop = savedReviewPosition.filmstripTop;
+        if (reviewFilmstripList instanceof HTMLElement) reviewFilmstripList.scrollLeft = savedReviewPosition.filmstripLeft;
+        scrollTo({ top: savedReviewPosition.top, behavior: "auto" });
+      });
     } else if (!location.hash && navigation instanceof PerformanceNavigationTiming && navigation.type === "navigate") {
       requestAnimationFrame(() => scrollTo({ top: 0, behavior: "auto" }));
     }
@@ -4303,7 +4315,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         const destination = new URL(link.href, location.href);
         if (destination.origin !== location.origin || destination.pathname !== location.pathname) return;
         try {
-          sessionStorage.setItem(reviewScrollKey, JSON.stringify({ top: scrollY }));
+          sessionStorage.setItem(reviewScrollKey, JSON.stringify({
+            top: scrollY,
+            filmstripTop: reviewFilmstrip instanceof HTMLElement ? reviewFilmstrip.scrollTop : 0,
+            filmstripLeft: reviewFilmstripList instanceof HTMLElement ? reviewFilmstripList.scrollLeft : 0
+          }));
         } catch {}
       });
     }
