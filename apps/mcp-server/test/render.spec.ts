@@ -215,7 +215,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@121");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@122");
     expect(html).toContain("type: 'ultimate-freestyle:preview-applied'");
     expect(html).toContain("[data-flow-content] .reveal-block");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");
@@ -844,6 +844,7 @@ describe("presentation artifact renderer", () => {
     });
     expect(html).toContain('data-composition="scene"');
     expect(html).toContain('.slide[data-composition="flow"].tone-light');
+    expect(html).toContain('.slide[data-user-template="true"][data-composition="flow"]');
     expect(html).toContain('[data-layout="minimal"] .slide[data-user-template="false"][data-composition="flow"]');
     expect(html).not.toContain('[data-layout="minimal"] .slide { background: #fff;');
     expect(html).toContain('--theme-surface: #05080dcc');

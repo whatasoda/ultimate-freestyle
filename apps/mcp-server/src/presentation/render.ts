@@ -6,7 +6,7 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@121";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@122";
 
 function escapeHtml(value: string): string {
   return value
@@ -1011,6 +1011,7 @@ export function renderPresentationHtml(
     .slide[data-composition="flow"].tone-light { background: #f6f1e8; color: #162033; }
     .slide[data-composition="flow"].tone-quiet { background: #e9eef5; color: #162033; }
     .slide[data-composition="flow"].tone-signal { background: var(--accent); color: #10131a; }
+    .slide[data-user-template="true"][data-composition="flow"] { background: var(--theme-background); color: var(--theme-foreground); }
     [data-layout="minimal"] .stage { background: white; }
     [data-layout="minimal"] .slide[data-user-template="false"][data-composition="flow"] { background: var(--theme-background); color: var(--theme-foreground); }
     [data-layout="minimal"] .slide[data-user-template="false"] .slide-sidebar { background: var(--theme-surface); color: var(--theme-foreground); border-color: var(--theme-border); }
