@@ -486,8 +486,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=201"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=201"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=202"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=202"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -840,7 +840,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=201"'
+      'href="/assets/dashboard.css?v=202"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -942,6 +942,8 @@ describe("Web dashboard", () => {
     expect(workspaceHtml).toContain('name="role_style_body_font"');
     expect(workspaceHtml).toContain('name="role_style_density"');
     expect(workspaceHtml).toContain('name="role_style_spacing_scale"');
+    expect(workspaceHtml).toContain('name="role_style_top_spacing_scale"');
+    expect(workspaceHtml).toContain('name="top_spacing_scale"');
     expect(workspaceHtml).toContain('name="role_style_motion_style"');
     expect(workspaceHtml).not.toContain("AIと研究固有デザインを作る");
     expect(workspaceHtml).not.toContain("3案を相談する文をコピー");
@@ -1036,7 +1038,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=201"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=202"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1045,7 +1047,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=201"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=202"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1057,7 +1059,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=201", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=202", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1068,7 +1070,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=201", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=202", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1978,6 +1980,7 @@ describe("Web dashboard", () => {
             accent: "#62d6ff",
             corner_radius_px: 16,
             spacing_scale: 1.05,
+            top_spacing_scale: 0.5,
             font_scale: 0.95,
             enter_animation: "slide-left",
             reveal_animation: "pop",
@@ -2000,6 +2003,7 @@ describe("Web dashboard", () => {
                 body_font: "monospace",
                 density: "compact",
                 spacing_scale: 0.85,
+                top_spacing_scale: 0.45,
                 motion_style: "dramatic",
                 motif: "waves",
                 heading_treatment: "boxed",
@@ -2019,6 +2023,7 @@ describe("Web dashboard", () => {
       template: {
         name: "読みやすい実験ノート",
         enter_animation: "slide-left",
+        top_spacing_scale: 0.5,
         panel_treatment: "raised",
         role_styles: {
           result: {
@@ -2027,6 +2032,7 @@ describe("Web dashboard", () => {
             body_font: "monospace",
             density: "compact",
             spacing_scale: 0.85,
+            top_spacing_scale: 0.45,
             motion_style: "dramatic",
             image_treatment: "monochrome",
             panel_treatment: "glass"
@@ -2260,6 +2266,7 @@ describe("Web dashboard", () => {
           body_font: "monospace",
           density: "compact",
           spacing_scale: 0.85,
+          top_spacing_scale: 0.45,
           motion_style: "dramatic",
           image_treatment: "monochrome",
           panel_treatment: "glass"

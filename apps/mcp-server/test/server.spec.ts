@@ -195,7 +195,7 @@ describe("MCP contract", () => {
         ok: true,
         service: "ultimate-freestyle-mcp",
         version: "0.16.0",
-        renderer_version: "uf-renderer@122",
+        renderer_version: "uf-renderer@123",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -1949,6 +1949,7 @@ describe("MCP contract", () => {
             { field: "body_font", value: "monospace" },
             { field: "density", value: "compact" },
             { field: "spacing_scale", value: 0.85 },
+            { field: "top_spacing_scale", value: 0.5 },
             { field: "motion_style", value: "dramatic" },
             { field: "image_treatment", value: "monochrome" }
           ]
@@ -1972,6 +1973,7 @@ describe("MCP contract", () => {
                   body_font: "monospace",
                   density: "compact",
                   spacing_scale: 0.85,
+                  top_spacing_scale: 0.5,
                   motion_style: "dramatic",
                   image_treatment: "monochrome"
                 }
@@ -1986,6 +1988,7 @@ describe("MCP contract", () => {
                 "body_font",
                 "density",
                 "spacing_scale",
+                "top_spacing_scale",
                 "motion_style",
                 "image_treatment",
                 "panel_treatment"

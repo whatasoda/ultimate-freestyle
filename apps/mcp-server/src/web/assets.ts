@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "201";
+export const DASHBOARD_ASSET_VERSION = "202";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -733,7 +733,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     });
   }
   const roleStyleStringFields = ["region_layout", "background", "surface", "foreground", "muted", "accent", "accent_secondary", "border", "visual_preset", "body_font", "heading_font", "density", "motion_style", "enter_animation", "reveal_animation", "motif", "motif_color", "heading_treatment", "image_treatment", "panel_treatment"];
-  const roleStyleNumberFields = ["sidebar_width_percent", "corner_radius_px", "spacing_scale", "font_scale", "body_weight", "heading_weight", "line_height", "letter_spacing_em", "motif_opacity", "motif_scale"];
+  const roleStyleNumberFields = ["sidebar_width_percent", "corner_radius_px", "spacing_scale", "top_spacing_scale", "font_scale", "body_weight", "heading_weight", "line_height", "letter_spacing_em", "motif_opacity", "motif_scale"];
   const templateRoleStyles = (form, data, roleOverride) => {
     const editor = form.querySelector("[data-role-style-editor]");
     if (!(editor instanceof HTMLElement)) return {};
@@ -804,6 +804,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         border: String(data.get("border") || "#334155"),
         corner_radius_px: Number(data.get("corner_radius_px")),
         spacing_scale: Number(data.get("spacing_scale")),
+        top_spacing_scale: Number(data.get("top_spacing_scale")),
         font_scale: Number(data.get("font_scale")),
         enter_animation: String(data.get("enter_animation") || "fade"),
         reveal_animation: String(data.get("reveal_animation") || "rise"),
@@ -1100,6 +1101,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       border: String(data.get("border") || ""),
       corner_radius_px: numberValue(data, "corner_radius_px"),
       spacing_scale: numberValue(data, "spacing_scale"),
+      top_spacing_scale: numberValue(data, "top_spacing_scale"),
       font_scale: numberValue(data, "font_scale"),
       enter_animation: String(data.get("enter_animation") || ""),
       reveal_animation: String(data.get("reveal_animation") || ""),

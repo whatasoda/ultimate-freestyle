@@ -77,6 +77,7 @@ describe("presentation artifact renderer", () => {
               border: "#334155",
               corner_radius_px: 12,
               spacing_scale: 1,
+              top_spacing_scale: 0.5,
               font_scale: 1,
               enter_animation: "wipe",
               reveal_animation: "zoom",
@@ -105,6 +106,7 @@ describe("presentation artifact renderer", () => {
                   accent: "#ff7f50",
                   corner_radius_px: 4,
                   spacing_scale: 0.8,
+                  top_spacing_scale: 0.4,
                   font_scale: 1.1,
                   enter_animation: "pop",
                   reveal_animation: "wipe",
@@ -215,7 +217,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@122");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@123");
     expect(html).toContain("type: 'ultimate-freestyle:preview-applied'");
     expect(html).toContain("[data-flow-content] .reveal-block");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");
@@ -230,7 +232,10 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('--template-accent:#ff7f50');
     expect(html).toContain('--template-radius:0.25cqw');
     expect(html).toContain('--template-spacing:0.8');
+    expect(html).toContain('--template-top-spacing:0.4');
     expect(html).toContain('--template-font-scale:1.1');
+    expect(html).toContain('calc(7% * var(--template-spacing) * var(--template-top-spacing))');
+    expect(html).toContain('calc(6% * var(--density-scale) * var(--template-top-spacing))');
     expect(html).toContain('--template-sidebar-width:38%');
     expect(html).toContain('.slide[data-slide-id="result"] { --template-background:#20152f');
     expect(html).toContain('.slide[data-slide-id="result"] .narration { --narration-text-scale:1.1');

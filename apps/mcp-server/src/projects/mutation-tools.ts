@@ -116,6 +116,8 @@ const templateMutableInput = {
   corner_radius_px:
     presentationTemplateSchema.shape.corner_radius_px.optional(),
   spacing_scale: presentationTemplateSchema.shape.spacing_scale.optional(),
+  top_spacing_scale:
+    presentationTemplateSchema.shape.top_spacing_scale.optional(),
   font_scale: presentationTemplateSchema.shape.font_scale.optional(),
   enter_animation:
     presentationTemplateSchema.shape.enter_animation.optional(),
@@ -152,6 +154,7 @@ const templateMutableFieldSchema = z.enum([
   "border",
   "corner_radius_px",
   "spacing_scale",
+  "top_spacing_scale",
   "font_scale",
   "enter_animation",
   "reveal_animation",
