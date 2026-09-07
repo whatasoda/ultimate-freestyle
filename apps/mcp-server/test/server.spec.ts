@@ -832,6 +832,7 @@ describe("MCP contract", () => {
           expected_version: 5,
           slide_id: "question",
           template_id: "mud-biim",
+          role: "result",
           body_edits: [
             {
               target: "content",
@@ -904,7 +905,7 @@ describe("MCP contract", () => {
           slides: [
             {
               id: "question",
-              role: "content",
+              role: "result",
               duration_seconds: 60,
               reveal_steps: 1,
               composition_mode: "flow",

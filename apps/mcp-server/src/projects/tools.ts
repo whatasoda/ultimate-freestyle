@@ -13,7 +13,8 @@ import {
 import type { ProjectSizeDetails } from "./repository";
 import {
   createEmptyProject,
-  projectSummarySchema
+  projectSummarySchema,
+  slideRoleSchema
 } from "./schema";
 
 const projectErrorCodeSchema = z.enum([
@@ -203,7 +204,7 @@ export function registerProjectTools(
                 title: z.string(),
                 position: z.number().int().nonnegative(),
                 template_id: z.string().nullable(),
-                role: z.enum(["content", "cover"]),
+                role: slideRoleSchema,
                 duration_seconds: z.number().int().positive(),
                 reveal_steps: z.number().int().nonnegative(),
                 composition_mode: z.enum(["flow", "canvas", "scene"]),
