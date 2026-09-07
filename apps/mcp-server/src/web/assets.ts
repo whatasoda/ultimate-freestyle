@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "199";
+export const DASHBOARD_ASSET_VERSION = "200";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -4283,8 +4283,29 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const reviewPage = document.querySelector("[data-review-page]");
   if (reviewPage instanceof HTMLElement) {
     const navigation = performance.getEntriesByType("navigation")[0];
-    if (!location.hash && navigation instanceof PerformanceNavigationTiming && navigation.type === "navigate") {
+    const reviewScrollKey = "ultimate-freestyle:review-scroll:" + (reviewPage.dataset.projectId || "");
+    let savedReviewScroll = null;
+    try {
+      const saved = sessionStorage.getItem(reviewScrollKey);
+      sessionStorage.removeItem(reviewScrollKey);
+      const parsed = saved === null ? null : JSON.parse(saved);
+      if (parsed && Number.isFinite(parsed.top) && parsed.top >= 0) savedReviewScroll = parsed.top;
+    } catch {}
+    if (savedReviewScroll !== null) {
+      requestAnimationFrame(() => scrollTo({ top: savedReviewScroll, behavior: "auto" }));
+    } else if (!location.hash && navigation instanceof PerformanceNavigationTiming && navigation.type === "navigate") {
       requestAnimationFrame(() => scrollTo({ top: 0, behavior: "auto" }));
+    }
+    for (const link of reviewPage.querySelectorAll('.review-filmstrip a[href]')) {
+      if (!(link instanceof HTMLAnchorElement)) continue;
+      link.addEventListener("click", (event) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const destination = new URL(link.href, location.href);
+        if (destination.origin !== location.origin || destination.pathname !== location.pathname) return;
+        try {
+          sessionStorage.setItem(reviewScrollKey, JSON.stringify({ top: scrollY }));
+        } catch {}
+      });
     }
     const composer = reviewPage.querySelector("[data-review-composer]");
     const selectionLabel = reviewPage.querySelector("[data-review-selection]");

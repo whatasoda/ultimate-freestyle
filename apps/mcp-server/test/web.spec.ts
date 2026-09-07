@@ -486,8 +486,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=199"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=199"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=200"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=200"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -840,7 +840,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=199"'
+      'href="/assets/dashboard.css?v=200"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1036,7 +1036,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=199"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=200"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1045,7 +1045,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=199"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=200"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1057,7 +1057,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=199", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=200", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1068,7 +1068,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=199", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=200", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);
@@ -1133,6 +1133,9 @@ describe("Web dashboard", () => {
     expect(dashboardStyleText).toContain(".skip-link:focus { translate: 0;");
     const dashboardScriptText = await dashboardScript.text();
     expect(() => new Function(dashboardScriptText)).not.toThrow();
+    expect(dashboardScriptText).toContain("ultimate-freestyle:review-scroll:");
+    expect(dashboardScriptText).toContain("sessionStorage.removeItem(reviewScrollKey)");
+    expect(dashboardScriptText).toContain(".review-filmstrip a[href]");
 
     const rejectedUpload = await requestProvider(
       provider,
