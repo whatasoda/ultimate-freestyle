@@ -116,3 +116,32 @@ ${lines.join("\n")}
 5. 各変更後に返るversionを次の expected_version に使い、最後に変更内容と未対応コメントを報告する。
 6. コメントの解決状態は自動変更しない。利用者がレビュー画面で確認して解決する。`;
 }
+
+export function buildAllOpenReviewRepairInstruction(
+  project: ProjectRecord,
+  comments: ReviewComment[]
+): string {
+  const openComments = comments.filter((comment) => comment.status === "open");
+  const countsBySlide = new Map<string, number>();
+  for (const comment of openComments) {
+    countsBySlide.set(comment.slide_id, (countsBySlide.get(comment.slide_id) ?? 0) + 1);
+  }
+  const slideSummary = [...countsBySlide]
+    .map(([slideId, count]) => `- ${slideId}: ${count}件`)
+    .join("\n");
+  return `research://projects/${project.project_id}/review-comments にある未解決コメントを、スライドをまたいですべて反映してください。
+
+対象研究: ${project.document.title}
+現在version: ${project.version}
+未解決コメント: ${openComments.length}件
+対象スライド:
+${slideSummary}
+
+進め方:
+1. review-comments resourceの索引を読み、案内された全page resourceを最後まで読む。
+2. 各コメントについて対象スライドresourceとアンカー状態を確認し、既存の小粒度MCP toolで該当項目だけを編集する。
+3. アンカーが stale のコメントは推測で編集せず、利用者へ確認する。moved は現在位置を再確認する。
+4. 複数スライドに共通する指摘は、一貫性を保ちながら対象に挙がった範囲へ反映する。コメントにない研究結果は変更しない。
+5. 各変更後に返るversionを次の expected_version に使い、最後に変更内容と未対応コメントを報告する。
+6. コメントの解決状態は自動変更しない。利用者がレビュー画面で確認して解決する。`;
+}

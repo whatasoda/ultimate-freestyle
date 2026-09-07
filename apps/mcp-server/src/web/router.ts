@@ -59,6 +59,7 @@ import {
 } from "../reviews/repository";
 import {
   addSlideReviewComment,
+  buildAllOpenReviewRepairInstruction,
   buildReviewRepairInstruction,
   ReviewServiceError
 } from "../reviews/service";
@@ -598,13 +599,26 @@ async function handleReviewInstruction(
   if (!read.ok) return read.response;
   const parsed = reviewInstructionRequestSchema.safeParse(read.value);
   if (!parsed.success) {
-    return jsonResponse({ ok: false, error: { code: "INVALID_COMMENT_SELECTION", message: "未解決コメントを1〜20件選んでください。" }, request_id: crypto.randomUUID() }, 422);
+    return jsonResponse({ ok: false, error: { code: "INVALID_COMMENT_SELECTION", message: "未解決コメントを1〜20件選ぶか、全件を指定してください。" }, request_id: crypto.randomUUID() }, 422);
   }
   const [project, comments] = await Promise.all([
     getProject(env.DB, session.userId, projectId),
     listReviewComments(env.DB, session.userId, projectId, { status: "open", limit: 200 })
   ]);
   if (project === null) return jsonResponse({ ok: false, error: { code: "PROJECT_NOT_FOUND", message: "研究が見つかりません。" }, request_id: crypto.randomUUID() }, 404);
+  if ("scope" in parsed.data) {
+    if (comments.length === 0) {
+      return jsonResponse({ ok: false, error: { code: "REVIEW_COMMENT_NOT_FOUND", message: "未解決コメントがありません。" }, request_id: crypto.randomUUID() }, 409);
+    }
+    return jsonResponse({
+      ok: true,
+      instruction: buildAllOpenReviewRepairInstruction(project, comments),
+      comment_count: comments.length,
+      project_version: project.version,
+      error: null,
+      request_id: crypto.randomUUID()
+    });
+  }
   const byId = new Map(comments.map((comment) => [comment.id, comment]));
   const selected = parsed.data.comment_ids.map((id) => byId.get(id)).filter((comment) => comment !== undefined);
   if (selected.length !== parsed.data.comment_ids.length) {

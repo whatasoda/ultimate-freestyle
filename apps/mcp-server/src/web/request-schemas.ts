@@ -18,9 +18,10 @@ import {
 import { scenePatternSchema } from "../projects/scene-patterns";
 import { voicevoxTuningStatusSchema } from "../voicevox/service";
 
-export const reviewInstructionRequestSchema = z.object({
-  comment_ids: z.array(z.string().uuid()).min(1).max(20)
-});
+export const reviewInstructionRequestSchema = z.union([
+  z.object({ comment_ids: z.array(z.string().uuid()).min(1).max(20) }).strict(),
+  z.object({ scope: z.literal("all_open") }).strict()
+]);
 
 export const projectFieldsRequestSchema = z
   .object({

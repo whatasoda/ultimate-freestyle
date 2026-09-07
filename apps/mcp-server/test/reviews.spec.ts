@@ -14,6 +14,7 @@ import {
 } from "../src/reviews/repository";
 import {
   addSlideReviewComment,
+  buildAllOpenReviewRepairInstruction,
   buildReviewRepairInstruction,
   reviewCommentWithAnchor
 } from "../src/reviews/service";
@@ -140,5 +141,10 @@ describe("slide review comments", () => {
     expect(instruction).toContain(`research://projects/${project.project_id}/review-comments`);
     expect(instruction).toContain("アンカー: moved");
     expect(instruction).toContain("コメントの解決状態は自動変更しない");
+
+    const allInstruction = buildAllOpenReviewRepairInstruction(movedProject, [comment]);
+    expect(allInstruction).toContain("スライドをまたいですべて反映");
+    expect(allInstruction).toContain("案内された全page resourceを最後まで読む");
+    expect(allInstruction).toContain("intro: 1件");
   });
 });

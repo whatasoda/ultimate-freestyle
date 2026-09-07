@@ -486,8 +486,8 @@ describe("Web dashboard", () => {
     );
     expect(detailHtml).toContain('name="confirmation" required pattern="DELETE"');
     expect(detailHtml).toContain("公開URLも直ちに無効になります");
-    expect(detailHtml).toContain('src="/assets/dashboard.js?v=198"');
-    expect(detailHtml).toContain('href="/assets/dashboard.css?v=198"');
+    expect(detailHtml).toContain('src="/assets/dashboard.js?v=199"');
+    expect(detailHtml).toContain('href="/assets/dashboard.css?v=199"');
     expect(detailHtml).toContain(
       '<a class="skip-link" href="#main-content">本文へ移動</a>'
     );
@@ -725,6 +725,7 @@ describe("Web dashboard", () => {
     expect(emptyReviewHtml).toContain("最初の読み上げ文");
     expect(emptyReviewHtml).toContain('data-kind="narration"');
     expect(emptyReviewHtml).toContain("AI修正依頼文");
+    expect(emptyReviewHtml).toContain("全0件から生成");
     expect(emptyReviewHtml).toContain('class="review-comments" aria-label="コメントとAI修正依頼文"');
     expect(emptyReviewHtml).not.toContain('<aside class="panel review-comments">');
     expect(emptyReviewHtml).toContain("これは実行コードではありません");
@@ -790,6 +791,28 @@ describe("Web dashboard", () => {
       comment_count: 1,
       instruction: expect.stringContaining("何を観察した画像なのか具体化してください。")
     });
+    const allReviewInstructionResponse = await requestProvider(
+      provider,
+      new Request(
+        "https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/review-instruction",
+        {
+          method: "POST",
+          headers: {
+            cookie: browserCookies,
+            "content-type": "application/json",
+            "x-csrf-token": cookieCsrfToken
+          },
+          body: JSON.stringify({ scope: "all_open" })
+        }
+      ),
+      authEnv
+    );
+    expect(allReviewInstructionResponse.status).toBe(200);
+    expect(await allReviewInstructionResponse.json()).toMatchObject({
+      ok: true,
+      comment_count: 1,
+      instruction: expect.stringContaining("スライドをまたいですべて反映")
+    });
     const reviewCommentActionUrl =
       `https://saijiyu-kenkyu.2764.moe/api/projects/10000000-0000-4000-8000-000000000001/review-comments/${createdReviewComment.comment.id}`;
     const resolveReviewCommentResponse = await requestProvider(
@@ -817,7 +840,7 @@ describe("Web dashboard", () => {
     );
     expect(deleteReviewCommentResponse.status).toBe(200);
     expect(workspaceHtml).toContain(
-      'href="/assets/dashboard.css?v=198"'
+      'href="/assets/dashboard.css?v=199"'
     );
     expect(workspaceHtml).toContain("発表全体の既定:");
     expect(workspaceHtml).toContain("スライド設定として上書きします");
@@ -1013,7 +1036,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardScript = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=198"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=199"),
       authEnv
     );
     expect(versionedDashboardScript.status).toBe(200);
@@ -1022,7 +1045,7 @@ describe("Web dashboard", () => {
     );
     const versionedDashboardStyle = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=198"),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=199"),
       authEnv
     );
     expect(versionedDashboardStyle.status).toBe(200);
@@ -1034,7 +1057,7 @@ describe("Web dashboard", () => {
     );
     const dashboardScriptHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=198", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.js?v=199", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardScriptHead.status).toBe(200);
@@ -1045,7 +1068,7 @@ describe("Web dashboard", () => {
     expect(await dashboardScriptHead.text()).toBe("");
     const dashboardStyleHead = await requestProvider(
       provider,
-      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=198", { method: "HEAD" }),
+      new Request("https://saijiyu-kenkyu.2764.moe/assets/dashboard.css?v=199", { method: "HEAD" }),
       authEnv
     );
     expect(dashboardStyleHead.status).toBe(200);

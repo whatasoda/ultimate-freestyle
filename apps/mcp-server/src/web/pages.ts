@@ -28,7 +28,7 @@ import { recommendedFlowBodyLimit, resolveSlideTypography } from "../projects/ty
 import type { RenderedQualityReport } from "../projects/quality-reports";
 import { flattenSlideReviewSources } from "../reviews/flatten";
 import {
-  buildReviewRepairInstruction,
+  buildAllOpenReviewRepairInstruction,
   reviewCommentWithAnchor
 } from "../reviews/service";
 import type { ReviewComment } from "../reviews/repository";
@@ -2212,6 +2212,7 @@ export function slideReviewPage(options: {
   const projectId = options.project.project_id;
   const currentComments = options.comments.filter((comment) => comment.slide_id === slide.id);
   const currentOpenComments = currentComments.filter((comment) => comment.status === "open");
+  const allOpenComments = options.comments.filter((comment) => comment.status === "open");
   const commentsBySlide = new Map<string, number>();
   for (const comment of options.comments) {
     if (comment.status === "open") commentsBySlide.set(comment.slide_id, (commentsBySlide.get(comment.slide_id) ?? 0) + 1);
@@ -2242,9 +2243,9 @@ export function slideReviewPage(options: {
       const statusLabel = comment.status === "open" ? "解決済みにする" : "未解決へ戻す";
       return `<article class="review-card" id="review-comment-${escapeHtml(comment.id)}" data-review-comment data-comment-id="${escapeHtml(comment.id)}" data-status="${escapeHtml(comment.status)}"><div class="review-card-head"><label><input type="checkbox" data-review-script-comment value="${escapeHtml(comment.id)}"${checked}${comment.status === "resolved" ? " disabled" : ""}><span>${escapeHtml(comment.target_label)}<small class="filmstrip-meta">v${comment.project_version}で追加</small></span></label><span class="anchor-state" data-state="${escapeHtml(anchor.state)}">${anchorLabels[anchor.state]}</span></div>${quote}<p>${escapeHtml(comment.body)}</p><div class="review-card-actions"><button type="button" data-review-status="${statusAction}" data-action-url="/api/projects/${escapeHtml(projectId)}/review-comments/${escapeHtml(comment.id)}" data-csrf="${escapeHtml(options.csrfToken)}">${statusLabel}</button><button class="danger" type="button" data-review-delete data-action-url="/api/projects/${escapeHtml(projectId)}/review-comments/${escapeHtml(comment.id)}" data-csrf="${escapeHtml(options.csrfToken)}">削除</button></div></article>`;
     }).join("");
-  const initialInstruction = currentOpenComments.length === 0
+  const initialInstruction = allOpenComments.length === 0
     ? ""
-    : buildReviewRepairInstruction(options.project, currentOpenComments);
+    : buildAllOpenReviewRepairInstruction(options.project, allOpenComments);
   const aspect = (deck.aspect_ratio ?? "16:9") === "4:3" ? "4 / 3" : "16 / 9";
   return new Response(
     shell(
@@ -2261,7 +2262,7 @@ export function slideReviewPage(options: {
              <section class="review-comments" aria-label="コメントとAI修正依頼文">
              <form class="review-composer" data-review-composer><div><p class="eyebrow">New comment</p><h2>コメントを追加</h2></div><p class="review-selection" data-review-selection>スライド全体へのコメントです。中央の文字を選ぶと範囲を指定できます。</p><input type="hidden" name="target_key" value="slide:whole"><input type="hidden" name="range_start"><input type="hidden" name="range_end"><input type="hidden" name="selected_text"><label>指摘・修正してほしいこと<textarea name="body" maxlength="4000" required placeholder="例: 結論を先に示し、根拠との関係が一読で分かる表現にしてください。"></textarea></label><div class="actions"><button type="submit">コメントを追加</button><button type="button" data-review-whole>スライド全体に戻す</button></div><p class="feedback" data-review-feedback aria-live="polite"></p></form>
              <section class="panel"><div class="section-head"><h2>コメント</h2><span class="count">${currentComments.length}件</span></div><div data-review-comment-list>${commentCards}</div></section>
-             <section class="review-script"><div><h2>AI修正依頼文</h2><p class="review-select-hint">チェックした未解決コメントを最大20件まで、Codex・ChatGPT・Claudeへ安全に渡せる依頼文にします。これは実行コードではありません。</p></div><div class="actions"><button type="button" data-op="ask" data-review-script-generate${currentOpenComments.length === 0 ? " disabled" : ""}>選択から生成</button><button type="button" data-review-script-copy${currentOpenComments.length === 0 ? " disabled" : ""}>コピー</button></div><textarea readonly data-review-script-output placeholder="未解決コメントを追加すると、ここにAI修正依頼文が表示されます。">${escapeHtml(initialInstruction)}</textarea><p class="feedback" data-review-script-feedback aria-live="polite">${currentOpenComments.length > 0 ? `${Math.min(currentOpenComments.length, 20)}件を含む依頼文です。${currentOpenComments.length > 20 ? "残りはチェックを切り替えて別の依頼文にしてください。" : ""}` : "未解決コメントを追加すると生成できます。"}</p></section>
+             <section class="review-script"><div><h2>AI修正依頼文</h2><p class="review-select-hint">全スライドの未解決コメントをまとめるか、今のスライドでチェックした最大20件だけを、Codex・ChatGPT・Claudeへ安全に渡せる依頼文にします。これは実行コードではありません。</p></div><div class="actions"><button type="button" data-op="ask" data-review-script-all${allOpenComments.length === 0 ? " disabled" : ""}>全${allOpenComments.length}件から生成</button><button type="button" data-op="ask" data-review-script-generate${currentOpenComments.length === 0 ? " disabled" : ""}>選択から生成</button><button type="button" data-review-script-copy${allOpenComments.length === 0 ? " disabled" : ""}>コピー</button></div><textarea readonly data-review-script-output placeholder="未解決コメントを追加すると、ここにAI修正依頼文が表示されます。">${escapeHtml(initialInstruction)}</textarea><p class="feedback" data-review-script-feedback aria-live="polite">${allOpenComments.length > 0 ? `全${allOpenComments.length}件・${commentsBySlide.size}枚を対象にした依頼文です。` : "未解決コメントを追加すると生成できます。"}</p></section>
              </section>
            </div>
          </div>

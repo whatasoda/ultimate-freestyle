@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "198";
+export const DASHBOARD_ASSET_VERSION = "199";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -4570,9 +4570,38 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       });
     }
     const generateButton = reviewPage.querySelector("[data-review-script-generate]");
+    const generateAllButton = reviewPage.querySelector("[data-review-script-all]");
     const copyButton = reviewPage.querySelector("[data-review-script-copy]");
     const scriptOutput = reviewPage.querySelector("[data-review-script-output]");
     const scriptFeedback = reviewPage.querySelector("[data-review-script-feedback]");
+    const generateReviewInstruction = async (button, body) => {
+      setButtonBusy(button, true);
+      if (scriptFeedback instanceof HTMLElement) {
+        scriptFeedback.textContent = "修正依頼文を生成しています…";
+        scriptFeedback.classList.remove("warning", "success");
+      }
+      try {
+        const response = await fetch(reviewPage.dataset.scriptUrl || "", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-csrf-token": reviewPage.dataset.csrf || "" },
+          body: JSON.stringify(body)
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(apiErrorMessage(result, "修正依頼文を生成できませんでした。"));
+        scriptOutput.value = result.instruction;
+        if (scriptFeedback instanceof HTMLElement) {
+          scriptFeedback.textContent = result.comment_count + "件の未解決コメントから生成しました。";
+          scriptFeedback.classList.add("success");
+        }
+      } catch (error) {
+        if (scriptFeedback instanceof HTMLElement) {
+          scriptFeedback.textContent = caughtErrorMessage(error, "修正依頼文を生成できませんでした。");
+          scriptFeedback.classList.add("warning");
+        }
+      } finally {
+        setButtonBusy(button, false);
+      }
+    };
     if (generateButton instanceof HTMLButtonElement && scriptOutput instanceof HTMLTextAreaElement) {
       generateButton.addEventListener("click", async () => {
         const commentIds = [...reviewPage.querySelectorAll("[data-review-script-comment]:checked")]
@@ -4592,32 +4621,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
           }
           return;
         }
-        setButtonBusy(generateButton, true);
-        if (scriptFeedback instanceof HTMLElement) {
-          scriptFeedback.textContent = "修正依頼文を生成しています…";
-          scriptFeedback.classList.remove("warning", "success");
-        }
-        try {
-          const response = await fetch(reviewPage.dataset.scriptUrl || "", {
-            method: "POST",
-            headers: { "content-type": "application/json", "x-csrf-token": reviewPage.dataset.csrf || "" },
-            body: JSON.stringify({ comment_ids: commentIds })
-          });
-          const result = await response.json();
-          if (!response.ok) throw new Error(apiErrorMessage(result, "修正依頼文を生成できませんでした。"));
-          scriptOutput.value = result.instruction;
-          if (scriptFeedback instanceof HTMLElement) {
-            scriptFeedback.textContent = result.comment_count + "件の未解決コメントから生成しました。";
-            scriptFeedback.classList.add("success");
-          }
-        } catch (error) {
-          if (scriptFeedback instanceof HTMLElement) {
-            scriptFeedback.textContent = caughtErrorMessage(error, "修正依頼文を生成できませんでした。");
-            scriptFeedback.classList.add("warning");
-          }
-        } finally {
-          setButtonBusy(generateButton, false);
-        }
+        await generateReviewInstruction(generateButton, { comment_ids: commentIds });
+      });
+    }
+    if (generateAllButton instanceof HTMLButtonElement && scriptOutput instanceof HTMLTextAreaElement) {
+      generateAllButton.addEventListener("click", async () => {
+        await generateReviewInstruction(generateAllButton, { scope: "all_open" });
       });
     }
     if (copyButton instanceof HTMLButtonElement && scriptOutput instanceof HTMLTextAreaElement) {
