@@ -6,9 +6,9 @@ import type {
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
 import { applyPronunciations } from "../projects/pronunciation";
-import { renderMermaidFlowchart } from "./mermaid";
+import { renderMermaidDiagram } from "./mermaid";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@124";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@125";
 
 function escapeHtml(value: string): string {
   return value
@@ -61,7 +61,7 @@ function renderTextBlocks(markdown: string): string {
         source.push(lines[lineIndex] ?? "");
         lineIndex += 1;
       }
-      blocks.push(renderMermaidFlowchart(source.join("\n")));
+      blocks.push(renderMermaidDiagram(source.join("\n")));
       continue;
     }
     const nextLine = lines[lineIndex + 1]?.trim() ?? "";
@@ -901,10 +901,22 @@ export function renderPresentationHtml(
     .mermaid-diagram { width: 100%; min-height: 0; margin: .4em 0; break-inside: avoid; }
     .mermaid-diagram svg { display: block; width: 100%; height: auto; max-height: 48cqh; overflow: visible; }
     .mermaid-edge { stroke: var(--theme-muted); stroke-width: 4; }
+    .mermaid-edge-dashed, .mermaid-message-dashed { stroke-dasharray: 12 9; }
+    .mermaid-edge-thick { stroke-width: 7; }
     .mermaid-arrow { fill: var(--theme-muted); }
-    .mermaid-node :is(rect,polygon) { fill: color-mix(in srgb, var(--theme-surface) 82%, var(--accent)); stroke: var(--accent); stroke-width: 4; }
+    .mermaid-node :is(rect,polygon,ellipse,path), .mermaid-participant :is(rect,circle,path) { fill: color-mix(in srgb, var(--theme-surface) 82%, var(--accent)); stroke: var(--accent); stroke-width: 4; }
+    .mermaid-node .mermaid-node-detail { fill: none; stroke-width: 3; }
     .mermaid-node text { fill: var(--theme-foreground); font-family: var(--font-body); font-size: 22px; font-weight: 750; }
     .mermaid-edge-label { paint-order: stroke; fill: var(--theme-foreground); stroke: var(--theme-background); stroke-width: 9px; font-family: var(--font-body); font-size: 18px; }
+    .mermaid-cluster rect { fill: color-mix(in srgb, var(--theme-surface) 55%, transparent); stroke: var(--theme-border); stroke-width: 3; stroke-dasharray: 9 7; }
+    .mermaid-cluster text, .mermaid-sequence-block text { fill: var(--theme-muted); font-family: var(--font-body); font-size: 17px; font-weight: 800; }
+    .mermaid-sequence g > text { fill: var(--theme-foreground); font-family: var(--font-body); font-size: 18px; font-weight: 750; }
+    .mermaid-lifeline { stroke: var(--theme-border); stroke-width: 3; stroke-dasharray: 8 8; }
+    .mermaid-message { fill: none; stroke: var(--theme-muted); stroke-width: 4; }
+    .mermaid-message-dashed { stroke-dasharray: 12 9; }
+    .mermaid-message-cross { fill: none; stroke: var(--accent-secondary, var(--accent)); stroke-width: 4; }
+    .mermaid-sequence-note rect { fill: color-mix(in srgb, var(--accent-secondary, var(--accent)) 18%, var(--theme-surface)); stroke: var(--accent-secondary, var(--accent)); stroke-width: 3; }
+    .mermaid-sequence-block rect { fill: color-mix(in srgb, var(--accent) 10%, transparent); stroke: var(--theme-border); stroke-width: 2; }
     .mermaid-error { padding: 1em; border: max(1px, .08cqw) solid var(--theme-border); background: var(--theme-surface); }
     .mermaid-error figcaption { font-weight: 800; }
     .mermaid-error p, .mermaid-error pre { font-size: .72em; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -912,6 +924,7 @@ export function renderPresentationHtml(
     .mermaid-draft[data-direction="TD"] .mermaid-draft-flow, .mermaid-draft[data-direction="TB"] .mermaid-draft-flow, .mermaid-draft[data-direction="BT"] .mermaid-draft-flow { flex-direction: column; }
     .mermaid-draft-node { padding: .7em 1em; border: max(2px, .12cqw) solid var(--accent); border-radius: .45em; background: color-mix(in srgb, var(--theme-surface) 82%, var(--accent)); font-weight: 750; text-align: center; }
     .mermaid-draft-arrow { color: var(--theme-muted); font-size: 1.6em; line-height: 1; }
+    .mermaid-draft-message { width: min(92%, 42em); padding: .35em .65em; border-left: max(2px, .14cqw) solid var(--accent); color: var(--theme-muted); font-size: .72em; }
     .slide[data-composition="canvas"], .slide[data-composition="scene"] { --slide-base: var(--canvas-background); grid-template: minmax(0, 1fr) auto / 1fr; overflow: var(--canvas-overflow); }
     .slide-canvas { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; overflow: var(--canvas-overflow); }
     .slide-scene { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; padding: calc(6% * var(--density-scale) * var(--template-top-spacing)) calc(6% * var(--density-scale)) calc(6% * var(--density-scale)); overflow: var(--canvas-overflow); }
@@ -2128,20 +2141,37 @@ export function renderPresentationHtml(
             diagramLines.push(String(lines[lineIndex] || '').trim());
             lineIndex += 1;
           }
-          const header = /^(?:flowchart|graph)\s+(LR|RL|TD|TB|BT)$/i.exec(diagramLines.shift() || '');
+          const firstLine = diagramLines.shift() || '';
+          const flowHeader = /^(?:flowchart|graph)\s+(LR|RL|TD|TB|BT)$/i.exec(firstLine);
+          const sequenceHeader = /^sequenceDiagram$/i.test(firstLine);
           const figure = document.createElement('figure');
           figure.className = 'mermaid-diagram mermaid-draft';
-          figure.dataset.direction = header ? header[1].toUpperCase() : 'LR';
+          figure.dataset.direction = flowHeader ? flowHeader[1].toUpperCase() : sequenceHeader ? 'TD' : 'LR';
           const flow = document.createElement('div');
           flow.className = 'mermaid-draft-flow';
           const nodeLabels = [];
-          for (const diagramLine of diagramLines) {
-            for (const token of diagramLine.split(/\s*(?:-->|==>|--[^>]*-->)\s*/)) {
-              const match = /^([A-Za-z0-9_-]+)(?:\[([^\]]+)\]|\(([^)]+)\)|\{([^}]+)\})?$/.exec(token.trim());
-              if (match && !nodeLabels.some((entry) => entry.id === match[1])) nodeLabels.push({ id: match[1], label: match[2] || match[3] || match[4] || match[1] });
+          const sequenceMessages = [];
+          if (sequenceHeader) {
+            for (const diagramLine of diagramLines) {
+              const participant = /^(?:participant|actor)\s+([A-Za-z0-9_-]+)(?:\s+as\s+(.+))?$/i.exec(diagramLine);
+              if (participant && !nodeLabels.some((entry) => entry.id === participant[1])) nodeLabels.push({ id: participant[1], label: participant[2] || participant[1] });
+              const message = /^([A-Za-z0-9_][A-Za-z0-9_-]*?)\s*(?:-->>|->>|-->|->|--x|-x)\s*([A-Za-z0-9_-]+)\s*:\s*(.+)$/.exec(diagramLine);
+              if (message) {
+                if (!nodeLabels.some((entry) => entry.id === message[1])) nodeLabels.push({ id: message[1], label: message[1] });
+                if (!nodeLabels.some((entry) => entry.id === message[2])) nodeLabels.push({ id: message[2], label: message[2] });
+                sequenceMessages.push(message[1] + ' → ' + message[2] + '：' + message[3]);
+              }
+            }
+          } else {
+            for (const diagramLine of diagramLines) {
+              if (/^(?:subgraph|end)\b/i.test(diagramLine)) continue;
+              for (const token of diagramLine.split(/\s*(?:-->\|[^|]+\||-\.->|==>|-->|--[^>]*-->)\s*/)) {
+                const match = /^([A-Za-z0-9_-]+)(?:\[\(([^)]+)\)\]|\(\[([^\]]+)\]\)|\(\(([^)]+)\)\)|\{\{([^}]+)\}\}|\[([^\]]+)\]|\(([^)]+)\)|\{([^}]+)\})?$/.exec(token.trim());
+                if (match && !nodeLabels.some((entry) => entry.id === match[1])) nodeLabels.push({ id: match[1], label: match.slice(2).find(Boolean) || match[1] });
+              }
             }
           }
-          if (!header || nodeLabels.length === 0) {
+          if ((!flowHeader && !sequenceHeader) || nodeLabels.length === 0) {
             figure.classList.add('mermaid-error');
             const message = document.createElement('p');
             message.textContent = 'Mermaid図の記法を確認してください。';
@@ -2159,6 +2189,12 @@ export function renderPresentationHtml(
               node.textContent = entry.label;
               flow.append(node);
             });
+            for (const sequenceMessage of sequenceMessages) {
+              const message = document.createElement('small');
+              message.className = 'mermaid-draft-message';
+              message.textContent = sequenceMessage;
+              flow.append(message);
+            }
             figure.append(flow);
           }
           target.append(figure);

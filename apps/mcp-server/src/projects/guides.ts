@@ -111,7 +111,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - presetだけで本文・見出し倍率、行間、段落間隔、段数、縦横揃えの安全な既定値が決まる。必要な項目だけを追加で上書きし、元へ戻す項目はnull、上書きをまとめて消す場合は \`reset_overrides: true\` を使う。
 - \`columns\` は既定2段、最大3段。4:3の3段組みは行長が短くなるため、Web UIの実rendererと見切れ診断を必ず確認する。
 - 文章量が多い一枚を自動fitだけで極端に縮小しない。まず組版presetと段数を選び、それでも読めない場合は内容を複数スライドへ分ける。
-- 仕組み図はMarkdownへMermaidのfenced code blockを書き、先頭を \`flowchart LR\` または \`flowchart TD\` とする。基本ノード、矢印、矢印ラベルだけを使い、未対応のsequence図、style、任意HTMLは入力しない。
+- 仕組み図はMarkdownへMermaidのfenced code blockを書く。流れは \`flowchart LR\`／\`TD\`、やり取りは \`sequenceDiagram\` を使う。flowchartは連結矢印、矢印ラベル、点線・強調線、subgraph、四角・角丸・ひし形・スタジアム・データベース・円・六角形に対応する。sequenceDiagramはparticipant／actor、メッセージ、Note、loop／opt／alt／par／critical／breakに対応する。style、classDef、click、任意HTMLは入力しない。
 
 ## 読み上げ表示
 

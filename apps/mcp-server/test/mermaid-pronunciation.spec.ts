@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  parseMermaidDiagram,
   parseMermaidFlowchart,
+  parseMermaidSequence,
+  renderMermaidDiagram,
   renderMermaidFlowchart
 } from "../src/presentation/mermaid";
 import {
@@ -15,6 +18,7 @@ describe("Mermaid flowchart", () => {
     expect(parseMermaidFlowchart(`flowchart LR
       input[入力] --> process(集計)
       process -- 公開 --> result{結果}`)).toEqual({
+      kind: "flowchart",
       direction: "LR",
       nodes: [
         { id: "input", label: "入力", shape: "rect" },
@@ -22,10 +26,35 @@ describe("Mermaid flowchart", () => {
         { id: "result", label: "結果", shape: "diamond" }
       ],
       edges: [
-        { from: "input", to: "process", label: null },
-        { from: "process", to: "result", label: "公開" }
-      ]
+        { from: "input", to: "process", label: null, style: "solid" },
+        { from: "process", to: "result", label: "公開", style: "solid" }
+      ],
+      clusters: []
     });
+  });
+
+  it("supports chained edges, pipe labels, edge styles, node shapes, and subgraphs", () => {
+    const diagram = parseMermaidFlowchart(`flowchart LR
+      subgraph collect[収集]
+        api([公式API]) -->|毎日| data[(保存データ)]
+      end
+      data ==> search{{検索と集計}}
+      search -.-> share((共有))`);
+
+    expect(diagram.nodes.map((node) => node.shape)).toEqual([
+      "stadium",
+      "database",
+      "hexagon",
+      "circle"
+    ]);
+    expect(diagram.edges).toEqual([
+      { from: "api", to: "data", label: "毎日", style: "solid" },
+      { from: "data", to: "search", label: null, style: "thick" },
+      { from: "search", to: "share", label: null, style: "dashed" }
+    ]);
+    expect(diagram.clusters).toEqual([
+      { id: "collect", label: "収集", nodeIds: ["api", "data"] }
+    ]);
   });
 
   it("renders escaped SVG without executing Mermaid source", () => {
@@ -37,8 +66,33 @@ describe("Mermaid flowchart", () => {
     expect(html).not.toContain("<script>alert(1)</script>");
   });
 
-  it("returns an in-slide error for unsupported syntax", () => {
-    expect(renderMermaidFlowchart("sequenceDiagram\nA->>B: hello")).toContain(
+  it("renders sequence diagrams with participants, notes, loops, and escaped labels", () => {
+    const source = `sequenceDiagram
+      actor U as 視聴者
+      participant A as アプリ
+      U->>A: <script>開始</script>
+      loop 待機中だけ
+        A-->>U: 状態を返す
+      end
+      Note over U,A: 一度だけ更新`;
+    const diagram = parseMermaidSequence(source);
+    const html = renderMermaidDiagram(source);
+
+    expect(parseMermaidDiagram(source)).toEqual(diagram);
+    expect(diagram.participants).toHaveLength(2);
+    expect(diagram.events.map((event) => event.kind)).toEqual([
+      "message",
+      "block",
+      "message",
+      "note"
+    ]);
+    expect(html).toContain('class="mermaid-diagram mermaid-sequence"');
+    expect(html).toContain("&lt;script&gt;開始&lt;/script&gt;");
+    expect(html).not.toContain("<script>開始</script>");
+  });
+
+  it("returns an in-slide error for unsupported directives", () => {
+    expect(renderMermaidFlowchart("flowchart LR\nclassDef danger fill:red")).toContain(
       "Mermaid図の記法を確認してください"
     );
   });
