@@ -8,7 +8,7 @@ import { resolveSlideTypography } from "../projects/typography";
 import { applyPronunciations } from "../projects/pronunciation";
 import { renderMermaidDiagram } from "./mermaid";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@127";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@128";
 
 function escapeHtml(value: string): string {
   return value
@@ -2165,7 +2165,7 @@ export function renderPresentationHtml(
               if (message) {
                 if (!nodeLabels.some((entry) => entry.id === message[1])) nodeLabels.push({ id: message[1], label: message[1] });
                 if (!nodeLabels.some((entry) => entry.id === message[2])) nodeLabels.push({ id: message[2], label: message[2] });
-                sequenceMessages.push(message[1] + ' → ' + message[2] + '：' + message[3]);
+                sequenceMessages.push({ from: message[1], to: message[2], text: message[3] });
               }
             }
           } else {
@@ -2228,10 +2228,11 @@ export function renderPresentationHtml(
                 flow.append(rankGroup);
               });
             }
+            const labelFor = (id) => nodeLabels.find((entry) => entry.id === id)?.label || id;
             for (const sequenceMessage of sequenceMessages) {
               const message = document.createElement('small');
               message.className = 'mermaid-draft-message';
-              message.textContent = sequenceMessage;
+              message.textContent = labelFor(sequenceMessage.from) + ' → ' + labelFor(sequenceMessage.to) + '：' + sequenceMessage.text;
               flow.append(message);
             }
             figure.append(flow);

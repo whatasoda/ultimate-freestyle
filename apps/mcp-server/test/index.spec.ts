@@ -123,8 +123,8 @@ describe("MCP Worker", () => {
     expect(body).toMatchObject({
       ok: true,
       service: "ultimate-freestyle-mcp",
-      version: "0.18.2",
-      renderer_version: "uf-renderer@127",
+      version: "0.18.3",
+      renderer_version: "uf-renderer@128",
       mode: "active",
       eligibility: {
         broadcaster_id: "67879379",
