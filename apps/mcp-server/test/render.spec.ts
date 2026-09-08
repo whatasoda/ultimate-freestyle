@@ -197,6 +197,9 @@ describe("presentation artifact renderer", () => {
           "/presentation-assets/revision/image"
       }
     });
+    const scripts = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const script of scripts) expect(() => new Function(script)).not.toThrow();
     expect(html).toContain('<meta http-equiv="Content-Security-Policy"');
     expect(html).toContain('class="stage"');
     expect(html).toContain('id="voice-progress"');
@@ -218,7 +221,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@125");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@126");
     expect(html).toContain("type: 'ultimate-freestyle:preview-applied'");
     expect(html).toContain("[data-flow-content] .reveal-block");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");
@@ -454,7 +457,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain('data-columns="3"');
     expect(html).toContain('--slide-body-scale:0.6');
     expect(html).toContain('--slide-heading-scale:0.7');
-    expect(html).toContain('--slide-column-gap:2.4em');
+    expect(html).toContain('--slide-column-gap: 2.5em');
     expect(html).toContain('--template-accent-secondary: #65ccff');
     expect(html).toContain('--template-border: #334155');
     expect(html).not.toContain('"/presentation-assets/revision/image"');

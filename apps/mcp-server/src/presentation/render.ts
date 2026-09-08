@@ -8,7 +8,7 @@ import { resolveSlideTypography } from "../projects/typography";
 import { applyPronunciations } from "../projects/pronunciation";
 import { renderMermaidDiagram } from "./mermaid";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@125";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@126";
 
 function escapeHtml(value: string): string {
   return value
@@ -2142,7 +2142,7 @@ export function renderPresentationHtml(
             lineIndex += 1;
           }
           const firstLine = diagramLines.shift() || '';
-          const flowHeader = /^(?:flowchart|graph)\s+(LR|RL|TD|TB|BT)$/i.exec(firstLine);
+          const flowHeader = /^(?:flowchart|graph)\\s+(LR|RL|TD|TB|BT)$/i.exec(firstLine);
           const sequenceHeader = /^sequenceDiagram$/i.test(firstLine);
           const figure = document.createElement('figure');
           figure.className = 'mermaid-diagram mermaid-draft';
@@ -2153,9 +2153,9 @@ export function renderPresentationHtml(
           const sequenceMessages = [];
           if (sequenceHeader) {
             for (const diagramLine of diagramLines) {
-              const participant = /^(?:participant|actor)\s+([A-Za-z0-9_-]+)(?:\s+as\s+(.+))?$/i.exec(diagramLine);
+              const participant = /^(?:participant|actor)\\s+([A-Za-z0-9_-]+)(?:\\s+as\\s+(.+))?$/i.exec(diagramLine);
               if (participant && !nodeLabels.some((entry) => entry.id === participant[1])) nodeLabels.push({ id: participant[1], label: participant[2] || participant[1] });
-              const message = /^([A-Za-z0-9_][A-Za-z0-9_-]*?)\s*(?:-->>|->>|-->|->|--x|-x)\s*([A-Za-z0-9_-]+)\s*:\s*(.+)$/.exec(diagramLine);
+              const message = /^([A-Za-z0-9_][A-Za-z0-9_-]*?)\\s*(?:-->>|->>|-->|->|--x|-x)\\s*([A-Za-z0-9_-]+)\\s*:\\s*(.+)$/.exec(diagramLine);
               if (message) {
                 if (!nodeLabels.some((entry) => entry.id === message[1])) nodeLabels.push({ id: message[1], label: message[1] });
                 if (!nodeLabels.some((entry) => entry.id === message[2])) nodeLabels.push({ id: message[2], label: message[2] });
@@ -2164,9 +2164,9 @@ export function renderPresentationHtml(
             }
           } else {
             for (const diagramLine of diagramLines) {
-              if (/^(?:subgraph|end)\b/i.test(diagramLine)) continue;
-              for (const token of diagramLine.split(/\s*(?:-->\|[^|]+\||-\.->|==>|-->|--[^>]*-->)\s*/)) {
-                const match = /^([A-Za-z0-9_-]+)(?:\[\(([^)]+)\)\]|\(\[([^\]]+)\]\)|\(\(([^)]+)\)\)|\{\{([^}]+)\}\}|\[([^\]]+)\]|\(([^)]+)\)|\{([^}]+)\})?$/.exec(token.trim());
+              if (/^(?:subgraph|end)\\b/i.test(diagramLine)) continue;
+              for (const token of diagramLine.split(/\\s*(?:-->\\|[^|]+\\||-\\.->|==>|-->|--[^>]*-->)\\s*/)) {
+                const match = /^([A-Za-z0-9_-]+)(?:\\[\\(([^)]+)\\)\\]|\\(\\[([^\\]]+)\\]\\)|\\(\\(([^)]+)\\)\\)|\\{\\{([^}]+)\\}\\}|\\[([^\\]]+)\\]|\\(([^)]+)\\)|\\{([^}]+)\\})?$/.exec(token.trim());
                 if (match && !nodeLabels.some((entry) => entry.id === match[1])) nodeLabels.push({ id: match[1], label: match.slice(2).find(Boolean) || match[1] });
               }
             }
