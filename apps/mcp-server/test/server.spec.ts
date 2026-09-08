@@ -195,8 +195,8 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.18.1",
-        renderer_version: "uf-renderer@126",
+        version: "0.18.2",
+        renderer_version: "uf-renderer@127",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",

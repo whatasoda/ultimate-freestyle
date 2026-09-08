@@ -8,7 +8,7 @@ import { resolveSlideTypography } from "../projects/typography";
 import { applyPronunciations } from "../projects/pronunciation";
 import { renderMermaidDiagram } from "./mermaid";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@126";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@127";
 
 function escapeHtml(value: string): string {
   return value
@@ -922,6 +922,10 @@ export function renderPresentationHtml(
     .mermaid-error p, .mermaid-error pre { font-size: .72em; white-space: pre-wrap; overflow-wrap: anywhere; }
     .mermaid-draft-flow { display: flex; align-items: center; justify-content: center; gap: .8em; min-height: 10em; }
     .mermaid-draft[data-direction="TD"] .mermaid-draft-flow, .mermaid-draft[data-direction="TB"] .mermaid-draft-flow, .mermaid-draft[data-direction="BT"] .mermaid-draft-flow { flex-direction: column; }
+    .mermaid-draft-rank { display: flex; flex-direction: column; align-items: stretch; justify-content: center; gap: .6em; min-width: 0; }
+    .mermaid-draft[data-direction="TD"] .mermaid-draft-rank, .mermaid-draft[data-direction="TB"] .mermaid-draft-rank, .mermaid-draft[data-direction="BT"] .mermaid-draft-rank { flex-direction: row; }
+    .mermaid-draft[data-kind="sequence"] .mermaid-draft-flow { flex-direction: column; align-items: stretch; }
+    .mermaid-draft[data-kind="sequence"] .mermaid-draft-rank { flex-direction: row; }
     .mermaid-draft-node { padding: .7em 1em; border: max(2px, .12cqw) solid var(--accent); border-radius: .45em; background: color-mix(in srgb, var(--theme-surface) 82%, var(--accent)); font-weight: 750; text-align: center; }
     .mermaid-draft-arrow { color: var(--theme-muted); font-size: 1.6em; line-height: 1; }
     .mermaid-draft-message { width: min(92%, 42em); padding: .35em .65em; border-left: max(2px, .14cqw) solid var(--accent); color: var(--theme-muted); font-size: .72em; }
@@ -2146,11 +2150,13 @@ export function renderPresentationHtml(
           const sequenceHeader = /^sequenceDiagram$/i.test(firstLine);
           const figure = document.createElement('figure');
           figure.className = 'mermaid-diagram mermaid-draft';
+          figure.dataset.kind = sequenceHeader ? 'sequence' : 'flowchart';
           figure.dataset.direction = flowHeader ? flowHeader[1].toUpperCase() : sequenceHeader ? 'TD' : 'LR';
           const flow = document.createElement('div');
           flow.className = 'mermaid-draft-flow';
           const nodeLabels = [];
           const sequenceMessages = [];
+          const flowEdges = [];
           if (sequenceHeader) {
             for (const diagramLine of diagramLines) {
               const participant = /^(?:participant|actor)\\s+([A-Za-z0-9_-]+)(?:\\s+as\\s+(.+))?$/i.exec(diagramLine);
@@ -2165,10 +2171,15 @@ export function renderPresentationHtml(
           } else {
             for (const diagramLine of diagramLines) {
               if (/^(?:subgraph|end)\\b/i.test(diagramLine)) continue;
+              const lineNodes = [];
               for (const token of diagramLine.split(/\\s*(?:-->\\|[^|]+\\||-\\.->|==>|-->|--[^>]*-->)\\s*/)) {
                 const match = /^([A-Za-z0-9_-]+)(?:\\[\\(([^)]+)\\)\\]|\\(\\[([^\\]]+)\\]\\)|\\(\\(([^)]+)\\)\\)|\\{\\{([^}]+)\\}\\}|\\[([^\\]]+)\\]|\\(([^)]+)\\)|\\{([^}]+)\\})?$/.exec(token.trim());
-                if (match && !nodeLabels.some((entry) => entry.id === match[1])) nodeLabels.push({ id: match[1], label: match.slice(2).find(Boolean) || match[1] });
+                if (match) {
+                  if (!nodeLabels.some((entry) => entry.id === match[1])) nodeLabels.push({ id: match[1], label: match.slice(2).find(Boolean) || match[1] });
+                  lineNodes.push(match[1]);
+                }
               }
+              for (let index = 1; index < lineNodes.length; index += 1) flowEdges.push({ from: lineNodes[index - 1], to: lineNodes[index] });
             }
           }
           if ((!flowHeader && !sequenceHeader) || nodeLabels.length === 0) {
@@ -2177,18 +2188,46 @@ export function renderPresentationHtml(
             message.textContent = 'Mermaid図の記法を確認してください。';
             figure.append(message);
           } else {
-            nodeLabels.forEach((entry, index) => {
-              if (index > 0) {
-                const arrow = document.createElement('span');
-                arrow.className = 'mermaid-draft-arrow';
-                arrow.textContent = figure.dataset.direction === 'TD' || figure.dataset.direction === 'TB' ? '↓' : figure.dataset.direction === 'BT' ? '↑' : figure.dataset.direction === 'RL' ? '←' : '→';
-                flow.append(arrow);
+            if (sequenceHeader) {
+              const participants = document.createElement('div');
+              participants.className = 'mermaid-draft-rank';
+              for (const entry of nodeLabels) {
+                const node = document.createElement('span');
+                node.className = 'mermaid-draft-node';
+                node.textContent = entry.label;
+                participants.append(node);
               }
-              const node = document.createElement('span');
-              node.className = 'mermaid-draft-node';
-              node.textContent = entry.label;
-              flow.append(node);
-            });
+              flow.append(participants);
+            } else {
+              const ranks = new Map(nodeLabels.map((entry) => [entry.id, 0]));
+              for (let pass = 0; pass < nodeLabels.length; pass += 1) {
+                let changed = false;
+                for (const edge of flowEdges) {
+                  const next = Math.min(nodeLabels.length - 1, (ranks.get(edge.from) || 0) + 1);
+                  if (next > (ranks.get(edge.to) || 0)) { ranks.set(edge.to, next); changed = true; }
+                }
+                if (!changed) break;
+              }
+              let usedRanks = [...new Set(ranks.values())].sort((left, right) => left - right);
+              if (figure.dataset.direction === 'RL' || figure.dataset.direction === 'BT') usedRanks = usedRanks.reverse();
+              usedRanks.forEach((rank, index) => {
+                if (index > 0) {
+                  const arrow = document.createElement('span');
+                  arrow.className = 'mermaid-draft-arrow';
+                  arrow.textContent = figure.dataset.direction === 'TD' || figure.dataset.direction === 'TB' ? '↓' : figure.dataset.direction === 'BT' ? '↑' : figure.dataset.direction === 'RL' ? '←' : '→';
+                  flow.append(arrow);
+                }
+                const rankGroup = document.createElement('div');
+                rankGroup.className = 'mermaid-draft-rank';
+                for (const entry of nodeLabels.filter((candidate) => ranks.get(candidate.id) === rank)) {
+                  const node = document.createElement('span');
+                  node.className = 'mermaid-draft-node';
+                  node.textContent = entry.label;
+                  rankGroup.append(node);
+                }
+                flow.append(rankGroup);
+              });
+            }
             for (const sequenceMessage of sequenceMessages) {
               const message = document.createElement('small');
               message.className = 'mermaid-draft-message';
