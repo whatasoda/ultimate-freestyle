@@ -7,6 +7,7 @@ import {
   narrationAppearanceSchema,
   narrationDisplaySchema,
   narrationSegmentSchema,
+  pronunciationEntrySchema,
   presentationAspectRatioSchema,
   presentationTemplateSchema,
   slideBlockSchema,
@@ -263,11 +264,17 @@ export const narrationSegmentRequestSchema = z
     voice_profile_id: narrationSegmentSchema.shape.voice_profile_id,
     voice_tuning: narrationSegmentSchema.shape.voice_tuning,
     voice_cues: narrationSegmentSchema.shape.voice_cues,
+    pronunciations: narrationSegmentSchema.shape.pronunciations,
     pause_before_ms: narrationSegmentSchema.shape.pause_before_ms,
     pause_after_ms: narrationSegmentSchema.shape.pause_after_ms
   })
   .required({ speaker: true, voice_profile_id: true, voice_tuning: true })
   .extend({ expected_version: z.number().int().positive() });
+
+export const pronunciationDictionaryRequestSchema = z.object({
+  expected_version: z.number().int().positive(),
+  entries: z.array(pronunciationEntrySchema).max(128)
+});
 
 export const narrationSegmentCreateRequestSchema = z.object({
   expected_version: z.number().int().positive(),

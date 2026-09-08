@@ -153,7 +153,7 @@ describe("presentation artifact renderer", () => {
                 text_align: "start",
                 vertical_align: "start"
               },
-              content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A\n1. 手順A\n2. 手順B\n\n| 比較 | **値** |\n| --- | :---: |\n| 安全 | <table-script> |",
+              content_markdown: "# 結果\n**重要**\n<script>alert('content')</script>\n- 記録A\n1. 手順A\n2. 手順B\n\n| 比較 | **値** |\n| --- | :---: |\n| 安全 | <table-script> |\n\n```mermaid\nflowchart LR\ninput[入力] --> result[結果]\n```",
               reveal_blocks: [
                 { at: 1, markdown: "追加で見せる証拠" }
               ],
@@ -204,6 +204,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("history.pushState");
     expect(html).toContain("speechSynthesis");
     expect(html).toContain('data-reveal="1"');
+    expect(html).toContain('class="mermaid-diagram"');
     expect(html).toContain('data-slide-id="result"');
     expect(html).toContain('aria-roledescription="スライド"');
     expect(html).toContain('data-slide-announcer aria-live="polite" aria-atomic="true"');
@@ -217,7 +218,7 @@ describe("presentation artifact renderer", () => {
     expect(html).toContain("top !== blocker");
     expect(html).toContain("readability, occlusions");
     expect(html).toContain(`data-renderer-version="${PRESENTATION_RENDERER_VERSION}"`);
-    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@123");
+    expect(PRESENTATION_RENDERER_VERSION).toBe("uf-renderer@124");
     expect(html).toContain("type: 'ultimate-freestyle:preview-applied'");
     expect(html).toContain("[data-flow-content] .reveal-block");
     expect(html).toContain("grid-template-columns: minmax(0, 1fr)");
@@ -1202,6 +1203,10 @@ describe("presentation artifact renderer", () => {
     expect(largeNarrationHtml).toContain('id="narration-segment-77"');
     expect(largeNarrationHtml).toContain('data-selected-narration="77"');
     expect(largeNarrationHtml).toContain('data-narration-select="77"');
+    expect(largeNarrationHtml).toContain("data-pronunciation-dictionary");
+    expect(largeNarrationHtml).toContain("発表全体の読み辞書");
+    expect(largeNarrationHtml).toContain("この区間だけの読み");
+    expect(largeNarrationHtml).toContain('data-markdown-action="mermaid"');
     expect(new TextEncoder().encode(largeNarrationHtml).byteLength).toBeLessThan(350_000);
 
     const projectWithNextSlide = projectRecordSchema.parse({

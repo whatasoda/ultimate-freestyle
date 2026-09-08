@@ -50,6 +50,7 @@ import {
   saveRenderedQualityReport
 } from "../projects/quality-reports";
 import { invalidateVoiceProfileAudio } from "../projects/voice-audio";
+import { invalidateAllNarrationAudio } from "../projects/pronunciation";
 import {
   deleteReviewComment,
   listReviewComments,
@@ -120,6 +121,7 @@ import {
   narrationSegmentDeleteRequestSchema,
   narrationSegmentRequestSchema,
   narrationSettingsRequestSchema,
+  pronunciationDictionaryRequestSchema,
   previewRequestSchema,
   projectFieldsRequestSchema,
   publishRequestSchema,
@@ -1448,6 +1450,59 @@ async function handleDeckSettingsUpdate(
       error,
       "発表画面の設定を保存できませんでした。"
     );
+  }
+}
+
+async function handlePronunciationDictionaryUpdate(
+  request: Request,
+  env: Env,
+  projectId: string
+): Promise<Response> {
+  if (request.method !== "PATCH") {
+    return new Response(null, { status: 405, headers: { allow: "PATCH" } });
+  }
+  const session = await requireWebSessionAndCsrf(request, env);
+  if (session === null) {
+    return jsonResponse(
+      { ok: false, error: { code: "AUTH_REQUIRED", message: "ログインし直してください。" }, request_id: crypto.randomUUID() },
+      403
+    );
+  }
+  const read = await readRequestJson(request);
+  if (!read.ok) return read.response;
+  const parsed = pronunciationDictionaryRequestSchema.safeParse(read.value);
+  if (!parsed.success) {
+    return jsonResponse(
+      { ok: false, error: { code: "INVALID_PRONUNCIATION_DICTIONARY", message: "読み辞書の表記と読みを確認してください。" }, request_id: crypto.randomUUID() },
+      422
+    );
+  }
+  try {
+    const project = await mutateProject(env.DB, {
+      ownerUserId: session.userId,
+      projectId,
+      expectedVersion: parsed.data.expected_version,
+      mutate: (document) => {
+        if (document.deck === null) {
+          const error = new Error("The presentation deck does not exist.");
+          Object.assign(error, { code: "DECK_REQUIRED" });
+          throw error;
+        }
+        if (JSON.stringify(document.deck.pronunciations ?? []) === JSON.stringify(parsed.data.entries)) return;
+        document.deck.pronunciations = parsed.data.entries;
+        invalidateAllNarrationAudio(document);
+      }
+    });
+    await recordWebAudit(env.DB, {
+      userId: session.userId,
+      eventType: "project.pronunciation_dictionary_updated",
+      outcome: "succeeded",
+      details: { project_id: projectId, entries: parsed.data.entries.length, version: project.version },
+      createdAt: new Date().toISOString()
+    });
+    return jsonResponse({ ok: true, project_id: projectId, version: project.version, updated_at: project.updated_at, error: null, request_id: crypto.randomUUID() });
+  } catch (error) {
+    return projectMutationErrorResponse(error, "読み辞書を保存できませんでした。");
   }
 }
 
@@ -3476,7 +3531,9 @@ async function handleNarrationSegmentUpdate(
           JSON.stringify(segment.voice_tuning ?? null) !==
             JSON.stringify(parsed.data.voice_tuning) ||
           (parsed.data.voice_cues !== undefined &&
-            JSON.stringify(segment.voice_cues ?? null) !== JSON.stringify(parsed.data.voice_cues));
+            JSON.stringify(segment.voice_cues ?? null) !== JSON.stringify(parsed.data.voice_cues)) ||
+          (parsed.data.pronunciations !== undefined &&
+            JSON.stringify(segment.pronunciations ?? []) !== JSON.stringify(parsed.data.pronunciations));
         voiceGenerationRequired = invalidatesAudio || segment.audio_src === null;
         Object.assign(segment, {
           text: parsed.data.text,
@@ -3486,6 +3543,7 @@ async function handleNarrationSegmentUpdate(
           audio_src: invalidatesAudio ? null : segment.audio_src
         });
         if (parsed.data.voice_cues !== undefined) segment.voice_cues = parsed.data.voice_cues;
+        if (parsed.data.pronunciations !== undefined) segment.pronunciations = parsed.data.pronunciations;
         if (parsed.data.pause_before_ms !== undefined) segment.pause_before_ms = parsed.data.pause_before_ms;
         if (parsed.data.pause_after_ms !== undefined) segment.pause_after_ms = parsed.data.pause_after_ms;
         narrationSegmentSchema.parse(segment);
@@ -4562,6 +4620,12 @@ export async function handleWebRequest(
   );
   if (deckSettingsMatch?.[1] !== undefined) {
     return handleDeckSettingsUpdate(request, env, deckSettingsMatch[1]);
+  }
+  const pronunciationDictionaryMatch = path.match(
+    new RegExp(`^/api/projects/${UUID_PATH}/pronunciations$`, "i")
+  );
+  if (pronunciationDictionaryMatch?.[1] !== undefined) {
+    return handlePronunciationDictionaryUpdate(request, env, pronunciationDictionaryMatch[1]);
   }
   const slideCreateMatch = path.match(
     new RegExp(`^/api/projects/${UUID_PATH}/slides$`)

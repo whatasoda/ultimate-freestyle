@@ -669,6 +669,31 @@ export const narrationVoiceCueSchema = z.object({
   pause_after_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional()
 });
 
+export const pronunciationEntrySchema = z.object({
+  surface: z.string().trim().min(1).max(80),
+  reading: z.string().trim().min(1).max(120)
+});
+
+export type PronunciationEntry = z.infer<typeof pronunciationEntrySchema>;
+
+function requireUniquePronunciationSurfaces(
+  entries: readonly PronunciationEntry[] | undefined,
+  context: z.RefinementCtx,
+  path: Array<string | number>
+): void {
+  const surfaces = new Set<string>();
+  for (const [index, entry] of (entries ?? []).entries()) {
+    if (surfaces.has(entry.surface)) {
+      context.addIssue({
+        code: "custom",
+        path: [...path, index, "surface"],
+        message: "Pronunciation dictionary surfaces must be unique within their scope."
+      });
+    }
+    surfaces.add(entry.surface);
+  }
+}
+
 export const narrationSegmentSchema = z
   .object({
     at: z.number().int().nonnegative().max(100),
@@ -682,10 +707,12 @@ export const narrationSegmentSchema = z
       .optional(),
     voice_tuning: narrationVoiceTuningSchema,
     voice_cues: z.array(narrationVoiceCueSchema).min(1).max(8).optional(),
+    pronunciations: z.array(pronunciationEntrySchema).max(32).optional(),
     pause_before_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional(),
     pause_after_ms: z.number().int().min(0).max(10_000).multipleOf(100).optional()
   })
   .superRefine((segment, context) => {
+    requireUniquePronunciationSurfaces(segment.pronunciations, context, ["pronunciations"]);
     if (segment.voice_cues === undefined) return;
     const cueIds = new Set<string>();
     for (const [index, cue] of segment.voice_cues.entries()) {
@@ -852,11 +879,13 @@ export const projectDocumentSchema = z
         })
         .nullable(),
       voicevox: voicevoxSettingsSchema.nullable().optional(),
+      pronunciations: z.array(pronunciationEntrySchema).max(128).optional(),
       slides: z.array(projectSlideSchema).max(100)
       })
       .nullable()
   })
   .superRefine((document, context) => {
+    requireUniquePronunciationSurfaces(document.deck?.pronunciations, context, ["deck", "pronunciations"]);
     const templateIds = new Set<string>();
     for (const [index, template] of (
       document.deck?.templates ?? []

@@ -124,6 +124,7 @@ describe("VOICEVOX generation", () => {
       layout: "minimal",
       narration_defaults: null,
       voicevox: null,
+      pronunciations: [{ surface: "ずんだもん", reading: "ズンダモン" }],
       slides: [
         {
           id: "intro",
@@ -200,6 +201,7 @@ describe("VOICEVOX generation", () => {
       layout: "minimal",
       narration_defaults: null,
       voicevox: null,
+      pronunciations: [{ surface: "ずんだもん", reading: "ズンダモン" }],
       slides: [
         {
           id: "intro",
@@ -221,6 +223,7 @@ describe("VOICEVOX generation", () => {
                 pause_before_ms: 500,
                 pause_after_ms: 1_000,
                 voice_tuning: { speedScale: 0.9, intonationScale: 0.8 },
+                pronunciations: [{ surface: "生成", reading: "せいせい" }],
                 voice_cues: [
                   { id: "calm", text: "ずんだもんの音声を", pause_after_ms: 800 },
                   { id: "emphasis", text: "生成します。" }
@@ -309,9 +312,9 @@ describe("VOICEVOX generation", () => {
     expect(synthesisUrl).toBe("http://voicevox/synthesize-sequence");
     expect(synthesisBody).toMatchObject({
       parts: [
-        { kind: "speech", text: "ずんだもんの音声を", style_id: 3, tuning: { speedScale: 0.9, intonationScale: 0.8 } },
+        { kind: "speech", text: "ズンダモンの音声を", style_id: 3, tuning: { speedScale: 0.9, intonationScale: 0.8 } },
         { kind: "pause", duration_ms: 800 },
-        { kind: "speech", text: "生成します。", style_id: 3, tuning: { speedScale: 0.9, intonationScale: 0.8 } }
+        { kind: "speech", text: "せいせいします。", style_id: 3, tuning: { speedScale: 0.9, intonationScale: 0.8 } }
       ]
     });
     const job = await getVoiceGenerationJob(

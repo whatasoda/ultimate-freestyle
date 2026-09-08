@@ -29,6 +29,7 @@ import {
   narrationAppearanceSchema,
   narrationDisplaySchema,
   narrationSegmentSchema,
+  pronunciationEntrySchema,
   panelTreatmentSchema,
   presentationRoleStyleSchema,
   presentationRoleStylesSchema,
@@ -48,6 +49,7 @@ import {
   type ProjectRecord,
   type SlideSceneNode
 } from "./schema";
+import { invalidateAllNarrationAudio } from "./pronunciation";
 import {
   normalizeProjectToolError,
   ProjectToolError,
@@ -2649,6 +2651,78 @@ export function registerProjectMutationTools(
           }
           slide.narration.segments.sort((a, b) => a.at - b.at);
           recalculateSlideRevealSteps(slide);
+        }
+      })
+  );
+
+  server.registerTool(
+    "set_narration_pronunciation",
+    {
+      title: "読み上げ辞書を一語編集",
+      description:
+        "画面の表記を変えず、発表全体または一つの読み上げ区間で使う読みを一語ずつ追加・更新・削除します。reading=nullで削除します。区間の指定は発表全体より優先されます。",
+      inputSchema: {
+        ...projectIdInput,
+        scope: z.enum(["deck", "segment"]),
+        slide_id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).optional(),
+        at: z.number().int().nonnegative().max(100).optional(),
+        surface: pronunciationEntrySchema.shape.surface,
+        reading: pronunciationEntrySchema.shape.reading.nullable()
+      },
+      outputSchema: mutationOutput,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: false
+      }
+    },
+    async ({ project_id, expected_version, scope, slide_id, at, surface, reading }) =>
+      executeMutation(db, getAuthProps, {
+        projectId: project_id,
+        expectedVersion: expected_version,
+        changedKind: "narration_pronunciation_set",
+        changedId: scope === "deck" ? surface : `${slide_id ?? ""}:${at ?? ""}:${surface}`,
+        mutate: (document) => {
+          const deck = requireDeck(document);
+          if (scope === "deck") {
+            const entries = deck.pronunciations ?? [];
+            const index = entries.findIndex((entry) => entry.surface === surface);
+            if (reading === null) {
+              if (index !== -1) entries.splice(index, 1);
+            } else if (index === -1) {
+              entries.push({ surface, reading });
+            } else {
+              entries[index] = { surface, reading };
+            }
+            deck.pronunciations = entries;
+            invalidateAllNarrationAudio(document);
+            return;
+          }
+          if (slide_id === undefined || at === undefined) {
+            throw new ProjectToolError(
+              "INVALID_FIELDS",
+              "slide_id and at are required for a segment pronunciation."
+            );
+          }
+          const segment = findSlide(document, slide_id).narration?.segments.find(
+            (item) => item.at === at
+          );
+          if (segment === undefined) {
+            throw new ProjectToolError("INVALID_CHANGE", "The narration segment does not exist.");
+          }
+          const entries = segment.pronunciations ?? [];
+          const index = entries.findIndex((entry) => entry.surface === surface);
+          if (reading === null) {
+            if (index !== -1) entries.splice(index, 1);
+          } else if (index === -1) {
+            entries.push({ surface, reading });
+          } else {
+            entries[index] = { surface, reading };
+          }
+          segment.pronunciations = entries;
+          segment.audio_src = null;
+          narrationSegmentSchema.parse(segment);
         }
       })
   );

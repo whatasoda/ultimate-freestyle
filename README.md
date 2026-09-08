@@ -6,7 +6,7 @@
 
 現在は、まず自分の研究を制作・発表できることを優先しています。他の人が配布物として簡単にカスタマイズできる状態への整備は将来の範囲です。
 
-本番の入口は `saijiyu-kenkyu.2764.moe` です。Remote MCP v0.15.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走prompt、安全な発表renderer、範囲付きレビューコメント、VOICEVOX差分生成を提供します。同じWorkerのWeb UIでは、自分の研究を一枚ずつ確認・編集し、画面テキストと音声原稿へコメントし、画像、音声、固定preview、公開版を管理できます。mainへのpushは検証後にD1 migrationとWorker・ContainerをCloudflareへ自動デプロイします。GitHub Pagesは公開経路に含めません。
+本番の入口は `saijiyu-kenkyu.2764.moe` です。Remote MCP v0.17.0は `apps/mcp-server/` からTwitch OAuth必須で稼働し、資格判定、所有者分離されたversion付き研究CRUD、伴走prompt、安全な発表renderer、範囲付きレビューコメント、VOICEVOX差分生成を提供します。同じWorkerのWeb UIでは、自分の研究を一枚ずつ確認・編集し、画面テキストと音声原稿へコメントし、画像、音声、固定preview、公開版を管理できます。mainへのpushは検証後にD1 migrationとWorker・ContainerをCloudflareへ自動デプロイします。GitHub Pagesは公開経路に含めません。
 
 ## できること
 
@@ -224,7 +224,7 @@ sidebar: (
 | `commentary` | 太い文字と話者ラベルを使った実況字幕 | テンポの速い説明、結果発表、ツッコミ |
 | `inline` | 原稿全体をスライドの一部として配置し、現在文を強調 | 論理的な説明、読み返してほしい内容 |
 
-表示文と読み上げ文は同じ `text` を使うため、二重管理は不要です。`inline` は全原稿を表示し、現在読み上げる段落を強調します。狭い画面では可読性を優先して現在段落だけを表示します。
+表示文と読み上げ原稿は同じ `text` を使います。英字や固有名詞だけは発表全体または読み上げ区間の読み辞書へ登録でき、画面の表記を保ったままブラウザ音声とVOICEVOXの読みを変えられます。`inline` は全原稿を表示し、現在読み上げる段落を強調します。狭い画面では可読性を優先して現在段落だけを表示します。
 
 ## 読み上げについて
 

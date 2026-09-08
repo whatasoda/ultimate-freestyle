@@ -1,4 +1,4 @@
-export const DASHBOARD_ASSET_VERSION = "202";
+export const DASHBOARD_ASSET_VERSION = "203";
 
 export const DASHBOARD_SCRIPT = String.raw`(() => {
   const dashboardThemeStorageKey = "ultimate-freestyle:dashboard-theme";
@@ -1015,6 +1015,17 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
   const serializeVersionedForm = (form, submitter = null) => {
     const data = new FormData(form);
     const body = { expected_version: Number(form.dataset.version) };
+    const pronunciationEntries = (value) => String(value || "")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const separator = line.indexOf("=");
+        return {
+          surface: (separator === -1 ? line : line.slice(0, separator)).trim(),
+          reading: (separator === -1 ? "" : line.slice(separator + 1)).trim()
+        };
+      });
     if (form.matches("[data-project-editor]")) {
       for (const name of ["title", "summary"]) {
         if (data.has(name)) body[name] = String(data.get(name) || "");
@@ -1150,6 +1161,9 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         corner_radius_px: optionalNumberValue(data, "appearance_corner_radius_px")
       }
     });
+    if (form.matches("[data-pronunciation-dictionary]")) Object.assign(body, {
+      entries: pronunciationEntries(data.get("pronunciations"))
+    });
     if (form.matches("[data-narration-segment-create]")) Object.assign(body, {
       at: numberValue(data, "at"),
       text: String(data.get("text") || "")
@@ -1180,6 +1194,7 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
         voice_profile_id: String(data.get("voice_profile_id") || "") || null,
         voice_tuning: Object.keys(tuning).length ? tuning : null,
         voice_cues: voiceCues,
+        pronunciations: pronunciationEntries(data.get("pronunciations")),
         pause_before_ms: Math.round(Math.max(0, Number(data.get("pause_before_seconds") || 0)) * 10) * 100,
         pause_after_ms: Math.round(Math.max(0, Number(data.get("pause_after_seconds") || 0.35)) * 10) * 100
       });
@@ -1946,6 +1961,11 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       } else if (action === "table") {
         replacement = "| 比較項目 | 条件A | 条件B |\n| --- | --- | --- |\n| 結果 |  |  |";
         selectionStart = start + replacement.indexOf("結果");
+        selectionEnd = selectionStart + 2;
+      } else if (action === "mermaid") {
+        const fence = String.fromCharCode(96).repeat(3);
+        replacement = fence + "mermaid\nflowchart LR\n  A[入力] --> B[処理]\n  B --> C[結果]\n" + fence;
+        selectionStart = start + replacement.indexOf("入力");
         selectionEnd = selectionStart + 2;
       } else {
         const prefix = action === "heading" ? "## " : action === "number" ? "1. " : "- ";
@@ -3102,6 +3122,44 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
     const field = voiceCueField(cue, name);
     return field instanceof HTMLInputElement || field instanceof HTMLTextAreaElement || field instanceof HTMLSelectElement ? field.value : "";
   };
+  const previewPronunciationEntries = (value) => String(value || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const separator = line.indexOf("=");
+      if (separator === -1) return [];
+      const surface = line.slice(0, separator).trim();
+      const reading = line.slice(separator + 1).trim();
+      return surface && reading ? [{ surface, reading }] : [];
+    });
+  const applyPreviewPronunciations = (text, form) => {
+    const globalField = document.querySelector('[data-pronunciation-dictionary] [name="pronunciations"]');
+    const localField = form.elements.namedItem("pronunciations");
+    const entries = new Map();
+    if (globalField instanceof HTMLTextAreaElement) {
+      for (const entry of previewPronunciationEntries(globalField.value)) entries.set(entry.surface, entry.reading);
+    }
+    if (localField instanceof HTMLTextAreaElement) {
+      for (const entry of previewPronunciationEntries(localField.value)) entries.set(entry.surface, entry.reading);
+    }
+    const sorted = [...entries].sort((left, right) => [...right[0]].length - [...left[0]].length);
+    let result = "";
+    for (let index = 0; index < text.length;) {
+      const match = sorted.find(([surface]) => text.startsWith(surface, index));
+      if (!match) {
+        const codePoint = text.codePointAt(index);
+        if (codePoint === undefined) break;
+        const character = String.fromCodePoint(codePoint);
+        result += character;
+        index += character.length;
+      } else {
+        result += match[1];
+        index += match[0].length;
+      }
+    }
+    return result;
+  };
   const syncVoiceCueForm = (form) => {
     const cues = voiceCueElements(form);
     const text = cues.map((cue) => voiceCueFieldValue(cue, "cue_text")).join("");
@@ -3247,12 +3305,12 @@ export const DASHBOARD_SCRIPT = String.raw`(() => {
       const cues = voiceCueElements(form);
       const previewCues = cues.length > 0
         ? cues.map((cue) => ({
-            text: voiceCueFieldValue(cue, "cue_text"),
+            text: applyPreviewPronunciations(voiceCueFieldValue(cue, "cue_text"), form),
             speed: Number(segmentTuningValue(form, "speedScale")),
             pitch: Number(segmentTuningValue(form, "pitchScale")),
             pause: Math.max(0, Number(voiceCueFieldValue(cue, "cue_pause_after_seconds") || 0) * 1000)
           }))
-        : [{ text: String(new FormData(form).get("text") || ""), speed: segmentTuningValue(form, "speedScale"), pitch: segmentTuningValue(form, "pitchScale"), pause: 0 }];
+        : [{ text: applyPreviewPronunciations(String(new FormData(form).get("text") || ""), form), speed: segmentTuningValue(form, "speedScale"), pitch: segmentTuningValue(form, "pitchScale"), pause: 0 }];
       const finish = (postPause = true) => {
         const delay = postPause ? Math.max(0, Number(new FormData(form).get("pause_after_seconds") || 0) * 1000) : 0;
         if (delay > 0) {

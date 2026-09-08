@@ -14,6 +14,7 @@ import { z } from "zod";
 
 import { getProject, mutateProject } from "../projects/repository";
 import type { ProjectRecord } from "../projects/schema";
+import { applyPronunciations } from "../projects/pronunciation";
 import {
   invalidateInheritedVoiceAudio,
   invalidateVoiceProfileAudio
@@ -281,7 +282,11 @@ async function buildVoicePlan(
             ? profiles.get(cue.voice_profile_id)
             : undefined) ?? profile;
         return {
-          text: cue.text,
+          text: applyPronunciations(
+            cue.text,
+            deck.pronunciations,
+            segment.pronunciations
+          ),
           speakerUuid: cueProfile.speaker_uuid,
           styleId: cueProfile.style_id,
           profileTuning: cueProfile.tuning,
@@ -305,7 +310,11 @@ async function buildVoicePlan(
         profileId: profile.id,
         profileLabel: cueProfileLabels.size > 1 ? "複数の声" : profile.label,
         input: createVoiceGenerationInput({
-          text: segment.text,
+          text: applyPronunciations(
+            segment.text,
+            deck.pronunciations,
+            segment.pronunciations
+          ),
           speakerUuid: profile.speaker_uuid,
           styleId: profile.style_id,
           profileTuning: profile.tuning,
@@ -737,11 +746,11 @@ export async function createVoiceGenerationJob(
   const oversizedSequence = missingPlan.filter((segment) =>
     segment.input.sequence?.some(
       (part) => part.kind === "speech" && [...part.text].length > MAX_SEGMENT_CHARACTERS
-    ) ?? [...segment.text].length > MAX_SEGMENT_CHARACTERS
+    ) ?? [...segment.input.text].length > MAX_SEGMENT_CHARACTERS
   );
   const batch = selectVoiceGenerationBatch(
     missingPlan.filter((segment) => !oversizedSequence.includes(segment)),
-    (segment) => segment.text,
+    (segment) => segment.input.text,
     (segment, characters) => segment.input.sequence === undefined && characters > MAX_SEGMENT_CHARACTERS
   );
   if (missingPlan.length > 0 && batch.selected.length === 0) {

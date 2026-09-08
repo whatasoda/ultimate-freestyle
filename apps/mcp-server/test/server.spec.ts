@@ -76,6 +76,7 @@ describe("MCP contract", () => {
           "set_slide_narration",
           "configure_slide_narration",
           "update_slide_narration_voice",
+          "set_narration_pronunciation",
           "get_voice_generation_status",
           "generate_voice_audio",
           "move_slide",
@@ -194,8 +195,8 @@ describe("MCP contract", () => {
       expect(result.structuredContent).toMatchObject({
         ok: true,
         service: "ultimate-freestyle-mcp",
-        version: "0.16.0",
-        renderer_version: "uf-renderer@123",
+        version: "0.17.0",
+        renderer_version: "uf-renderer@124",
         eligibility: {
           broadcaster_id: "67879379",
           broadcaster_login: "kashiwo",
@@ -2002,6 +2003,46 @@ describe("MCP contract", () => {
             }
           }]
         }
+      });
+      const deckPronunciation = await client.callTool({
+        name: "set_narration_pronunciation",
+        arguments: {
+          project_id: projectId,
+          expected_version: 16,
+          scope: "deck",
+          surface: "MCP",
+          reading: "エムシーピー"
+        }
+      });
+      expect(deckPronunciation.structuredContent).toMatchObject({ ok: true, version: 17 });
+      const segmentPronunciation = await client.callTool({
+        name: "set_narration_pronunciation",
+        arguments: {
+          project_id: projectId,
+          expected_version: 17,
+          scope: "segment",
+          slide_id: "intro",
+          at: 0,
+          surface: "研究",
+          reading: "けんきゅう"
+        }
+      });
+      expect(segmentPronunciation.structuredContent).toMatchObject({ ok: true, version: 18 });
+      const pronunciationDeck = await readJsonResource(
+        client,
+        `research://projects/${projectId}/deck`
+      );
+      expect(pronunciationDeck).toMatchObject({
+        version: 18,
+        deck: { settings: { pronunciations: [{ surface: "MCP", reading: "エムシーピー" }] } }
+      });
+      const pronunciationNarration = await readJsonResource(
+        client,
+        `research://projects/${projectId}/slides/intro/narration/0`
+      );
+      expect(pronunciationNarration).toMatchObject({
+        version: 18,
+        segment: { pronunciations: [{ surface: "研究", reading: "けんきゅう" }] }
       });
     } finally {
       await client.close();

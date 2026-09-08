@@ -111,6 +111,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - presetだけで本文・見出し倍率、行間、段落間隔、段数、縦横揃えの安全な既定値が決まる。必要な項目だけを追加で上書きし、元へ戻す項目はnull、上書きをまとめて消す場合は \`reset_overrides: true\` を使う。
 - \`columns\` は既定2段、最大3段。4:3の3段組みは行長が短くなるため、Web UIの実rendererと見切れ診断を必ず確認する。
 - 文章量が多い一枚を自動fitだけで極端に縮小しない。まず組版presetと段数を選び、それでも読めない場合は内容を複数スライドへ分ける。
+- 仕組み図はMarkdownへMermaidのfenced code blockを書き、先頭を \`flowchart LR\` または \`flowchart TD\` とする。基本ノード、矢印、矢印ラベルだけを使い、未対応のsequence図、style、任意HTMLは入力しない。
 
 ## 読み上げ表示
 
@@ -118,6 +119,7 @@ const PRESENTATION_STYLE_GUIDE = `# 発表デザイン・読み上げ設定ガ�
 - displayはADV枠の \`dialogue\`、実況風の \`commentary\`、全文追従の \`inline\`、映像字幕の \`subtitle\`、最小表示の \`minimal\`。
 - 枠は配置、寸法、文字揃え、話者表示、進捗表示、文字倍率、最大行数だけを安全なtokenで調整する。
 - 読み上げ本文は \`set_slide_narration\`、segmentの話者・VOICEVOX profile・調声値は \`update_slide_narration_voice\` で別々に更新する。
+- 英字や固有名詞の読みは \`set_narration_pronunciation\` で一語ずつ登録する。\`scope: "deck"\` は発表全体、\`scope: "segment"\` は指定したslideとstepだけに適用し、同じ表記ではsegmentを優先する。\`reading: null\` で削除する。画面の字幕は元の表記を保つ。
 - VOICEVOXの声は \`research://guide/voicevox-catalog\` から選び、\`set_voicevox_profile\`へ \`catalog_profile_id\` を渡す。話者UUIDやstyle IDは手入力しない。
 - profileの基準調声値だけを変える場合は \`update_voicevox_profile_tuning\` を使う。本文や音声設定が変わると、古い生成音声は無効になる。
 - 生成数とjobの要約はget_voice_generation_statusまたはresearch://projects/{id}/voice、一枚の区間一覧はvoice/slides/{slideId}、原稿全文・実効調声・生成状態はそこから案内される一区間resourceで確認する。

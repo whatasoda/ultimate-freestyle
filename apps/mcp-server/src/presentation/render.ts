@@ -5,8 +5,10 @@ import type {
   SlideSceneNode
 } from "../projects/schema";
 import { resolveSlideTypography } from "../projects/typography";
+import { applyPronunciations } from "../projects/pronunciation";
+import { renderMermaidFlowchart } from "./mermaid";
 
-export const PRESENTATION_RENDERER_VERSION = "uf-renderer@123";
+export const PRESENTATION_RENDERER_VERSION = "uf-renderer@124";
 
 function escapeHtml(value: string): string {
   return value
@@ -51,6 +53,17 @@ function renderTextBlocks(markdown: string): string {
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
     const line = lines[lineIndex] ?? "";
     const trimmed = line.trim();
+    if (/^```mermaid\s*$/i.test(trimmed)) {
+      flushList();
+      const source: string[] = [];
+      lineIndex += 1;
+      while (lineIndex < lines.length && !/^```\s*$/.test((lines[lineIndex] ?? "").trim())) {
+        source.push(lines[lineIndex] ?? "");
+        lineIndex += 1;
+      }
+      blocks.push(renderMermaidFlowchart(source.join("\n")));
+      continue;
+    }
     const nextLine = lines[lineIndex + 1]?.trim() ?? "";
     const tableCells = (value: string) => {
       const withoutEdges = value.replace(/^\s*\|/, "").replace(/\|\s*$/, "");
@@ -524,6 +537,11 @@ export function renderPresentationHtml(
             : undefined) ?? defaultProfile;
         return {
           ...segment,
+          spokenText: applyPronunciations(
+            segment.text,
+            deck.pronunciations,
+            segment.pronunciations
+          ),
           pauseBeforeMs: segment.pause_before_ms ?? 0,
           pauseAfterMs: segment.pause_after_ms ?? 350,
           voiceProfileLabel: profile?.label ?? null,
@@ -545,6 +563,11 @@ export function renderPresentationHtml(
               (cue.voice_profile_id ? profiles.get(cue.voice_profile_id) : undefined) ?? profile;
             return {
               ...cue,
+              spokenText: applyPronunciations(
+                cue.text,
+                deck.pronunciations,
+                segment.pronunciations
+              ),
               pauseAfterMs: cue.pause_after_ms ?? 0,
               voiceProfileLabel: cueProfile?.label ?? null,
               voiceSpeakerName: cueProfile?.speaker_name ?? null,
@@ -875,6 +898,20 @@ export function renderPresentationHtml(
     :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) th { background: color-mix(in srgb, var(--accent) 18%, var(--theme-surface)); color: var(--theme-foreground); font-weight: 850; }
     :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) .align-center { text-align: center; }
     :is(.slide-content,.slide-sidebar,uf-markdown,uf-card) .align-right { text-align: right; }
+    .mermaid-diagram { width: 100%; min-height: 0; margin: .4em 0; break-inside: avoid; }
+    .mermaid-diagram svg { display: block; width: 100%; height: auto; max-height: 48cqh; overflow: visible; }
+    .mermaid-edge { stroke: var(--theme-muted); stroke-width: 4; }
+    .mermaid-arrow { fill: var(--theme-muted); }
+    .mermaid-node :is(rect,polygon) { fill: color-mix(in srgb, var(--theme-surface) 82%, var(--accent)); stroke: var(--accent); stroke-width: 4; }
+    .mermaid-node text { fill: var(--theme-foreground); font-family: var(--font-body); font-size: 22px; font-weight: 750; }
+    .mermaid-edge-label { paint-order: stroke; fill: var(--theme-foreground); stroke: var(--theme-background); stroke-width: 9px; font-family: var(--font-body); font-size: 18px; }
+    .mermaid-error { padding: 1em; border: max(1px, .08cqw) solid var(--theme-border); background: var(--theme-surface); }
+    .mermaid-error figcaption { font-weight: 800; }
+    .mermaid-error p, .mermaid-error pre { font-size: .72em; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .mermaid-draft-flow { display: flex; align-items: center; justify-content: center; gap: .8em; min-height: 10em; }
+    .mermaid-draft[data-direction="TD"] .mermaid-draft-flow, .mermaid-draft[data-direction="TB"] .mermaid-draft-flow, .mermaid-draft[data-direction="BT"] .mermaid-draft-flow { flex-direction: column; }
+    .mermaid-draft-node { padding: .7em 1em; border: max(2px, .12cqw) solid var(--accent); border-radius: .45em; background: color-mix(in srgb, var(--theme-surface) 82%, var(--accent)); font-weight: 750; text-align: center; }
+    .mermaid-draft-arrow { color: var(--theme-muted); font-size: 1.6em; line-height: 1; }
     .slide[data-composition="canvas"], .slide[data-composition="scene"] { --slide-base: var(--canvas-background); grid-template: minmax(0, 1fr) auto / 1fr; overflow: var(--canvas-overflow); }
     .slide-canvas { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; overflow: var(--canvas-overflow); }
     .slide-scene { position: relative; min-width: 0; min-height: 0; grid-row: 1; grid-column: 1; padding: calc(6% * var(--density-scale) * var(--template-top-spacing)) calc(6% * var(--density-scale)) calc(6% * var(--density-scale)); overflow: var(--canvas-overflow); }
@@ -1549,12 +1586,12 @@ export function renderPresentationHtml(
       const browserSpeaker = segment.speaker || '読み上げ';
       const cues = Array.isArray(segment.voiceCues) && segment.voiceCues.length > 0
         ? segment.voiceCues
-        : [{ text: segment.text, effectiveTuning: segment.effectiveTuning, pauseAfterMs: 0 }];
+        : [{ text: segment.text, spokenText: segment.spokenText || segment.text, effectiveTuning: segment.effectiveTuning, pauseAfterMs: 0 }];
       setVoiceStatus(fallback ? 'fallback' : 'browser', (fallback ? 'VOICEVOX失敗 → ' : '') + 'ブラウザ音声 · ' + browserSpeaker + (cues.length > 1 ? ' · ' + cues.length + '区間' : ''));
       const run = voiceRun;
       const estimated = cues.reduce((total, cue) => {
         const rate = clamp(Number(cue.effectiveTuning?.speedScale || 1), .5, 2);
-        return total + Math.max(1.2, cue.text.length / (7 * rate)) * 1000 + Number(cue.pauseAfterMs || 0);
+        return total + Math.max(1.2, String(cue.spokenText || cue.text).length / (7 * rate)) * 1000 + Number(cue.pauseAfterMs || 0);
       }, 0);
       startProgressClock(estimated, 0, 'voice');
       const playCue = (index) => {
@@ -1562,7 +1599,7 @@ export function renderPresentationHtml(
         const cue = cues[index];
         if (!cue) { finishVoice(segment); return; }
         const tuning = cue.effectiveTuning || segment.effectiveTuning || {};
-        const utterance = new SpeechSynthesisUtterance(cue.text);
+        const utterance = new SpeechSynthesisUtterance(cue.spokenText || cue.text);
         utterance.lang = 'ja-JP';
         utterance.rate = clamp(Number(tuning.speedScale || 1), .5, 2);
         utterance.pitch = clamp(1 + Number(tuning.pitchScale || 0) * 4, .5, 1.5);
@@ -2083,6 +2120,50 @@ export function renderPresentationHtml(
       for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
         const source = lines[lineIndex] || '';
         const line = source.trim();
+        if (line.toLowerCase() === String.fromCharCode(96).repeat(3) + 'mermaid') {
+          flushList();
+          const diagramLines = [];
+          lineIndex += 1;
+          while (lineIndex < lines.length && String(lines[lineIndex] || '').trim() !== String.fromCharCode(96).repeat(3)) {
+            diagramLines.push(String(lines[lineIndex] || '').trim());
+            lineIndex += 1;
+          }
+          const header = /^(?:flowchart|graph)\s+(LR|RL|TD|TB|BT)$/i.exec(diagramLines.shift() || '');
+          const figure = document.createElement('figure');
+          figure.className = 'mermaid-diagram mermaid-draft';
+          figure.dataset.direction = header ? header[1].toUpperCase() : 'LR';
+          const flow = document.createElement('div');
+          flow.className = 'mermaid-draft-flow';
+          const nodeLabels = [];
+          for (const diagramLine of diagramLines) {
+            for (const token of diagramLine.split(/\s*(?:-->|==>|--[^>]*-->)\s*/)) {
+              const match = /^([A-Za-z0-9_-]+)(?:\[([^\]]+)\]|\(([^)]+)\)|\{([^}]+)\})?$/.exec(token.trim());
+              if (match && !nodeLabels.some((entry) => entry.id === match[1])) nodeLabels.push({ id: match[1], label: match[2] || match[3] || match[4] || match[1] });
+            }
+          }
+          if (!header || nodeLabels.length === 0) {
+            figure.classList.add('mermaid-error');
+            const message = document.createElement('p');
+            message.textContent = 'Mermaid図の記法を確認してください。';
+            figure.append(message);
+          } else {
+            nodeLabels.forEach((entry, index) => {
+              if (index > 0) {
+                const arrow = document.createElement('span');
+                arrow.className = 'mermaid-draft-arrow';
+                arrow.textContent = figure.dataset.direction === 'TD' || figure.dataset.direction === 'TB' ? '↓' : figure.dataset.direction === 'BT' ? '↑' : figure.dataset.direction === 'RL' ? '←' : '→';
+                flow.append(arrow);
+              }
+              const node = document.createElement('span');
+              node.className = 'mermaid-draft-node';
+              node.textContent = entry.label;
+              flow.append(node);
+            });
+            figure.append(flow);
+          }
+          target.append(figure);
+          continue;
+        }
         const nextLine = String(lines[lineIndex + 1] || '').trim();
         const headerCells = tableCells(line);
         const separatorCells = tableCells(nextLine);
